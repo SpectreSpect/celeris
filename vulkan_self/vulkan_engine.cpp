@@ -162,26 +162,11 @@ void VulkanEngine::draw_frame() {
         m_in_flight_fences[m_current_frame]
     );
 
-    VkSwapchainKHR swapchains[] = {
-        m_swapchain.handle()
-    };
-
-    VkPresentInfoKHR present_info{};
-    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
-    present_info.waitSemaphoreCount = 1;
-    present_info.pWaitSemaphores = &m_render_finished_semaphores[image_index];
-
-    present_info.swapchainCount = 1;
-    present_info.pSwapchains = swapchains;
-    present_info.pImageIndices = &image_index;
-
-    VkResult present_result = vkQueuePresentKHR(
-        m_device.present_queue().handle(),
-        &present_info
+    m_device.present_queue().present(
+        m_render_finished_semaphores[image_index],
+        m_swapchain,
+        image_index
     );
-
-    logger.check(present_result == VK_SUCCESS, "Failed to present swapchain image");
 
     m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 }

@@ -31,7 +31,7 @@ public:
     VulkanSwapchain(VulkanSwapchain&& other) noexcept;
     VulkanSwapchain& operator=(VulkanSwapchain&& other) noexcept;
 
-    VkSwapchainKHR handle() const noexcept;
+    const VkSwapchainKHR& handle() const noexcept;
     VkImage image(uint32_t index = 0) const;
 
     const std::vector<VkImage>& images() const noexcept;

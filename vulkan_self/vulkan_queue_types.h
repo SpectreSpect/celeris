@@ -2,12 +2,22 @@
 
 #include <cstdint>
 #include <vector>
+#include <string>
 
 enum class VulkanQueueType {
     Graphics,
     Present,
     Compute,
     Transfer
+};
+
+inline std::string queue_type_str(VulkanQueueType type) {
+    switch(type) {
+        case VulkanQueueType::Graphics: return "Graphics";
+        case VulkanQueueType::Present: return "Present";
+        case VulkanQueueType::Compute: return "Compute";
+        case VulkanQueueType::Transfer: return "Transfer";
+    }
 };
 
 struct QueueRequest {

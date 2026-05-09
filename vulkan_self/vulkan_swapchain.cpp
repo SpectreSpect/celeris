@@ -118,7 +118,7 @@ VulkanSwapchain& VulkanSwapchain::operator=(VulkanSwapchain&& other) noexcept {
     return *this;
 }
 
-VkSwapchainKHR VulkanSwapchain::handle() const noexcept {
+const VkSwapchainKHR& VulkanSwapchain::handle() const noexcept {
     return m_swapchain;
 }
 

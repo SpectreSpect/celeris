@@ -1,8 +1,11 @@
 #include "vulkan_queue.h"
 
+#include <vector>
+
 #include "vulkan_device.h"
 #include "vulkan_command_buffer.h"
 #include "vulkan_fence.h"
+#include "vulkan_swapchain.h"
 
 VulkanQueue::VulkanQueue(const VulkanDevice& device, QueueLocation location, VulkanQueueType type)
     : m_location(location), m_type(type)
@@ -49,21 +52,23 @@ QueueFamilyInfo VulkanQueue::family_info() const noexcept {
 }
 
 void VulkanQueue::submit(
-    std::span<VkSemaphore> wait_semaphores,
-    std::span<VkPipelineStageFlags> wait_stages,
+    std::span<const VkSemaphore> wait_semaphores,
+    std::span<const VkPipelineStageFlags> wait_stages,
     std::span<VulkanCommandBuffer> command_buffers,
     std::span<VkSemaphore> signal_semaphores,
     VulkanFence& fence)
 {
     LOG_METHOD();
 
-    VkSubmitInfo submit_info{};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    logger.check(m_queue != VK_NULL_HANDLE, "Queue has not been initialized");
 
     logger.check(wait_semaphores.size() == wait_stages.size())
         << "The number of simaphores (" << clr(std::to_string(wait_semaphores.size()), LoggerPalette::orange)
         << ") does not match the number of waiting stages "
         << "(" << clr(std::to_string(wait_stages.size()), LoggerPalette::orange) << ")";
+
+    VkSubmitInfo submit_info{};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
     submit_info.waitSemaphoreCount = static_cast<uint32_t>(wait_semaphores.size());
     submit_info.pWaitSemaphores = wait_semaphores.data();
@@ -75,10 +80,10 @@ void VulkanQueue::submit(
         command_buffer_handles.push_back(command_buffer.handle());
     }
 
-    submit_info.commandBufferCount = command_buffer_handles.size();
+    submit_info.commandBufferCount = static_cast<uint32_t>(command_buffer_handles.size());
     submit_info.pCommandBuffers = command_buffer_handles.data();
 
-    submit_info.signalSemaphoreCount = signal_semaphores.size();
+    submit_info.signalSemaphoreCount = static_cast<uint32_t>(signal_semaphores.size());
     submit_info.pSignalSemaphores = signal_semaphores.data();
 
     VkResult submit_result = vkQueueSubmit(
@@ -98,10 +103,11 @@ void VulkanQueue::submit(
     VkSemaphore signal_semaphore,
     VulkanFence& fence)
 {
-    std::span<VkSemaphore> wait_semaphores = {&wait_semaphore, 1};
-    std::span<VkPipelineStageFlags> wait_stages = {&wait_stage, 1};
+    std::span<const VkSemaphore> wait_semaphores = {&wait_semaphore, 1};
+    std::span<const VkPipelineStageFlags> wait_stages = {&wait_stage, 1};
     std::span<VulkanCommandBuffer> command_buffers = {&command_buffer, 1};
     std::span<VkSemaphore> signal_semaphores = {&signal_semaphore, 1};
+
     submit(
         wait_semaphores,
         wait_stages,
@@ -109,4 +115,60 @@ void VulkanQueue::submit(
         signal_semaphores,
         fence
     );
+}
+
+VkResult VulkanQueue::present(
+    std::span<const VkSemaphore> wait_semaphores,
+    std::span<const VulkanSwapchain> swapchains,
+    std::span<const uint32_t> image_indices)
+{
+    LOG_METHOD();
+
+    logger.check(m_queue != VK_NULL_HANDLE, "Queue has not been initialized");
+
+    logger.check(m_type == VulkanQueueType::Present)
+        << "The queue type must be '" << clr("Present", LoggerPalette::blue)
+        << "', but it is '" << clr(queue_type_str(m_type), LoggerPalette::blue) << "'";
+    
+    logger.check(swapchains.size() == image_indices.size(), "The number of swapchains is not equal to the number of image_indices");
+
+    VkPresentInfoKHR present_info{};
+    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+    present_info.waitSemaphoreCount = static_cast<uint32_t>(wait_semaphores.size());
+    present_info.pWaitSemaphores = wait_semaphores.data();
+
+    std::vector<VkSwapchainKHR> swapchain_handles;
+    swapchain_handles.reserve(swapchains.size());
+
+    for (const VulkanSwapchain& swapchain : swapchains) {
+        swapchain_handles.push_back(swapchain.handle());
+    }
+    
+    present_info.swapchainCount = static_cast<uint32_t>(swapchain_handles.size());
+    present_info.pSwapchains = swapchain_handles.data();
+    present_info.pImageIndices = image_indices.data();
+
+    VkResult present_result = vkQueuePresentKHR(m_queue, &present_info);
+
+    logger.check(
+        present_result == VK_SUCCESS ||
+        present_result == VK_SUBOPTIMAL_KHR ||
+        present_result == VK_ERROR_OUT_OF_DATE_KHR, 
+        "Failed to present swapchain image"
+    );
+
+    return present_result;
+}
+
+VkResult VulkanQueue::present(
+    VkSemaphore wait_semaphore,
+    const VulkanSwapchain& swapchain,
+    uint32_t image_index)
+{
+    std::span<const VkSemaphore> wait_semaphores = {&wait_semaphore, 1};
+    std::span<const VulkanSwapchain> swapchains = {&swapchain, 1};
+    std::span<const uint32_t> image_indices = {&image_index, 1};
+
+    return present(wait_semaphores, swapchains, image_indices);
 }
