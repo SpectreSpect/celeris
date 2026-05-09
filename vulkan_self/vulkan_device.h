@@ -25,12 +25,20 @@ public:
     VulkanDevice& operator=(VulkanDevice&& other) noexcept;
 
     VkDevice handle() const noexcept;
-    void wait_idle() const;
+    void wait_idle();
 
     const VulkanQueue& graphics_queue(uint32_t index = 0) const;
+    VulkanQueue& graphics_queue(uint32_t index = 0);
+
     const VulkanQueue& present_queue(uint32_t index = 0) const;
+    VulkanQueue& present_queue(uint32_t index = 0);
+    
     const VulkanQueue& compute_queue(uint32_t index = 0) const;
+    VulkanQueue& compute_queue(uint32_t index = 0);
+    
     const VulkanQueue& transfer_queue(uint32_t index = 0) const;
+    VulkanQueue& transfer_queue(uint32_t index = 0);
+    
 
 private:
     VkDevice m_device = VK_NULL_HANDLE;
@@ -42,5 +50,7 @@ private:
 
 private:
     void retrieve_queues(const QueueAllocation& queue_allocation);
+    
     const VulkanQueue& get_queue(const std::vector<VulkanQueue>& queues, uint32_t index, std::string_view error_message) const;
+    VulkanQueue& get_queue(std::vector<VulkanQueue>& queues, uint32_t index, std::string_view error_message);
 };

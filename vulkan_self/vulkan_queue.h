@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <utility>
+#include <span>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -9,11 +10,15 @@
 #include "vulkan_queue_types.h"
 #include "logger/logger_header.h"
 
+class VulkanDevice;
+class VulkanCommandBuffer;
+class VulkanFence;
+
 class VulkanQueue {
 public:
     _XCLASS_NAME(VulkanQueue);
 
-    explicit VulkanQueue(VkDevice device, QueueLocation location, VulkanQueueType type);
+    explicit VulkanQueue(const VulkanDevice& device, QueueLocation location, VulkanQueueType type);
 
     VulkanQueue(const VulkanQueue&) = delete;
     VulkanQueue& operator=(const VulkanQueue&) = delete;
@@ -25,6 +30,22 @@ public:
     QueueLocation location() const noexcept;
     VulkanQueueType type() const noexcept;
     QueueFamilyInfo family_info() const noexcept;
+
+    void submit(
+        std::span<VkSemaphore> wait_semaphores,
+        std::span<VkPipelineStageFlags> wait_stages,
+        std::span<VulkanCommandBuffer> command_buffers,
+        std::span<VkSemaphore> signal_semaphores,
+        VulkanFence& fence
+    );
+
+    void submit(
+        VkSemaphore wait_semaphore,
+        VkPipelineStageFlags wait_stage,
+        VulkanCommandBuffer& command_buffer,
+        VkSemaphore signal_semaphore,
+        VulkanFence& fence
+    );
 
 private:
     VkQueue m_queue = VK_NULL_HANDLE;

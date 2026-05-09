@@ -154,41 +154,13 @@ void VulkanEngine::draw_frame() {
     m_command_buffers[m_current_frame].reset();
     record_command_buffer(m_command_buffers[m_current_frame], image_index);
 
-    VkSemaphore wait_semaphores[] = {
-        m_image_available_semaphores[m_current_frame]
-    };
-
-    VkPipelineStageFlags wait_stages[] = {
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-    };
-
-    // Важно: render-finished semaphore берём по image_index,
-    // а не по m_currentFrame.
-    VkSemaphore signal_semaphores[] = {
-        m_render_finished_semaphores[image_index]
-    };
-
-    VkSubmitInfo submit_info{};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-    submit_info.waitSemaphoreCount = 1;
-    submit_info.pWaitSemaphores = wait_semaphores;
-    submit_info.pWaitDstStageMask = wait_stages;
-
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &m_command_buffers[m_current_frame].handle();
-
-    submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = signal_semaphores;
-
-    VkResult submit_result = vkQueueSubmit(
-        m_device.graphics_queue().handle(),
-        1,
-        &submit_info,
-        m_in_flight_fences[m_current_frame].handle()
+    m_device.graphics_queue().submit(
+        m_image_available_semaphores[m_current_frame],
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        m_command_buffers[m_current_frame],
+        m_render_finished_semaphores[image_index],
+        m_in_flight_fences[m_current_frame]
     );
-
-    logger.check(submit_result == VK_SUCCESS, "Failed to submit draw command buffer");
 
     VkSwapchainKHR swapchains[] = {
         m_swapchain.handle()
@@ -198,7 +170,7 @@ void VulkanEngine::draw_frame() {
     present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
     present_info.waitSemaphoreCount = 1;
-    present_info.pWaitSemaphores = signal_semaphores;
+    present_info.pWaitSemaphores = &m_render_finished_semaphores[image_index];
 
     present_info.swapchainCount = 1;
     present_info.pSwapchains = swapchains;

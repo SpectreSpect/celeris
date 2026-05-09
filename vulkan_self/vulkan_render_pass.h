@@ -12,8 +12,8 @@ class VulkanRenderPass {
 public:
     _XCLASS_NAME(VulkanRenderPass);
 
-    VulkanRenderPass(const VulkanDevice& device, const VkRenderPassCreateInfo& desc);
-    VulkanRenderPass(const VulkanDevice& device, const VulkanSwapchain& swapchain);
+    explicit VulkanRenderPass(const VulkanDevice& device, const VkRenderPassCreateInfo& desc);
+    explicit VulkanRenderPass(const VulkanDevice& device, const VulkanSwapchain& swapchain);
 
     ~VulkanRenderPass();
     void destroy();

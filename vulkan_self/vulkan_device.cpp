@@ -108,7 +108,7 @@ VkDevice VulkanDevice::handle() const noexcept {
     return m_device;
 }
 
-void VulkanDevice::wait_idle() const {
+void VulkanDevice::wait_idle() {
     LOG_METHOD();
 
     if (m_device != VK_NULL_HANDLE) {
@@ -122,9 +122,17 @@ const VulkanQueue& VulkanDevice::graphics_queue(uint32_t index) const {
     return get_queue(m_graphics_queues, index, "No graphics queues available");
 }
 
+VulkanQueue& VulkanDevice::graphics_queue(uint32_t index) {
+    return const_cast<VulkanQueue&>(std::as_const(*this).graphics_queue(index));
+}
+
 const VulkanQueue& VulkanDevice::present_queue(uint32_t index) const {
     LOG_METHOD();
     return get_queue(m_present_queues, index, "No present queues available");
+}
+
+VulkanQueue& VulkanDevice::present_queue(uint32_t index) {
+    return const_cast<VulkanQueue&>(std::as_const(*this).present_queue(index));
 }
 
 const VulkanQueue& VulkanDevice::compute_queue(uint32_t index) const {
@@ -132,9 +140,17 @@ const VulkanQueue& VulkanDevice::compute_queue(uint32_t index) const {
     return get_queue(m_compute_queues, index, "No compute queues available");
 }
 
+VulkanQueue& VulkanDevice::compute_queue(uint32_t index) {
+    return const_cast<VulkanQueue&>(std::as_const(*this).compute_queue(index));
+}
+
 const VulkanQueue& VulkanDevice::transfer_queue(uint32_t index) const {
     LOG_METHOD();
     return get_queue(m_transfer_queues, index, "No transfer queues available");
+}
+
+VulkanQueue& VulkanDevice::transfer_queue(uint32_t index) {
+    return const_cast<VulkanQueue&>(std::as_const(*this).transfer_queue(index));
 }
 
 void VulkanDevice::retrieve_queues(const QueueAllocation& queue_allocation) {
@@ -149,7 +165,7 @@ void VulkanDevice::retrieve_queues(const QueueAllocation& queue_allocation) {
         queues.reserve(locations.size());
 
         for (const QueueLocation& location : locations) {
-            queues.emplace_back(m_device, location, type);
+            queues.emplace_back(*this, location, type);
         }
     };
 
@@ -169,4 +185,12 @@ const VulkanQueue& VulkanDevice::get_queue(
     logger.check(index < queues.size(), "Queue index is out of range");
 
     return queues[index];
+}
+
+VulkanQueue& VulkanDevice::get_queue(
+    std::vector<VulkanQueue>& queues,
+    uint32_t index,
+    std::string_view error_message)
+{
+    return const_cast<VulkanQueue&>(std::as_const(*this).get_queue(queues, index, error_message));
 }
