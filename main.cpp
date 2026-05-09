@@ -14,6 +14,7 @@
 #include "icp/voxel_point_map_reseter.h"
 #include "point_cloud/generation/point_cloud_generator.h"
 #include "gicp_test_clouds.h"
+#include "icp/gicp.h"
 
 
 int main() {
@@ -24,6 +25,7 @@ int main() {
     ui::init(&window, &engine);
 
     Camera camera = Camera();
+    camera.position.z = 1003;
     window.set_camera(&camera);
     FPSCameraController camera_controller = FPSCameraController(&camera);
     camera_controller.speed = 150;
@@ -59,6 +61,10 @@ int main() {
     voxel_map_point_cloud.create(engine, voxel_point_map.map_point_count);
 
     voxel_map_point_cloud.set_points(voxel_point_map.map_point_buffer, voxel_point_map.map_point_count);
+
+    GICP gicp;
+
+    
 
     size_t last_frame_id = 0;
     float timer = 0.0f;
@@ -110,6 +116,9 @@ int main() {
             // point_cloud_frames[last_frame_id].point_cloud.rotation = point_cloud_frames[last_frame_id - 1].point_cloud.rotation;
 
             gicp_pass.step(voxel_point_map, gicp_test_clouds.source_frame.point_cloud, gicp_test_clouds.source_frame.normal_buffer);
+
+            // gicp.step_test(gicp_test_clouds.source_frame, gicp_test_clouds.target_frame, 
+            //                gicp_test_clouds.source_frame.normals, gicp_test_clouds.target_frame.normals);
 
             // gicp_pass.fit(voxel_point_map, point_cloud_frames[last_frame_id].point_cloud, point_cloud_frames[last_frame_id].normal_buffer, 10);
             

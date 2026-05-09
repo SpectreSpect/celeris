@@ -255,7 +255,8 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
 
     glm::mat3 R_src = euler_xyz_to_mat3(source_point_cloud.rotation);
     glm::mat3 R_src_new = dR * R_src;
-    glm::vec3 t_src_new = dR * source_point_cloud.position + v;
+
+    glm::vec3 t_src_new = source_point_cloud.position + v;
 
     source_point_cloud.position = t_src_new;
     source_point_cloud.rotation = mat3_to_euler_xyz(R_src_new);

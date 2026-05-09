@@ -457,12 +457,12 @@ int main() {
     // PointCloud point_cloud_frames[num_point_cloud_frames];
     // VideoBuffer normal_buffers[num_point_cloud_frames];
 
-    const uint32_t forward_frames = 40;
+    const uint32_t forward_frames = 10;
     const uint32_t turn_frames    = 20;
     const uint32_t return_frames  = num_point_cloud_frames - forward_frames - turn_frames;
 
     const float start_x     = 0.0f;
-    const float end_x       = 40.0f;   // "end of road"
+    const float end_x       = 1.0f;   // "end of road"
     const float scanner_y   = 0.3f;
 
     for (uint32_t i = 0; i < num_point_cloud_frames; i++) {

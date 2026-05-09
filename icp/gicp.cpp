@@ -713,6 +713,21 @@ double GICP::step(PointCloudFrame& source_point_cloud,
     return rmse;
 }
 
+
+void print_mat3(const glm::mat3& m) {
+    std::cout << std::fixed << std::setprecision(6);
+
+    for (int row = 0; row < 3; row++) {
+        std::cout << "[ ";
+
+        for (int col = 0; col < 3; col++) {
+            std::cout << std::setw(12) << m[col][row] << " ";
+        }
+
+        std::cout << "]\n";
+    }
+}
+
 double GICP::step_test(PointCloudFrame& source_point_cloud,
                   const PointCloudFrame& target_point_cloud,
                   const std::vector<glm::vec4>& source_normals,
@@ -776,13 +791,20 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
         float best_dist_sq = max_corr_dist_sq;
 
         for (size_t j = 0; j < target_points.size(); ++j) {
-            glm::vec3 n_tgt_world = glm::vec3(tgt_normals[j]);
+            // glm::vec3 n_tgt_world = glm::vec3(tgt_normals[j]);
+
+            glm::vec3 n_tgt_local = glm::vec3(tgt_normals[j]);
+            glm::vec3 n_tgt_world = transform_normal_world(target_point_cloud.point_cloud, n_tgt_local);
 
             if (glm::dot(n_tgt_world, n_tgt_world) < 1e-12f) {
                 continue;
             }
 
-            glm::vec3 q = glm::vec3(target_points[j].pos); // or .pos
+            // glm::vec3 q = glm::vec3(target_points[j].pos); // or .pos
+
+            glm::vec3 q_local = glm::vec3(target_points[j].pos);
+            glm::vec3 q = transform_point_world(target_point_cloud.point_cloud, q_local);
+
             glm::vec3 diff = q - x;
             float dist_sq = glm::dot(diff, diff);
 
@@ -811,8 +833,23 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
             continue;
         }
 
-        glm::vec3 q = glm::vec3(target_points[target_id].pos); // or .pos
-        glm::vec3 n_tgt_world = glm::vec3(tgt_normals[target_id]);
+        // glm::vec3 q = glm::vec3(target_points[target_id].pos); // or .pos
+        // glm::vec3 n_tgt_world = glm::vec3(tgt_normals[target_id]);
+
+
+
+        glm::vec3 n_tgt_local = glm::vec3(tgt_normals[target_id]);
+        glm::vec3 n_tgt_world = transform_normal_world(target_point_cloud.point_cloud, n_tgt_local);
+
+        if (glm::dot(n_tgt_world, n_tgt_world) < 1e-12f) {
+            continue;
+        }
+
+        // glm::vec3 q = glm::vec3(target_points[j].pos); // or .pos
+
+        glm::vec3 q_local = glm::vec3(target_points[target_id].pos);
+        glm::vec3 q = transform_point_world(target_point_cloud.point_cloud, q_local);
+
 
         glm::mat3 C_A = covariance_from_normal(n_src_world, gicp_eps);
         glm::mat3 C_B = covariance_from_normal(n_tgt_world, gicp_eps);
@@ -822,7 +859,10 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
 
         glm::vec3 d = q - x;
 
-        glm::mat3 B = skew_matrix(x);
+        glm::vec3 rotation_center = source_point_cloud.point_cloud.position;
+
+        glm::vec3 x_rel = x - rotation_center;
+        glm::mat3 B = skew_matrix(x_rel);
 
         glm::mat3 H00 = glm::transpose(B) * M * B;
         glm::mat3 H01 = -glm::transpose(B) * M;
@@ -844,9 +884,9 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
         valid_count++;
     }
 
-    if (valid_count < 6) {
-        return -1.0;
-    }
+    // if (valid_count < 6) {
+    //     return -1.0;
+    // }
 
     double rmse = std::sqrt(total_weighted_sq_error / double(valid_count));
 
@@ -857,10 +897,16 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
 
     double delta[6] = {};
 
+    std::cout << "g: (" << (float)g[0] << ", " << (float)g[1] << ", " << (float)g[2] << ", " << (float)g[3] << (float)g[4] << ", " << (float)g[5] << ", " << (float)g[6] << ")" << std::endl;
+    // std::cout << "Hs: " << std::endl;
+    // print_mat3(H);
+
     bool ok = solve_6x6(H, g, delta);
     if (!ok) {
         return -1.0;
     }
+
+    std::cout << "delta: (" << (float)delta[0] << ", " << (float)delta[1] << ", " << (float)delta[2] << ", " << (float)delta[3] << (float)delta[4] << ", " << (float)delta[5] << ", " << (float)delta[6] << ")" << std::endl;
 
     glm::vec3 omega(
         (float)delta[0],
@@ -886,9 +932,21 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
 
     glm::mat3 dR = omega_to_mat3(omega);
 
+    std::cout << "dR: " << std::endl;
+    print_mat3(dR);
+    
+    std::cout << "v: (" << v.x << ", " << v.y << ", " << v.z << ")" << std::endl;
+
     glm::mat3 R_src = euler_xyz_to_mat3(source_point_cloud.point_cloud.rotation);
     glm::mat3 R_src_new = dR * R_src;
-    glm::vec3 t_src_new = dR * source_point_cloud.point_cloud.position + v;
+    
+    glm::vec3 center = source_point_cloud.point_cloud.position;
+
+    // glm::vec3 t_src_new = dR * source_point_cloud.point_cloud.position + v;
+    glm::vec3 t_src_new = center + v;
+    
+
+    
 
     source_point_cloud.point_cloud.position = t_src_new;
     source_point_cloud.point_cloud.rotation = mat3_to_euler_xyz(R_src_new);
