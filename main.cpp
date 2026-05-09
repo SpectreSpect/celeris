@@ -26,7 +26,7 @@ int main() {
     Camera camera = Camera();
     window.set_camera(&camera);
     FPSCameraController camera_controller = FPSCameraController(&camera);
-    camera_controller.speed = 20;
+    camera_controller.speed = 150;
 
     PointCloudPass point_cloud_pass;
     point_cloud_pass.create(engine);

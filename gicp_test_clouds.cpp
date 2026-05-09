@@ -16,8 +16,8 @@ void GICPTestClouds::create_roads(VulkanEngine* engine) {
     // target_frame.point_cloud.rotation += glm::vec3(0, 2, 0);
 
 
-    source_frame.point_cloud.position += glm::vec3(0, 0, 50);
-    target_frame.point_cloud.position += glm::vec3(0, 0, 50);
+    source_frame.point_cloud.position += glm::vec3(0, 0, 1000);
+    target_frame.point_cloud.position += glm::vec3(0, 0, 1000);
 }
 
 void GICPTestClouds::generate_road(VulkanEngine* engine, PointCloudFrame* frame, glm::vec4 color) {

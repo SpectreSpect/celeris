@@ -382,10 +382,19 @@ GICPPartial get_gicp_partial(uint source_point_id, mat3 R_src, vec3 source_posit
     if (!is_finite_vec3(p_local) || !is_finite_vec3(n_src_local))
         return partial;
 
-    vec3 x = transform_point_world(R_src, source_scale, source_position, p_local);
+    vec3 scaled_local = p_local * source_scale;
+
+    vec3 x_rel = R_src * scaled_local;
+    if (!is_finite_vec3(x_rel))
+        return partial;
+
+    vec3 x = x_rel + source_position;
+    if (!is_finite_vec3(x))
+        return partial;
+
     vec3 n_src_world = transform_normal_world(R_src, source_scale, n_src_local);
 
-    if (!is_finite_vec3(x) || !is_finite_vec3(n_src_world))
+    if (!is_finite_vec3(n_src_world))
         return partial;
 
     if (dot(n_src_world, n_src_world) < 1e-12)
@@ -435,7 +444,23 @@ GICPPartial get_gicp_partial(uint source_point_id, mat3 R_src, vec3 source_posit
     if (!is_finite_mat3(M))
         return partial;
 
-    mat3 B = skew_matrix(x);
+    /*
+        Important fix:
+
+        The rotational Jacobian must use the point relative to the source cloud's
+        rotation center, not the absolute world-space position.
+
+        Bad:
+            mat3 B = skew_matrix(x);
+
+        Good:
+            mat3 B = skew_matrix(x_rel);
+
+        Otherwise, translating both clouds by something like vec3(0, 0, 1000)
+        changes the optimization problem, even though the relative pose stayed
+        the same.
+    */
+    mat3 B = skew_matrix(x_rel);
 
     mat3 H00 = transpose(B) * M * B;
     mat3 H01 = -transpose(B) * M;
@@ -467,7 +492,7 @@ GICPPartial get_gicp_partial(uint source_point_id, mat3 R_src, vec3 source_posit
     partial.total_weighted_sq_error = double(weighted_error);
     partial.valid_count = 1u;
 
-    float t = clamp(dist_to_target / 5.0, 0.0, 1.0);
+    float t = clamp(dist_to_target / max_corr_dist, 0.0, 1.0);
     // source_point_buffer.points[source_point_id].color = vec4(heatmap(t), 1.0);
 
     return partial;
