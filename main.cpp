@@ -75,7 +75,7 @@ int main() {
     point_cloud_frames[last_frame_id].point_cloud.color = glm::vec4(1, 0, 0, 1);
 
     // point_cloud_frames[80].point_cloud.rotation = glm::vec3(0.0f, 1.26295185, 0.0f);
-    point_cloud_frames[80].point_cloud.rotation = glm::vec3(0.0f, 1, 0.0f);
+    point_cloud_frames[last_frame_id].point_cloud.rotation = glm::vec3(0.0f, 1, 0.0f);
 
     // point_cloud_frames[last_frame_id].get_normals(point_cloud_frames[last_frame_id].points, point_cloud_frames[last_frame_id].normals);
     // point_cloud_frames[last_frame_id].normal_buffer.update_data(point_cloud_frames[last_frame_id].normals.data(), point_cloud_frames[last_frame_id].normals.size() * sizeof(glm::vec4));
@@ -124,19 +124,19 @@ int main() {
         
         // point_cloud_pass.render(point_cloud_frames[last_frame_id].point_cloud, camera);
 
-        // point_cloud_pass.render(voxel_map_point_cloud, camera);
+        point_cloud_pass.render(voxel_map_point_cloud, camera);
 
         // point_cloud_pass.render(gicp_test_clouds.target_frame.point_cloud, camera);
         // point_cloud_pass.render(gicp_test_clouds.source_frame.point_cloud, camera);
         // point_cloud_pass.render(point_cloud_frames[test_frame].point_cloud, camera);
         // point_cloud_pass.render(point_cloud_frames[last_frame_id].point_cloud, camera);
 
-        point_cloud_pass.render(point_cloud_frames[test_frame].point_cloud, camera);
+        // point_cloud_pass.render(point_cloud_frames[test_frame].point_cloud, camera);
         point_cloud_pass.render(point_cloud_frames[last_frame_id].point_cloud, camera);
 
         normal_cloud_pass.render(point_cloud_frames[last_frame_id].point_cloud, point_cloud_frames[last_frame_id].normal_buffer, camera);
-        normal_cloud_pass.render(point_cloud_frames[test_frame].point_cloud, point_cloud_frames[test_frame].normal_buffer, camera);
-        // normal_cloud_pass.render(voxel_map_point_cloud, voxel_point_map.map_normal_buffer, camera);
+        // normal_cloud_pass.render(point_cloud_frames[test_frame].point_cloud, point_cloud_frames[test_frame].normal_buffer, camera);
+        normal_cloud_pass.render(voxel_map_point_cloud, voxel_point_map.map_normal_buffer, camera);
         
         
 
@@ -170,11 +170,11 @@ int main() {
 
             // gicp_pass.step(voxel_point_map, gicp_test_clouds.source_frame.point_cloud, gicp_test_clouds.source_frame.normal_buffer);
 
-            // gicp_pass.step(voxel_point_map, point_cloud_frames[last_frame_id].point_cloud, point_cloud_frames[last_frame_id].normal_buffer);
+            gicp_pass.step(voxel_point_map, point_cloud_frames[last_frame_id].point_cloud, point_cloud_frames[last_frame_id].normal_buffer);
 
             
-            gicp.step_test(point_cloud_frames[last_frame_id], point_cloud_frames[test_frame], 
-                           point_cloud_frames[last_frame_id].normals, point_cloud_frames[test_frame].normals);
+            // gicp.step_test(point_cloud_frames[last_frame_id], point_cloud_frames[test_frame], 
+            //                point_cloud_frames[last_frame_id].normals, point_cloud_frames[test_frame].normals);
             
             std::cout << point_cloud_frames[80].point_cloud.rotation.y << std::endl;
 

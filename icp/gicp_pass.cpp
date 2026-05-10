@@ -215,6 +215,13 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
     const float max_rot = glm::radians(5.0f);
     const float max_trans = 5.0f;
 
+
+    // uint32_t map_count = 0;
+    // voxel_point_map.map_point_count_buffer.read_subdata(0, &map_count, sizeof(map_count));
+
+    // std::cout << "GPU map count: " << map_count << std::endl;
+
+
     if (result.valid_count < 6) {
         std::cout << "valid_count was less than 6" << std::endl;
         return 99999;
