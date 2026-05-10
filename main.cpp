@@ -25,7 +25,7 @@ int main() {
     ui::init(&window, &engine);
 
     Camera camera = Camera();
-    camera.position.z = 1003;
+    camera.position.z = 0;
     window.set_camera(&camera);
     FPSCameraController camera_controller = FPSCameraController(&camera);
     camera_controller.speed = 150;
@@ -51,9 +51,17 @@ int main() {
     voxel_point_map_reseter.reset(voxel_point_map);
     VoxelMapPointInserter voxel_map_point_inserter;
     voxel_map_point_inserter.create(engine);
-    // voxel_map_point_inserter.insert(voxel_point_map, point_cloud_frames[0].point_cloud, point_cloud_frames[0].normal_buffer);
 
-    voxel_map_point_inserter.insert(voxel_point_map, gicp_test_clouds.target_frame.point_cloud, gicp_test_clouds.target_frame.normal_buffer);
+    uint32_t test_frame = 0;
+    size_t last_frame_id = 10;
+
+    voxel_map_point_inserter.insert(voxel_point_map, point_cloud_frames[last_frame_id].point_cloud, point_cloud_frames[last_frame_id].normal_buffer);
+
+    // voxel_map_point_inserter.insert(voxel_point_map, gicp_test_clouds.target_frame.point_cloud, gicp_test_clouds.target_frame.normal_buffer);
+
+    // point_cloud_frames[test_frame].point_cloud.rotation = glm::vec3(-1, -1, -1);
+    point_cloud_frames[test_frame].point_cloud.rotation = glm::vec3(0, -0.1, 0);
+    // point_cloud_frames[test_frame].point_cloud.position = glm::vec3(0, 0, 0);
 
     GICPPass gicp_pass;
     gicp_pass.create(engine);
@@ -65,8 +73,6 @@ int main() {
     GICP gicp;
 
     
-
-    size_t last_frame_id = 0;
     float timer = 0.0f;
     float last_frame = 0.0f;
     float start_time = (float)glfwGetTime();
@@ -92,7 +98,12 @@ int main() {
         point_cloud_pass.render(voxel_map_point_cloud, camera);
 
         // point_cloud_pass.render(gicp_test_clouds.target_frame.point_cloud, camera);
-        point_cloud_pass.render(gicp_test_clouds.source_frame.point_cloud, camera);
+        // point_cloud_pass.render(gicp_test_clouds.source_frame.point_cloud, camera);
+        // point_cloud_pass.render(point_cloud_frames[test_frame].point_cloud, camera);
+        point_cloud_pass.render(point_cloud_frames[last_frame_id].point_cloud, camera);
+
+
+        
 
         ImGui::Begin("Debug");
 
@@ -104,10 +115,16 @@ int main() {
             point_cloud_frames[last_frame_id].point_cloud.position = point_cloud_frames[last_frame_id - 1].point_cloud.position;
             point_cloud_frames[last_frame_id].point_cloud.rotation = point_cloud_frames[last_frame_id - 1].point_cloud.rotation;
 
-            gicp_pass.fit(voxel_point_map, point_cloud_frames[last_frame_id].point_cloud, point_cloud_frames[last_frame_id].normal_buffer, 10);
+            // point_cloud_frames[last_frame_id].point_cloud.position = glm::vec3(0, 0, 0);
+            // point_cloud_frames[last_frame_id].point_cloud.rotation = glm::vec3(0, 0, 0);
+
+            // gicp_pass.fit(voxel_point_map, point_cloud_frames[last_frame_id].point_cloud, point_cloud_frames[last_frame_id].normal_buffer, 10);
             
+            
+        }
+
+        if (ImGui::Button("Insert frame")) {
             voxel_map_point_inserter.insert(voxel_point_map, point_cloud_frames[last_frame_id].point_cloud, point_cloud_frames[last_frame_id].normal_buffer);
-            
             voxel_map_point_cloud.set_points(voxel_point_map.map_point_buffer, voxel_point_map.map_point_count);
         }
 
@@ -115,7 +132,9 @@ int main() {
             // point_cloud_frames[last_frame_id].point_cloud.position = point_cloud_frames[last_frame_id - 1].point_cloud.position;
             // point_cloud_frames[last_frame_id].point_cloud.rotation = point_cloud_frames[last_frame_id - 1].point_cloud.rotation;
 
-            gicp_pass.step(voxel_point_map, gicp_test_clouds.source_frame.point_cloud, gicp_test_clouds.source_frame.normal_buffer);
+            // gicp_pass.step(voxel_point_map, gicp_test_clouds.source_frame.point_cloud, gicp_test_clouds.source_frame.normal_buffer);
+
+            gicp_pass.step(voxel_point_map, point_cloud_frames[last_frame_id].point_cloud, point_cloud_frames[last_frame_id].normal_buffer);
 
             // gicp.step_test(gicp_test_clouds.source_frame, gicp_test_clouds.target_frame, 
             //                gicp_test_clouds.source_frame.normals, gicp_test_clouds.target_frame.normals);

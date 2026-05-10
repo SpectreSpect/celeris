@@ -411,17 +411,17 @@ void main()
     // ------------------------------------------------------------
     // 1. Infinite ground plane
     // ------------------------------------------------------------
-    {
-        float tHit;
-        if (intersectPlane(rayOrigin, rayDir, ground, tHit)) {
-            if (tHit < nearestT) {
-                nearestT = tHit;
-                nearestColor = ground.color;
-                nearestNormal = normalize(ground.normal);
-                hitSomething = true;
-            }
-        }
-    }
+    // {
+    //     float tHit;
+    //     if (intersectPlane(rayOrigin, rayDir, ground, tHit)) {
+    //         if (tHit < nearestT) {
+    //             nearestT = tHit;
+    //             nearestColor = ground.color;
+    //             nearestNormal = normalize(ground.normal);
+    //             hitSomething = true;
+    //         }
+    //     }
+    // }
 
     // ------------------------------------------------------------
     // 2. Road edge boxes

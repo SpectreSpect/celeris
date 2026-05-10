@@ -13,6 +13,8 @@ public:
     void create_roads(VulkanEngine* engine);
     void generate_single_point(VulkanEngine* engine, PointCloudFrame* frame, glm::vec4 color, const glm::vec3& position, const glm::vec3& normal);
     void generate_road(VulkanEngine* engine, PointCloudFrame* frame, glm::vec4 color, std::size_t target_point_count);
+    void road_with_trees(VulkanEngine* engine, PointCloudFrame* frame, glm::vec4 color, std::size_t target_point_count);
+    void trees_and_spheres(VulkanEngine* engine, PointCloudFrame* frame, glm::vec4 color, std::size_t target_point_count);
     
     void add_point(PointCloudFrame* frame, const glm::vec4& pos, const glm::vec4& color, const glm::vec4& normal);
 
