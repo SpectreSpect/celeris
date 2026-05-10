@@ -60,6 +60,7 @@ add_executable(app
   icp/gicp_reductor.cpp
   point_cloud/generation/point_cloud_generator.cpp
   gicp_test_clouds.cpp
+  point_cloud/normal_cloud_pass.cpp
 )
 
 target_link_libraries(app PRIVATE

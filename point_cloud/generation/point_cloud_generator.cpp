@@ -100,7 +100,7 @@ PointCloud PointCloudGenerator::generate(glm::vec3 position, glm::vec3 rotation,
     return output_point_cloud;
 }
 
-void PointCloudGenerator::generate(PointCloud& point_cloud, VideoBuffer& normal_buffer, glm::vec3 position, glm::vec3 rotation) {
+void PointCloudGenerator::generate(PointCloud& point_cloud, VideoBuffer& normal_buffer, glm::vec3 position, glm::vec3 rotation, int width, int height) {
 
     if (!this->engine)
         throw std::runtime_error("engine was null");
@@ -111,8 +111,8 @@ void PointCloudGenerator::generate(PointCloud& point_cloud, VideoBuffer& normal_
     // cubemap.create(*engine, face_size, 1, usage, VK_FORMAT_R32G32B32A32_SFLOAT);
 
     PointCloudGeneratorUniform uniform_data{};
-    uniform_data.width = 3600;
-    uniform_data.height = 16;
+    uniform_data.width = width;
+    uniform_data.height = height;
     uniform_data.max_range = 50;
     uniform_data.position = glm::vec4(position, 1.0f);
     uniform_data.rotation = glm::vec4(rotation, 1.0f);
@@ -171,7 +171,7 @@ void PointCloudGenerator::generate(PointCloud& point_cloud, VideoBuffer& normal_
 }
 
 
-void PointCloudGenerator::generate_with_motion(PointCloudFrame* point_cloud_frames, uint32_t num_point_cloud_frames) {
+void PointCloudGenerator::generate_with_motion(PointCloudFrame* point_cloud_frames, uint32_t num_point_cloud_frames, int width, int height) {
     float pi = glm::pi<float>();
 
     const uint32_t forward_frames = 0;
@@ -217,11 +217,26 @@ void PointCloudGenerator::generate_with_motion(PointCloudFrame* point_cloud_fram
             rotation = glm::vec3(0.0f, pi, 0.0f);
         }
 
-        uint32_t num_points = 3600 * 16;
+        uint32_t num_points = width * height;
 
         point_cloud_frames[i].point_cloud.create(*engine, num_points);
         point_cloud_frames[i].normal_buffer.create(*engine, num_points * sizeof(glm::vec4));
 
-        generate(point_cloud_frames[i].point_cloud, point_cloud_frames[i].normal_buffer, position, rotation);
+        // if (i == 80)
+        //     std::cout << 'sdf' << std::endl;
+        
+        // if (i == 0)
+        //     std::cout << 'sdf' << std::endl;
+
+        generate(point_cloud_frames[i].point_cloud, point_cloud_frames[i].normal_buffer, position, rotation, width, height);
+
+        point_cloud_frames[i].points.resize(num_points);
+        point_cloud_frames[i].point_cloud.get_instance_buffer().read_subdata(0, point_cloud_frames[i].points.data(), num_points * sizeof(PointInstance));
+
+        point_cloud_frames[i].normals.resize(num_points);
+        point_cloud_frames[i].normal_buffer.read_subdata(0, point_cloud_frames[i].normals.data(), num_points * sizeof(glm::vec4));
+
+        // point_cloud_frames[i].point_cloud.instance_buffer
+        // point_cloud_frames[i].points = 
     }
 }

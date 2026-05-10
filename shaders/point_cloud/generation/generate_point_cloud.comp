@@ -449,11 +449,11 @@ void main()
             vec3 leftBoxCenter  = vec3(leftEdgeXZ.x,  boxHalfSize.y, leftEdgeXZ.y);
             vec3 rightBoxCenter = vec3(rightEdgeXZ.x, boxHalfSize.y, rightEdgeXZ.y);
 
-            testSceneBox(
-                leftBoxCenter, boxHalfSize, edgeColorL,
-                rayOrigin, rayDir,
-                nearestT, hitSomething, nearestColor, nearestNormal
-            );
+            // testSceneBox(
+            //     leftBoxCenter, boxHalfSize, edgeColorL,
+            //     rayOrigin, rayDir,
+            //     nearestT, hitSomething, nearestColor, nearestNormal
+            // );
 
             testSceneBox(
                 rightBoxCenter, boxHalfSize, edgeColorR,
@@ -561,6 +561,6 @@ void main()
     } else {
         output_points[point_id].position = vec4(0.0, 0.0, 0.0, 1.0);
         output_points[point_id].color    = vec4(0.0, 0.0, 0.0, 0.0);
-        output_normals[point_id]         = vec4(0.0, 0.0, 0.0, 0.0);
+        output_normals[point_id]         = vec4(0.0, 1.0, 0.0, 0.0);
     }
 }

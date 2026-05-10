@@ -165,14 +165,27 @@ void main()
     if (source_point_id >= params.source_point_count)
         return;
 
+    PointInstance src_point = source_point_buffer.points[source_point_id];
+    vec4 src_normal4 = source_normal_buffer.normals[source_point_id];
+
+    // Skip missed rays / invalid generated points
+    if (src_point.color.a <= 0.001)
+        return;
+
+    vec3 n_local = src_normal4.xyz;
+    float n_len = length(n_local);
+
+    // Skip invalid zero normals
+    if (n_len <= 0.00001)
+        return;
+
     float voxel_size = 0.5;
 
-    vec3 p_local = source_point_buffer.points[source_point_id].position.xyz;
+    vec3 p_local = src_point.position.xyz;
     vec3 p_world = (params.source_model * vec4(p_local, 1.0)).xyz;
 
     mat3 normal_matrix = transpose(inverse(mat3(params.source_model)));
-    vec3 n_local = source_normal_buffer.normals[source_point_id].xyz;
-    vec3 n_world = normalize(normal_matrix * n_local);
+    vec3 n_world = normalize(normal_matrix * (n_local / n_len));
 
     ivec3 key = voxel_key_from_world_pos(p_world, voxel_size);
 
@@ -180,13 +193,6 @@ void main()
         key,
         vec4(p_world, 1.0),
         vec4(n_world, 0.0),
-        source_point_buffer.points[source_point_id].color
+        src_point.color
     );
-
-    // voxel_insert_point_and_normal(
-    //     key,
-    //     vec4(p_world, 1.0),
-    //     vec4(n_world, 0.0),
-    //     params.color
-    // );
 }

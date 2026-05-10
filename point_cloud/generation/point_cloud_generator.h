@@ -36,8 +36,8 @@ public:
     PointCloud generate(glm::vec3 position, glm::vec3 rotation, float time, 
                         glm::vec3 prev_position, glm::vec3 prev_rotation, float prev_time);
     
-    void generate(PointCloud& point_cloud, VideoBuffer& normal_buffer, glm::vec3 position, glm::vec3 rotation);
-    void generate_with_motion(PointCloudFrame* point_cloud_frames, uint32_t num_point_cloud_frames);
+    void generate(PointCloud& point_cloud, VideoBuffer& normal_buffer, glm::vec3 position, glm::vec3 rotation, int width, int height);
+    void generate_with_motion(PointCloudFrame* point_cloud_frames, uint32_t num_point_cloud_frames, int width, int height);
 
     // 1. points
     // 2. normals
