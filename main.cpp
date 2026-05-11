@@ -98,8 +98,6 @@ int main() {
     normal_cloud_pass.line_width_px = 2.0f;
     normal_cloud_pass.use_point_color = false;
 
-
-
     GICP gicp;
 
     float timer = 0.0f;
