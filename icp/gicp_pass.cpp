@@ -2,6 +2,34 @@
 #include <cmath>
 #include <iostream>
 
+// glm::mat3 GICPPass::euler_xyz_to_mat3(const glm::vec3& euler) {
+//     float cx = std::cos(euler.x);
+//     float sx = std::sin(euler.x);
+
+//     float cy = std::cos(euler.y);
+//     float sy = std::sin(euler.y);
+
+//     float cz = std::cos(euler.z);
+//     float sz = std::sin(euler.z);
+
+//     glm::mat3 rx(1.0f);
+//     rx[0] = glm::vec3(1.0f, 0.0f, 0.0f);
+//     rx[1] = glm::vec3(0.0f,  cx,  -sx);
+//     rx[2] = glm::vec3(0.0f,  sx,   cx);
+
+//     glm::mat3 ry(1.0f);
+//     ry[0] = glm::vec3( cy, 0.0f,  sy);
+//     ry[1] = glm::vec3(0.0f, 1.0f, 0.0f);
+//     ry[2] = glm::vec3(-sy, 0.0f,  cy);
+
+//     glm::mat3 rz(1.0f);
+//     rz[0] = glm::vec3( cz, -sz, 0.0f);
+//     rz[1] = glm::vec3( sz,  cz, 0.0f);
+//     rz[2] = glm::vec3(0.0f, 0.0f, 1.0f);
+
+//     return rz * ry * rx;
+// }
+
 glm::mat3 GICPPass::euler_xyz_to_mat3(const glm::vec3& euler) {
     float cx = std::cos(euler.x);
     float sx = std::sin(euler.x);
@@ -14,17 +42,17 @@ glm::mat3 GICPPass::euler_xyz_to_mat3(const glm::vec3& euler) {
 
     glm::mat3 rx(1.0f);
     rx[0] = glm::vec3(1.0f, 0.0f, 0.0f);
-    rx[1] = glm::vec3(0.0f,  cx,  -sx);
-    rx[2] = glm::vec3(0.0f,  sx,   cx);
+    rx[1] = glm::vec3(0.0f,  cx,   sx);
+    rx[2] = glm::vec3(0.0f, -sx,   cx);
 
     glm::mat3 ry(1.0f);
-    ry[0] = glm::vec3( cy, 0.0f,  sy);
+    ry[0] = glm::vec3( cy, 0.0f, -sy);
     ry[1] = glm::vec3(0.0f, 1.0f, 0.0f);
-    ry[2] = glm::vec3(-sy, 0.0f,  cy);
+    ry[2] = glm::vec3( sy, 0.0f,  cy);
 
     glm::mat3 rz(1.0f);
-    rz[0] = glm::vec3( cz, -sz, 0.0f);
-    rz[1] = glm::vec3( sz,  cz, 0.0f);
+    rz[0] = glm::vec3( cz,  sz, 0.0f);
+    rz[1] = glm::vec3(-sz,  cz, 0.0f);
     rz[2] = glm::vec3(0.0f, 0.0f, 1.0f);
 
     return rz * ry * rx;

@@ -16,15 +16,30 @@
 
 class GICPPass {
 public:
-    struct GICPPassUniform {
+    // struct GICPPassUniform {
+    //     glm::vec4 position;
+    //     glm::vec4 rotation;
+    //     uint32_t num_source_points;
+    //     uint32_t num_target_points;
+    //     uint32_t num_hash_table_slots;
+    //     uint32_t _pad0;
+    // };
+
+    // static_assert(sizeof(GICPPassUniform) == 48);
+
+    struct alignas(16) GICPPassUniform {
         glm::vec4 position;
         glm::vec4 rotation;
+
         uint32_t num_source_points;
         uint32_t num_target_points;
         uint32_t num_hash_table_slots;
         uint32_t _pad0;
     };
 
+    static_assert(offsetof(GICPPassUniform, position) == 0);
+    static_assert(offsetof(GICPPassUniform, rotation) == 16);
+    static_assert(offsetof(GICPPassUniform, num_source_points) == 32);
     static_assert(sizeof(GICPPassUniform) == 48);
 
     struct OutputBuffer {

@@ -88,6 +88,38 @@ bool is_finite_mat3(mat3 m)
            is_finite_vec3(m[2]);
 }
 
+// mat3 euler_xyz_to_mat3(vec3 euler)
+// {
+//     float cx = cos(euler.x);
+//     float sx = sin(euler.x);
+
+//     float cy = cos(euler.y);
+//     float sy = sin(euler.y);
+
+//     float cz = cos(euler.z);
+//     float sz = sin(euler.z);
+
+//     mat3 rx = mat3(
+//         1.0, 0.0, 0.0,
+//         0.0,  cx, -sx,
+//         0.0,  sx,  cx
+//     );
+
+//     mat3 ry = mat3(
+//          cy, 0.0, sy,
+//          0.0, 1.0, 0.0,
+//         -sy, 0.0, cy
+//     );
+
+//     mat3 rz = mat3(
+//         cz, -sz, 0.0,
+//         sz,  cz, 0.0,
+//         0.0, 0.0, 1.0
+//     );
+
+//     return rz * ry * rx;
+// }
+
 mat3 euler_xyz_to_mat3(vec3 euler)
 {
     float cx = cos(euler.x);
@@ -99,21 +131,22 @@ mat3 euler_xyz_to_mat3(vec3 euler)
     float cz = cos(euler.z);
     float sz = sin(euler.z);
 
+    // GLSL mat3 constructor is column-major.
     mat3 rx = mat3(
         1.0, 0.0, 0.0,
-        0.0,  cx, -sx,
-        0.0,  sx,  cx
+        0.0,  cx,  sx,
+        0.0, -sx,  cx
     );
 
     mat3 ry = mat3(
-         cy, 0.0, sy,
-         0.0, 1.0, 0.0,
-        -sy, 0.0, cy
+         cy, 0.0, -sy,
+        0.0, 1.0, 0.0,
+         sy, 0.0,  cy
     );
 
     mat3 rz = mat3(
-        cz, -sz, 0.0,
-        sz,  cz, 0.0,
+         cz,  sz, 0.0,
+        -sz,  cz, 0.0,
         0.0, 0.0, 1.0
     );
 
@@ -369,7 +402,7 @@ vec3 heatmap(float t)
 
 GICPPartial get_gicp_partial(uint source_point_id, mat3 R_src, vec3 source_position, vec3 source_scale)
 {
-    const float max_corr_dist    = 5.0;
+    const float max_corr_dist    = 10.0;
     const float max_corr_dist_sq = max_corr_dist * max_corr_dist;
     const float gicp_eps         = 1e-3;
     const float min_normal_dot   = -1.0;
@@ -399,6 +432,14 @@ GICPPartial get_gicp_partial(uint source_point_id, mat3 R_src, vec3 source_posit
 
     if (dot(n_src_world, n_src_world) < 1e-12)
         return partial;
+
+    // uint target_id = find_closest_id_hash(
+    //     x,
+    //     vec4(n_src_world, 0.0),
+    //     max_corr_dist_sq,
+    //     max_corr_dist,
+    //     min_normal_dot
+    // );
 
     uint target_id = find_closest_id_hash(
         x,

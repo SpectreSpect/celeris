@@ -16,14 +16,28 @@
 
 class VoxelMapPointInserter {
 public:
+    // struct InserterUniform {
+    //     uint32_t source_point_count;
+    //     uint32_t max_map_point_count;
+    //     uint32_t num_hash_table_slots;
+    //     uint32_t _pad0;
+    //     alignas(16) glm::mat4 source_model;
+    //     glm::vec4 color;
+    // };
+
+
     struct InserterUniform {
         uint32_t source_point_count;
         uint32_t max_map_point_count;
         uint32_t num_hash_table_slots;
         uint32_t _pad0;
-        alignas(16) glm::mat4 source_model;
+
+        glm::mat4 source_model;
         glm::vec4 color;
     };
+
+    static_assert(offsetof(InserterUniform, source_model) == 16);
+    static_assert(offsetof(InserterUniform, color) == 80);
 
     // static_assert(sizeof(InserterUniform) == 80);
 

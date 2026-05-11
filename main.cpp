@@ -61,7 +61,7 @@ int main() {
 
     uint32_t test_frame = 0;
     // size_t last_frame_id = 80;
-    size_t last_frame_id = 80;
+    size_t last_frame_id = 2;
 
     // voxel_map_point_inserter.insert(voxel_point_map, point_cloud_frames[last_frame_id].point_cloud, point_cloud_frames[last_frame_id].normal_buffer);
 
@@ -75,7 +75,7 @@ int main() {
     point_cloud_frames[last_frame_id].point_cloud.color = glm::vec4(1, 0, 0, 1);
 
     // point_cloud_frames[80].point_cloud.rotation = glm::vec3(0.0f, 1.26295185, 0.0f);
-    point_cloud_frames[last_frame_id].point_cloud.rotation = glm::vec3(0.0f, 1, 0.0f);
+    // point_cloud_frames[last_frame_id].point_cloud.rotation = glm::vec3(0.0f, 1, 0.0f);
 
     // point_cloud_frames[last_frame_id].get_normals(point_cloud_frames[last_frame_id].points, point_cloud_frames[last_frame_id].normals);
     // point_cloud_frames[last_frame_id].normal_buffer.update_data(point_cloud_frames[last_frame_id].normals.data(), point_cloud_frames[last_frame_id].normals.size() * sizeof(glm::vec4));

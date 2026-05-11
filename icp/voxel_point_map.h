@@ -19,13 +19,28 @@ public:
     //     uint32_t pad1[3];
     // };
 
+    // struct alignas(16) VoxelHashSlotGpu {
+    //     uint32_t state;
+    //     uint32_t pad0[3];
+    //     glm::ivec4 key;
+    //     uint32_t value;
+    //     uint32_t pad1[3];
+    // };
+    // static_assert(sizeof(VoxelHashSlotGpu) == 48);
+
     struct alignas(16) VoxelHashSlotGpu {
         uint32_t state;
-        uint32_t pad0[3];
+        uint32_t _pad0[3];
+
         glm::ivec4 key;
+
         uint32_t value;
-        uint32_t pad1[3];
+        uint32_t _pad1[3];
     };
+
+    static_assert(offsetof(VoxelHashSlotGpu, state) == 0);
+    static_assert(offsetof(VoxelHashSlotGpu, key)   == 16);
+    static_assert(offsetof(VoxelHashSlotGpu, value) == 32);
     static_assert(sizeof(VoxelHashSlotGpu) == 48);
 
     VoxelPointMap() = default;
