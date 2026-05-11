@@ -161,33 +161,16 @@ void VulkanEngine::draw_frame() {
 
 void VulkanEngine::record_command_buffer(VulkanCommandBuffer& command_buffer, uint32_t image_index) {
     LOG_METHOD();
-
-    VkCommandBufferBeginInfo begin_info{};
-    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
     {
         auto render_pass_commands = command_buffer.begin_scope();
 
-        VkRenderPassBeginInfo render_pass_info{};
-        render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        render_pass_info.renderPass = m_render_pass.handle();
-        render_pass_info.framebuffer = m_swapchain_framebuffers[image_index].handle();
-
-        render_pass_info.renderArea.offset = {0, 0};
-        render_pass_info.renderArea.extent = m_swapchain.extent();
-
-        VkClearValue clear_color{};
-        clear_color.color = {{0.05f, 0.08f, 0.12f, 1.0f}};
-
-        render_pass_info.clearValueCount = 1;
-        render_pass_info.pClearValues = &clear_color;
-
-        vkCmdBeginRenderPass(
-            command_buffer.handle(),
-            &render_pass_info,
-            VK_SUBPASS_CONTENTS_INLINE
+        m_render_pass.begin(
+            command_buffer,
+            m_swapchain_framebuffers[image_index],
+            m_swapchain,
+            {{0.05f, 0.08f, 0.12f, 1.0f}}
         );
 
-        vkCmdEndRenderPass(command_buffer.handle());
+        m_render_pass.end(command_buffer);
     }
 }

@@ -1,6 +1,8 @@
 #include "vulkan_render_pass.h"
 #include "vulkan_device.h"
 #include "vulkan_swapchain.h"
+#include "vulkan_framebuffer.h"
+#include "vulkan_command_buffer.h"
 
 #include <utility>
 
@@ -91,6 +93,48 @@ VulkanRenderPass& VulkanRenderPass::operator=(VulkanRenderPass&& other) noexcept
 
 VkRenderPass VulkanRenderPass::handle() const noexcept {
     return m_render_pass;
+}
+
+void VulkanRenderPass::begin(
+    VulkanCommandBuffer& command_buffer,
+    const VulkanFramebuffer& framebuffer,
+    VkExtent2D extent,
+    VkOffset2D offset,
+    VkClearValue clear_color)
+{
+    LOG_METHOD();
+
+    VkRenderPassBeginInfo render_pass_info{};
+    render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    render_pass_info.renderPass = m_render_pass;
+    render_pass_info.framebuffer = framebuffer.handle();
+
+    render_pass_info.renderArea.offset = offset; //{0, 0};
+    render_pass_info.renderArea.extent = extent; //m_swapchain.extent();
+
+    render_pass_info.clearValueCount = 1; // Пока захардкодим 1 для простоты
+    render_pass_info.pClearValues = &clear_color;
+
+    vkCmdBeginRenderPass(
+        command_buffer.handle(),
+        &render_pass_info,
+        VK_SUBPASS_CONTENTS_INLINE
+    );
+}
+
+void VulkanRenderPass::begin(
+    VulkanCommandBuffer& command_buffer,
+    const VulkanFramebuffer& framebuffer,
+    const VulkanSwapchain& swapchain,
+    VkClearValue clear_color)
+{
+    begin(command_buffer, framebuffer, swapchain.extent(), {0, 0}, clear_color);
+}
+
+
+void VulkanRenderPass::end(VulkanCommandBuffer& command_buffer) {
+    LOG_METHOD();
+    vkCmdEndRenderPass(command_buffer.handle());
 }
 
 void VulkanRenderPass::create(const VkRenderPassCreateInfo& desc) {

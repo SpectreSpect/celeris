@@ -7,6 +7,8 @@
 
 class VulkanDevice;
 class VulkanSwapchain;
+class VulkanCommandBuffer;
+class VulkanFramebuffer;
 
 class VulkanRenderPass {
 public:
@@ -25,6 +27,23 @@ public:
     VulkanRenderPass& operator=(VulkanRenderPass&& other) noexcept;
 
     VkRenderPass handle() const noexcept;
+
+    void begin(
+        VulkanCommandBuffer& command_buffer,
+        const VulkanFramebuffer& framebuffer,
+        VkExtent2D extent,
+        VkOffset2D offset = {0, 0},
+        VkClearValue clear_color = {{0.0f, 0.0f, 0.0f, 1.0f}}
+    );
+
+    void begin(
+        VulkanCommandBuffer& command_buffer,
+        const VulkanFramebuffer& framebuffer,
+        const VulkanSwapchain& swapchain,
+        VkClearValue clear_color = {{0.0f, 0.0f, 0.0f, 1.0f}}
+    );
+
+    void end(VulkanCommandBuffer& command_buffer);
 
 private:
     VkRenderPass m_render_pass = VK_NULL_HANDLE;

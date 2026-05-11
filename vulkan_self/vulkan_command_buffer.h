@@ -17,7 +17,7 @@ public:
 
     CommandBufferScope() = delete;
     CommandBufferScope(VulkanCommandBuffer& command_buffer);
-    ~CommandBufferScope();
+    ~CommandBufferScope() noexcept;
 
     CommandBufferScope(const CommandBufferScope&) = delete;
     CommandBufferScope& operator=(const CommandBufferScope&) = delete;
@@ -50,6 +50,7 @@ public:
     const VkCommandBuffer& handle() const noexcept;
 
     void begin();
+    VkResult end_noexcept() noexcept;
     void end();
 
     CommandBufferScope begin_scope();

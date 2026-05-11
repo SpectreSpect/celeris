@@ -14,8 +14,8 @@ CommandBufferScope::CommandBufferScope(VulkanCommandBuffer& command_buffer)
     m_command_buffer.begin();
 }
 
-CommandBufferScope::~CommandBufferScope() {
-    m_command_buffer.end();
+CommandBufferScope::~CommandBufferScope() noexcept {
+    m_command_buffer.end_noexcept();
 }
 
 VulkanCommandBuffer::VulkanCommandBuffer(
@@ -84,9 +84,13 @@ void VulkanCommandBuffer::begin() {
     logger.check(begin_result == VK_SUCCESS, "Failed to begin recording command buffer");
 }
 
+VkResult VulkanCommandBuffer::end_noexcept() noexcept {
+    return vkEndCommandBuffer(m_command_buffer);
+}
+
 void VulkanCommandBuffer::end() {
     LOG_METHOD();
-    VkResult end_result = vkEndCommandBuffer(m_command_buffer);
+    VkResult end_result = end_noexcept();
     logger.check(end_result == VK_SUCCESS, "Failed to record command buffer");
 }
 
