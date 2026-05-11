@@ -3,6 +3,7 @@
 #include "vulkan_device.h"
 #include "vulkan_surface.h"
 #include "window.h"
+#include "vulkan_fence.h"
 
 #include <limits>
 #include <utility>
@@ -141,6 +142,49 @@ VkFormat VulkanSwapchain::image_format() const noexcept {
 
 VkExtent2D VulkanSwapchain::extent() const noexcept {
     return m_extent;
+}
+
+VkResult VulkanSwapchain::acquire_next_image_impl(
+    uint32_t& image_index_out,
+    VkSemaphore image_available_semaphore,
+    VkFence image_available_fence,
+    uint64_t timeout)
+{
+    LOG_METHOD();
+    VkResult acquire_result = vkAcquireNextImageKHR(
+        m_device,
+        m_swapchain,
+        timeout,
+        image_available_semaphore,
+        image_available_fence,
+        &image_index_out
+    );
+
+    logger.check(
+        acquire_result == VK_SUCCESS ||
+        acquire_result == VK_SUBOPTIMAL_KHR ||
+        acquire_result == VK_ERROR_OUT_OF_DATE_KHR,
+        "Failed to acquire swapchain image"
+    );
+
+    return acquire_result;
+}
+
+VkResult VulkanSwapchain::acquire_next_image(
+    uint32_t& image_index_out,
+    VkSemaphore ready_image_semaphore,
+    uint64_t timeout)
+{
+   return acquire_next_image_impl(image_index_out, ready_image_semaphore, VK_NULL_HANDLE, timeout); 
+}
+
+VkResult VulkanSwapchain::acquire_next_image(
+    uint32_t& image_index_out,
+    VkSemaphore ready_image_semaphore,
+    VulkanFence& ready_image_fence,
+    uint64_t timeout)
+{
+    return acquire_next_image_impl(image_index_out, ready_image_semaphore, ready_image_fence.handle(), timeout); 
 }
 
 VkSurfaceFormatKHR VulkanSwapchain::choose_swap_surface_format(

@@ -134,23 +134,10 @@ void VulkanEngine::draw_frame() {
     m_in_flight_fences[m_current_frame].wait();
 
     uint32_t image_index = 0;
-
-    VkResult acquire_result = vkAcquireNextImageKHR(
-        m_device.handle(),
-        m_swapchain.handle(),
-        UINT64_MAX,
-        m_image_available_semaphores[m_current_frame],
-        VK_NULL_HANDLE,
-        &image_index
-    );
-
-    logger.check(
-        acquire_result == VK_SUCCESS,
-        "Failed to acquire swapchain image"
-    );
-
+    VkResult result = m_swapchain.acquire_next_image(image_index, m_image_available_semaphores[m_current_frame]);
+    logger.check(result == VK_SUCCESS, "Failed to acquire next image");
+    
     m_in_flight_fences[m_current_frame].reset();
-
     m_command_buffers[m_current_frame].reset();
     record_command_buffer(m_command_buffers[m_current_frame], image_index);
 
@@ -162,11 +149,12 @@ void VulkanEngine::draw_frame() {
         m_in_flight_fences[m_current_frame]
     );
 
-    m_device.present_queue().present(
+    result = m_device.present_queue().present(
         m_render_finished_semaphores[image_index],
         m_swapchain,
         image_index
     );
+    logger.check(result == VK_SUCCESS, "Failed to present image");
 
     m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 }

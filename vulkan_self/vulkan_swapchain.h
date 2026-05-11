@@ -11,6 +11,7 @@ class VulkanPhysicalDevice;
 class VulkanDevice;
 class VulkanSurface;
 class Window;
+class VulkanFence;
 
 class VulkanSwapchain {
 public:
@@ -39,6 +40,19 @@ public:
     VkFormat image_format() const noexcept;
     VkExtent2D extent() const noexcept;
 
+    VkResult acquire_next_image(
+        uint32_t& image_index_out,
+        VkSemaphore ready_image_semaphore,
+        uint64_t timeout = UINT64_MAX
+    );
+
+    VkResult acquire_next_image(
+        uint32_t& image_index_out,
+        VkSemaphore ready_image_semaphore,
+        VulkanFence& ready_image_fence,
+        uint64_t timeout = UINT64_MAX
+    );
+
 private:
     VkSwapchainKHR m_swapchain = VK_NULL_HANDLE;
     std::vector<VkImage> m_images;
@@ -61,4 +75,11 @@ private:
         const VkSurfaceCapabilitiesKHR& capabilities,
         const Window& window
     ) const;
+
+    VkResult acquire_next_image_impl(
+        uint32_t& image_index_out,
+        VkSemaphore image_available_semaphore,
+        VkFence image_available_fence = VK_NULL_HANDLE,
+        uint64_t timeout = UINT64_MAX
+    );
 };
