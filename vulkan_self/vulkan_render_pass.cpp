@@ -6,6 +6,23 @@
 
 #include <utility>
 
+RenderPassScope::RenderPassScope(
+    VulkanRenderPass& render_pass,
+    VulkanCommandBuffer& command_buffer,
+    const VulkanFramebuffer& framebuffer,
+    VkExtent2D extent,
+    VkOffset2D offset,
+    VkClearValue clear_color)
+    :   m_render_pass(render_pass),
+        m_command_buffer(command_buffer)
+{
+    m_render_pass.begin(command_buffer, framebuffer, extent, offset, clear_color);
+}
+
+RenderPassScope::~RenderPassScope() noexcept {
+    m_render_pass.end(m_command_buffer);
+}
+
 VulkanRenderPass::VulkanRenderPass(const VulkanDevice& device, const VkRenderPassCreateInfo& desc)
     :   m_device(device.handle())
 {
@@ -135,6 +152,27 @@ void VulkanRenderPass::begin(
 void VulkanRenderPass::end(VulkanCommandBuffer& command_buffer) {
     LOG_METHOD();
     vkCmdEndRenderPass(command_buffer.handle());
+}
+
+RenderPassScope VulkanRenderPass::begin_scope(
+    VulkanCommandBuffer& command_buffer,
+    const VulkanFramebuffer& framebuffer,
+    VkExtent2D extent,
+    VkOffset2D offset,
+    VkClearValue clear_color)
+{
+    LOG_METHOD();
+    return RenderPassScope(*this, command_buffer, framebuffer, extent, offset, clear_color);
+}
+
+RenderPassScope VulkanRenderPass::begin_scope(
+    VulkanCommandBuffer& command_buffer,
+    const VulkanFramebuffer& framebuffer,
+    const VulkanSwapchain& swapchain,
+    VkClearValue clear_color)
+{
+    LOG_METHOD();
+    return RenderPassScope(*this, command_buffer, framebuffer, swapchain.extent(), {0, 0}, clear_color);
 }
 
 void VulkanRenderPass::create(const VkRenderPassCreateInfo& desc) {

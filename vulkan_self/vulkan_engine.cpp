@@ -162,15 +162,15 @@ void VulkanEngine::draw_frame() {
 void VulkanEngine::record_command_buffer(VulkanCommandBuffer& command_buffer, uint32_t image_index) {
     LOG_METHOD();
     {
-        auto render_pass_commands = command_buffer.begin_scope();
+        auto command_buffer_scope = command_buffer.begin_scope();
 
-        m_render_pass.begin(
-            command_buffer,
-            m_swapchain_framebuffers[image_index],
-            m_swapchain,
-            {{0.05f, 0.08f, 0.12f, 1.0f}}
-        );
-
-        m_render_pass.end(command_buffer);
+        {
+            auto render_pass_scope = m_render_pass.begin_scope(
+                command_buffer,
+                m_swapchain_framebuffers[image_index],
+                m_swapchain,
+                {{0.05f, 0.08f, 0.12f, 1.0f}}
+            );
+        }
     }
 }
