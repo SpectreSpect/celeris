@@ -164,6 +164,7 @@ void GICPPass::create(VulkanEngine& engine) {
     builder.add_storage_buffer(6, VK_SHADER_STAGE_COMPUTE_BIT); // output storage buffer
     builder.add_storage_buffer(7, VK_SHADER_STAGE_COMPUTE_BIT); // voxel hash table buffer
     builder.add_storage_buffer(8, VK_SHADER_STAGE_COMPUTE_BIT); // partial output buffer
+    builder.add_storage_buffer(9, VK_SHADER_STAGE_COMPUTE_BIT); // rejection buffer
 
     descriptor_set_bundle = builder.create(engine.device);
     pipeline.create(engine.device, descriptor_set_bundle, shader_module);
@@ -174,6 +175,7 @@ void GICPPass::create(VulkanEngine& engine) {
     // partial_dst.create(engine, sizeof(GICPReductor::GICPPartial) * max_partial_count, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     partial_src.create(engine, sizeof(GICPReductor::GICPPartial) * max_partial_count);
     partial_dst.create(engine, sizeof(GICPReductor::GICPPartial) * max_partial_count);
+    rejection_buffer.create(engine, sizeof(uint32_t) * max_partial_count);
     reductor = GICPReductor(engine);
 }
 
@@ -199,6 +201,7 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
     descriptor_set_bundle.bind_storage_buffer(6, output_buffer);
     descriptor_set_bundle.bind_storage_buffer(7, voxel_point_map.map_hash_table_buffer);
     descriptor_set_bundle.bind_storage_buffer(8, partial_src);
+    descriptor_set_bundle.bind_storage_buffer(9, rejection_buffer);
 
     uint32_t x_groups = vulkan_utils::div_up_u32(source_point_cloud.num_instances, 32);
 
@@ -209,11 +212,42 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
 
     command_buffer.submit_and_wait(compute_queue, fence);
 
+
+    std::vector<GICPReductor::GICPPartial> partials_out;
+    partials_out.resize(source_point_cloud.num_instances);
+    partial_src.read_subdata(0, partials_out.data(), source_point_cloud.num_instances * sizeof(GICPReductor::GICPPartial));
+
+    uint32_t test_valid_count = 0u;
+    for (int i = 0; i < partials_out.size(); i++) {
+        test_valid_count += partials_out[i].valid_count;
+    }
+
+    std::cout << test_valid_count << std::endl;
+
+
+
+    std::vector<uint32_t> rejection_buffer_out;
+    rejection_buffer_out.resize(source_point_cloud.num_instances);
+    rejection_buffer.read_subdata(0, rejection_buffer_out.data(), source_point_cloud.num_instances * sizeof(uint32_t));
+
+
+    std::unordered_map<uint32_t, uint32_t> rejection_counts;
+
+    for (int i = 0; i < rejection_buffer_out.size(); i++) {
+        rejection_counts[rejection_buffer_out[i]]++;
+    }
+
+    for (const auto& [type, count] : rejection_counts) {
+        std::cout << "Rejection type " << type
+                << ": " << count << '\n';
+    }
+    
     uint32_t partial_count = vulkan_utils::div_up_u32(source_point_cloud.num_instances, 32);
     GICPReductor::GICPPartial result = reductor.reduce(partial_src, partial_dst, partial_count);
 
     const float max_rot = glm::radians(5.0f);
     const float max_trans = 5.0f;
+
 
     if (result.valid_count < 6) {
         std::cout << "valid_count was less than 6" << std::endl;

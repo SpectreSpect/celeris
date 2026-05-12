@@ -60,6 +60,12 @@ layout(std430, set = 0, binding = 8) writeonly buffer OutputPartialBuffer {
     GICPPartial partials[];
 } output_partial_buffer;
 
+layout(std430, set = 0, binding = 9) writeonly buffer RejectionBuffer {
+    uint rejections[];
+} rejection_buffer;
+
+
+
 #ifndef VOXEL_MAX_PROBES
 #define VOXEL_MAX_PROBES 128u
 #endif
@@ -442,7 +448,10 @@ vec3 heatmap(float t)
 
 GICPPartial get_gicp_partial(uint source_point_id, mat3 R_src, vec3 source_position, vec3 source_scale)
 {
+    rejection_buffer.rejections[source_point_id] = 123123;
+
     const float max_corr_dist    = 10.0;
+    // const float max_corr_dist    = 100.0;
     const float max_corr_dist_sq = max_corr_dist * max_corr_dist;
     const float gicp_eps         = 1e-3;
     // const float min_normal_dot   = -1.0;
@@ -455,29 +464,44 @@ GICPPartial get_gicp_partial(uint source_point_id, mat3 R_src, vec3 source_posit
 
 
     if (dot(n_src_local, n_src_local) < 1e-12) {
+        rejection_buffer.rejections[source_point_id] = 1;
         return partial;
     }
 
-    if (!is_finite_vec3(p_local) || !is_finite_vec3(n_src_local))
+    if (!is_finite_vec3(p_local) || !is_finite_vec3(n_src_local)) {
+        rejection_buffer.rejections[source_point_id] = 2;
         return partial;
+    }
+        
 
     vec3 scaled_local = p_local * source_scale;
 
     vec3 x_rel = R_src * scaled_local;
-    if (!is_finite_vec3(x_rel))
+    if (!is_finite_vec3(x_rel)) {
+        rejection_buffer.rejections[source_point_id] = 3;
         return partial;
+    }
 
     vec3 x = x_rel + source_position;
-    if (!is_finite_vec3(x))
+    if (!is_finite_vec3(x)) {
+        rejection_buffer.rejections[source_point_id] = 4;
         return partial;
+    }
+        
 
     vec3 n_src_world = transform_normal_world(R_src, source_scale, n_src_local);
 
-    if (!is_finite_vec3(n_src_world))
+    if (!is_finite_vec3(n_src_world)) {
+        rejection_buffer.rejections[source_point_id] = 5;
         return partial;
+    }
+        
 
-    if (dot(n_src_world, n_src_world) < 1e-12)
+    if (dot(n_src_world, n_src_world) < 1e-12) {
+        rejection_buffer.rejections[source_point_id] = 6;
         return partial;
+    }
+        
 
     // uint target_id = find_closest_id_hash(
     //     x,
@@ -495,41 +519,66 @@ GICPPartial get_gicp_partial(uint source_point_id, mat3 R_src, vec3 source_posit
         min_normal_dot
     );
 
-    if (target_id == VOXEL_INVALID_ID)
+
+    if (target_id == VOXEL_INVALID_ID) {
+        rejection_buffer.rejections[source_point_id] = 7;
         return partial;
+    }
+        
 
     vec3 q = map_point_buffer.points[target_id].position.xyz;
     vec3 n_tgt_world = map_normal_buffer.normals[target_id].xyz;
 
-    if (!is_finite_vec3(q) || !is_finite_vec3(n_tgt_world))
+    if (!is_finite_vec3(q) || !is_finite_vec3(n_tgt_world)) {
+        rejection_buffer.rejections[source_point_id] = 8;
         return partial;
+    }
+        
 
     float n_tgt_len2 = dot(n_tgt_world, n_tgt_world);
-    if (!is_finite_float(n_tgt_len2) || n_tgt_len2 < 1e-12)
+    if (!is_finite_float(n_tgt_len2) || n_tgt_len2 < 1e-12) {
+        rejection_buffer.rejections[source_point_id] = 9;
         return partial;
+    }
+        
 
     vec3 d = q - x;
-    if (!is_finite_vec3(d))
+    if (!is_finite_vec3(d)) {
+        rejection_buffer.rejections[source_point_id] = 10;
         return partial;
+    }
+        
 
     float dist_to_target = length(d);
-    if (!is_finite_float(dist_to_target))
+    if (!is_finite_float(dist_to_target)) {
+        rejection_buffer.rejections[source_point_id] = 11;
         return partial;
+    }
+        
 
     mat3 C_A = covariance_from_normal(n_src_world, gicp_eps);
     mat3 C_B = covariance_from_normal(n_tgt_world, gicp_eps);
     mat3 Sigma = C_A + C_B;
 
-    if (!is_finite_mat3(Sigma))
+    if (!is_finite_mat3(Sigma)) {
+        rejection_buffer.rejections[source_point_id] = 12;
         return partial;
+    }
+        
 
     float detSigma = determinant(Sigma);
-    if (!is_finite_float(detSigma) || abs(detSigma) < 1e-9)
+    if (!is_finite_float(detSigma) || abs(detSigma) < 1e-9) {
+        rejection_buffer.rejections[source_point_id] = 13;
         return partial;
+    }
+        
 
     mat3 M = inverse(Sigma);
-    if (!is_finite_mat3(M))
+    if (!is_finite_mat3(M)) {
+        rejection_buffer.rejections[source_point_id] = 14;
         return partial;
+    }
+        
 
     /*
         Important fix:
@@ -561,6 +610,7 @@ GICPPartial get_gicp_partial(uint source_point_id, mat3 R_src, vec3 source_posit
         !is_finite_mat3(H10) || !is_finite_mat3(H11) ||
         !is_finite_vec3(g0)  || !is_finite_vec3(g1))
     {
+        rejection_buffer.rejections[source_point_id] = 15;
         return partial;
     }
 
@@ -573,8 +623,11 @@ GICPPartial get_gicp_partial(uint source_point_id, mat3 R_src, vec3 source_posit
     add_vec3_block(partial.g, 3, g1);
 
     float weighted_error = dot(d, M * d);
-    if (!is_finite_float(weighted_error))
+    if (!is_finite_float(weighted_error)) {
+        rejection_buffer.rejections[source_point_id] = 16;
         return zero_partial();
+    }
+        
 
     partial.total_weighted_sq_error = double(weighted_error);
     partial.valid_count = 1u;
@@ -582,6 +635,7 @@ GICPPartial get_gicp_partial(uint source_point_id, mat3 R_src, vec3 source_posit
     float t = clamp(dist_to_target / max_corr_dist, 0.0, 1.0);
     // source_point_buffer.points[source_point_id].color = vec4(heatmap(t), 1.0);
 
+    rejection_buffer.rejections[source_point_id] = 0;
     return partial;
 }
 

@@ -13,6 +13,7 @@
 #include "../point_cloud/point_cloud.h"
 #include "voxel_point_map.h"
 #include "gicp_reductor.h"
+#include <unordered_map>
 
 class GICPPass {
 public:
@@ -65,6 +66,8 @@ private:
 
     VideoBuffer partial_src;
     VideoBuffer partial_dst;
+
+    VideoBuffer rejection_buffer;
 
     uint32_t max_partial_count = 1000000;
 };
