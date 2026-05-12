@@ -61,7 +61,7 @@ int main() {
 
     uint32_t test_frame = 0;
     // size_t last_frame_id = 80;
-    size_t last_frame_id = 80;
+    size_t last_frame_id = 10;
 
     // voxel_map_point_inserter.insert(voxel_point_map, point_cloud_frames[last_frame_id].point_cloud, point_cloud_frames[last_frame_id].normal_buffer);
 
@@ -80,8 +80,6 @@ int main() {
     // point_cloud_frames[last_frame_id].get_normals(point_cloud_frames[last_frame_id].points, point_cloud_frames[last_frame_id].normals);
     // point_cloud_frames[last_frame_id].normal_buffer.update_data(point_cloud_frames[last_frame_id].normals.data(), point_cloud_frames[last_frame_id].normals.size() * sizeof(glm::vec4));
 
-
-
     // voxel_map_point_inserter.insert(voxel_point_map, point_cloud_frames[0].point_cloud, point_cloud_frames[0].normal_buffer);
     voxel_map_point_inserter.insert(voxel_point_map, point_cloud_frames[test_frame].point_cloud, point_cloud_frames[test_frame].normal_buffer);
 
@@ -97,8 +95,6 @@ int main() {
     normal_cloud_pass.normal_length = 0.5f;
     normal_cloud_pass.line_width_px = 2.0f;
     normal_cloud_pass.use_point_color = false;
-
-
 
     GICP gicp;
 
@@ -137,8 +133,6 @@ int main() {
         normal_cloud_pass.render(point_cloud_frames[last_frame_id].point_cloud, point_cloud_frames[last_frame_id].normal_buffer, camera);
         normal_cloud_pass.render(point_cloud_frames[test_frame].point_cloud, point_cloud_frames[test_frame].normal_buffer, camera);
         // normal_cloud_pass.render(voxel_map_point_cloud, voxel_point_map.map_normal_buffer, camera);
-        
-        
 
         ImGui::Begin("Debug");
 

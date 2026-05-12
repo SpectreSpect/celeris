@@ -713,7 +713,6 @@ double GICP::step(PointCloudFrame& source_point_cloud,
     return rmse;
 }
 
-
 void print_mat3(const glm::mat3& m) {
     std::cout << std::fixed << std::setprecision(6);
 
