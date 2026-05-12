@@ -196,119 +196,119 @@ void GICP::add_vec3_block(double g[6], int row0, const glm::vec3& v) {
 // }
 
 bool GICP::solve_6x6(const double H_in[6][6], const double g_in[6], double delta_out[6]) {
-    int counter = 0;
-    std::ofstream out("/home/spectre/Projects/test_open_3d/solve_6x6_cpu_dump.txt");
-    out << std::setprecision(std::numeric_limits<double>::max_digits10);
+    // int counter = 0;
+    // std::ofstream out("/home/spectre/Projects/test_open_3d/solve_6x6_cpu_dump.txt");
+    // out << std::setprecision(std::numeric_limits<double>::max_digits10);
 
-    auto dump = [&](int ordinal, double value) {
-        out << counter << "." << ordinal << " = " << value << '\n';
-        counter++;
-    };
+    // auto dump = [&](int ordinal, double value) {
+    //     out << counter << "." << ordinal << " = " << value << '\n';
+    //     counter++;
+    // };
 
     double a[6][7];
 
     for (int r = 0; r < 6; r++) {
-        dump(1, static_cast<double>(r));
+        // dump(1, static_cast<double>(r));
 
         for (int c = 0; c < 6; c++) {
-            dump(2, static_cast<double>(c));
+            // dump(2, static_cast<double>(c));
 
             a[r][c] = H_in[r][c];
-            dump(3, a[r][c]);
+            // dump(3, a[r][c]);
         }
 
         a[r][6] = g_in[r];
-        dump(4, a[r][6]);
+        // dump(4, a[r][6]);
     }
 
     // Forward elimination with partial pivoting
     for (int col = 0; col < 6; col++) {
-        dump(5, static_cast<double>(col));
+        // dump(5, static_cast<double>(col));
 
         // Find pivot row
         int pivot_row = col;
-        dump(6, static_cast<double>(pivot_row));
+        // dump(6, static_cast<double>(pivot_row));
 
         double max_abs = std::abs(a[col][col]);
-        dump(7, max_abs);
+        // dump(7, max_abs);
 
         for (int r = col + 1; r < 6; r++) {
-            dump(8, static_cast<double>(r));
+            // dump(8, static_cast<double>(r));
 
             double v = std::abs(a[r][col]);
-            dump(9, v);
+            // dump(9, v);
 
             if (v > max_abs) {
-                dump(10, 1.0); // entered if
+                // dump(10, 1.0); // entered if
 
                 max_abs = v;
-                dump(11, max_abs);
+                // dump(11, max_abs);
 
                 pivot_row = r;
-                dump(12, static_cast<double>(pivot_row));
+                // dump(12, static_cast<double>(pivot_row));
             }
         }
 
         // Singular / degenerate check
         if (max_abs < 1e-12) {
-            dump(13, 1.0); // entered if
+            // dump(13, 1.0); // entered if
             return false;
         }
 
         // Swap rows if needed
         if (pivot_row != col) {
-            dump(14, 1.0); // entered if
+            // dump(14, 1.0); // entered if
 
             for (int c = col; c < 7; c++) {
-                dump(15, static_cast<double>(c));
+                // dump(15, static_cast<double>(c));
 
                 std::swap(a[col][c], a[pivot_row][c]);
 
-                dump(16, a[col][c]);
-                dump(17, a[pivot_row][c]);
+                // dump(16, a[col][c]);
+                // dump(17, a[pivot_row][c]);
             }
         }
 
         // Eliminate rows below
         for (int r = col + 1; r < 6; r++) {
-            dump(18, static_cast<double>(r));
+            // dump(18, static_cast<double>(r));
 
             double factor = a[r][col] / a[col][col];
-            dump(19, factor);
+            // dump(19, factor);
 
             for (int c = col; c < 7; c++) {
-                dump(20, static_cast<double>(c));
+                // dump(20, static_cast<double>(c));
 
                 a[r][c] -= factor * a[col][c];
-                dump(21, a[r][c]);
+                // dump(21, a[r][c]);
             }
         }
     }
 
     // Back substitution
     for (int r = 5; r >= 0; r--) {
-        dump(22, static_cast<double>(r));
+        // dump(22, static_cast<double>(r));
 
         double sum = a[r][6];
-        dump(23, sum);
+        // dump(23, sum);
 
         for (int c = r + 1; c < 6; c++) {
-            dump(24, static_cast<double>(c));
+            // dump(24, static_cast<double>(c));
 
             sum -= a[r][c] * delta_out[c];
-            dump(25, sum);
+            // dump(25, sum);
         }
 
         if (std::abs(a[r][r]) < 1e-12) {
-            dump(26, 1.0); // entered if
+            // dump(26, 1.0); // entered if
             return false;
         }
 
         delta_out[r] = sum / a[r][r];
-        dump(27, delta_out[r]);
+        // dump(27, delta_out[r]);
     }
 
-    dump(28, 1.0); // returning true
+    // dump(28, 1.0); // returning true
     return true;
 }
 
@@ -777,6 +777,17 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
         if (glm::dot(n_src_local, n_src_local) < 1e-12f) {
             continue;
         }
+
+        // glm::vec3 test_p = glm::vec3(1, 5, 10);
+        // glm::vec3 test_x = transform_point_world(
+        //     source_point_cloud.point_cloud,
+        //     test_p
+        // );
+
+        // glm::vec3 test_x_rel = test_x - source_point_cloud.point_cloud.position;
+
+
+
 
         glm::vec3 x = transform_point_world(
             source_point_cloud.point_cloud,

@@ -2,33 +2,39 @@
 #include <cmath>
 #include <iostream>
 
+// glm::mat3 GICPPass::euler_xyz_to_mat3(const glm::vec3& euler) {
+//     float cx = std::cos(euler.x);
+//     float sx = std::sin(euler.x);
+
+//     float cy = std::cos(euler.y);
+//     float sy = std::sin(euler.y);
+
+//     float cz = std::cos(euler.z);
+//     float sz = std::sin(euler.z);
+
+//     glm::mat3 rx(1.0f);
+//     rx[0] = glm::vec3(1.0f, 0.0f, 0.0f);
+//     rx[1] = glm::vec3(0.0f,  cx,  -sx);
+//     rx[2] = glm::vec3(0.0f,  sx,   cx);
+
+//     glm::mat3 ry(1.0f);
+//     ry[0] = glm::vec3( cy, 0.0f,  sy);
+//     ry[1] = glm::vec3(0.0f, 1.0f, 0.0f);
+//     ry[2] = glm::vec3(-sy, 0.0f,  cy);
+
+//     glm::mat3 rz(1.0f);
+//     rz[0] = glm::vec3( cz, -sz, 0.0f);
+//     rz[1] = glm::vec3( sz,  cz, 0.0f);
+//     rz[2] = glm::vec3(0.0f, 0.0f, 1.0f);
+
+//     return rz * ry * rx;
+// }
+
 glm::mat3 GICPPass::euler_xyz_to_mat3(const glm::vec3& euler) {
-    float cx = std::cos(euler.x);
-    float sx = std::sin(euler.x);
-
-    float cy = std::cos(euler.y);
-    float sy = std::sin(euler.y);
-
-    float cz = std::cos(euler.z);
-    float sz = std::sin(euler.z);
-
-    glm::mat3 rx(1.0f);
-    rx[0] = glm::vec3(1.0f, 0.0f, 0.0f);
-    rx[1] = glm::vec3(0.0f,  cx,  -sx);
-    rx[2] = glm::vec3(0.0f,  sx,   cx);
-
-    glm::mat3 ry(1.0f);
-    ry[0] = glm::vec3( cy, 0.0f,  sy);
-    ry[1] = glm::vec3(0.0f, 1.0f, 0.0f);
-    ry[2] = glm::vec3(-sy, 0.0f,  cy);
-
-    glm::mat3 rz(1.0f);
-    rz[0] = glm::vec3( cz, -sz, 0.0f);
-    rz[1] = glm::vec3( sz,  cz, 0.0f);
-    rz[2] = glm::vec3(0.0f, 0.0f, 1.0f);
-
-    return rz * ry * rx;
+    return glm::mat3(glm::eulerAngleXYZ(euler.x, euler.y, euler.z));
 }
+
+
 
 glm::mat3 GICPPass::skew_matrix(const glm::vec3& v) {
     glm::mat3 K(0.0f);
@@ -38,67 +44,198 @@ glm::mat3 GICPPass::skew_matrix(const glm::vec3& v) {
     return K;
 }
 
+// bool GICPPass::solve_6x6(const double H_in[6][6], const double g_in[6], double delta_out[6]) {
+//     const double EPS = 1.0e-12;
+//     double a[6][7];
+
+//     for (int r = 0; r < 6; ++r) {
+//         for (int c = 0; c < 6; ++c) {
+//             a[r][c] = H_in[r][c];
+//         }
+//         a[r][6] = g_in[r];
+//     }
+
+//     for (int col = 0; col < 6; ++col) {
+//         int pivot_row = col;
+//         double max_abs = std::abs(a[col][col]);
+
+//         for (int r = col + 1; r < 6; ++r) {
+//             double v = std::abs(a[r][col]);
+//             if (v > max_abs) {
+//                 max_abs = v;
+//                 pivot_row = r;
+//             }
+//         }
+
+//         if (max_abs < EPS) {
+//             return false;
+//         }
+
+//         if (pivot_row != col) {
+//             for (int c = col; c < 7; ++c) {
+//                 std::swap(a[col][c], a[pivot_row][c]);
+//             }
+//         }
+
+//         for (int r = col + 1; r < 6; ++r) {
+//             double factor = a[r][col] / a[col][col];
+//             for (int c = col; c < 7; ++c) {
+//                 a[r][c] -= factor * a[col][c];
+//             }
+//         }
+//     }
+
+//     for (int i = 0; i < 6; ++i) {
+//         delta_out[i] = 0.0;
+//     }
+
+//     for (int r = 5; r >= 0; --r) {
+//         double sum = a[r][6];
+
+//         for (int c = r + 1; c < 6; ++c) {
+//             sum -= a[r][c] * delta_out[c];
+//         }
+
+//         if (std::abs(a[r][r]) < EPS) {
+//             return false;
+//         }
+
+//         delta_out[r] = sum / a[r][r];
+//     }
+
+//     return true;
+// }
+
+
 bool GICPPass::solve_6x6(const double H_in[6][6], const double g_in[6], double delta_out[6]) {
-    const double EPS = 1.0e-12;
+    // int counter = 0;
+    // std::ofstream out("/home/spectre/Projects/test_open_3d/solve_6x6_cpu_dump.txt");
+    // out << std::setprecision(std::numeric_limits<double>::max_digits10);
+
+    // auto dump = [&](int ordinal, double value) {
+    //     out << counter << "." << ordinal << " = " << value << '\n';
+    //     counter++;
+    // };
+
     double a[6][7];
 
-    for (int r = 0; r < 6; ++r) {
-        for (int c = 0; c < 6; ++c) {
+    for (int r = 0; r < 6; r++) {
+        // dump(1, static_cast<double>(r));
+
+        for (int c = 0; c < 6; c++) {
+            // dump(2, static_cast<double>(c));
+
             a[r][c] = H_in[r][c];
+            // dump(3, a[r][c]);
         }
+
         a[r][6] = g_in[r];
+        // dump(4, a[r][6]);
     }
 
-    for (int col = 0; col < 6; ++col) {
-        int pivot_row = col;
-        double max_abs = std::abs(a[col][col]);
+    // Forward elimination with partial pivoting
+    for (int col = 0; col < 6; col++) {
+        // dump(5, static_cast<double>(col));
 
-        for (int r = col + 1; r < 6; ++r) {
+        // Find pivot row
+        int pivot_row = col;
+        // dump(6, static_cast<double>(pivot_row));
+
+        double max_abs = std::abs(a[col][col]);
+        // dump(7, max_abs);
+
+        for (int r = col + 1; r < 6; r++) {
+            // dump(8, static_cast<double>(r));
+
             double v = std::abs(a[r][col]);
+            // dump(9, v);
+
             if (v > max_abs) {
+                // dump(10, 1.0); // entered if
+
                 max_abs = v;
+                // dump(11, max_abs);
+
                 pivot_row = r;
+                // dump(12, static_cast<double>(pivot_row));
             }
         }
 
-        if (max_abs < EPS) {
+        // Singular / degenerate check
+        if (max_abs < 1e-12) {
+            // dump(13, 1.0); // entered if
             return false;
         }
 
+        // Swap rows if needed
         if (pivot_row != col) {
-            for (int c = col; c < 7; ++c) {
+            // dump(14, 1.0); // entered if
+
+            for (int c = col; c < 7; c++) {
+                // dump(15, static_cast<double>(c));
+
                 std::swap(a[col][c], a[pivot_row][c]);
+
+                // dump(16, a[col][c]);
+                // dump(17, a[pivot_row][c]);
             }
         }
 
-        for (int r = col + 1; r < 6; ++r) {
+        // Eliminate rows below
+        for (int r = col + 1; r < 6; r++) {
+            // dump(18, static_cast<double>(r));
+
             double factor = a[r][col] / a[col][col];
-            for (int c = col; c < 7; ++c) {
+            // dump(19, factor);
+
+            for (int c = col; c < 7; c++) {
+                // dump(20, static_cast<double>(c));
+
                 a[r][c] -= factor * a[col][c];
+                // dump(21, a[r][c]);
             }
         }
     }
 
-    for (int i = 0; i < 6; ++i) {
-        delta_out[i] = 0.0;
-    }
+    // Back substitution
+    for (int r = 5; r >= 0; r--) {
+        // dump(22, static_cast<double>(r));
 
-    for (int r = 5; r >= 0; --r) {
         double sum = a[r][6];
+        // dump(23, sum);
 
-        for (int c = r + 1; c < 6; ++c) {
+        for (int c = r + 1; c < 6; c++) {
+            // dump(24, static_cast<double>(c));
+
             sum -= a[r][c] * delta_out[c];
+            // dump(25, sum);
         }
 
-        if (std::abs(a[r][r]) < EPS) {
+        if (std::abs(a[r][r]) < 1e-12) {
+            // dump(26, 1.0); // entered if
             return false;
         }
 
         delta_out[r] = sum / a[r][r];
+        // dump(27, delta_out[r]);
     }
 
+    // dump(28, 1.0); // returning true
     return true;
 }
+
+// glm::mat3 GICPPass::omega_to_mat3(const glm::vec3& omega) {
+//     float theta = glm::length(omega);
+
+//     if (theta < 1e-12f) {
+//         return glm::mat3(1.0f);
+//     }
+
+//     glm::vec3 axis = omega / theta;
+//     glm::mat3 K = skew_matrix(axis);
+
+//     return glm::mat3(1.0f) + std::sin(theta) * K + (1.0f - std::cos(theta)) * (K * K);
+// }
 
 glm::mat3 GICPPass::omega_to_mat3(const glm::vec3& omega) {
     float theta = glm::length(omega);
@@ -108,35 +245,40 @@ glm::mat3 GICPPass::omega_to_mat3(const glm::vec3& omega) {
     }
 
     glm::vec3 axis = omega / theta;
-    glm::mat3 K = skew_matrix(axis);
-
-    return glm::mat3(1.0f) + std::sin(theta) * K + (1.0f - std::cos(theta)) * (K * K);
+    glm::mat4 R4 = glm::rotate(glm::mat4(1.0f), theta, axis);
+    return glm::mat3(R4);
 }
 
+// glm::vec3 GICPPass::mat3_to_euler_xyz(const glm::mat3& R) {
+//     const float EPS = 1e-6f;
+//     const float HALF_PI = 1.57079632679f;
+
+//     float x, y, z;
+
+//     float sy = glm::clamp(-R[0][2], -1.0f, 1.0f);
+
+//     if (sy >= 1.0f - EPS) {
+//         y = HALF_PI;
+//         z = 0.0f;
+//         x = std::atan2(R[1][0], R[1][1]);
+//     }
+//     else if (sy <= -1.0f + EPS) {
+//         y = -HALF_PI;
+//         z = 0.0f;
+//         x = std::atan2(-R[1][0], R[1][1]);
+//     }
+//     else {
+//         y = std::asin(sy);
+//         x = std::atan2(R[1][2], R[2][2]);
+//         z = std::atan2(R[0][1], R[0][0]);
+//     }
+
+//     return glm::vec3(x, y, z);
+// }
+
 glm::vec3 GICPPass::mat3_to_euler_xyz(const glm::mat3& R) {
-    const float EPS = 1e-6f;
-    const float HALF_PI = 1.57079632679f;
-
     float x, y, z;
-
-    float sy = glm::clamp(-R[0][2], -1.0f, 1.0f);
-
-    if (sy >= 1.0f - EPS) {
-        y = HALF_PI;
-        z = 0.0f;
-        x = std::atan2(R[1][0], R[1][1]);
-    }
-    else if (sy <= -1.0f + EPS) {
-        y = -HALF_PI;
-        z = 0.0f;
-        x = std::atan2(-R[1][0], R[1][1]);
-    }
-    else {
-        y = std::asin(sy);
-        x = std::atan2(R[1][2], R[2][2]);
-        z = std::atan2(R[0][1], R[0][0]);
-    }
-
+    glm::extractEulerAngleXYZ(glm::mat4(R), x, y, z);
     return glm::vec3(x, y, z);
 }
 
@@ -176,6 +318,7 @@ void GICPPass::create(VulkanEngine& engine) {
     partial_src.create(engine, sizeof(GICPReductor::GICPPartial) * max_partial_count);
     partial_dst.create(engine, sizeof(GICPReductor::GICPPartial) * max_partial_count);
     rejection_buffer.create(engine, sizeof(uint32_t) * max_partial_count);
+    // debug_buffer.create(engine, sizeof(uint32_t) * max_partial_count);
     reductor = GICPReductor(engine);
 }
 
@@ -241,6 +384,14 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
         std::cout << "Rejection type " << type
                 << ": " << count << '\n';
     }
+
+
+    OutputBuffer debug_data{};
+    output_buffer.read_subdata(0, &debug_data, sizeof(OutputBuffer));
+
+
+    std::cout <<  "(" << debug_data.position.x << ", " << debug_data.position.y << ", " << debug_data.position.z << ", " << debug_data.position.w << ")" << std::endl;
+    std::cout <<  "(" << debug_data.rotation.x << ", " << debug_data.rotation.y << ", " << debug_data.rotation.z << ", " << debug_data.rotation.w << ")" << std::endl;
     
     uint32_t partial_count = vulkan_utils::div_up_u32(source_point_cloud.num_instances, 32);
     GICPReductor::GICPPartial result = reductor.reduce(partial_src, partial_dst, partial_count);
