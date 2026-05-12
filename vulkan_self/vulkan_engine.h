@@ -31,6 +31,37 @@
 #include "vulkan_fence.h"
 #include "vulkan_semaphore.h"
 
+struct SwapchainResources {
+    VulkanSwapchain swapchain;
+    std::vector<VulkanImageView> image_views;
+    VulkanRenderPass render_pass;
+    std::vector<VulkanFramebuffer> framebuffers;
+    std::vector<VulkanSemaphore> render_finished_semaphores;
+
+    SwapchainResources(
+        const VulkanPhysicalDevice& physical_device,
+        const VulkanDevice& device,
+        const VulkanSurface& surface,
+        Window& window)
+        :   swapchain(physical_device, device, surface, window),
+            image_views(VulkanImageView::from_swapchain(device, swapchain)),
+            render_pass(device, swapchain),
+            framebuffers(
+                VulkanFramebuffer::from_image_views(
+                    image_views,
+                    device,
+                    render_pass,
+                    swapchain.extent()
+                )
+            ),
+            render_finished_semaphores(
+                VulkanSemaphore::create_semaphores(
+                    device,
+                    swapchain.images().size()
+                )
+            ) {}
+};
+
 class VulkanEngine {
 public:
     _XCLASS_NAME(VulkanEngine);
@@ -56,15 +87,11 @@ private:
     VulkanSurface m_surface;
     VulkanPhysicalDevice m_physical_device;
     VulkanDevice m_device;
-    VulkanSwapchain m_swapchain;
-    std::vector<VulkanImageView> m_swapchain_image_views;
-    VulkanRenderPass m_render_pass;
-    std::vector<VulkanFramebuffer> m_swapchain_framebuffers;
+    std::optional<SwapchainResources> m_swapchain_resources;
     VulkanCommandPool m_command_pool;
     std::vector<VulkanCommandBuffer> m_command_buffers;
     std::vector<VulkanFence> m_in_flight_fences;
     std::vector<VulkanSemaphore> m_image_available_semaphores;
-    std::vector<VulkanSemaphore> m_render_finished_semaphores;
 
     static constexpr size_t MAX_FRAMES_IN_FLIGHT = 2;
     size_t m_current_frame = 0;
@@ -73,4 +100,5 @@ private:
 private:
     void record_command_buffer(VulkanCommandBuffer& command_buffer, uint32_t image_index);
     void draw_frame();
+    void recreate_swapchain();
 };

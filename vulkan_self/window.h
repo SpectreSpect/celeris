@@ -15,10 +15,12 @@ class Window {
 public:
     _XCLASS_NAME(Window);
 
-    Window() = delete;
-    Window(const GlfwContext&, uint32_t width, uint32_t height, std::string_view title);
-    ~Window();
-    void destroy();
+    bool is_window_resized = false;
+
+    explicit Window() = delete;
+    explicit Window(const GlfwContext&, uint32_t width, uint32_t height, std::string_view title);
+    ~Window() noexcept;
+    void destroy() noexcept;
 
     Window(const Window&) = delete;
     Window& operator=(const Window&) = delete;
@@ -35,10 +37,15 @@ public:
     uint32_t height() const noexcept;
     const std::string& title() const noexcept;
 
+    void wait_until_framebuffer_available();
+
 private:
     uint32_t m_width = 0;
     uint32_t m_height = 0;
     std::string m_title;
 
     GLFWwindow* m_window = nullptr;
+
+private:
+    static void resize_callback(GLFWwindow* handle, int width, int height);
 };
