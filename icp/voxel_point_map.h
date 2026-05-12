@@ -2,6 +2,7 @@
 #include "../vulkan_engine.h"
 #include "../vulkan/video_buffer.h"
 #include "../point_cloud/point_instance.h"
+#include "../point_cloud/point_cloud_frame.h"
 
 
 class VoxelPointMap {
@@ -30,6 +31,7 @@ public:
 
     VoxelPointMap() = default;
     void create(VulkanEngine& engine, uint32_t num_hash_table_slots, uint32_t max_map_point_count);
+    void get_point_cloud_frame(PointCloudFrame* frame);
 
     uint32_t num_hash_table_slots = 0;
     uint32_t max_map_point_count = 0;

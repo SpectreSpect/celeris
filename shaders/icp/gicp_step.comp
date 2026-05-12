@@ -305,6 +305,79 @@ uint find_closest_id_hash(
     return min_id;
 }
 
+
+uint find_closest_id_brute_force(
+    vec3 position,
+    vec4 normal4,
+    float max_dist_sq,
+    float max_corr_dist,
+    float min_normal_dot
+) {
+    if (map_point_count_buffer.count == 0u)
+        return VOXEL_INVALID_ID;
+
+    if (!is_finite_vec3(position))
+        return VOXEL_INVALID_ID;
+
+    uint min_id = VOXEL_INVALID_ID;
+
+    float min_dist = max_dist_sq;
+
+    if (is_finite_float(max_corr_dist) && max_corr_dist > 0.0) {
+        min_dist = min(min_dist, max_corr_dist * max_corr_dist);
+    }
+
+    vec3 query_normal = normal4.xyz;
+    bool use_normal_check =
+        is_finite_vec3(query_normal) &&
+        dot(query_normal, query_normal) > 1e-12;
+
+    if (use_normal_check)
+        query_normal = normalize(query_normal);
+
+    for (uint candidate_id = 0u;
+         candidate_id < map_point_count_buffer.count;
+         ++candidate_id)
+    {
+        vec3 candidate_pos =
+            map_point_buffer.points[candidate_id].position.xyz;
+
+        vec3 candidate_normal =
+            map_normal_buffer.normals[candidate_id].xyz;
+
+        if (!is_finite_vec3(candidate_pos) || !is_finite_vec3(candidate_normal))
+            continue;
+
+        float nlen_sq = dot(candidate_normal, candidate_normal);
+
+        if (!is_finite_float(nlen_sq) || nlen_sq < 1e-12)
+            continue;
+
+        vec3 to_point = candidate_pos - position;
+        float dist_sq = dot(to_point, to_point);
+
+        if (!is_finite_float(dist_sq))
+            continue;
+
+        if (dist_sq >= min_dist)
+            continue;
+
+        if (use_normal_check && min_normal_dot > -1.0) {
+            candidate_normal *= inversesqrt(nlen_sq);
+
+            float ndot = dot(query_normal, candidate_normal);
+
+            if (!is_finite_float(ndot) || ndot < min_normal_dot)
+                continue;
+        }
+
+        min_dist = dist_sq;
+        min_id = candidate_id;
+    }
+
+    return min_id;
+}
+
 mat3 skew_matrix(vec3 v)
 {
     return mat3(
@@ -369,15 +442,21 @@ vec3 heatmap(float t)
 
 GICPPartial get_gicp_partial(uint source_point_id, mat3 R_src, vec3 source_position, vec3 source_scale)
 {
-    const float max_corr_dist    = 5.0;
+    const float max_corr_dist    = 10.0;
     const float max_corr_dist_sq = max_corr_dist * max_corr_dist;
     const float gicp_eps         = 1e-3;
-    const float min_normal_dot   = -1.0;
+    // const float min_normal_dot   = -1.0;
+    const float min_normal_dot   = 0.5f;
 
     GICPPartial partial = zero_partial();
 
     vec3 p_local     = source_point_buffer.points[source_point_id].position.xyz;
     vec3 n_src_local = source_normal_buffer.normals[source_point_id].xyz;
+
+
+    if (dot(n_src_local, n_src_local) < 1e-12) {
+        return partial;
+    }
 
     if (!is_finite_vec3(p_local) || !is_finite_vec3(n_src_local))
         return partial;
@@ -400,7 +479,15 @@ GICPPartial get_gicp_partial(uint source_point_id, mat3 R_src, vec3 source_posit
     if (dot(n_src_world, n_src_world) < 1e-12)
         return partial;
 
-    uint target_id = find_closest_id_hash(
+    // uint target_id = find_closest_id_hash(
+    //     x,
+    //     vec4(n_src_world, 0.0),
+    //     max_corr_dist_sq,
+    //     max_corr_dist,
+    //     min_normal_dot
+    // );
+
+    uint target_id = find_closest_id_brute_force(
         x,
         vec4(n_src_world, 0.0),
         max_corr_dist_sq,

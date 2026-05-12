@@ -754,7 +754,8 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
     const float max_rot          = glm::radians(5.0f);
     const float max_trans        = 5.0f;
     const float gicp_eps         = 1e-3f;
-    const float min_normal_dot   = -1.0f; // currently effectively disabled
+    // const float min_normal_dot   = -1.0f; // currently effectively disabled
+    const float min_normal_dot   = 0.5f; // currently effectively disabled
 
     double H[6][6] = {};
     double g[6]    = {};
@@ -772,6 +773,10 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
 
         // Replace .normal access if your normal storage is different.
         glm::vec3 n_src_local = glm::vec3(src_normals[i]);
+
+        if (glm::dot(n_src_local, n_src_local) < 1e-12f) {
+            continue;
+        }
 
         glm::vec3 x = transform_point_world(
             source_point_cloud.point_cloud,
@@ -793,6 +798,10 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
 
         for (size_t j = 0; j < target_points.size(); ++j) {
             // glm::vec3 n_tgt_world = glm::vec3(tgt_normals[j]);
+
+            if (glm::dot(tgt_normals[j], tgt_normals[j]) < 1e-12f) {
+                continue;
+            }
 
             glm::vec3 n_tgt_local = glm::vec3(tgt_normals[j]);
             glm::vec3 n_tgt_world = transform_normal_world(target_point_cloud.point_cloud, n_tgt_local);
@@ -885,9 +894,9 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
         valid_count++;
     }
 
-    // if (valid_count < 6) {
-    //     return -1.0;
-    // }
+    if (valid_count < 6) {
+        return -1.0;
+    }
 
     double rmse = std::sqrt(total_weighted_sq_error / double(valid_count));
 

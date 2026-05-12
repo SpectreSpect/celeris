@@ -27,6 +27,69 @@ void GICPTestClouds::create_roads(VulkanEngine* engine) {
 }
 
 
+
+void GICPTestClouds::create_points(VulkanEngine* engine) {
+    generate_three_points(engine, &target_frame, glm::vec4(0, 0, 1, 1), glm::vec3(0, 1, 0));
+    generate_three_points(engine, &source_frame, glm::vec4(1, 0, 0, 1), glm::vec3(0, 1, 0));
+
+    // source_frame.point_cloud.position += glm::vec3(2, 0, 0);
+    source_frame.point_cloud.rotation = glm::vec3(0, 1, 0);
+}
+
+void GICPTestClouds::generate_three_points(
+    VulkanEngine* engine,
+    PointCloudFrame* frame,
+    glm::vec4 color,
+    const glm::vec3& normal
+) {
+    frame->points.clear();
+    frame->normals.clear();
+
+    frame->points.reserve(3);
+    frame->normals.reserve(3);
+
+    glm::vec3 safe_normal = normal;
+
+    if (glm::length(safe_normal) < 0.00001f) {
+        safe_normal = glm::vec3(0.0f, 1.0f, 0.0f);
+    } else {
+        safe_normal = glm::normalize(safe_normal);
+    }
+
+    add_point(
+        frame,
+        glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
+        color,
+        glm::vec4(safe_normal, 0.0f)
+    );
+
+    add_point(
+        frame,
+        glm::vec4(-1.0f, 0.0f, -1.0f, 1.0f),
+        color,
+        glm::vec4(safe_normal, 0.0f)
+    );
+
+    add_point(
+        frame,
+        glm::vec4(1.0f, 0.0f, -1.0f, 1.0f),
+        color,
+        glm::vec4(safe_normal, 0.0f)
+    );
+
+    frame->point_cloud.create(*engine, frame->points.size());
+    frame->normal_buffer.create(*engine, frame->points.size() * sizeof(glm::vec4));
+
+    frame->normal_buffer.update_data(
+        frame->normals.data(),
+        frame->normals.size() * sizeof(glm::vec4)
+    );
+
+    frame->point_cloud.color = color;
+    frame->point_cloud.set_points(frame->points);
+}
+
+
 void GICPTestClouds::generate_single_point(
     VulkanEngine* engine,
     PointCloudFrame* frame,

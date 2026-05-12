@@ -11,6 +11,8 @@ class GICPTestClouds {
 public:
     GICPTestClouds() = default;
     void create_roads(VulkanEngine* engine);
+    void create_points(VulkanEngine* engine);
+    void generate_three_points(VulkanEngine* engine, PointCloudFrame* frame, glm::vec4 color, const glm::vec3& normal);
     void generate_single_point(VulkanEngine* engine, PointCloudFrame* frame, glm::vec4 color, const glm::vec3& position, const glm::vec3& normal);
     void generate_road(VulkanEngine* engine, PointCloudFrame* frame, glm::vec4 color, std::size_t target_point_count);
     void road_with_trees(VulkanEngine* engine, PointCloudFrame* frame, glm::vec4 color, std::size_t target_point_count);

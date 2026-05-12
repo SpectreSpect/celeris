@@ -561,6 +561,6 @@ void main()
     } else {
         output_points[point_id].position = vec4(0.0, 0.0, 0.0, 1.0);
         output_points[point_id].color    = vec4(0.0, 0.0, 0.0, 0.0);
-        output_normals[point_id]         = vec4(0.0, 1.0, 0.0, 0.0);
+        output_normals[point_id]         = vec4(0.0, 0.0, 0.0, 0.0);
     }
 }
