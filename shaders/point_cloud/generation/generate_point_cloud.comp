@@ -411,17 +411,17 @@ void main()
     // ------------------------------------------------------------
     // 1. Infinite ground plane
     // ------------------------------------------------------------
-    // {
-    //     float tHit;
-    //     if (intersectPlane(rayOrigin, rayDir, ground, tHit)) {
-    //         if (tHit < nearestT) {
-    //             nearestT = tHit;
-    //             nearestColor = ground.color;
-    //             nearestNormal = normalize(ground.normal);
-    //             hitSomething = true;
-    //         }
-    //     }
-    // }
+    {
+        float tHit;
+        if (intersectPlane(rayOrigin, rayDir, ground, tHit)) {
+            if (tHit < nearestT) {
+                nearestT = tHit;
+                nearestColor = ground.color;
+                nearestNormal = normalize(ground.normal);
+                hitSomething = true;
+            }
+        }
+    }
 
     // ------------------------------------------------------------
     // 2. Road edge boxes
@@ -449,11 +449,11 @@ void main()
             vec3 leftBoxCenter  = vec3(leftEdgeXZ.x,  boxHalfSize.y, leftEdgeXZ.y);
             vec3 rightBoxCenter = vec3(rightEdgeXZ.x, boxHalfSize.y, rightEdgeXZ.y);
 
-            // testSceneBox(
-            //     leftBoxCenter, boxHalfSize, edgeColorL,
-            //     rayOrigin, rayDir,
-            //     nearestT, hitSomething, nearestColor, nearestNormal
-            // );
+            testSceneBox(
+                leftBoxCenter, boxHalfSize, edgeColorL,
+                rayOrigin, rayDir,
+                nearestT, hitSomething, nearestColor, nearestNormal
+            );
 
             testSceneBox(
                 rightBoxCenter, boxHalfSize, edgeColorR,

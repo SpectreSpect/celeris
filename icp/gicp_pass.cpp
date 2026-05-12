@@ -356,42 +356,41 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
     command_buffer.submit_and_wait(compute_queue, fence);
 
 
-    std::vector<GICPReductor::GICPPartial> partials_out;
-    partials_out.resize(source_point_cloud.num_instances);
-    partial_src.read_subdata(0, partials_out.data(), source_point_cloud.num_instances * sizeof(GICPReductor::GICPPartial));
+    // std::vector<GICPReductor::GICPPartial> partials_out;
+    // partials_out.resize(source_point_cloud.num_instances);
+    // partial_src.read_subdata(0, partials_out.data(), source_point_cloud.num_instances * sizeof(GICPReductor::GICPPartial));
 
-    uint32_t test_valid_count = 0u;
-    for (int i = 0; i < partials_out.size(); i++) {
-        test_valid_count += partials_out[i].valid_count;
-    }
+    // uint32_t test_valid_count = 0u;
+    // for (int i = 0; i < partials_out.size(); i++) {
+    //     test_valid_count += partials_out[i].valid_count;
+    // }
 
-    std::cout << test_valid_count << std::endl;
-
-
-
-    std::vector<uint32_t> rejection_buffer_out;
-    rejection_buffer_out.resize(source_point_cloud.num_instances);
-    rejection_buffer.read_subdata(0, rejection_buffer_out.data(), source_point_cloud.num_instances * sizeof(uint32_t));
+    // std::cout << test_valid_count << std::endl;
 
 
-    std::unordered_map<uint32_t, uint32_t> rejection_counts;
 
-    for (int i = 0; i < rejection_buffer_out.size(); i++) {
-        rejection_counts[rejection_buffer_out[i]]++;
-    }
-
-    for (const auto& [type, count] : rejection_counts) {
-        std::cout << "Rejection type " << type
-                << ": " << count << '\n';
-    }
+    // std::vector<uint32_t> rejection_buffer_out;
+    // rejection_buffer_out.resize(source_point_cloud.num_instances);
+    // rejection_buffer.read_subdata(0, rejection_buffer_out.data(), source_point_cloud.num_instances * sizeof(uint32_t));
 
 
-    OutputBuffer debug_data{};
-    output_buffer.read_subdata(0, &debug_data, sizeof(OutputBuffer));
+    // std::unordered_map<uint32_t, uint32_t> rejection_counts;
+
+    // for (int i = 0; i < rejection_buffer_out.size(); i++) {
+    //     rejection_counts[rejection_buffer_out[i]]++;
+    // }
+
+    // for (const auto& [type, count] : rejection_counts) {
+    //     std::cout << "Rejection type " << type
+    //             << ": " << count << '\n';
+    // }
 
 
-    std::cout <<  "(" << debug_data.position.x << ", " << debug_data.position.y << ", " << debug_data.position.z << ", " << debug_data.position.w << ")" << std::endl;
-    std::cout <<  "(" << debug_data.rotation.x << ", " << debug_data.rotation.y << ", " << debug_data.rotation.z << ", " << debug_data.rotation.w << ")" << std::endl;
+    // OutputBuffer debug_data{};
+    // output_buffer.read_subdata(0, &debug_data, sizeof(OutputBuffer));
+
+    // std::cout <<  "(" << debug_data.position.x << ", " << debug_data.position.y << ", " << debug_data.position.z << ", " << debug_data.position.w << ")" << std::endl;
+    // std::cout <<  "(" << debug_data.rotation.x << ", " << debug_data.rotation.y << ", " << debug_data.rotation.z << ", " << debug_data.rotation.w << ")" << std::endl;
     
     uint32_t partial_count = vulkan_utils::div_up_u32(source_point_cloud.num_instances, 32);
     GICPReductor::GICPPartial result = reductor.reduce(partial_src, partial_dst, partial_count);
