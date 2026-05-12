@@ -9,6 +9,5 @@ int main() {
     queue_request.present_count = 1;
 
     VulkanEngine engine(glfw_context, window, queue_request);
-    engine.init();
     engine.run();
 }

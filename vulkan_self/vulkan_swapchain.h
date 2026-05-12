@@ -12,6 +12,7 @@ class VulkanDevice;
 class VulkanSurface;
 class Window;
 class VulkanFence;
+class VulkanSemaphore;
 
 class VulkanSwapchain {
 public:
@@ -42,14 +43,8 @@ public:
 
     VkResult acquire_next_image(
         uint32_t& image_index_out,
-        VkSemaphore ready_image_semaphore,
-        uint64_t timeout = UINT64_MAX
-    );
-
-    VkResult acquire_next_image(
-        uint32_t& image_index_out,
-        VkSemaphore ready_image_semaphore,
-        VulkanFence& ready_image_fence,
+        VulkanSemaphore& image_available_semaphore,
+        VulkanFence* image_available_fence = nullptr,
         uint64_t timeout = UINT64_MAX
     );
 
@@ -75,11 +70,4 @@ private:
         const VkSurfaceCapabilitiesKHR& capabilities,
         const Window& window
     ) const;
-
-    VkResult acquire_next_image_impl(
-        uint32_t& image_index_out,
-        VkSemaphore image_available_semaphore,
-        VkFence image_available_fence = VK_NULL_HANDLE,
-        uint64_t timeout = UINT64_MAX
-    );
 };

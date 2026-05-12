@@ -14,6 +14,7 @@ class VulkanDevice;
 class VulkanCommandBuffer;
 class VulkanFence;
 class VulkanSwapchain;
+class VulkanSemaphore;
 
 class VulkanQueue {
 public:
@@ -33,29 +34,29 @@ public:
     QueueFamilyInfo family_info() const noexcept;
 
     void submit(
-        std::span<const VkSemaphore> wait_semaphores,
+        std::span<const VulkanSemaphore> wait_semaphores,
         std::span<const VkPipelineStageFlags> wait_stages,
         std::span<VulkanCommandBuffer> command_buffers,
-        std::span<VkSemaphore> signal_semaphores,
+        std::span<VulkanSemaphore> signal_semaphores,
         VulkanFence& fence
     );
 
     void submit(
-        VkSemaphore wait_semaphore,
+        VulkanSemaphore& wait_semaphore,
         VkPipelineStageFlags wait_stage,
         VulkanCommandBuffer& command_buffer,
-        VkSemaphore signal_semaphore,
+        VulkanSemaphore& signal_semaphore,
         VulkanFence& fence
     );
 
     VkResult present(
-        std::span<const VkSemaphore> wait_semaphores,
+        std::span<const VulkanSemaphore> wait_semaphores,
         std::span<const VulkanSwapchain> swapchains,
         std::span<const uint32_t> image_indices
     );
 
     VkResult present(
-        VkSemaphore wait_semaphore,
+        VulkanSemaphore& wait_semaphore,
         const VulkanSwapchain& swapchain,
         uint32_t image_index
     );

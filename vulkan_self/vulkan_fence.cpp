@@ -1,6 +1,7 @@
 #include "vulkan_fence.h"
 
 #include "vulkan_device.h"
+#include "collect_handles_helper.h"
 
 #include <utility>
 #include <string>
@@ -84,19 +85,6 @@ void VulkanFence::check_device_consistency(VkDevice device, const std::vector<Vu
     }
 }
 
-std::vector<VkFence> VulkanFence::collect_handles(const std::vector<VulkanFence>& fences) {
-    LOG_NAMED("VulkanFence");
-    
-    std::vector<VkFence> handles;
-    handles.reserve(fences.size());
-
-    for (const VulkanFence& fence : fences) {
-        handles.push_back(fence.handle());
-    }
-
-    return handles;
-}
-
 bool VulkanFence::wait(VkDevice device, std::span<const VkFence> fences, VkBool32 wait_all, uint64_t timeout) {
     LOG_NAMED("VulkanFence");
 
@@ -162,7 +150,7 @@ bool VulkanFence::wait_fences(
 
     VulkanFence::check_device_consistency(device, fences);
 
-    std::vector<VkFence> fence_handles = VulkanFence::collect_handles(fences);
+    std::vector<VkFence> fence_handles = collect_handles(fences);
     return VulkanFence::wait(device, fence_handles, wait_all, timeout);
 }
 
@@ -201,7 +189,7 @@ void VulkanFence::reset_fences(VkDevice device, const std::vector<VulkanFence>& 
 
     VulkanFence::check_device_consistency(device, fences);
 
-    std::vector<VkFence> fence_handles = VulkanFence::collect_handles(fences);
+    std::vector<VkFence> fence_handles = collect_handles(fences);
     VulkanFence::reset(device, fence_handles);
 }
 

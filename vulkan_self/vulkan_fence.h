@@ -62,9 +62,6 @@ private:
     static void check_correctness(std::span<const VkFence> fences);
     static void check_device_consistency(VkDevice device, const std::vector<VulkanFence>& fences);
 
-
-    static std::vector<VkFence> collect_handles(const std::vector<VulkanFence>& fences);
-
     static bool wait(
         VkDevice device,
         std::span<const VkFence> fences,

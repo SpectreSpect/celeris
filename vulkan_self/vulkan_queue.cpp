@@ -6,6 +6,9 @@
 #include "vulkan_command_buffer.h"
 #include "vulkan_fence.h"
 #include "vulkan_swapchain.h"
+#include "vulkan_semaphore.h"
+
+#include "collect_handles_helper.h"
 
 VulkanQueue::VulkanQueue(const VulkanDevice& device, QueueLocation location, VulkanQueueType type)
     : m_location(location), m_type(type)
@@ -52,10 +55,10 @@ QueueFamilyInfo VulkanQueue::family_info() const noexcept {
 }
 
 void VulkanQueue::submit(
-    std::span<const VkSemaphore> wait_semaphores,
+    std::span<const VulkanSemaphore> wait_semaphores,
     std::span<const VkPipelineStageFlags> wait_stages,
     std::span<VulkanCommandBuffer> command_buffers,
-    std::span<VkSemaphore> signal_semaphores,
+    std::span<VulkanSemaphore> signal_semaphores,
     VulkanFence& fence)
 {
     LOG_METHOD();
@@ -70,21 +73,19 @@ void VulkanQueue::submit(
     VkSubmitInfo submit_info{};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    submit_info.waitSemaphoreCount = static_cast<uint32_t>(wait_semaphores.size());
-    submit_info.pWaitSemaphores = wait_semaphores.data();
-    submit_info.pWaitDstStageMask = wait_stages.data();
+    std::vector<VkSemaphore> wait_semaphore_handles = collect_handles(wait_semaphores);
+    std::vector<VkCommandBuffer> command_buffer_handles = collect_handles(command_buffers);
+    std::vector<VkSemaphore> signal_semaphore_handles = collect_handles(signal_semaphores);
 
-    std::vector<VkCommandBuffer> command_buffer_handles;
-    command_buffer_handles.reserve(command_buffers.size());
-    for (VulkanCommandBuffer& command_buffer : command_buffers) {
-        command_buffer_handles.push_back(command_buffer.handle());
-    }
+    submit_info.waitSemaphoreCount = static_cast<uint32_t>(wait_semaphore_handles.size());
+    submit_info.pWaitSemaphores = wait_semaphore_handles.data();
+    submit_info.pWaitDstStageMask = wait_stages.data();
 
     submit_info.commandBufferCount = static_cast<uint32_t>(command_buffer_handles.size());
     submit_info.pCommandBuffers = command_buffer_handles.data();
 
-    submit_info.signalSemaphoreCount = static_cast<uint32_t>(signal_semaphores.size());
-    submit_info.pSignalSemaphores = signal_semaphores.data();
+    submit_info.signalSemaphoreCount = static_cast<uint32_t>(signal_semaphore_handles.size());
+    submit_info.pSignalSemaphores = signal_semaphore_handles.data();
 
     VkResult submit_result = vkQueueSubmit(
         m_queue,
@@ -97,16 +98,16 @@ void VulkanQueue::submit(
 }
 
 void VulkanQueue::submit(
-    VkSemaphore wait_semaphore,
+    VulkanSemaphore& wait_semaphore,
     VkPipelineStageFlags wait_stage,
     VulkanCommandBuffer& command_buffer,
-    VkSemaphore signal_semaphore,
+    VulkanSemaphore& signal_semaphore,
     VulkanFence& fence)
 {
-    std::span<const VkSemaphore> wait_semaphores = {&wait_semaphore, 1};
+    std::span<const VulkanSemaphore> wait_semaphores = {&wait_semaphore, 1};
     std::span<const VkPipelineStageFlags> wait_stages = {&wait_stage, 1};
     std::span<VulkanCommandBuffer> command_buffers = {&command_buffer, 1};
-    std::span<VkSemaphore> signal_semaphores = {&signal_semaphore, 1};
+    std::span<VulkanSemaphore> signal_semaphores = {&signal_semaphore, 1};
 
     submit(
         wait_semaphores,
@@ -118,7 +119,7 @@ void VulkanQueue::submit(
 }
 
 VkResult VulkanQueue::present(
-    std::span<const VkSemaphore> wait_semaphores,
+    std::span<const VulkanSemaphore> wait_semaphores,
     std::span<const VulkanSwapchain> swapchains,
     std::span<const uint32_t> image_indices)
 {
@@ -135,15 +136,11 @@ VkResult VulkanQueue::present(
     VkPresentInfoKHR present_info{};
     present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
-    present_info.waitSemaphoreCount = static_cast<uint32_t>(wait_semaphores.size());
-    present_info.pWaitSemaphores = wait_semaphores.data();
+    std::vector<VkSemaphore> wait_semaphore_handles = collect_handles(wait_semaphores);
+    std::vector<VkSwapchainKHR> swapchain_handles = collect_handles(swapchains);
 
-    std::vector<VkSwapchainKHR> swapchain_handles;
-    swapchain_handles.reserve(swapchains.size());
-
-    for (const VulkanSwapchain& swapchain : swapchains) {
-        swapchain_handles.push_back(swapchain.handle());
-    }
+    present_info.waitSemaphoreCount = static_cast<uint32_t>(wait_semaphore_handles.size());
+    present_info.pWaitSemaphores = wait_semaphore_handles.data();
     
     present_info.swapchainCount = static_cast<uint32_t>(swapchain_handles.size());
     present_info.pSwapchains = swapchain_handles.data();
@@ -162,11 +159,11 @@ VkResult VulkanQueue::present(
 }
 
 VkResult VulkanQueue::present(
-    VkSemaphore wait_semaphore,
+    VulkanSemaphore& wait_semaphore,
     const VulkanSwapchain& swapchain,
     uint32_t image_index)
 {
-    std::span<const VkSemaphore> wait_semaphores = {&wait_semaphore, 1};
+    std::span<const VulkanSemaphore> wait_semaphores = {&wait_semaphore, 1};
     std::span<const VulkanSwapchain> swapchains = {&swapchain, 1};
     std::span<const uint32_t> image_indices = {&image_index, 1};
 

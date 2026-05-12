@@ -29,52 +29,9 @@ VulkanEngine::VulkanEngine(
                 static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
             )
         ),
-        m_in_flight_fences(VulkanFence::create_fences(m_device, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT))) {}
-
-VulkanEngine::~VulkanEngine() {
-    destroy();
-}
-
-void VulkanEngine::destroy() {
-    LOG_METHOD();
-
-    if (m_device.handle()) {
-        m_device.wait_idle();
-
-        for (VkSemaphore semaphore : m_render_finished_semaphores) {
-            if (semaphore != VK_NULL_HANDLE) {
-                vkDestroySemaphore(m_device.handle(), semaphore, nullptr);
-            }
-        }
-
-        for (VkSemaphore semaphore : m_image_available_semaphores) {
-            if (semaphore != VK_NULL_HANDLE) {
-                vkDestroySemaphore(m_device.handle(), semaphore, nullptr);
-            }
-        }
-
-        m_render_finished_semaphores.clear();
-        m_image_available_semaphores.clear();
-        m_in_flight_fences.clear();
-
-        m_swapchain_framebuffers.clear();
-        m_swapchain_image_views.clear();
-
-        m_command_buffers.clear();
-    }
-}
-
-void VulkanEngine::init() {
-    LOG_METHOD();
-
-    init_vulkan();
-}
-
-void VulkanEngine::init_vulkan() {
-    LOG_METHOD();
-
-    create_sync_objects();
-}
+        m_in_flight_fences(VulkanFence::create_fences(m_device, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT))),
+        m_image_available_semaphores(VulkanSemaphore::create_semaphores(m_device, MAX_FRAMES_IN_FLIGHT)),
+        m_render_finished_semaphores(VulkanSemaphore::create_semaphores(m_device, m_swapchain.images().size())) {}
 
 void VulkanEngine::run() {
     LOG_METHOD();
@@ -85,47 +42,6 @@ void VulkanEngine::run() {
     }
 
     m_device.wait_idle();
-}
-
-void VulkanEngine::create_sync_objects() {
-    LOG_METHOD();
-
-    m_image_available_semaphores.resize(MAX_FRAMES_IN_FLIGHT);
-
-    // Важно: эти semaphores ждёт vkQueuePresentKHR,
-    // поэтому они должны быть по количеству swapchain images.
-    m_render_finished_semaphores.resize(m_swapchain.images().size());
-
-    VkSemaphoreCreateInfo semaphore_info{};
-    semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
-        VkResult image_semaphore_result = vkCreateSemaphore(
-            m_device.handle(),
-            &semaphore_info,
-            nullptr,
-            &m_image_available_semaphores[i]
-        );
-
-        logger.check(
-            image_semaphore_result == VK_SUCCESS,
-            "Failed to create per-frame synchronization objects"
-        );
-    }
-
-    for (size_t i = 0; i < m_render_finished_semaphores.size(); ++i) {
-        VkResult render_semaphore_result = vkCreateSemaphore(
-            m_device.handle(),
-            &semaphore_info,
-            nullptr,
-            &m_render_finished_semaphores[i]
-        );
-
-        logger.check(
-            render_semaphore_result == VK_SUCCESS,
-            "Failed to create per-swapchain-image render finished semaphore"
-        );
-    }
 }
 
 void VulkanEngine::draw_frame() {
@@ -163,7 +79,6 @@ void VulkanEngine::record_command_buffer(VulkanCommandBuffer& command_buffer, ui
     LOG_METHOD();
     {
         auto command_buffer_scope = command_buffer.begin_scope();
-
         {
             auto render_pass_scope = m_render_pass.begin_scope(
                 command_buffer,

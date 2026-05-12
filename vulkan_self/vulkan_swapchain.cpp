@@ -4,6 +4,7 @@
 #include "vulkan_surface.h"
 #include "window.h"
 #include "vulkan_fence.h"
+#include "vulkan_semaphore.h"
 
 #include <limits>
 #include <utility>
@@ -144,10 +145,10 @@ VkExtent2D VulkanSwapchain::extent() const noexcept {
     return m_extent;
 }
 
-VkResult VulkanSwapchain::acquire_next_image_impl(
+VkResult VulkanSwapchain::acquire_next_image(
     uint32_t& image_index_out,
-    VkSemaphore image_available_semaphore,
-    VkFence image_available_fence,
+    VulkanSemaphore& image_available_semaphore,
+    VulkanFence* image_available_fence,
     uint64_t timeout)
 {
     LOG_METHOD();
@@ -155,8 +156,8 @@ VkResult VulkanSwapchain::acquire_next_image_impl(
         m_device,
         m_swapchain,
         timeout,
-        image_available_semaphore,
-        image_available_fence,
+        image_available_semaphore.handle(),
+        image_available_fence != nullptr ? image_available_fence->handle() : VK_NULL_HANDLE,
         &image_index_out
     );
 
@@ -168,23 +169,6 @@ VkResult VulkanSwapchain::acquire_next_image_impl(
     );
 
     return acquire_result;
-}
-
-VkResult VulkanSwapchain::acquire_next_image(
-    uint32_t& image_index_out,
-    VkSemaphore ready_image_semaphore,
-    uint64_t timeout)
-{
-   return acquire_next_image_impl(image_index_out, ready_image_semaphore, VK_NULL_HANDLE, timeout); 
-}
-
-VkResult VulkanSwapchain::acquire_next_image(
-    uint32_t& image_index_out,
-    VkSemaphore ready_image_semaphore,
-    VulkanFence& ready_image_fence,
-    uint64_t timeout)
-{
-    return acquire_next_image_impl(image_index_out, ready_image_semaphore, ready_image_fence.handle(), timeout); 
 }
 
 VkSurfaceFormatKHR VulkanSwapchain::choose_swap_surface_format(

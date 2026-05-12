@@ -29,6 +29,7 @@
 #include "vulkan_command_pool.h"
 #include "vulkan_command_buffer.h"
 #include "vulkan_fence.h"
+#include "vulkan_semaphore.h"
 
 class VulkanEngine {
 public:
@@ -41,17 +42,11 @@ public:
         std::string_view app_name = "vulkan_engine"
     );
 
-    ~VulkanEngine();
-    void destroy();
-
     VulkanEngine(const VulkanEngine&) = delete;
     VulkanEngine& operator=(const VulkanEngine&) = delete;
 
     VulkanEngine(VulkanEngine&&) = delete;
     VulkanEngine& operator=(VulkanEngine&&) = delete;
-
-    void init();
-    void init_vulkan();
 
     void run();
 
@@ -68,17 +63,14 @@ private:
     VulkanCommandPool m_command_pool;
     std::vector<VulkanCommandBuffer> m_command_buffers;
     std::vector<VulkanFence> m_in_flight_fences;
+    std::vector<VulkanSemaphore> m_image_available_semaphores;
+    std::vector<VulkanSemaphore> m_render_finished_semaphores;
 
     static constexpr size_t MAX_FRAMES_IN_FLIGHT = 2;
     size_t m_current_frame = 0;
-
-    std::vector<VkSemaphore> m_image_available_semaphores;
-    std::vector<VkSemaphore> m_render_finished_semaphores;
     
 
 private:
-    void create_sync_objects();
-
     void record_command_buffer(VulkanCommandBuffer& command_buffer, uint32_t image_index);
     void draw_frame();
 };
