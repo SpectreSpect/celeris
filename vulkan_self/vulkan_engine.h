@@ -73,6 +73,8 @@ public:
         std::string_view app_name = "vulkan_engine"
     );
 
+    ~VulkanEngine();
+
     VulkanEngine(const VulkanEngine&) = delete;
     VulkanEngine& operator=(const VulkanEngine&) = delete;
 
@@ -95,10 +97,16 @@ private:
 
     static constexpr size_t MAX_FRAMES_IN_FLIGHT = 2;
     size_t m_current_frame = 0;
-    
+
+    VkPipelineLayout m_pipeline_layout = VK_NULL_HANDLE;
+    VkPipeline m_graphics_pipeline = VK_NULL_HANDLE;
 
 private:
     void record_command_buffer(VulkanCommandBuffer& command_buffer, uint32_t image_index);
     void draw_frame();
     void recreate_swapchain();
+
+    VkShaderModule create_shader_module(const std::vector<char>& code);
+    void create_graphics_pipeline();
+    void cleanup_graphics_pipeline();
 };
