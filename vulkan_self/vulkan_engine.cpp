@@ -23,7 +23,8 @@ VulkanEngine::VulkanEngine(
             )
         ),
         m_in_flight_fences(VulkanFence::create_fences(m_device, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT))),
-        m_image_available_semaphores(VulkanSemaphore::create_semaphores(m_device, MAX_FRAMES_IN_FLIGHT))
+        m_image_available_semaphores(VulkanSemaphore::create_semaphores(m_device, MAX_FRAMES_IN_FLIGHT)),
+        m_pipeline_layout(m_device)
     {
         create_graphics_pipeline();
     }
@@ -218,22 +219,6 @@ void VulkanEngine::create_graphics_pipeline() {
     color_blending.blendConstants[2] = 0.0f;
     color_blending.blendConstants[3] = 0.0f;
 
-    VkPipelineLayoutCreateInfo pipeline_layout_info{};
-    pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipeline_layout_info.setLayoutCount = 0;
-    pipeline_layout_info.pSetLayouts = nullptr;
-    pipeline_layout_info.pushConstantRangeCount = 0;
-    pipeline_layout_info.pPushConstantRanges = nullptr;
-
-    VkResult result = vkCreatePipelineLayout(
-        m_device.handle(),
-        &pipeline_layout_info,
-        nullptr,
-        &m_pipeline_layout
-    );
-
-    logger.check(result == VK_SUCCESS, "Failed to create pipeline layout");
-
     VkGraphicsPipelineCreateInfo pipeline_info{};
     pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipeline_info.stageCount = 2;
@@ -246,13 +231,13 @@ void VulkanEngine::create_graphics_pipeline() {
     pipeline_info.pDepthStencilState = nullptr;
     pipeline_info.pColorBlendState = &color_blending;
     pipeline_info.pDynamicState = nullptr;
-    pipeline_info.layout = m_pipeline_layout;
+    pipeline_info.layout = m_pipeline_layout.handle();
     pipeline_info.renderPass = m_swapchain_resources->render_pass.handle();
     pipeline_info.subpass = 0;
     pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
     pipeline_info.basePipelineIndex = -1;
 
-    result = vkCreateGraphicsPipelines(
+    VkResult result = vkCreateGraphicsPipelines(
         m_device.handle(),
         VK_NULL_HANDLE,
         1,
@@ -268,10 +253,5 @@ void VulkanEngine::cleanup_graphics_pipeline() {
     if (m_graphics_pipeline != VK_NULL_HANDLE) {
         vkDestroyPipeline(m_device.handle(), m_graphics_pipeline, nullptr);
         m_graphics_pipeline = VK_NULL_HANDLE;
-    }
-
-    if (m_pipeline_layout != VK_NULL_HANDLE) {
-        vkDestroyPipelineLayout(m_device.handle(), m_pipeline_layout, nullptr);
-        m_pipeline_layout = VK_NULL_HANDLE;
     }
 }

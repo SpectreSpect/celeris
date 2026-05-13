@@ -31,6 +31,7 @@
 #include "vulkan_fence.h"
 #include "vulkan_semaphore.h"
 #include "vulkan_shader_module.h"
+#include "vulkan_pipeline_layout.h"
 
 struct SwapchainResources {
     VulkanSwapchain swapchain;
@@ -95,11 +96,11 @@ private:
     std::vector<VulkanCommandBuffer> m_command_buffers;
     std::vector<VulkanFence> m_in_flight_fences;
     std::vector<VulkanSemaphore> m_image_available_semaphores;
+    VulkanPipelineLayout m_pipeline_layout;
 
     static constexpr size_t MAX_FRAMES_IN_FLIGHT = 2;
     size_t m_current_frame = 0;
 
-    VkPipelineLayout m_pipeline_layout = VK_NULL_HANDLE;
     VkPipeline m_graphics_pipeline = VK_NULL_HANDLE;
 
 private:
