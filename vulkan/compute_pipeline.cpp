@@ -1,11 +1,11 @@
 #include "compute_pipeline.h"
 
 
-ComputePipeline::ComputePipeline(VkDevice& device, DescriptorSetBundle& descriptor_set_bundle, ShaderModule& compute_shader) {
+ComputePipeline::ComputePipeline(VkDevice& device, DescriptorSetBundle& descriptor_set_bundle, VulkanShaderModule& compute_shader) {
     create(device, descriptor_set_bundle, compute_shader);
 }
 
-void ComputePipeline::create(VkDevice& device, DescriptorSetBundle& descriptor_set_bundle, ShaderModule& compute_shader) {
+void ComputePipeline::create(VkDevice& device, DescriptorSetBundle& descriptor_set_bundle, VulkanShaderModule& compute_shader) {
     this->descriptor_set_bundle = &descriptor_set_bundle;
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};

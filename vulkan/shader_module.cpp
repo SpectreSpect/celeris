@@ -1,14 +1,14 @@
 #include "shader_module.h"
 
-ShaderModule::ShaderModule(VkDevice& device, const std::filesystem::path& path) {
+VulkanShaderModule::VulkanShaderModule(VkDevice& device, const std::filesystem::path& path) {
     create(device, path);
 }
 
-ShaderModule::~ShaderModule() {
+VulkanShaderModule::~VulkanShaderModule() {
     destroy();
 }
 
-ShaderModule::ShaderModule(ShaderModule&& other) noexcept {
+VulkanShaderModule::VulkanShaderModule(VulkanShaderModule&& other) noexcept {
     shader_module = other.shader_module;
     device = other.device;
 
@@ -16,7 +16,7 @@ ShaderModule::ShaderModule(ShaderModule&& other) noexcept {
     other.device = nullptr;
 }
 
-ShaderModule& ShaderModule::operator=(ShaderModule&& other) noexcept {
+VulkanShaderModule& VulkanShaderModule::operator=(VulkanShaderModule&& other) noexcept {
     if (this != &other) {
         destroy();
 
@@ -29,7 +29,7 @@ ShaderModule& ShaderModule::operator=(ShaderModule&& other) noexcept {
     return *this;
 }
 
-void ShaderModule::destroy() {
+void VulkanShaderModule::destroy() {
     if (device && shader_module != VK_NULL_HANDLE) {
         vkDestroyShaderModule(*device, shader_module, nullptr);
         shader_module = VK_NULL_HANDLE;
@@ -37,7 +37,7 @@ void ShaderModule::destroy() {
     device = nullptr;
 }
 
-std::vector<char> ShaderModule::read_file(const std::filesystem::path& filename) {
+std::vector<char> VulkanShaderModule::read_file(const std::filesystem::path& filename) {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
     if (!file.is_open()) {
         std::string message = "failed to open file: " + filename.string();
@@ -55,7 +55,7 @@ std::vector<char> ShaderModule::read_file(const std::filesystem::path& filename)
     return buffer;
 }
 
-void ShaderModule::create(VkDevice& device, const std::vector<char>& code) {
+void VulkanShaderModule::create(VkDevice& device, const std::vector<char>& code) {
     destroy();
     this->device = &device;
 
@@ -70,7 +70,7 @@ void ShaderModule::create(VkDevice& device, const std::vector<char>& code) {
     );
 }
 
-void ShaderModule::create(VkDevice& device, const std::filesystem::path& filename) {
+void VulkanShaderModule::create(VkDevice& device, const std::filesystem::path& filename) {
     std::vector<char> code = read_file(filename);
     create(device, code);
 }

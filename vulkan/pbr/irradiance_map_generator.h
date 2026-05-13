@@ -41,7 +41,7 @@ private:
     DescriptorSetBundle descriptor_set_bundle;
     Fence fence;
     VideoBuffer uniform_buffer;
-    ShaderModule equirect_to_cubemap_cs;
+    VulkanShaderModule equirect_to_cubemap_cs;
     
     uint32_t compute_queue_family_id;
     VkQueue compute_queue;

@@ -2,7 +2,7 @@
 #include "../vulkan_engine.h"
 
 GraphicsPipeline::GraphicsPipeline(VulkanEngine& engine, DescriptorSetBundle& descriptor_set_bundle,
-                                   VulkanVertexLayout& vertex_layout, ShaderModule& vert_module, ShaderModule& frag_module, bool depth_test) {
+                                   VulkanVertexLayout& vertex_layout, VulkanShaderModule& vert_module, VulkanShaderModule& frag_module, bool depth_test) {
     create(engine,  descriptor_set_bundle, vertex_layout, vert_module, frag_module, depth_test);
 }
 
@@ -19,7 +19,7 @@ void GraphicsPipeline::create(VulkanEngine& engine, RenderPass& render_pass, VkE
 }
 
 void GraphicsPipeline::create(VulkanEngine& engine, RenderPass& render_pass, VkExtent2D& extent, DescriptorSetBundle& descriptor_set_bundle,
-                              VulkanVertexLayout& vertex_layout, ShaderModule& vert_module, ShaderModule& frag_module, bool depth_test) {
+                              VulkanVertexLayout& vertex_layout, VulkanShaderModule& vert_module, VulkanShaderModule& frag_module, bool depth_test) {
     create(engine,
            render_pass,
            extent,
@@ -151,6 +151,6 @@ void GraphicsPipeline::create(VulkanEngine& engine, DescriptorSetBundle& descrip
 }
 
 void GraphicsPipeline::create(VulkanEngine& engine, DescriptorSetBundle& descriptor_set_bundle, VulkanVertexLayout& vertex_layout, 
-                              ShaderModule& vert_module, ShaderModule& frag_module, bool depth_test) {
+                              VulkanShaderModule& vert_module, VulkanShaderModule& frag_module, bool depth_test) {
     create(engine, descriptor_set_bundle, vertex_layout, vert_module.shader_module, frag_module.shader_module, depth_test);
 }

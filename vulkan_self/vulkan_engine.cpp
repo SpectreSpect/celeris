@@ -3,23 +3,6 @@
 #include <fstream>
 #include <array>
 
-namespace {
-    std::vector<char> read_file(const std::string& filename) {
-        std::ifstream file(filename, std::ios::ate | std::ios::binary);
-
-        logger.check(file.is_open(), "Failed to open file: " + filename);
-
-        size_t file_size = static_cast<size_t>(file.tellg());
-        std::vector<char> buffer(file_size);
-
-        file.seekg(0);
-        file.read(buffer.data(), file_size);
-        file.close();
-
-        return buffer;
-    }
-}
-
 VulkanEngine::VulkanEngine(
     const GlfwContext& glfw_context,
     Window& window,
@@ -149,45 +132,20 @@ void VulkanEngine::recreate_swapchain() {
     m_swapchain_resources.emplace(m_physical_device, m_device, m_surface, m_window);
 }
 
-VkShaderModule VulkanEngine::create_shader_module(const std::vector<char>& code) {
-    LOG_METHOD();
-
-    VkShaderModuleCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    create_info.codeSize = code.size();
-    create_info.pCode = reinterpret_cast<const uint32_t*>(code.data());
-
-    VkShaderModule shader_module = VK_NULL_HANDLE;
-
-    VkResult result = vkCreateShaderModule(
-        m_device.handle(),
-        &create_info,
-        nullptr,
-        &shader_module
-    );
-
-    logger.check(result == VK_SUCCESS, "Failed to create shader module");
-
-    return shader_module;
-}
-
 void VulkanEngine::create_graphics_pipeline() {
-    auto vert_shader_code = read_file("shaders/triangle.vert.spv");
-    auto frag_shader_code = read_file("shaders/triangle.frag.spv");
-
-    VkShaderModule vert_shader_module = create_shader_module(vert_shader_code);
-    VkShaderModule frag_shader_module = create_shader_module(frag_shader_code);
+    VulkanShaderModule vert_shader_module(m_device, "shaders/triangle.vert.spv");
+    VulkanShaderModule frag_shader_module(m_device, "shaders/triangle.frag.spv");
 
     VkPipelineShaderStageCreateInfo vert_shader_stage_info{};
     vert_shader_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vert_shader_stage_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    vert_shader_stage_info.module = vert_shader_module;
+    vert_shader_stage_info.module = vert_shader_module.handle();
     vert_shader_stage_info.pName = "main";
 
     VkPipelineShaderStageCreateInfo frag_shader_stage_info{};
     frag_shader_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     frag_shader_stage_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    frag_shader_stage_info.module = frag_shader_module;
+    frag_shader_stage_info.module = frag_shader_module.handle();
     frag_shader_stage_info.pName = "main";
 
     VkPipelineShaderStageCreateInfo shader_stages[] = {
@@ -304,9 +262,6 @@ void VulkanEngine::create_graphics_pipeline() {
     );
 
     logger.check(result == VK_SUCCESS, "Failed to create graphics pipeline");
-
-    vkDestroyShaderModule(m_device.handle(), frag_shader_module, nullptr);
-    vkDestroyShaderModule(m_device.handle(), vert_shader_module, nullptr);
 }
 
 void VulkanEngine::cleanup_graphics_pipeline() {

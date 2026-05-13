@@ -28,7 +28,7 @@ void LightingSystem::init(VulkanEngine& engine) {
 
     // light_indices_for_clusters_program = new ComputeProgram(&shader_manager.light_incides_for_clusters_cs);
 
-    light_indices_for_clusters_program = new ShaderModule(engine.device, executable_dir() / "shaders" / "light_incides_for_clusters.comp.spv");
+    light_indices_for_clusters_program = new VulkanShaderModule(engine.device, executable_dir() / "shaders" / "light_incides_for_clusters.comp.spv");
 
 
     compute_queue_family_id = vulkan_utils::find_compute_queue_family(engine.physicalDevice);

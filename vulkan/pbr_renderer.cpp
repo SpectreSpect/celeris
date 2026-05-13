@@ -1,7 +1,7 @@
 #include "pbr_renderer.h"
 #include "../mesh.h"
 
-PBRRenderer::PBRRenderer(VulkanEngine& engine, ShaderModule& vertex_shader, ShaderModule& fragment_shader, float exposure) {
+PBRRenderer::PBRRenderer(VulkanEngine& engine, VulkanShaderModule& vertex_shader, VulkanShaderModule& fragment_shader, float exposure) {
     this->vertex_shader = &vertex_shader;
     this->fragment_shader = &fragment_shader;
     this->engine = &engine;

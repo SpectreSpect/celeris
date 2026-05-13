@@ -30,8 +30,8 @@ public:
     
     VulkanEngine* engine;
     
-    ShaderModule* vertex_shader;
-    ShaderModule* fragment_shader;
+    VulkanShaderModule* vertex_shader;
+    VulkanShaderModule* fragment_shader;
 
     GraphicsPipeline pipeline;
 

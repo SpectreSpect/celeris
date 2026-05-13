@@ -42,6 +42,7 @@ add_executable(app
   vulkan_self/vulkan_command_buffer.cpp
   vulkan_self/vulkan_fence.cpp
   vulkan_self/vulkan_semaphore.cpp
+  vulkan_self/vulkan_shader_module.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

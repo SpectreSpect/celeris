@@ -29,8 +29,8 @@ private:
     CommandPool command_pool;
     CommandBuffer command_buffer;
 
-    ShaderModule skybox_vs;
-    ShaderModule skybox_fs;
+    VulkanShaderModule skybox_vs;
+    VulkanShaderModule skybox_fs;
 
     DescriptorSetBundle descriptor_set_bundle;
     GraphicsPipeline pipeline;

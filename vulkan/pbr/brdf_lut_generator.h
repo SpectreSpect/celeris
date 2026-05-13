@@ -40,7 +40,7 @@ private:
     DescriptorSetBundle descriptor_set_bundle;
     Fence fence;
     VideoBuffer uniform_buffer;
-    ShaderModule generate_brdf_lut_cs;
+    VulkanShaderModule generate_brdf_lut_cs;
     
     uint32_t compute_queue_family_id;
     VkQueue compute_queue;

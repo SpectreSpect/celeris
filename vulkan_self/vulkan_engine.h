@@ -30,6 +30,7 @@
 #include "vulkan_command_buffer.h"
 #include "vulkan_fence.h"
 #include "vulkan_semaphore.h"
+#include "vulkan_shader_module.h"
 
 struct SwapchainResources {
     VulkanSwapchain swapchain;
@@ -106,7 +107,6 @@ private:
     void draw_frame();
     void recreate_swapchain();
 
-    VkShaderModule create_shader_module(const std::vector<char>& code);
     void create_graphics_pipeline();
     void cleanup_graphics_pipeline();
 };

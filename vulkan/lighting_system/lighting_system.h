@@ -43,7 +43,7 @@ public:
     size_t max_lights_per_cluster = 1500;
     glm::vec3 num_clusters{25, 25, 25};
 
-    ShaderModule* light_indices_for_clusters_program = nullptr;
+    VulkanShaderModule* light_indices_for_clusters_program = nullptr;
     
     float cluster_fov = 0.0f;
     float cluster_aspect = 0.0f;

@@ -29,19 +29,19 @@ public:
     // VideoBuffer uniform_buffer;
 
     GraphicsPipeline() = default;
-    GraphicsPipeline(VulkanEngine& engine, DescriptorSetBundle& descriptor_set_bundle, VulkanVertexLayout& vertex_layout, ShaderModule& vert_module, ShaderModule& frag_module, bool depth_test = true);
+    GraphicsPipeline(VulkanEngine& engine, DescriptorSetBundle& descriptor_set_bundle, VulkanVertexLayout& vertex_layout, VulkanShaderModule& vert_module, VulkanShaderModule& frag_module, bool depth_test = true);
     void create(VulkanEngine& engine, RenderPass& render_pass, VkExtent2D& extent, DescriptorSetBundle& descriptor_set_bundle,
             VulkanVertexLayout& vertex_layout, VkShaderModule& vert_module, VkShaderModule& frag_module, bool depth_test = true);
 
     void create(VulkanEngine& engine, RenderPass& render_pass, VkExtent2D& extent,
                 DescriptorSetBundle& descriptor_set_bundle,
-                VulkanVertexLayout& vertex_layout, ShaderModule& vert_module, ShaderModule& frag_module, bool depth_test = true);
+                VulkanVertexLayout& vertex_layout, VulkanShaderModule& vert_module, VulkanShaderModule& frag_module, bool depth_test = true);
 
     void create(VkDevice& device, VkPhysicalDevice& physical_device, VkRenderPass& render_pass, 
                 VkExtent2D& swapchain_extent, DescriptorSetBundle& descriptor_set_bundle, VulkanVertexLayout& vertex_layout, 
                 VkShaderModule& vert_module, VkShaderModule& frag_module, bool depth_test = true);
     void create(VulkanEngine& engine, DescriptorSetBundle& descriptor_set_bundle, VulkanVertexLayout& vertex_layout, VkShaderModule& vert_module, VkShaderModule& frag_module, bool depth_test = true);
-    void create(VulkanEngine& engine, DescriptorSetBundle& descriptor_set_bundle, VulkanVertexLayout& vertex_layout, ShaderModule& vert_module, ShaderModule& frag_module, bool depth_test = true);
+    void create(VulkanEngine& engine, DescriptorSetBundle& descriptor_set_bundle, VulkanVertexLayout& vertex_layout, VulkanShaderModule& vert_module, VulkanShaderModule& frag_module, bool depth_test = true);
     
     VkPipelineBindPoint get_bind_point() const override {
         return VK_PIPELINE_BIND_POINT_GRAPHICS;

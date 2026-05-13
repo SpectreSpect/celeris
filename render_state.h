@@ -14,8 +14,8 @@ struct RenderState {
     glm::mat4 view;       // projection * view
     glm::mat4 transform;    // accumulated parent->world transform
     uint32_t prefilte_map_mip_levels;
-    ShaderModule* vertex_shader;
-    ShaderModule* fragment_shader;
+    VulkanShaderModule* vertex_shader;
+    VulkanShaderModule* fragment_shader;
     Camera* camera;
     VulkanEngine* engine;
     Renderer* renderer;
