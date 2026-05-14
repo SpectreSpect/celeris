@@ -494,7 +494,8 @@ GICPPartial get_gicp_partial(uint source_point_id, mat3 R_src, vec3 source_posit
     const float max_corr_dist_sq = max_corr_dist * max_corr_dist;
     const float gicp_eps         = 1e-3;
     // const float min_normal_dot   = -1.0;
-    const float min_normal_dot   = 0.5f;
+    // const float min_normal_dot   = 0.5f;
+    const float min_normal_dot   = 0.9f;
 
     GICPPartial partial = zero_partial();
 

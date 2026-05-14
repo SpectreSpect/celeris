@@ -40,7 +40,7 @@ public:
     // DescriptorSetBundle descriptor_set_bundle;
 
     PointCloud() = default;
-    void create(VulkanEngine& engine, uint32_t num_points = 0);
+    void create(VulkanEngine& engine, uint32_t num_points = 1);
     void set_points(const std::vector<PointInstance>& point_instances);
     void set_points(VideoBuffer& point_instance_buffer, uint32_t num_instances);
 
