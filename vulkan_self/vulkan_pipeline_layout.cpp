@@ -17,6 +17,18 @@ PipelineLayoutBuilder& PipelineLayoutBuilder::add_push_constants(
 {
     LOG_METHOD();
 
+    logger.check(size_bytes > 0)
+        << "Push constant range size must be greater than zero\n";
+
+    logger.check(size_bytes % 4 == 0)
+        << "Push constant range size must be a multiple of 4\n";
+
+    logger.check(offset % 4 == 0)
+        << "Push constant range offset must be a multiple of 4\n";
+
+    logger.check(stage_flags != 0)
+        << "Push constant range stage flags must not be zero\n";
+
     VkPushConstantRange push_constant_range{};
     push_constant_range.stageFlags = stage_flags;
     push_constant_range.offset = offset;
@@ -63,7 +75,7 @@ VulkanPipelineLayout::VulkanPipelineLayout(const PipelineLayoutBuilder& builder)
     pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipeline_layout_info.setLayoutCount = 0;
     pipeline_layout_info.pSetLayouts = nullptr;
-    pipeline_layout_info.pushConstantRangeCount = builder.desc().push_constant_ranges.size();
+    pipeline_layout_info.pushConstantRangeCount = static_cast<uint32_t>(builder.desc().push_constant_ranges.size());
     pipeline_layout_info.pPushConstantRanges = builder.desc().push_constant_ranges.data();
 
     push_constant_ranges = builder.desc().push_constant_ranges; // Копирование

@@ -30,15 +30,23 @@ public:
     PipelineLayoutBuilder& set_device(const VulkanDevice& device) noexcept;
 
     template<class T>
-    PipelineLayoutBuilder& add_push_constants(
-        VkShaderStageFlags stage_flags = VK_SHADER_STAGE_VERTEX_BIT)
-    {
+    static constexpr uint32_t push_constant_size_v() {
         static_assert(std::is_trivially_copyable_v<T>,
             "Push constant type must be trivially copyable");
 
         static_assert(sizeof(T) % 4 == 0,
             "Push constant size must be a multiple of 4 bytes");
 
+        static_assert(sizeof(T) <= UINT32_MAX,
+            "Push constant type is too large");
+
+        return static_cast<uint32_t>(sizeof(T));
+    }
+
+    template<class T>
+    PipelineLayoutBuilder& add_push_constants(
+        VkShaderStageFlags stage_flags = VK_SHADER_STAGE_VERTEX_BIT)
+    {
         uint32_t next_offset = 0;
 
         for (const auto& range : m_desc.push_constant_ranges) {
@@ -51,7 +59,7 @@ public:
         next_offset = Utils::align_up(next_offset, 4);
 
         return add_push_constants(
-            static_cast<uint32_t>(sizeof(T)),
+            push_constant_size_v<T>(),
             next_offset,
             stage_flags
         );
@@ -62,7 +70,7 @@ public:
         uint32_t offset,
         VkShaderStageFlags stage_flags = VK_SHADER_STAGE_VERTEX_BIT)
     {
-        return add_push_constants(sizeof(T), offset, stage_flags);
+        return add_push_constants(push_constant_size_v<T>(), offset, stage_flags);
     }
 
     PipelineLayoutBuilder& add_push_constants(
@@ -97,7 +105,7 @@ public:
     static PipelineLayoutBuilder create_builder() noexcept;
 
     template<class... Args>
-    inline void push_constants(VulkanCommandBuffer& command_buffer, const Args&... args) {
+    inline void push_constants(VulkanCommandBuffer& command_buffer, const Args&... args) const {
         LOG_METHOD();
 
         logger.check(sizeof...(Args) == push_constant_ranges.size())
@@ -115,7 +123,7 @@ public:
             vkCmdPushConstants(
                 command_buffer.handle(),
                 m_pipeline_layout,
-                VK_SHADER_STAGE_VERTEX_BIT,
+                push_constant_ranges[i].stageFlags,
                 push_constant_ranges[i].offset,
                 push_constant_ranges[i].size,
                 arg_pointers[i].first
