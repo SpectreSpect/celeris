@@ -73,7 +73,7 @@ struct alignas(16) PointNormal {
 };
 
 struct alignas(16) HashTableSlot {
-    glm::uvec2     hash_key;
+    glm::ivec2     hash_key;
     std::uint32_t  _pad0[2];     // forces hash_value to offset 16
 
     HashPoint      hash_value;   // offset 16, size 32

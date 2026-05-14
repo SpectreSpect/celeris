@@ -62,3 +62,8 @@ static MultiColorString header_str(std::string_view class_name, std::string_view
     )
 
 using clr = ColoredString; 
+
+//
+
+#define VSCODE_CLR_STREAM(CLASS_NAME, FUNC_NAME) \
+clr(CLASS_NAME, LoggerPalette::teal) << "::" << clr(FUNC_NAME, LoggerPalette::purple) << clr("()", LoggerPalette::yellow)

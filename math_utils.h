@@ -171,7 +171,7 @@ namespace math_utils {
         return log2_floor_u32(x);
     }
     
-    static glm::uvec2 split_u64(uint64_t k) {
+    static glm::ivec2 split_u64(uint64_t k) {
         return glm::uvec2(uint32_t(k & 0xFFFFFFFFull), uint32_t(k >> 32));
     }
 

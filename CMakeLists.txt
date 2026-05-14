@@ -44,6 +44,7 @@ add_executable(app
   vulkan_self/vulkan_semaphore.cpp
   vulkan_self/vulkan_shader_module.cpp
   vulkan_self/vulkan_pipeline_layout.cpp
+  vulkan_self/vulkan_pipeline.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
