@@ -95,7 +95,8 @@ void PointCloudFrame::load_from_file(VulkanEngine& engine, const std::filesystem
 
         if (!s.valid) {
             points[i].pos = glm::vec4(INF, INF, INF, 1.0f);
-            points[i].color = glm::vec4(0, 0, 1, 1);
+            // points[i].color = glm::vec4(0, 0, 1, 1);
+            points[i].color = glm::vec4(1, 1, 1, 1);
             continue;
         }
 
@@ -117,7 +118,8 @@ void PointCloudFrame::load_from_file(VulkanEngine& engine, const std::filesystem
         const glm::vec3 p_ref_eng = ros_pos_to_engine(p_ref_ros);
 
         points[i].pos = glm::vec4(p_ref_eng, 1.0f);
-        points[i].color = glm::vec4(0, 0, 1, 1);
+        // points[i].color = glm::vec4(0, 0, 1, 1);
+        points[i].color = glm::vec4(1, 1, 1, 1);
     }
 
     get_normals(points, normals);

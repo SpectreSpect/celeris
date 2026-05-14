@@ -26,7 +26,8 @@ public:
     bool looped = true;
 
     PointCloudVideo() = default;
-    void load_from_file(VulkanEngine& engine, const std::filesystem::path& csv_path, int max_frames = -1);
+    // void load_from_file(VulkanEngine& engine, const std::filesystem::path& csv_path, int max_frames = -1);
+    void load_from_file(VulkanEngine& engine, const std::filesystem::path& csv_path, int first_frame = -1, int last_frame = -1);
     size_t get_frame_id(float time, size_t search_start_id = 0);
     void move(float time = 0.0f);
     void pause();
