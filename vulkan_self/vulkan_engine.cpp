@@ -24,10 +24,10 @@ VulkanEngine::VulkanEngine(
         ),
         m_in_flight_fences(VulkanFence::create_fences(m_device, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT))),
         m_image_available_semaphores(VulkanSemaphore::create_semaphores(m_device, MAX_FRAMES_IN_FLIGHT)),
-        m_pipeline_layout(m_device),
+        m_pipeline_layout(create_pipeline_layout()),
         m_graphics_pipeline(create_graphics_pipeline())
     {
-
+        
     }
 
 VulkanEngine::~VulkanEngine() {
@@ -55,6 +55,15 @@ void VulkanEngine::record_command_buffer(VulkanCommandBuffer& command_buffer, ui
             m_swapchain_resources->swapchain,
             {{0.05f, 0.08f, 0.12f, 1.0f}}
         );
+
+            static TestPushConstants pc{
+                .offset = {0.0f, 0.0f},
+                .scale = 1.0f
+            };
+
+            pc.offset.x += 0.0001f;
+            
+            m_pipeline_layout.push_constants(command_buffer, pc);
             
             m_graphics_pipeline.bind(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
 
@@ -129,7 +138,19 @@ void VulkanEngine::recreate_swapchain() {
     m_swapchain_resources.emplace(m_physical_device, m_device, m_surface, m_window);
 }
 
+VulkanPipelineLayout VulkanEngine::create_pipeline_layout() {
+    LOG_METHOD();
+
+    PipelineLayoutBuilder builder = VulkanPipelineLayout::create_builder();
+    builder.set_device(m_device);
+    builder.add_push_constants<TestPushConstants>();
+    
+    return VulkanPipelineLayout(builder);
+}
+
 VulkanPipeline VulkanEngine::create_graphics_pipeline() {
+    LOG_METHOD();
+    
     VulkanShaderModule vert_shader_module(m_device, "shaders/triangle.vert.spv");
     VulkanShaderModule frag_shader_module(m_device, "shaders/triangle.frag.spv");
 

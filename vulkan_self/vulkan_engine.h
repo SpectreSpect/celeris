@@ -65,6 +65,11 @@ struct SwapchainResources {
             ) {}
 };
 
+struct TestPushConstants {
+    glm::vec2 offset;
+    float scale;
+};
+
 class VulkanEngine {
 public:
     _XCLASS_NAME(VulkanEngine);
@@ -109,6 +114,7 @@ private:
     void draw_frame();
     void recreate_swapchain();
 
+    VulkanPipelineLayout create_pipeline_layout();
     VulkanPipeline create_graphics_pipeline();
     void cleanup_graphics_pipeline();
 };
