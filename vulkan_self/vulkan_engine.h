@@ -96,7 +96,8 @@ public:
     VulkanEngine(VulkanEngine&&) = delete;
     VulkanEngine& operator=(VulkanEngine&&) = delete;
 
-    bool aquire_free_resources(VulkanCommandBuffer*& command_buffer, uint32_t& free_swapchain_image_index);
+    bool aquire_free_resources(uint32_t& free_swapchain_image_index);
+    VulkanCommandBuffer& get_active_command_buffer();
     void submit_graphic_commands(uint32_t current_swapchain_image_index);
     void present(uint32_t current_swapchain_image_index);
 
@@ -121,8 +122,6 @@ private:
 
 
 private:
-    void record_command_buffer(VulkanCommandBuffer& command_buffer, uint32_t image_index);
-    void draw_frame();
     void recreate_swapchain();
 
     VulkanPipelineLayout create_pipeline_layout();

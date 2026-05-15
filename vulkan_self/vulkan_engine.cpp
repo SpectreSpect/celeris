@@ -34,8 +34,10 @@ VulkanEngine::~VulkanEngine() {
 
 }
 
-bool VulkanEngine::aquire_free_resources(VulkanCommandBuffer*& command_buffer, uint32_t& free_swapchain_image_index) {
+bool VulkanEngine::aquire_free_resources(uint32_t& free_swapchain_image_index) {
     LOG_METHOD();
+
+    logger.check(m_current_frame < MAX_FRAMES_IN_FLIGHT, "The frame index is out of array bounds");
 
     m_in_flight_fences[m_current_frame].wait();
 
@@ -55,6 +57,14 @@ bool VulkanEngine::aquire_free_resources(VulkanCommandBuffer*& command_buffer, u
     m_command_buffers[m_current_frame].reset();
 
     return true;
+}
+
+VulkanCommandBuffer& VulkanEngine::get_active_command_buffer() {
+    LOG_METHOD();
+
+    logger.check(m_current_frame < MAX_FRAMES_IN_FLIGHT, "The frame index is out of array bounds");
+
+    return m_command_buffers[m_current_frame];
 }
 
 void VulkanEngine::submit_graphic_commands(uint32_t current_swapchain_image_index) {
@@ -95,66 +105,56 @@ void VulkanEngine::run() {
 
     while (!m_window.should_close()) {
         m_window.poll_events();
-        draw_frame();
+        
+        uint32_t image_index = 0;
+        if (!aquire_free_resources(image_index)) return;
+        VulkanCommandBuffer& command_buffer = get_active_command_buffer();
+
+        // Запись команд
+        {auto command_buffer_scope = command_buffer.begin_scope();
+            {auto render_pass_scope = m_swapchain_resources->render_pass.begin_scope(
+                command_buffer,
+                m_swapchain_resources->framebuffers[image_index],
+                m_swapchain_resources->swapchain,
+                {{0.05f, 0.08f, 0.12f, 1.0f}}
+            );
+
+                m_graphics_pipeline.bind(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
+
+                VulkanPipeline::set_viewport(
+                    command_buffer,
+                    m_swapchain_resources->swapchain.extent()
+                );
+
+                VulkanPipeline::set_scissor(
+                    command_buffer,
+                    m_swapchain_resources->swapchain.extent()
+                );
+
+                static TestPushConstants pc{
+                    .offset = {0.0f, 0.0f},
+                    .scale = 1.0f
+                };
+
+                pc.offset.x += 0.0001f;
+                
+                m_pipeline_layout.push_constants(command_buffer, pc);
+                
+                vkCmdDraw(
+                    command_buffer.handle(),
+                    3,
+                    1,
+                    0,
+                    0
+                );
+            }
+        }
+
+        submit_graphic_commands(image_index);
+        present(image_index);
     }
 
     m_device.wait_idle();
-}
-
-void VulkanEngine::record_command_buffer(VulkanCommandBuffer& command_buffer, uint32_t image_index) {
-    LOG_METHOD();
-    {auto command_buffer_scope = command_buffer.begin_scope();
-        
-        {auto render_pass_scope = m_swapchain_resources->render_pass.begin_scope(
-            command_buffer,
-            m_swapchain_resources->framebuffers[image_index],
-            m_swapchain_resources->swapchain,
-            {{0.05f, 0.08f, 0.12f, 1.0f}}
-        );
-
-            m_graphics_pipeline.bind(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
-
-            VulkanPipeline::set_viewport(
-                command_buffer,
-                m_swapchain_resources->swapchain.extent()
-            );
-
-            VulkanPipeline::set_scissor(
-                command_buffer,
-                m_swapchain_resources->swapchain.extent()
-            );
-
-            static TestPushConstants pc{
-                .offset = {0.0f, 0.0f},
-                .scale = 1.0f
-            };
-
-            pc.offset.x += 0.0001f;
-            
-            m_pipeline_layout.push_constants(command_buffer, pc);
-            
-            vkCmdDraw(
-                command_buffer.handle(),
-                3,
-                1,
-                0,
-                0
-            );
-        }
-    }
-}
-
-void VulkanEngine::draw_frame() {
-    LOG_METHOD();
-
-    uint32_t image_index = 0;
-    VulkanCommandBuffer* command_buffer = nullptr;
-    if (!aquire_free_resources(command_buffer, image_index)) return;
-
-    record_command_buffer(m_command_buffers[m_current_frame], image_index);
-
-    submit_graphic_commands(image_index);
-    present(image_index);
 }
 
 void VulkanEngine::recreate_swapchain() {
