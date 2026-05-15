@@ -96,12 +96,22 @@ public:
     VulkanEngine(VulkanEngine&&) = delete;
     VulkanEngine& operator=(VulkanEngine&&) = delete;
 
+    Window& window() noexcept;
+    const Window& window() const noexcept;
+
+    VulkanDevice& device() noexcept;
+    const VulkanDevice& device() const noexcept;
+
+    VulkanPhysicalDevice& physical_device() noexcept;
+    const VulkanPhysicalDevice& physical_device() const noexcept;
+
+    SwapchainResources& swapchain_resources();
+    const SwapchainResources& swapchain_resources() const;
+
     bool aquire_free_resources(uint32_t& free_swapchain_image_index);
     VulkanCommandBuffer& get_active_command_buffer();
     void submit_graphic_commands(uint32_t current_swapchain_image_index);
     void present(uint32_t current_swapchain_image_index);
-
-    void run();
 
 private:
     Window& m_window;
@@ -114,8 +124,6 @@ private:
     std::vector<VulkanCommandBuffer> m_command_buffers;
     std::vector<VulkanFence> m_in_flight_fences;
     std::vector<VulkanSemaphore> m_image_available_semaphores;
-    VulkanPipelineLayout m_pipeline_layout;
-    VulkanPipeline m_graphics_pipeline;
 
     static constexpr size_t MAX_FRAMES_IN_FLIGHT = 2;
     size_t m_current_frame = 0;
@@ -123,8 +131,4 @@ private:
 
 private:
     void recreate_swapchain();
-
-    VulkanPipelineLayout create_pipeline_layout();
-    VulkanPipeline create_graphics_pipeline();
-    void cleanup_graphics_pipeline();
 };

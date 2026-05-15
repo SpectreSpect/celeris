@@ -23,15 +23,46 @@ VulkanEngine::VulkanEngine(
             )
         ),
         m_in_flight_fences(VulkanFence::create_fences(m_device, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT))),
-        m_image_available_semaphores(VulkanSemaphore::create_semaphores(m_device, MAX_FRAMES_IN_FLIGHT)),
-        m_pipeline_layout(create_pipeline_layout()),
-        m_graphics_pipeline(create_graphics_pipeline())
-    {
-        
-    }
+        m_image_available_semaphores(VulkanSemaphore::create_semaphores(m_device, MAX_FRAMES_IN_FLIGHT)) {}
 
 VulkanEngine::~VulkanEngine() {
 
+}
+
+Window& VulkanEngine::window() noexcept {
+    return m_window;
+}
+
+const Window& VulkanEngine::window() const noexcept {
+    return m_window;
+}
+
+VulkanDevice& VulkanEngine::device() noexcept {
+    return m_device;
+}
+
+const VulkanDevice& VulkanEngine::device() const noexcept {
+    return m_device;
+}
+
+VulkanPhysicalDevice& VulkanEngine::physical_device() noexcept {
+    return m_physical_device;
+}
+
+const VulkanPhysicalDevice& VulkanEngine::physical_device() const noexcept {
+    return m_physical_device;
+}
+
+SwapchainResources& VulkanEngine::swapchain_resources() {
+    LOG_METHOD();
+    logger.check(m_swapchain_resources.has_value(), "Swapchain resources are not initialized");
+    return *m_swapchain_resources;
+}
+
+const SwapchainResources& VulkanEngine::swapchain_resources() const {
+    LOG_METHOD();
+    logger.check(m_swapchain_resources.has_value(), "Swapchain resources are not initialized");
+    return *m_swapchain_resources;
 }
 
 bool VulkanEngine::aquire_free_resources(uint32_t& free_swapchain_image_index) {
@@ -100,63 +131,6 @@ void VulkanEngine::present(uint32_t current_swapchain_image_index) {
     m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void VulkanEngine::run() {
-    LOG_METHOD();
-
-    while (!m_window.should_close()) {
-        m_window.poll_events();
-        
-        uint32_t image_index = 0;
-        if (!aquire_free_resources(image_index)) return;
-        VulkanCommandBuffer& command_buffer = get_active_command_buffer();
-
-        // Запись команд
-        {auto command_buffer_scope = command_buffer.begin_scope();
-            {auto render_pass_scope = m_swapchain_resources->render_pass.begin_scope(
-                command_buffer,
-                m_swapchain_resources->framebuffers[image_index],
-                m_swapchain_resources->swapchain,
-                {{0.05f, 0.08f, 0.12f, 1.0f}}
-            );
-
-                m_graphics_pipeline.bind(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
-
-                VulkanPipeline::set_viewport(
-                    command_buffer,
-                    m_swapchain_resources->swapchain.extent()
-                );
-
-                VulkanPipeline::set_scissor(
-                    command_buffer,
-                    m_swapchain_resources->swapchain.extent()
-                );
-
-                static TestPushConstants pc{
-                    .offset = {0.0f, 0.0f},
-                    .scale = 1.0f
-                };
-
-                pc.offset.x += 0.0001f;
-                
-                m_pipeline_layout.push_constants(command_buffer, pc);
-                
-                vkCmdDraw(
-                    command_buffer.handle(),
-                    3,
-                    1,
-                    0,
-                    0
-                );
-            }
-        }
-
-        submit_graphic_commands(image_index);
-        present(image_index);
-    }
-
-    m_device.wait_idle();
-}
-
 void VulkanEngine::recreate_swapchain() {
     LOG_METHOD();
 
@@ -167,28 +141,4 @@ void VulkanEngine::recreate_swapchain() {
 
     m_swapchain_resources.reset();
     m_swapchain_resources.emplace(m_physical_device, m_device, m_surface, m_window);
-}
-
-VulkanPipelineLayout VulkanEngine::create_pipeline_layout() {
-    LOG_METHOD();
-
-    PipelineLayoutBuilder builder = VulkanPipelineLayout::create_builder();
-    builder.set_device(m_device);
-    builder.add_push_constants<TestPushConstants>();
-    
-    return VulkanPipelineLayout(builder);
-}
-
-VulkanPipeline VulkanEngine::create_graphics_pipeline() {
-    LOG_METHOD();
-    
-    VulkanShaderModule vert_shader_module(m_device, "shaders/triangle.vert.spv");
-    VulkanShaderModule frag_shader_module(m_device, "shaders/triangle.frag.spv");
-
-    PipelineBuilder builder = VulkanPipeline::create_builder();
-    builder.set_graphic_objects(m_device, m_pipeline_layout, m_swapchain_resources->render_pass);
-    builder.add_vert_shader_stage(vert_shader_module);
-    builder.add_frag_shader_stage(frag_shader_module);
-
-    return VulkanPipeline(builder);
 }
