@@ -22,14 +22,6 @@ const PipelineBuliderDesc PipelineBuilder::m_default_desc = {
     .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
     .primitive_restart_enable = false,
 
-    .viewport_size = std::nullopt, // Должно быть обязательно заполненно
-    .viewport_origin = {0.0f, 0.0f},
-    .viewport_min_depth = 0.0f,
-    .viewport_max_depth = 1.0f,
-
-    .scissor_offset = {0, 0},
-    .scissor_extent = std::nullopt, // Должно быть обязательно заполненно
-
     .depth_clamp_enable = false,
     .rasterizer_discard_enable = false,
     .polygon_mode = VK_POLYGON_MODE_FILL,
@@ -115,44 +107,6 @@ PipelineBuilder& PipelineBuilder::set_input_assembly(
     return *this;
 }
 
-PipelineBuilder& PipelineBuilder::set_viewport(
-    glm::vec2 size,
-    glm::vec2 origin,
-    float min_depth,
-    float max_depth) noexcept
-{
-    m_desc.viewport_size = size;
-    m_desc.viewport_origin = origin;
-    m_desc.viewport_min_depth = min_depth;
-    m_desc.viewport_max_depth = max_depth;
-
-    return *this;
-}
-
-PipelineBuilder& PipelineBuilder::set_viewport(
-    VkExtent2D size,
-    VkOffset2D origin,
-    float min_depth,
-    float max_depth) noexcept
-{
-    return set_viewport(
-        glm::vec2{size.width, size.height},
-        glm::vec2{origin.x, origin.y},
-        min_depth,
-        max_depth
-    );
-}
-
-PipelineBuilder& PipelineBuilder::set_scissor(
-    VkExtent2D extent,
-    VkOffset2D offset) noexcept
-{
-    m_desc.scissor_extent = extent;
-    m_desc.scissor_offset = offset;
-
-    return *this;
-}
-
 PipelineBuilder& PipelineBuilder::set_rasterizer(
     bool depth_clamp_enable,
     bool rasterizer_discard_enable,
@@ -224,14 +178,6 @@ VulkanPipeline::VulkanPipeline(const PipelineBuilder& builder)
     logger.check(builder.desc().fragment_shader_module != VK_NULL_HANDLE)
         << "Fragment shader module is not initialized. Use "
         << VSCODE_CLR_STREAM("PipelineBulider", "add_frag_shader_stage") << ".\n";
-
-    logger.check(builder.desc().viewport_size.has_value())
-        << "The viewport must have a size specified (you can do this in the method"
-        << VSCODE_CLR_STREAM("PipelineBulider", "set_viewport") << ").\n";
-    
-    logger.check(builder.desc().scissor_extent.has_value())
-        << "The scissor must have a extent specified (you can do this in the method"
-        << VSCODE_CLR_STREAM("PipelineBulider", "set_scissor") << ").\n";
     
     VkPipelineShaderStageCreateInfo vert_shader_stage_info{};
     vert_shader_stage_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -261,18 +207,6 @@ VulkanPipeline::VulkanPipeline(const PipelineBuilder& builder)
     input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     input_assembly.topology = builder.desc().topology;
     input_assembly.primitiveRestartEnable = builder.desc().primitive_restart_enable;
-
-    VkViewport viewport{};
-    viewport.x = builder.desc().viewport_origin.x;
-    viewport.y = builder.desc().viewport_origin.y;
-    viewport.width = builder.desc().viewport_size->x;
-    viewport.height = builder.desc().viewport_size->y;
-    viewport.minDepth = builder.desc().viewport_min_depth;
-    viewport.maxDepth = builder.desc().viewport_max_depth;
-
-    VkRect2D scissor{};
-    scissor.offset = {builder.desc().scissor_offset.x, builder.desc().scissor_offset.y};
-    scissor.extent = {builder.desc().scissor_extent->width, builder.desc().scissor_extent->height};
 
     VkPipelineViewportStateCreateInfo viewport_state{};
     viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;

@@ -168,8 +168,6 @@ VulkanPipeline VulkanEngine::create_graphics_pipeline() {
     builder.set_graphic_objects(m_device, m_pipeline_layout, m_swapchain_resources->render_pass);
     builder.add_vert_shader_stage(vert_shader_module);
     builder.add_frag_shader_stage(frag_shader_module);
-    builder.set_viewport(m_swapchain_resources->swapchain.extent());
-    builder.set_scissor(m_swapchain_resources->swapchain.extent());
 
     return VulkanPipeline(builder);
 }

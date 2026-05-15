@@ -32,14 +32,6 @@ struct PipelineBuliderDesc {
     VkPrimitiveTopology topology;
     bool primitive_restart_enable;
 
-    std::optional<glm::vec2> viewport_size;
-    glm::vec2 viewport_origin;
-    float viewport_min_depth;
-    float viewport_max_depth;
-
-    VkOffset2D scissor_offset;
-    std::optional<VkExtent2D> scissor_extent;
-
     bool depth_clamp_enable;
     bool rasterizer_discard_enable;
     VkPolygonMode polygon_mode;
@@ -87,25 +79,6 @@ public:
     PipelineBuilder& set_input_assembly(
         VkPrimitiveTopology topology = m_default_desc.topology,
         bool primitive_restart_enable = m_default_desc.primitive_restart_enable
-    ) noexcept;
-
-    PipelineBuilder& set_viewport(
-        glm::vec2 size,
-        glm::vec2 origin = m_default_desc.viewport_origin,
-        float min_depth = m_default_desc.viewport_min_depth,
-        float max_depth = m_default_desc.viewport_max_depth
-    ) noexcept;
-
-    PipelineBuilder& set_viewport(
-        VkExtent2D size,
-        VkOffset2D origin = {(int32_t)m_default_desc.viewport_origin.x, (int32_t)m_default_desc.viewport_origin.y},
-        float min_depth = m_default_desc.viewport_min_depth,
-        float max_depth = m_default_desc.viewport_max_depth
-    ) noexcept;
-
-    PipelineBuilder& set_scissor(
-        VkExtent2D extent,
-        VkOffset2D offset = m_default_desc.scissor_offset
     ) noexcept;
 
     PipelineBuilder& set_rasterizer(
