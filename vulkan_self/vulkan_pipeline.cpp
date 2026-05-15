@@ -277,9 +277,17 @@ VulkanPipeline::VulkanPipeline(const PipelineBuilder& builder)
     VkPipelineViewportStateCreateInfo viewport_state{};
     viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewport_state.viewportCount = 1;
-    viewport_state.pViewports = &viewport;
     viewport_state.scissorCount = 1;
-    viewport_state.pScissors = &scissor;
+
+    VkDynamicState dynamic_states[] = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR
+    };
+
+    VkPipelineDynamicStateCreateInfo dynamic_state{};
+    dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamic_state.dynamicStateCount = 2;
+    dynamic_state.pDynamicStates = dynamic_states;
 
     VkPipelineRasterizationStateCreateInfo rasterizer{};
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -318,11 +326,11 @@ VulkanPipeline::VulkanPipeline(const PipelineBuilder& builder)
     pipeline_info.pVertexInputState = &vertex_input_info;
     pipeline_info.pInputAssemblyState = &input_assembly;
     pipeline_info.pViewportState = &viewport_state;
+    pipeline_info.pDynamicState = &dynamic_state;
     pipeline_info.pRasterizationState = &rasterizer;
     pipeline_info.pMultisampleState = &multisampling;
     pipeline_info.pDepthStencilState = nullptr;
     pipeline_info.pColorBlendState = &color_blending;
-    pipeline_info.pDynamicState = nullptr;
     pipeline_info.layout = builder.desc().pipeline_layout;
     pipeline_info.renderPass = builder.desc().render_pass;
     pipeline_info.subpass = 0;
@@ -388,4 +396,58 @@ void VulkanPipeline::bind(VulkanCommandBuffer& command_buffer, VkPipelineBindPoi
 
 PipelineBuilder VulkanPipeline::create_builder() noexcept {
     return PipelineBuilder();
+}
+
+void VulkanPipeline::set_viewport(
+    VulkanCommandBuffer& command_buffer, 
+    glm::vec2 size,
+    glm::vec2 origin,
+    float min_depth,
+    float max_depth) 
+{
+    LOG_NAMED("VulkanPipeline");
+
+    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+
+    VkViewport viewport{};
+    viewport.x = origin.x;
+    viewport.y = origin.y;
+    viewport.width = size.x;
+    viewport.height = size.y;
+    viewport.minDepth = min_depth;
+    viewport.maxDepth = max_depth;
+
+    vkCmdSetViewport(command_buffer.handle(), 0, 1, &viewport);
+}
+
+void VulkanPipeline::set_viewport(
+    VulkanCommandBuffer& command_buffer, 
+    VkExtent2D size,
+    VkOffset2D origin,
+    float min_depth,
+    float max_depth)
+{
+    set_viewport(
+        command_buffer,
+        Utils::to_vec2(size),
+        Utils::to_vec2(origin),
+        min_depth,
+        max_depth
+    );
+}
+
+void VulkanPipeline::set_scissor(
+    VulkanCommandBuffer& command_buffer,
+    VkExtent2D extent,
+    VkOffset2D offset)
+{
+    LOG_NAMED("VulkanPipeline");
+
+    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+
+    VkRect2D scissor{};
+    scissor.offset = offset;
+    scissor.extent = extent;
+
+    vkCmdSetScissor(command_buffer.handle(), 0, 1, &scissor);
 }

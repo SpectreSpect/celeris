@@ -33,6 +33,7 @@
 #include "vulkan_shader_module.h"
 #include "vulkan_pipeline_layout.h"
 #include "vulkan_pipeline.h"
+#include "utils.h"
 
 struct SwapchainResources {
     VulkanSwapchain swapchain;

@@ -56,6 +56,18 @@ void VulkanEngine::record_command_buffer(VulkanCommandBuffer& command_buffer, ui
             {{0.05f, 0.08f, 0.12f, 1.0f}}
         );
 
+            m_graphics_pipeline.bind(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
+
+            VulkanPipeline::set_viewport(
+                command_buffer,
+                m_swapchain_resources->swapchain.extent()
+            );
+
+            VulkanPipeline::set_scissor(
+                command_buffer,
+                m_swapchain_resources->swapchain.extent()
+            );
+
             static TestPushConstants pc{
                 .offset = {0.0f, 0.0f},
                 .scale = 1.0f
@@ -65,8 +77,6 @@ void VulkanEngine::record_command_buffer(VulkanCommandBuffer& command_buffer, ui
             
             m_pipeline_layout.push_constants(command_buffer, pc);
             
-            m_graphics_pipeline.bind(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
-
             vkCmdDraw(
                 command_buffer.handle(),
                 3,
