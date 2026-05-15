@@ -63,6 +63,13 @@ public:
         throw Exception(error_message.to_monocolor_string());
     }
 
+    template<class Exception = std::runtime_error, bool new_line = true>
+    requires std::derived_from<Exception, std::exception> &&
+             std::constructible_from<Exception, std::string>
+    inline void throw_error(std::string_view error_message) const {
+        throw_error<Exception, new_line>(MultiColorString(error_message));
+    }
+
     template<class Exception = std::runtime_error, bool new_line = false>
     requires std::derived_from<Exception, std::exception> &&
              std::constructible_from<Exception, std::string>

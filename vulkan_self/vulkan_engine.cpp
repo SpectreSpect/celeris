@@ -34,6 +34,62 @@ VulkanEngine::~VulkanEngine() {
 
 }
 
+bool VulkanEngine::aquire_free_resources(VulkanCommandBuffer*& command_buffer, uint32_t& free_swapchain_image_index) {
+    LOG_METHOD();
+
+    m_in_flight_fences[m_current_frame].wait();
+
+    VkResult result = m_swapchain_resources->swapchain.acquire_next_image(free_swapchain_image_index, m_image_available_semaphores[m_current_frame]);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        recreate_swapchain();
+        return false;
+    }
+
+    logger.check(
+        result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR,
+        "Failed to acquire next image"
+    );
+    
+    m_in_flight_fences[m_current_frame].reset();
+    m_command_buffers[m_current_frame].reset();
+
+    return true;
+}
+
+void VulkanEngine::submit_graphic_commands(uint32_t current_swapchain_image_index) {
+    LOG_METHOD();
+
+    m_device.graphics_queue().submit(
+        m_image_available_semaphores[m_current_frame],
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        m_command_buffers[m_current_frame],
+        m_swapchain_resources->render_finished_semaphores[current_swapchain_image_index],
+        m_in_flight_fences[m_current_frame]
+    );
+}
+
+void VulkanEngine::present(uint32_t current_swapchain_image_index) {
+    LOG_METHOD();
+
+    VkResult result = m_device.present_queue().present(
+        m_swapchain_resources->render_finished_semaphores[current_swapchain_image_index],
+        m_swapchain_resources->swapchain,
+        current_swapchain_image_index
+    );
+    
+    if (result == VK_ERROR_OUT_OF_DATE_KHR ||
+        result == VK_SUBOPTIMAL_KHR ||
+        m_window.is_window_resized)
+    {
+        recreate_swapchain();
+    } else {
+        logger.check(result == VK_SUCCESS, "Failed to present image");
+    }
+
+    m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
 void VulkanEngine::run() {
     LOG_METHOD();
 
@@ -91,49 +147,14 @@ void VulkanEngine::record_command_buffer(VulkanCommandBuffer& command_buffer, ui
 void VulkanEngine::draw_frame() {
     LOG_METHOD();
 
-    m_in_flight_fences[m_current_frame].wait();
-
     uint32_t image_index = 0;
-    VkResult result = m_swapchain_resources->swapchain.acquire_next_image(image_index, m_image_available_semaphores[m_current_frame]);
+    VulkanCommandBuffer* command_buffer = nullptr;
+    if (!aquire_free_resources(command_buffer, image_index)) return;
 
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        recreate_swapchain();
-        return;
-    }
-
-    logger.check(
-        result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR,
-        "Failed to acquire next image"
-    );
-    
-    m_in_flight_fences[m_current_frame].reset();
-    m_command_buffers[m_current_frame].reset();
     record_command_buffer(m_command_buffers[m_current_frame], image_index);
 
-    m_device.graphics_queue().submit(
-        m_image_available_semaphores[m_current_frame],
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        m_command_buffers[m_current_frame],
-        m_swapchain_resources->render_finished_semaphores[image_index],
-        m_in_flight_fences[m_current_frame]
-    );
-
-    result = m_device.present_queue().present(
-        m_swapchain_resources->render_finished_semaphores[image_index],
-        m_swapchain_resources->swapchain,
-        image_index
-    );
-    
-    if (result == VK_ERROR_OUT_OF_DATE_KHR ||
-        result == VK_SUBOPTIMAL_KHR ||
-        m_window.is_window_resized)
-    {
-        recreate_swapchain();
-    } else {
-        logger.check(result == VK_SUCCESS, "Failed to present image");
-    }
-
-    m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+    submit_graphic_commands(image_index);
+    present(image_index);
 }
 
 void VulkanEngine::recreate_swapchain() {

@@ -53,6 +53,8 @@ private:
     PipelineBuliderDesc m_desc = m_default_desc;
 
 public:
+    _XCLASS_NAME(PipelineBuilder);
+
     PipelineBuilder() = default;
 
     PipelineBuilder& set_device(const VulkanDevice& device) noexcept;

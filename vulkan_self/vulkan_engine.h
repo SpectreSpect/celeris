@@ -31,6 +31,7 @@
 #include "vulkan_fence.h"
 #include "vulkan_semaphore.h"
 #include "vulkan_shader_module.h"
+#include "vulkan_buffer.h"
 #include "vulkan_pipeline_layout.h"
 #include "vulkan_pipeline.h"
 #include "utils.h"
@@ -71,6 +72,11 @@ struct TestPushConstants {
     float scale;
 };
 
+struct SimpleVertex {
+    glm::vec2 pos;
+    glm::vec3 color;
+};
+
 class VulkanEngine {
 public:
     _XCLASS_NAME(VulkanEngine);
@@ -89,6 +95,10 @@ public:
 
     VulkanEngine(VulkanEngine&&) = delete;
     VulkanEngine& operator=(VulkanEngine&&) = delete;
+
+    bool aquire_free_resources(VulkanCommandBuffer*& command_buffer, uint32_t& free_swapchain_image_index);
+    void submit_graphic_commands(uint32_t current_swapchain_image_index);
+    void present(uint32_t current_swapchain_image_index);
 
     void run();
 
