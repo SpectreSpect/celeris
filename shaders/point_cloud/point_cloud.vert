@@ -42,8 +42,8 @@ layout(push_constant) uniform ObjectPushConstants {
 
 void main() {
     vLocal = aCorner;
-    // vColor = aColor;
-    vColor = pc.color;
+    vColor = aColor;
+    // vColor = pc.color;
 
     vec4 centerW4 = pc.model * vec4(aPos.xyz, 1.0);
 

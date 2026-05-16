@@ -25,6 +25,241 @@ void PointCloudGenerator::create(VulkanEngine& engine) {
     fence = Fence(engine.device);
 }
 
+
+glm::vec3 PointCloudGenerator::safe_normalize(glm::vec3 v, glm::vec3 fallback) {
+    float len2 = glm::dot(v, v);
+    if (len2 < 1e-12f) {
+        return fallback;
+    }
+    return v / std::sqrt(len2);
+}
+
+glm::vec3 PointCloudGenerator::euler_xyz_from_mat3(const glm::mat3& R) {
+    // GLM is column-major: R[col][row]
+    //
+    // For R = Rz * Ry * Rx:
+    //
+    // r20 = -sin(y)
+    // r21 = cos(y) * sin(x)
+    // r22 = cos(y) * cos(x)
+    // r10 = sin(z) * cos(y)
+    // r00 = cos(z) * cos(y)
+
+    float r00 = R[0][0];
+    float r10 = R[0][1];
+    float r20 = R[0][2];
+
+    float r21 = R[1][2];
+    float r22 = R[2][2];
+
+    float y = std::asin(std::clamp(-r20, -1.0f, 1.0f));
+    float cy = std::cos(y);
+
+    float x;
+    float z;
+
+    if (std::abs(cy) > 1e-6f) {
+        x = std::atan2(r21, r22);
+        z = std::atan2(r10, r00);
+    } else {
+        // Gimbal lock fallback.
+        // We choose x = 0 and solve z from the remaining matrix terms.
+        x = 0.0f;
+        z = std::atan2(-R[1][0], R[1][1]);
+    }
+
+    return glm::vec3{x, y, z}; // pitch, yaw, roll in radians
+}
+
+glm::vec3 PointCloudGenerator::lidar_rotation_from_camera_front_up(glm::vec3 camera_front, glm::vec3 camera_up_hint) {
+    // Your LiDAR shader convention:
+    //
+    // local +X = forward
+    // local +Y = up
+    // local +Z = right
+
+    glm::vec3 front = safe_normalize(camera_front, glm::vec3(1.0f, 0.0f, 0.0f));
+    glm::vec3 upHint = safe_normalize(camera_up_hint, glm::vec3(0.0f, 1.0f, 0.0f));
+
+    glm::vec3 right = glm::cross(front, upHint);
+
+    if (glm::dot(right, right) < 1e-12f) {
+        // front and up were almost parallel
+        glm::vec3 fallbackUp = std::abs(front.y) < 0.99f
+            ? glm::vec3(0.0f, 1.0f, 0.0f)
+            : glm::vec3(1.0f, 0.0f, 0.0f);
+
+        right = glm::cross(front, fallbackUp);
+    }
+
+    right = glm::normalize(right);
+    glm::vec3 up = glm::normalize(glm::cross(right, front));
+
+    glm::mat3 R;
+
+    // Columns are local axes expressed in world space.
+    R[0] = front; // local +X
+    R[1] = up;    // local +Y
+    R[2] = right; // local +Z
+
+    return euler_xyz_from_mat3(R);
+}
+
+glm::vec3 PointCloudGenerator::lidar_rotation_from_camera(const Camera& camera) {
+    return lidar_rotation_from_camera_front_up(camera.front, camera.up);
+}
+
+void PointCloudGenerator::write_camera_transform_header(std::ofstream& out) {
+    out << "# frame px py pz rx ry rz fx fy fz ux uy uz\n";
+}
+
+void PointCloudGenerator::write_camera_transform(std::ofstream& out, uint32_t frame_index, const Camera& camera) {
+    glm::vec3 rotation = lidar_rotation_from_camera(camera);
+
+    out << frame_index << ' '
+
+        << camera.position.x << ' '
+        << camera.position.y << ' '
+        << camera.position.z << ' '
+
+        << rotation.x << ' '
+        << rotation.y << ' '
+        << rotation.z << ' '
+
+        << camera.front.x << ' '
+        << camera.front.y << ' '
+        << camera.front.z << ' '
+
+        << camera.up.x << ' '
+        << camera.up.y << ' '
+        << camera.up.z << '\n';
+}
+
+void PointCloudGenerator::save_camera_transformations(const std::string& path, const std::vector<Camera>& cameras) {
+    std::ofstream out(path);
+
+    if (!out) {
+        throw std::runtime_error("Failed to open camera transformation file for writing: " + path);
+    }
+
+    out << std::fixed << std::setprecision(9);
+
+    write_camera_transform_header(out);
+
+    for (uint32_t i = 0; i < cameras.size(); ++i) {
+        write_camera_transform(out, i, cameras[i]);
+    }
+}
+
+std::vector<PointCloudGenerator::LidarTransformFrame> PointCloudGenerator::load_lidar_transformations(const std::string& path) {
+    std::ifstream in(path);
+
+    if (!in) {
+        throw std::runtime_error("Failed to open camera transformation file for reading: " + path);
+    }
+
+    std::vector<LidarTransformFrame> frames;
+
+    std::string line;
+    uint32_t line_number = 0;
+
+    while (std::getline(in, line)) {
+        ++line_number;
+
+        if (line.empty()) {
+            continue;
+        }
+
+        if (line[0] == '#') {
+            continue;
+        }
+
+        std::istringstream iss(line);
+
+        LidarTransformFrame frame{};
+
+        if (!(iss
+            >> frame.frame_index
+
+            >> frame.position.x
+            >> frame.position.y
+            >> frame.position.z
+
+            >> frame.rotation.x
+            >> frame.rotation.y
+            >> frame.rotation.z
+        )) {
+            throw std::runtime_error(
+                "Failed to parse camera transformation file at line " +
+                std::to_string(line_number)
+            );
+        }
+
+        frames.push_back(frame);
+    }
+
+    return frames;
+}
+
+uint32_t PointCloudGenerator::generate_from_camera_transform_file(
+    PointCloudFrame* point_cloud_frames,
+    uint32_t max_point_cloud_frames,
+    int width,
+    int height,
+    const std::string& path
+) {
+    std::vector<LidarTransformFrame> transforms = load_lidar_transformations(path);
+
+    uint32_t frames_to_generate = std::min<uint32_t>(
+        max_point_cloud_frames,
+        static_cast<uint32_t>(transforms.size())
+    );
+
+    uint32_t num_points = static_cast<uint32_t>(width * height);
+
+    for (uint32_t i = 0; i < frames_to_generate; ++i) {
+        const LidarTransformFrame& transform = transforms[i];
+
+        glm::vec3 position = transform.position;
+        glm::vec3 rotation = transform.rotation;
+
+        point_cloud_frames[i].point_cloud.create(*engine, num_points);
+        point_cloud_frames[i].normal_buffer.create(*engine, num_points * sizeof(glm::vec4));
+
+        generate(
+            point_cloud_frames[i].point_cloud,
+            point_cloud_frames[i].normal_buffer,
+            position,
+            rotation,
+            width,
+            height
+        );
+
+
+
+        point_cloud_frames[i].points.resize(num_points);
+        point_cloud_frames[i].point_cloud.get_instance_buffer().read_subdata(
+            0,
+            point_cloud_frames[i].points.data(),
+            num_points * sizeof(PointInstance)
+        );
+
+        point_cloud_frames[i].normals.resize(num_points);
+        point_cloud_frames[i].normal_buffer.read_subdata(
+            0,
+            point_cloud_frames[i].normals.data(),
+            num_points * sizeof(glm::vec4)
+        );
+
+        point_cloud_frames[i].point_cloud.color = glm::vec4(1, 0, 0, 1);
+
+        point_cloud_frames[i].point_cloud.position = position;
+        point_cloud_frames[i].point_cloud.rotation = rotation;
+    }
+
+    return frames_to_generate;
+}
+
 PointCloud PointCloudGenerator::generate(glm::vec3 position, glm::vec3 rotation, float time, 
                                          glm::vec3 prev_position, glm::vec3 prev_rotation, float prev_time) {
     if (!this->engine)
@@ -235,6 +470,8 @@ void PointCloudGenerator::generate_with_motion(PointCloudFrame* point_cloud_fram
 
         point_cloud_frames[i].normals.resize(num_points);
         point_cloud_frames[i].normal_buffer.read_subdata(0, point_cloud_frames[i].normals.data(), num_points * sizeof(glm::vec4));
+
+        point_cloud_frames[i].point_cloud.color = glm::vec4(1, 0, 0, 1);
 
         // point_cloud_frames[i].point_cloud.instance_buffer
         // point_cloud_frames[i].points = 

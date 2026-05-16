@@ -22,6 +22,12 @@ public:
         glm::vec4 rotation;
     };
 
+    struct LidarTransformFrame {
+        uint32_t frame_index;
+        glm::vec3 position;
+        glm::vec3 rotation; // Euler XYZ in radians: pitch, yaw, roll
+    };
+
     // struct PointCloudGeneratorPushConstants {
     //     glm::vec4 color;
     //     glm::mat4 model;
@@ -33,6 +39,17 @@ public:
 
     PointCloudGenerator() = default;
     void create(VulkanEngine& engine);
+    static glm::vec3 safe_normalize(glm::vec3 v, glm::vec3 fallback) ;
+    static glm::vec3 euler_xyz_from_mat3(const glm::mat3& R);
+    static glm::vec3 lidar_rotation_from_camera_front_up(glm::vec3 camera_front, glm::vec3 camera_up_hint);
+    static glm::vec3 lidar_rotation_from_camera(const Camera& camera);
+    static void write_camera_transform_header(std::ofstream& out) ;
+    static void write_camera_transform(std::ofstream& out, uint32_t frame_index, const Camera& camera);
+    static void save_camera_transformations(const std::string& path, const std::vector<Camera>& cameras);
+    static std::vector<LidarTransformFrame> load_lidar_transformations(const std::string& path);
+    uint32_t generate_from_camera_transform_file(PointCloudFrame* point_cloud_frames, uint32_t max_point_cloud_frames,
+                                                                      int width, int height, const std::string& path);
+
     PointCloud generate(glm::vec3 position, glm::vec3 rotation, float time, 
                         glm::vec3 prev_position, glm::vec3 prev_rotation, float prev_time);
     
