@@ -4,6 +4,7 @@
 
 #include "vulkan_physical_device.h"
 #include "vulkan_device.h"
+#include "vulkan_command_buffer.h"
 
 VulkanBuffer::VulkanBuffer(
     const VulkanPhysicalDevice& physical_device,
@@ -91,7 +92,7 @@ VulkanBuffer& VulkanBuffer::operator=(VulkanBuffer&& other) noexcept
     return *this;
 } 
 
-VkBuffer VulkanBuffer::handle() const noexcept {
+const VkBuffer& VulkanBuffer::handle() const noexcept {
     return m_buffer;
 }
 
@@ -137,6 +138,15 @@ void VulkanBuffer::upload(const void* data, VkDeviceSize size_bytes, VkDeviceSiz
         m_device,
         m_memory
     );
+}
+
+void VulkanBuffer::bind_as_vertex_buffer(
+    VulkanCommandBuffer& command_buffer,
+    uint32_t buffer_binding,
+    VkDeviceSize offset) const 
+{
+    // Позже сделать возможность использовать несколько биндингов. #TODO
+    vkCmdBindVertexBuffers(command_buffer.handle(), buffer_binding, 1, &m_buffer, &offset);
 }
 
 VkBuffer VulkanBuffer::create_buffer(

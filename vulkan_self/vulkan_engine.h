@@ -30,10 +30,6 @@
 #include "vulkan_command_buffer.h"
 #include "vulkan_fence.h"
 #include "vulkan_semaphore.h"
-#include "vulkan_shader_module.h"
-#include "vulkan_buffer.h"
-#include "vulkan_pipeline_layout.h"
-#include "vulkan_pipeline.h"
 #include "utils.h"
 
 struct SwapchainResources {
@@ -65,16 +61,6 @@ struct SwapchainResources {
                     swapchain.images().size()
                 )
             ) {}
-};
-
-struct TestPushConstants {
-    glm::vec2 offset;
-    float scale;
-};
-
-struct SimpleVertex {
-    glm::vec2 pos;
-    glm::vec3 color;
 };
 
 class VulkanEngine {

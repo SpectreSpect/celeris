@@ -11,6 +11,7 @@
 #include <GLFW/glfw3.h>
 
 #include "logger/logger_header.h"
+#include "vertex_layout_builder.h"
 
 class VulkanShaderModule;
 class VulkanPipelineLayout;
@@ -28,6 +29,9 @@ struct PipelineBuliderDesc {
 
     VkShaderModule fragment_shader_module;
     std::string fragment_entry_point_name;
+
+    std::vector<VkVertexInputBindingDescription> vertex_bindings;
+    std::vector<VkVertexInputAttributeDescription> vertex_attributes;
 
     VkPrimitiveTopology topology;
     bool primitive_restart_enable;
@@ -76,7 +80,7 @@ public:
         std::string_view entry_point_name = m_default_desc.fragment_entry_point_name
     );
 
-    PipelineBuilder& set_vertex_layout() noexcept; // Пока не знаю как заполнять, поэтому пусто. Реалезую позже. #TODO
+    PipelineBuilder& set_vertex_layout(const VertexLayoutBuilder& layout) noexcept;
 
     PipelineBuilder& set_input_assembly(
         VkPrimitiveTopology topology = m_default_desc.topology,
@@ -130,7 +134,7 @@ public:
 
     static PipelineBuilder create_builder() noexcept; // Микро функция для удобства
 
-    static void set_viewport(
+    static void set_y_down_viewport(
         VulkanCommandBuffer& command_buffer, 
         glm::vec2 size,
         glm::vec2 origin = glm::vec2{0.0f, 0.0f},
@@ -138,7 +142,23 @@ public:
         float max_depth = 1.0f
     );
 
-    static void set_viewport(
+    static void set_y_down_viewport(
+        VulkanCommandBuffer& command_buffer, 
+        VkExtent2D size,
+        VkOffset2D origin = VkOffset2D{0, 0},
+        float min_depth = 0.0f,
+        float max_depth = 1.0f
+    );
+
+    static void set_y_up_viewport(
+        VulkanCommandBuffer& command_buffer, 
+        glm::vec2 size,
+        glm::vec2 origin = glm::vec2{0.0f, 0.0f},
+        float min_depth = 0.0f,
+        float max_depth = 1.0f
+    );
+
+    static void set_y_up_viewport(
         VulkanCommandBuffer& command_buffer, 
         VkExtent2D size,
         VkOffset2D origin = VkOffset2D{0, 0},

@@ -1,4 +1,20 @@
 #include "vulkan_self/vulkan_engine.h"
+#include "vulkan_self/vulkan_shader_module.h"
+#include "vulkan_self/vulkan_pipeline_layout.h"
+#include "vulkan_self/vulkan_pipeline.h"
+#include "vulkan_self/vulkan_buffer.h"
+
+#include <vector>
+
+struct TestPushConstants {
+    glm::vec2 offset;
+    float scale;
+};
+
+struct SimpleVertex {
+    glm::vec2 pos;
+    glm::vec3 color;
+};
 
 int main() {
     GlfwContext glfw_context;
@@ -21,9 +37,37 @@ int main() {
 
     PipelineBuilder pipeline_builder = VulkanPipeline::create_builder();
     pipeline_builder.set_graphic_objects(engine.device(), pipeline_layout, engine.swapchain_resources().render_pass);
+
+    VertexLayoutBuilder vertex_layout;
+    vertex_layout.add_binding(0, sizeof(SimpleVertex));
+    vertex_layout.add_attribute(0, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(SimpleVertex, pos));
+    vertex_layout.add_attribute(1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(SimpleVertex, color));
+
+    pipeline_builder.set_vertex_layout(vertex_layout);
     pipeline_builder.add_vert_shader_stage(vert_shader_module);
     pipeline_builder.add_frag_shader_stage(frag_shader_module);
     VulkanPipeline pipeline = VulkanPipeline(pipeline_builder);
+
+    std::vector<SimpleVertex> vertices = {
+        {glm::vec2{-0.5f, 0.5f}, glm::vec3{1.0f, 0.0f, 0.0f}},
+        {glm::vec2{0.5f, 0.5f}, glm::vec3{0.0f, 0.0f, 1.0f}},
+        {glm::vec2{0.5f, -0.5f}, glm::vec3{0.0f, 1.0f, 0.0f}},
+
+        {glm::vec2{-0.5f, 0.5f}, glm::vec3{1.0f, 0.0f, 0.0f}},
+        {glm::vec2{-0.5f, -0.5f}, glm::vec3{1.0f, 1.0f, 1.0f}},
+        {glm::vec2{0.5f, -0.5f}, glm::vec3{0.0f, 1.0f, 0.0f}}
+        
+    };
+
+    VulkanBuffer vertex_buffer(
+        engine.physical_device(), 
+        engine.device(),
+        vertices.size() * sizeof(SimpleVertex),
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    );
+
+    vertex_buffer.upload(vertices);
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
@@ -43,7 +87,7 @@ int main() {
 
                 pipeline.bind(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
 
-                VulkanPipeline::set_viewport(
+                VulkanPipeline::set_y_up_viewport(
                     command_buffer,
                     engine.swapchain_resources().swapchain.extent()
                 );
@@ -52,6 +96,8 @@ int main() {
                     command_buffer,
                     engine.swapchain_resources().swapchain.extent()
                 );
+
+                vertex_buffer.bind_as_vertex_buffer(command_buffer);
 
                 static TestPushConstants pc{
                     .offset = {0.0f, 0.0f},
@@ -64,7 +110,7 @@ int main() {
                 
                 vkCmdDraw(
                     command_buffer.handle(),
-                    3,
+                    6,
                     1,
                     0,
                     0

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <span>
+#include <vector>
 #include <type_traits>
 #include <cstddef>
 #include <cstring>
@@ -13,6 +14,7 @@
 
 class VulkanPhysicalDevice;
 class VulkanDevice;
+class VulkanCommandBuffer;
 
 class VulkanBuffer {
 public:
@@ -35,7 +37,7 @@ public:
     VulkanBuffer(VulkanBuffer&& other) noexcept;
     VulkanBuffer& operator=(VulkanBuffer&& other) noexcept;
 
-    VkBuffer handle() const noexcept;
+    const VkBuffer& handle() const noexcept;
     VkDeviceSize size() const noexcept;
 
     void upload(const void* data, VkDeviceSize size_bytes, VkDeviceSize offset_bytes = 0);
@@ -52,6 +54,17 @@ public:
             offset_bytes
         );
     }
+
+    template<class T>
+    inline void upload(const std::vector<T>& data, VkDeviceSize offset_bytes = 0) {
+        upload(std::span<const T>(data), offset_bytes);
+    }
+
+    void bind_as_vertex_buffer(
+        VulkanCommandBuffer& command_buffer,
+        uint32_t buffer_binding = 0,
+        VkDeviceSize offset = 0
+    ) const;
 
 private:
     VkDevice m_device = VK_NULL_HANDLE;

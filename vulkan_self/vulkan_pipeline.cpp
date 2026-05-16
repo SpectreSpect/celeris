@@ -90,10 +90,10 @@ PipelineBuilder& PipelineBuilder::add_frag_shader_stage(
     return *this;
 }
 
-PipelineBuilder& PipelineBuilder::set_vertex_layout() noexcept
+PipelineBuilder& PipelineBuilder::set_vertex_layout(const VertexLayoutBuilder& layout) noexcept
 {
-    // #TODO
-
+    m_desc.vertex_bindings = layout.bindings();
+    m_desc.vertex_attributes = layout.attributes();
     return *this;
 }
 
@@ -198,10 +198,15 @@ VulkanPipeline::VulkanPipeline(const PipelineBuilder& builder)
 
     VkPipelineVertexInputStateCreateInfo vertex_input_info{};
     vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertex_input_info.vertexBindingDescriptionCount = 0;
-    vertex_input_info.pVertexBindingDescriptions = nullptr;
-    vertex_input_info.vertexAttributeDescriptionCount = 0;
-    vertex_input_info.pVertexAttributeDescriptions = nullptr;
+    vertex_input_info.vertexBindingDescriptionCount = 
+        static_cast<uint32_t>(builder.desc().vertex_bindings.size());
+
+    vertex_input_info.pVertexBindingDescriptions = builder.desc().vertex_bindings.data();
+
+    vertex_input_info.vertexAttributeDescriptionCount = 
+        static_cast<uint32_t>(builder.desc().vertex_attributes.size());
+
+    vertex_input_info.pVertexAttributeDescriptions = builder.desc().vertex_attributes.data();
 
     VkPipelineInputAssemblyStateCreateInfo input_assembly{};
     input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -332,7 +337,7 @@ PipelineBuilder VulkanPipeline::create_builder() noexcept {
     return PipelineBuilder();
 }
 
-void VulkanPipeline::set_viewport(
+void VulkanPipeline::set_y_down_viewport(
     VulkanCommandBuffer& command_buffer, 
     glm::vec2 size,
     glm::vec2 origin,
@@ -354,14 +359,46 @@ void VulkanPipeline::set_viewport(
     vkCmdSetViewport(command_buffer.handle(), 0, 1, &viewport);
 }
 
-void VulkanPipeline::set_viewport(
+void VulkanPipeline::set_y_down_viewport(
     VulkanCommandBuffer& command_buffer, 
     VkExtent2D size,
     VkOffset2D origin,
     float min_depth,
     float max_depth)
 {
-    set_viewport(
+    set_y_down_viewport(
+        command_buffer,
+        Utils::to_vec2(size),
+        Utils::to_vec2(origin),
+        min_depth,
+        max_depth
+    );
+}
+
+void VulkanPipeline::set_y_up_viewport(
+    VulkanCommandBuffer& command_buffer, 
+    glm::vec2 size,
+    glm::vec2 origin,
+    float min_depth,
+    float max_depth)
+{
+    set_y_down_viewport(
+        command_buffer,
+        glm::vec2{size.x, -size.y},
+        glm::vec2{origin.x, origin.y + size.y},
+        min_depth,
+        max_depth
+    );
+}
+
+void VulkanPipeline::set_y_up_viewport(
+    VulkanCommandBuffer& command_buffer, 
+    VkExtent2D size,
+    VkOffset2D origin,
+    float min_depth,
+    float max_depth)
+{
+    set_y_up_viewport(
         command_buffer,
         Utils::to_vec2(size),
         Utils::to_vec2(origin),
