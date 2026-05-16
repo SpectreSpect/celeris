@@ -30,6 +30,7 @@ public:
     }
 
     static glm::mat3 euler_xyz_to_mat3(const glm::vec3& euler);
+    static glm::quat omega_to_quat(const glm::vec3& omega);
     static glm::vec3 transform_normal_world(const PointCloud& cloud, const glm::vec3& local_n);
     static glm::vec3 transform_normal_world_test(const glm::vec3& cloud_rotation, const glm::vec3 cloud_scale, const glm::vec3& local_n);
     static glm::vec3 transform_point_world(const PointCloud& cloud, const glm::vec3& local_p);

@@ -52,7 +52,7 @@ int main() {
     // point_cloud_video.load_from_file(engine, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 100, 200);
 
     // int lidar_scan_width = 3600;
-    int lidar_scan_width = 10;
+    int lidar_scan_width = 100;
     // int lidar_scan_height = 16;
     int lidar_scan_height = 16;
 
@@ -60,9 +60,9 @@ int main() {
 
     uint32_t num_point_cloud_frames = 200;
     PointCloudFrame point_cloud_frames[num_point_cloud_frames];
-    // point_cloud_generator.generate_with_motion(point_cloud_frames, num_point_cloud_frames, lidar_scan_width, lidar_scan_height);
-    point_cloud_generator.generate_from_camera_transform_file(point_cloud_frames, 5, 
-        lidar_scan_width, lidar_scan_height, camera_transformations_path);
+    point_cloud_generator.generate_with_motion(point_cloud_frames, num_point_cloud_frames, lidar_scan_width, lidar_scan_height);
+    // point_cloud_generator.generate_from_camera_transform_file(point_cloud_frames, 100, 
+    //     lidar_scan_width, lidar_scan_height, camera_transformations_path);
 
     GICPTestClouds gicp_test_clouds;
     // gicp_test_clouds.create_roads(&engine);
@@ -225,8 +225,8 @@ int main() {
 
             // point_cloud_video.frames[current_frame_id].point_cloud.color = glm::vec4(1, 0, 0, 1);
 
-            // point_cloud_frames[current_frame_id].point_cloud.position = point_cloud_frames[current_frame_id - 1].point_cloud.position;
-            // point_cloud_frames[current_frame_id].point_cloud.rotation = point_cloud_frames[current_frame_id - 1].point_cloud.rotation;
+            point_cloud_frames[current_frame_id].point_cloud.position = point_cloud_frames[current_frame_id - 1].point_cloud.position;
+            point_cloud_frames[current_frame_id].point_cloud.rotation = point_cloud_frames[current_frame_id - 1].point_cloud.rotation;
             
 
             // point_cloud_video.frames[current_frame_id].point_cloud.position = point_cloud_video.frames[current_frame_id - 1].point_cloud.position;

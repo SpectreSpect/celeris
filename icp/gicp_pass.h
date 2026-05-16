@@ -19,7 +19,8 @@ class GICPPass {
 public:
     struct GICPPassUniform {
         glm::vec4 position;
-        glm::vec4 rotation;
+        // glm::vec4 rotation;
+        glm::quat rotation;
         uint32_t num_source_points;
         uint32_t num_target_points;
         uint32_t num_hash_table_slots;

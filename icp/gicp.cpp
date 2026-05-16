@@ -4,9 +4,42 @@ glm::mat3 GICP::euler_xyz_to_mat3(const glm::vec3& euler) {
     return glm::mat3(glm::eulerAngleXYZ(euler.x, euler.y, euler.z));
 }
 
+glm::quat GICP::omega_to_quat(const glm::vec3& omega) {
+    float theta = glm::length(omega);
 
-glm::vec3 GICP::transform_normal_world(const PointCloud& cloud, const glm::vec3& local_n) {
-    glm::mat3 R = euler_xyz_to_mat3(cloud.rotation);
+    if (theta < 1e-12f) {
+        return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    }
+
+    glm::vec3 axis = omega / theta;
+    return glm::normalize(glm::angleAxis(theta, axis));
+}
+
+
+// glm::vec3 GICP::transform_normal_world(const PointCloud& cloud, const glm::vec3& local_n) {
+//     glm::mat3 R = euler_xyz_to_mat3(cloud.rotation);
+
+//     glm::mat3 S(1.0f);
+//     S[0][0] = cloud.scale.x;
+//     S[1][1] = cloud.scale.y;
+//     S[2][2] = cloud.scale.z;
+
+//     glm::mat3 linear = R * S;
+//     glm::mat3 normal_matrix = glm::transpose(glm::inverse(linear));
+
+//     return glm::normalize(normal_matrix * local_n);
+// }
+
+glm::vec3 GICP::transform_normal_world(
+    const PointCloud& cloud,
+    const glm::vec3& local_n
+) {
+    if (glm::dot(local_n, local_n) < 1e-12f) {
+        return glm::vec3(0.0f);
+    }
+
+    glm::quat q = glm::normalize(cloud.rotation);
+    glm::mat3 R = glm::mat3_cast(q);
 
     glm::mat3 S(1.0f);
     S[0][0] = cloud.scale.x;
@@ -16,7 +49,13 @@ glm::vec3 GICP::transform_normal_world(const PointCloud& cloud, const glm::vec3&
     glm::mat3 linear = R * S;
     glm::mat3 normal_matrix = glm::transpose(glm::inverse(linear));
 
-    return glm::normalize(normal_matrix * local_n);
+    glm::vec3 n_world = normal_matrix * local_n;
+
+    if (glm::dot(n_world, n_world) < 1e-12f) {
+        return glm::vec3(0.0f);
+    }
+
+    return glm::normalize(n_world);
 }
 
 glm::vec3 GICP::transform_normal_world_test(const glm::vec3& cloud_rotation, const glm::vec3 cloud_scale, const glm::vec3& local_n) {
@@ -33,8 +72,23 @@ glm::vec3 GICP::transform_normal_world_test(const glm::vec3& cloud_rotation, con
     return glm::normalize(normal_matrix * local_n);
 }
 
-glm::vec3 GICP::transform_point_world(const PointCloud& cloud, const glm::vec3& local_p) {
-    glm::mat3 R = euler_xyz_to_mat3(cloud.rotation);
+// glm::vec3 GICP::transform_point_world(const PointCloud& cloud, const glm::vec3& local_p) {
+//     glm::mat3 R = euler_xyz_to_mat3(cloud.rotation);
+
+//     glm::vec3 scaled(
+//         local_p.x * cloud.scale.x,
+//         local_p.y * cloud.scale.y,
+//         local_p.z * cloud.scale.z
+//     );
+
+//     return R * scaled + cloud.position;
+// }
+
+glm::vec3 GICP::transform_point_world(
+    const PointCloud& cloud,
+    const glm::vec3& local_p
+) {
+    glm::mat3 R = glm::mat3_cast(glm::normalize(cloud.rotation));
 
     glm::vec3 scaled(
         local_p.x * cloud.scale.x,
@@ -697,7 +751,8 @@ double GICP::step(PointCloudFrame& source_point_cloud,
 
     glm::mat3 dR = omega_to_mat3(omega);
 
-    glm::mat3 R_src = euler_xyz_to_mat3(source_point_cloud.point_cloud.rotation);
+    // glm::mat3 R_src = euler_xyz_to_mat3(source_point_cloud.point_cloud.rotation);
+    glm::mat3 R_src = glm::mat3_cast(glm::normalize(source_point_cloud.rotation));
     glm::mat3 R_src_new = dR * R_src;
     glm::vec3 t_src_new = dR * source_point_cloud.point_cloud.position + v;
 
@@ -1039,30 +1094,38 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
         v *= max_trans / v_len;
     }
 
-    glm::mat3 dR = omega_to_mat3(omega);
+    glm::quat dq = omega_to_quat(omega);
 
-    // std::cout << "dR: " << std::endl;
-    // print_mat3(dR);
-    
-    // std::cout << "v: (" << v.x << ", " << v.y << ", " << v.z << ")" << std::endl;
-
-    glm::mat3 R_src = euler_xyz_to_mat3(source_point_cloud.point_cloud.rotation);
-    glm::mat3 R_src_new = dR * R_src;
-    
     glm::vec3 center = source_point_cloud.point_cloud.position;
-
-    // glm::vec3 t_src_new = dR * source_point_cloud.point_cloud.position + v;
     glm::vec3 t_src_new = center + v;
 
-    std::cout << "initial_position: (" << source_point_cloud.point_cloud.position.x << ", " << source_point_cloud.point_cloud.position.y << ", " << source_point_cloud.point_cloud.position.z << ")" << std::endl;
-    std::cout << "initial_rotation: (" << source_point_cloud.point_cloud.rotation.x << ", " << source_point_cloud.point_cloud.rotation.y << ", " << source_point_cloud.point_cloud.rotation.z << ")" << std::endl;
+    glm::quat q_old = glm::normalize(source_point_cloud.point_cloud.rotation);
+    glm::quat q_new = glm::normalize(dq * q_old);
 
+    std::cout << "initial_position: ("
+            << source_point_cloud.point_cloud.position.x << ", "
+            << source_point_cloud.point_cloud.position.y << ", "
+            << source_point_cloud.point_cloud.position.z << ")\n";
+
+    std::cout << "initial_rotation quat: (w="
+            << q_old.w << ", x="
+            << q_old.x << ", y="
+            << q_old.y << ", z="
+            << q_old.z << ")\n";
 
     source_point_cloud.point_cloud.position = t_src_new;
-    source_point_cloud.point_cloud.rotation = mat3_to_euler_xyz(R_src_new);
+    source_point_cloud.point_cloud.rotation = q_new;
 
-    std::cout << "new_position: (" << source_point_cloud.point_cloud.position.x << ", " << source_point_cloud.point_cloud.position.y << ", " << source_point_cloud.point_cloud.position.z << ")" << std::endl;
-    std::cout << "new_rotation: (" << source_point_cloud.point_cloud.rotation.x << ", " << source_point_cloud.point_cloud.rotation.y << ", " << source_point_cloud.point_cloud.rotation.z << ")" << std::endl;
+    std::cout << "new_position: ("
+            << source_point_cloud.point_cloud.position.x << ", "
+            << source_point_cloud.point_cloud.position.y << ", "
+            << source_point_cloud.point_cloud.position.z << ")\n";
+
+    std::cout << "new_rotation quat: (w="
+            << q_new.w << ", x="
+            << q_new.x << ", y="
+            << q_new.y << ", z="
+            << q_new.z << ")\n";
 
     return rmse;
 }

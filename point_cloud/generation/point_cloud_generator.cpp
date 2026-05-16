@@ -253,8 +253,8 @@ uint32_t PointCloudGenerator::generate_from_camera_transform_file(
 
         point_cloud_frames[i].point_cloud.color = glm::vec4(1, 0, 0, 1);
 
-        point_cloud_frames[i].point_cloud.position = position;
-        point_cloud_frames[i].point_cloud.rotation = rotation;
+        // point_cloud_frames[i].point_cloud.position = position;
+        // point_cloud_frames[i].point_cloud.rotation = rotation;
     }
 
     return frames_to_generate;
@@ -409,12 +409,12 @@ void PointCloudGenerator::generate(PointCloud& point_cloud, VideoBuffer& normal_
 void PointCloudGenerator::generate_with_motion(PointCloudFrame* point_cloud_frames, uint32_t num_point_cloud_frames, int width, int height) {
     float pi = glm::pi<float>();
 
-    const uint32_t forward_frames = 80;
+    const uint32_t forward_frames = 5;
     const uint32_t turn_frames    = 20;
     const uint32_t return_frames  = num_point_cloud_frames - forward_frames - turn_frames;
 
     const float start_x     = 0.0f;
-    const float end_x       = 40.0f;   // "end of road"
+    const float end_x       = 5.0f;   // "end of road"
     const float scanner_y   = 0.3f;
 
     for (uint32_t i = 0; i < num_point_cloud_frames; i++) {

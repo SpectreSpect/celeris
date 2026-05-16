@@ -330,7 +330,7 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
     GICPPassUniform uniform_data{};
     uniform_data.position = glm::vec4(source_point_cloud.position, 1.0f);
     // uniform_data.rotation = glm::vec4(source_point_cloud.rotation, 1.0f);
-    uniform_data.rotation = glm::vec4(source_point_cloud.rotation, 1.0f);
+    uniform_data.rotation = source_point_cloud.rotation;
     uniform_data.num_source_points = source_point_cloud.num_instances;
     uniform_data.num_target_points = voxel_point_map.map_point_count;
     uniform_data.num_hash_table_slots = voxel_point_map.num_hash_table_slots;
@@ -438,7 +438,8 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
 
     glm::mat3 dR = omega_to_mat3(omega);
 
-    glm::mat3 R_src = euler_xyz_to_mat3(source_point_cloud.rotation);
+    // glm::mat3 R_src = euler_xyz_to_mat3(source_point_cloud.rotation);
+    glm::mat3 R_src = glm::mat3_cast(glm::normalize(source_point_cloud.rotation));
     glm::mat3 R_src_new = dR * R_src;
 
     glm::vec3 t_src_new = source_point_cloud.position + v;
