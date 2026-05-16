@@ -40,7 +40,7 @@ int main() {
     std::string camera_transformations_path = "/home/spectre/TEMP_lidar_output_mesh/camera_transformations/camera_transformations.txt";
 
     PointCloudVideo point_cloud_video = PointCloudVideo();
-    // point_cloud_video.load_from_file(engine, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 60, 80);
+    point_cloud_video.load_from_file(engine, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 150);
 
     // for (int i = 60; i <= 81; i++) {
     //     point_cloud_video.frames[i].point_cloud.position = glm::vec3(0, 0, 0);
@@ -167,8 +167,8 @@ int main() {
         // point_cloud_pass.render(gicp_test_clouds.source_frame.point_cloud, camera);
 
 
-        point_cloud_pass.render(point_cloud_frames[current_frame_id].point_cloud, camera);
-        // point_cloud_pass.render(point_cloud_video.frames[current_frame_id].point_cloud, camera);
+        // point_cloud_pass.render(point_cloud_frames[current_frame_id].point_cloud, camera);
+        point_cloud_pass.render(point_cloud_video.frames[current_frame_id].point_cloud, camera);
 
         // point_cloud_pass.render(point_cloud_frames[test_frame].point_cloud, camera);
         // point_cloud_pass.render(point_cloud_frames[current_frame_id].point_cloud, camera);
@@ -265,13 +265,14 @@ int main() {
 
 
             // gicp_pass.fit(voxel_point_map, point_cloud_video.frames[current_frame_id].point_cloud, point_cloud_video.frames[current_frame_id].normal_buffer, 20);
+            gicp_pass.fit(voxel_point_map, point_cloud_video.frames[current_frame_id].point_cloud, point_cloud_video.frames[current_frame_id].normal_buffer, 10);
 
 
 
 
-            // voxel_map_point_inserter.insert(voxel_point_map, point_cloud_video.frames[current_frame_id].point_cloud, point_cloud_video.frames[current_frame_id].normal_buffer);
-            // last_inserted_frame_id = current_frame_id;
-            // voxel_map_point_cloud.set_points(voxel_point_map.map_point_buffer, voxel_point_map.map_point_count);
+            voxel_map_point_inserter.insert(voxel_point_map, point_cloud_video.frames[current_frame_id].point_cloud, point_cloud_video.frames[current_frame_id].normal_buffer);
+            last_inserted_frame_id = current_frame_id;
+            voxel_map_point_cloud.set_points(voxel_point_map.map_point_buffer, voxel_point_map.map_point_count);
         }
 
         if (ImGui::Button("Previous frame")) {
@@ -279,15 +280,15 @@ int main() {
         }
 
         if (ImGui::Button("Insert frame")) {
-            voxel_map_point_inserter.insert(voxel_point_map, point_cloud_frames[current_frame_id].point_cloud, point_cloud_frames[current_frame_id].normal_buffer);
-            last_inserted_frame_id = current_frame_id;
-            voxel_map_point_cloud.set_points(voxel_point_map.map_point_buffer, voxel_point_map.map_point_count);
-
-            voxel_point_map.get_point_cloud_frame(&voxel_map_frame);
-
-            // voxel_map_point_inserter.insert(voxel_point_map, point_cloud_video.frames[current_frame_id].point_cloud, point_cloud_video.frames[current_frame_id].normal_buffer);
+            // voxel_map_point_inserter.insert(voxel_point_map, point_cloud_frames[current_frame_id].point_cloud, point_cloud_frames[current_frame_id].normal_buffer);
             // last_inserted_frame_id = current_frame_id;
             // voxel_map_point_cloud.set_points(voxel_point_map.map_point_buffer, voxel_point_map.map_point_count);
+
+            // voxel_point_map.get_point_cloud_frame(&voxel_map_frame);
+
+            voxel_map_point_inserter.insert(voxel_point_map, point_cloud_video.frames[current_frame_id].point_cloud, point_cloud_video.frames[current_frame_id].normal_buffer);
+            last_inserted_frame_id = current_frame_id;
+            voxel_map_point_cloud.set_points(voxel_point_map.map_point_buffer, voxel_point_map.map_point_count);
         }
 
         if (ImGui::Button("GICP step")) {
@@ -296,8 +297,8 @@ int main() {
 
             // gicp_pass.step(voxel_point_map, gicp_test_clouds.source_frame.point_cloud, gicp_test_clouds.source_frame.normal_buffer);
 
-            gicp_pass.step(voxel_point_map, point_cloud_frames[current_frame_id].point_cloud, point_cloud_frames[current_frame_id].normal_buffer);
-            // gicp_pass.step(voxel_point_map, point_cloud_video.frames[current_frame_id].point_cloud, point_cloud_video.frames[current_frame_id].normal_buffer);
+            // gicp_pass.step(voxel_point_map, point_cloud_frames[current_frame_id].point_cloud, point_cloud_frames[current_frame_id].normal_buffer);
+            gicp_pass.step(voxel_point_map, point_cloud_video.frames[current_frame_id].point_cloud, point_cloud_video.frames[current_frame_id].normal_buffer);
 
             
             // gicp.step_test(point_cloud_frames[current_frame_id], point_cloud_frames[test_frame], 
