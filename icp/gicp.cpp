@@ -733,11 +733,11 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
                   const std::vector<glm::vec4>& target_normals)
 {
     // const auto& source_points = source_point_cloud.points;
-    // const auto& target_points = target_point_cloud.points;   // already in world space
+    // const auto& target_points = target_point_cloud.points;  
     const auto& source_points = source_point_cloud.points;
-    const auto& target_points = target_point_cloud.points;   // already in world space
+    const auto& target_points = target_point_cloud.points;   
     const auto& src_normals   = source_normals;
-    const auto& tgt_normals   = target_normals;              // already in world space
+    const auto& tgt_normals   = target_normals;        
 
     if (source_points.size() != src_normals.size()) {
         // std::cout << "source_points.size() != source_normals.size()\n";
@@ -766,6 +766,59 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
     // const glm::vec3 source_rotation = source_location.rotation;
     // const glm::vec3 source_scale(1.0f, 1.0f, 1.0f);
     // const glm::vec3 source_position = source_location.position;
+
+    // std::cout << "Source points: " << std::endl;
+    // for (size_t i = 0; i < source_points.size(); ++i) {
+    //     glm::vec3 p_local = glm::vec3(source_points[i].pos);
+    //     glm::vec3 x = transform_point_world(
+    //         source_point_cloud.point_cloud,
+    //         p_local
+    //     );
+
+    //     std::cout << "(" << x.x << ", " << x.y << ", " << x.z << ");  ";
+    // }
+
+    // std::cout << "Source normals: " << std::endl;
+    // for (size_t i = 0; i < source_points.size(); ++i) {
+    //     glm::vec3 p_local = glm::vec3(source_points[i].pos);
+    //     glm::vec3 x = transform_point_world(
+    //         source_point_cloud.point_cloud,
+    //         p_local
+    //     );
+
+    //     std::cout << "(" << x.x << ", " << x.y << ", " << x.z << ");  ";
+    // }
+
+
+    // std::cout << "Target points and normals: " << std::endl;
+    // for (size_t j = 0; j < target_points.size(); ++j) {
+
+    //     glm::vec3 n_tgt_local_sum = glm::vec3(tgt_normals[j]);
+
+    //     if (glm::dot(n_tgt_local_sum, n_tgt_local_sum) < 1e-12f) {
+    //         continue;
+    //     }
+
+    //     glm::vec3 n_tgt_local = glm::normalize(n_tgt_local_sum);
+
+    //     glm::vec3 n_tgt_world = transform_normal_world(target_point_cloud.point_cloud, n_tgt_local);
+    //     // glm::vec3 n_tgt_world = n_tgt_local;
+
+    //     if (glm::dot(n_tgt_world, n_tgt_world) < 1e-12f) {
+    //         continue;
+    //     }
+
+    //     // glm::vec3 q = glm::vec3(target_points[j].pos); // or .pos
+
+    //     glm::vec3 q_local = glm::vec3(target_points[j].pos);
+    //     glm::vec3 q = transform_point_world(target_point_cloud.point_cloud, q_local);
+
+    //     std::cout << "point: (" << q.x << ", " << q.y << ", " << q.z << ")  normal: (" << n_tgt_world.x << ", " << n_tgt_world.y << ", " << n_tgt_world.z << ")" << std::endl;
+    // }
+
+
+
+    
 
     for (size_t i = 0; i < source_points.size(); ++i) {
         // Replace .position with .pos if that is your actual field name.
@@ -807,15 +860,31 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
         int target_id = -1;
         float best_dist_sq = max_corr_dist_sq;
 
+        glm::vec3 normal_sum_TEST = glm::vec3(0, 0, 0);
+        int normal_mean_count_TEST = 0;
+
         for (size_t j = 0; j < target_points.size(); ++j) {
             // glm::vec3 n_tgt_world = glm::vec3(tgt_normals[j]);
 
-            if (glm::dot(tgt_normals[j], tgt_normals[j]) < 1e-12f) {
+            // if (glm::dot(tgt_normals[j], tgt_normals[j]) < 1e-12f) {
+            //     continue;
+            // }
+
+            // glm::vec3 n_tgt_local = glm::vec3(tgt_normals[j]);
+
+            glm::vec3 n_tgt_local_sum = glm::vec3(tgt_normals[j]);
+
+            if (glm::dot(n_tgt_local_sum, n_tgt_local_sum) < 1e-12f) {
                 continue;
             }
 
-            glm::vec3 n_tgt_local = glm::vec3(tgt_normals[j]);
+            glm::vec3 n_tgt_local = glm::normalize(n_tgt_local_sum);
+            
+            normal_sum_TEST += n_tgt_local;
+            normal_mean_count_TEST++;
+
             glm::vec3 n_tgt_world = transform_normal_world(target_point_cloud.point_cloud, n_tgt_local);
+            // glm::vec3 n_tgt_world = n_tgt_local;
 
             if (glm::dot(n_tgt_world, n_tgt_world) < 1e-12f) {
                 continue;
@@ -850,6 +919,11 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
             target_id = static_cast<int>(j);
         }
 
+        glm::vec3 normal_mean_TEST = normal_sum_TEST / float(normal_mean_count_TEST);
+
+        // std::cout << "(" << normal_mean_TEST.x << ", " << normal_mean_TEST.y << ", " << normal_mean_TEST.z << ")" << std::endl;
+
+
         if (target_id < 0) {
             continue;
         }
@@ -859,8 +933,16 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
 
 
 
-        glm::vec3 n_tgt_local = glm::vec3(tgt_normals[target_id]);
+        glm::vec3 n_tgt_local_sum = glm::vec3(tgt_normals[target_id]);
+
+        if (glm::dot(n_tgt_local_sum, n_tgt_local_sum) < 1e-12f) {
+            continue;
+        }
+
+        glm::vec3 n_tgt_local = glm::normalize(n_tgt_local_sum);
+
         glm::vec3 n_tgt_world = transform_normal_world(target_point_cloud.point_cloud, n_tgt_local);
+        // glm::vec3 n_tgt_world = n_tgt_local;
 
         if (glm::dot(n_tgt_world, n_tgt_world) < 1e-12f) {
             continue;
@@ -941,12 +1023,18 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
         (float)delta[5]
     );
 
+    std::cout << "--GICP INFO---" << std::endl;
+
     float omega_len = glm::length(omega);
+    std::cout << "omega_len: " << omega_len << std::endl;
     if (omega_len > max_rot) {
         omega *= max_rot / omega_len;
     }
 
+    
+
     float v_len = glm::length(v);
+    std::cout << "v_len: " << v_len << std::endl;
     if (v_len > max_trans) {
         v *= max_trans / v_len;
     }
@@ -954,7 +1042,7 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
     glm::mat3 dR = omega_to_mat3(omega);
 
     // std::cout << "dR: " << std::endl;
-    print_mat3(dR);
+    // print_mat3(dR);
     
     // std::cout << "v: (" << v.x << ", " << v.y << ", " << v.z << ")" << std::endl;
 
@@ -965,12 +1053,16 @@ double GICP::step_test(PointCloudFrame& source_point_cloud,
 
     // glm::vec3 t_src_new = dR * source_point_cloud.point_cloud.position + v;
     glm::vec3 t_src_new = center + v;
-    
 
-    
+    std::cout << "initial_position: (" << source_point_cloud.point_cloud.position.x << ", " << source_point_cloud.point_cloud.position.y << ", " << source_point_cloud.point_cloud.position.z << ")" << std::endl;
+    std::cout << "initial_rotation: (" << source_point_cloud.point_cloud.rotation.x << ", " << source_point_cloud.point_cloud.rotation.y << ", " << source_point_cloud.point_cloud.rotation.z << ")" << std::endl;
+
 
     source_point_cloud.point_cloud.position = t_src_new;
     source_point_cloud.point_cloud.rotation = mat3_to_euler_xyz(R_src_new);
+
+    std::cout << "new_position: (" << source_point_cloud.point_cloud.position.x << ", " << source_point_cloud.point_cloud.position.y << ", " << source_point_cloud.point_cloud.position.z << ")" << std::endl;
+    std::cout << "new_rotation: (" << source_point_cloud.point_cloud.rotation.x << ", " << source_point_cloud.point_cloud.rotation.y << ", " << source_point_cloud.point_cloud.rotation.z << ")" << std::endl;
 
     return rmse;
 }

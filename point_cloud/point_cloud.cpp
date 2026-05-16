@@ -2,6 +2,9 @@
 
 void PointCloud::create(VulkanEngine& engine, uint32_t num_points) {
     this->engine = &engine;
+
+    num_points = num_points <= 0 ? 1 : num_points;
+
     instance_buffer = VideoBuffer(engine, num_points * sizeof(PointInstance));
     num_instances = num_points;
     external_instance_buffer = nullptr;
