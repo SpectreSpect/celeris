@@ -30,6 +30,17 @@
 //     return rz * ry * rx;
 // }
 
+glm::quat GICPPass::omega_to_quat(const glm::vec3& omega) {
+    float theta = glm::length(omega);
+
+    if (theta < 1e-12f) {
+        return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    }
+
+    glm::vec3 axis = omega / theta;
+    return glm::normalize(glm::angleAxis(theta, axis));
+}
+
 glm::mat3 GICPPass::euler_xyz_to_mat3(const glm::vec3& euler) {
     return glm::mat3(glm::eulerAngleXYZ(euler.x, euler.y, euler.z));
 }
@@ -327,10 +338,13 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
         throw std::runtime_error("engine was null");
     }
 
+    glm::quat q = glm::normalize(source_point_cloud.rotation);
+
     GICPPassUniform uniform_data{};
     uniform_data.position = glm::vec4(source_point_cloud.position, 1.0f);
     // uniform_data.rotation = glm::vec4(source_point_cloud.rotation, 1.0f);
-    uniform_data.rotation = source_point_cloud.rotation;
+    
+    uniform_data.rotation = glm::vec4(q.x, q.y, q.z, q.w);
     uniform_data.num_source_points = source_point_cloud.num_instances;
     uniform_data.num_target_points = voxel_point_map.map_point_count;
     uniform_data.num_hash_table_slots = voxel_point_map.num_hash_table_slots;
@@ -422,9 +436,17 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
         return 9999;
     }
 
-    glm::vec3 omega = glm::vec3((float)delta[0], (float)delta[1], (float)delta[2]);
+    glm::vec3 omega = glm::vec3(
+        static_cast<float>(delta[0]),
+        static_cast<float>(delta[1]),
+        static_cast<float>(delta[2])
+    );
 
-    glm::vec3 v = glm::vec3((float)delta[3], (float)delta[4], (float)delta[5]);
+    glm::vec3 v = glm::vec3(
+        static_cast<float>(delta[3]),
+        static_cast<float>(delta[4]),
+        static_cast<float>(delta[5])
+    );
 
     float omega_len = glm::length(omega);
     if (omega_len > max_rot) {
@@ -436,24 +458,13 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
         v *= max_trans / v_len;
     }
 
-    glm::mat3 dR = omega_to_mat3(omega);
+    // Quaternion update.
+    // Matches matrix update: R_new = dR * R_old
+    glm::quat dq = omega_to_quat(omega);
 
-    // glm::mat3 R_src = euler_xyz_to_mat3(source_point_cloud.rotation);
-    glm::mat3 R_src = glm::mat3_cast(glm::normalize(source_point_cloud.rotation));
-    glm::mat3 R_src_new = dR * R_src;
+    source_point_cloud.position += v;
+    source_point_cloud.rotation = glm::normalize(dq * source_point_cloud.rotation);
 
-    glm::vec3 t_src_new = source_point_cloud.position + v;
-
-    source_point_cloud.position = t_src_new;
-    source_point_cloud.rotation = mat3_to_euler_xyz(R_src_new);
-
-    // std::cout << "valid_count = " << result.valid_count
-    //           << ", weighted_rmse = " << rmse
-    //           << ", |omega| = " << glm::length(omega)
-    //           << ", |v| = " << glm::length(v)
-    //           << "\n";
-
-    // std::cout << rmse << std::endl;
     return rmse;
 }
 

@@ -60,9 +60,9 @@ int main() {
 
     uint32_t num_point_cloud_frames = 200;
     PointCloudFrame point_cloud_frames[num_point_cloud_frames];
-    point_cloud_generator.generate_with_motion(point_cloud_frames, num_point_cloud_frames, lidar_scan_width, lidar_scan_height);
-    // point_cloud_generator.generate_from_camera_transform_file(point_cloud_frames, 100, 
-    //     lidar_scan_width, lidar_scan_height, camera_transformations_path);
+    // point_cloud_generator.generate_with_motion(point_cloud_frames, num_point_cloud_frames, lidar_scan_width, lidar_scan_height);
+    point_cloud_generator.generate_from_camera_transform_file(point_cloud_frames, 100, 
+        lidar_scan_width, lidar_scan_height, camera_transformations_path);
 
     GICPTestClouds gicp_test_clouds;
     // gicp_test_clouds.create_roads(&engine);
@@ -296,15 +296,15 @@ int main() {
 
             // gicp_pass.step(voxel_point_map, gicp_test_clouds.source_frame.point_cloud, gicp_test_clouds.source_frame.normal_buffer);
 
-            // gicp_pass.step(voxel_point_map, point_cloud_frames[current_frame_id].point_cloud, point_cloud_frames[current_frame_id].normal_buffer);
+            gicp_pass.step(voxel_point_map, point_cloud_frames[current_frame_id].point_cloud, point_cloud_frames[current_frame_id].normal_buffer);
             // gicp_pass.step(voxel_point_map, point_cloud_video.frames[current_frame_id].point_cloud, point_cloud_video.frames[current_frame_id].normal_buffer);
 
             
             // gicp.step_test(point_cloud_frames[current_frame_id], point_cloud_frames[test_frame], 
             //                point_cloud_frames[current_frame_id].normals, point_cloud_frames[test_frame].normals);
 
-            gicp.step_test(point_cloud_frames[current_frame_id], voxel_map_frame, 
-                    point_cloud_frames[current_frame_id].normals, voxel_map_frame.normals);
+            // gicp.step_test(point_cloud_frames[current_frame_id], voxel_map_frame, 
+            //         point_cloud_frames[current_frame_id].normals, voxel_map_frame.normals);
             
             // gicp.step_test(gicp_test_clouds.source_frame, gicp_test_clouds.target_frame, 
             //                gicp_test_clouds.source_frame.normals, gicp_test_clouds.target_frame.normals);

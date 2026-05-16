@@ -20,7 +20,7 @@ public:
     struct GICPPassUniform {
         glm::vec4 position;
         // glm::vec4 rotation;
-        glm::quat rotation;
+        glm::vec4 rotation;
         uint32_t num_source_points;
         uint32_t num_target_points;
         uint32_t num_hash_table_slots;
@@ -41,6 +41,7 @@ public:
     double fit(VoxelPointMap& voxel_point_map, PointCloud& source_point_cloud, VideoBuffer& source_normal_buffer, uint32_t max_steps);
 
 private:
+    static glm::quat omega_to_quat(const glm::vec3& omega);
     static glm::mat3 euler_xyz_to_mat3(const glm::vec3& euler);
     static glm::mat3 skew_matrix(const glm::vec3& v);
     static bool solve_6x6(const double H_in[6][6], const double g_in[6], double delta_out[6]);
