@@ -40,7 +40,7 @@ int main() {
     std::string camera_transformations_path = "/home/spectre/TEMP_lidar_output_mesh/camera_transformations/camera_transformations.txt";
 
     PointCloudVideo point_cloud_video = PointCloudVideo();
-    point_cloud_video.load_from_file(engine, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 150);
+    point_cloud_video.load_from_file(engine, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, -1);
 
     // for (int i = 60; i <= 81; i++) {
     //     point_cloud_video.frames[i].point_cloud.position = glm::vec3(0, 0, 0);
@@ -58,10 +58,10 @@ int main() {
 
     generated_point_cloud.create(engine, lidar_scan_width * lidar_scan_height);
 
-    uint32_t num_point_cloud_frames = 200;
+    uint32_t num_point_cloud_frames = 100;
     PointCloudFrame point_cloud_frames[num_point_cloud_frames];
     // point_cloud_generator.generate_with_motion(point_cloud_frames, num_point_cloud_frames, lidar_scan_width, lidar_scan_height);
-    point_cloud_generator.generate_from_camera_transform_file(point_cloud_frames, 100, 
+    point_cloud_generator.generate_from_camera_transform_file(point_cloud_frames, num_point_cloud_frames, 
         lidar_scan_width, lidar_scan_height, camera_transformations_path);
 
     GICPTestClouds gicp_test_clouds;
@@ -79,6 +79,38 @@ int main() {
     uint32_t test_frame = 0;
     size_t current_frame_id = 0;
     size_t last_inserted_frame_id = current_frame_id;
+
+    auto& frames = point_cloud_video.frames;
+
+    // Important: save original first frame pose before overwriting it.
+    glm::vec3 first_position = frames[0].point_cloud.position;
+    glm::quat first_rotation = glm::normalize(frames[0].point_cloud.rotation);
+
+    for (int i = static_cast<int>(frames.size()) - 1; i >= 1; --i) {
+        glm::vec3 p_prev = frames[i - 1].point_cloud.position;
+        glm::vec3 p_curr = frames[i].point_cloud.position;
+
+        glm::quat q_prev = glm::normalize(frames[i - 1].point_cloud.rotation);
+        glm::quat q_curr = glm::normalize(frames[i].point_cloud.rotation);
+
+        // Optional: avoid quaternion sign discontinuity.
+        // q and -q represent the same rotation.
+        if (glm::dot(q_prev, q_curr) < 0.0f) {
+            q_curr = -q_curr;
+        }
+
+        glm::vec3 delta_position = p_curr - p_prev;
+
+        // Since your update convention is:
+        // q_new = dq * q_old
+        glm::quat delta_rotation = glm::normalize(q_curr * glm::inverse(q_prev));
+
+        frames[i].point_cloud.position = delta_position;
+        frames[i].point_cloud.rotation = delta_rotation;
+    }
+
+    frames[0].point_cloud.position = glm::vec3(0.0f);
+    frames[0].point_cloud.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
 
     // point_cloud_video.frames[last_inserted_frame_id].point_cloud.position = glm::vec3(0, 0, 0);
@@ -225,12 +257,17 @@ int main() {
 
             // point_cloud_video.frames[current_frame_id].point_cloud.color = glm::vec4(1, 0, 0, 1);
 
-            point_cloud_frames[current_frame_id].point_cloud.position = point_cloud_frames[current_frame_id - 1].point_cloud.position;
-            point_cloud_frames[current_frame_id].point_cloud.rotation = point_cloud_frames[current_frame_id - 1].point_cloud.rotation;
-            
+            // point_cloud_frames[current_frame_id].point_cloud.position = point_cloud_frames[current_frame_id - 1].point_cloud.position;
+            // point_cloud_frames[current_frame_id].point_cloud.rotation = point_cloud_frames[current_frame_id - 1].point_cloud.rotation;
 
-            // point_cloud_video.frames[current_frame_id].point_cloud.position = point_cloud_video.frames[current_frame_id - 1].point_cloud.position;
-            // point_cloud_video.frames[current_frame_id].point_cloud.rotation = point_cloud_video.frames[current_frame_id - 1].point_cloud.rotation;
+            if (current_frame_id > 0) {
+                auto& curr = point_cloud_video.frames[current_frame_id].point_cloud;
+                const auto& prev = point_cloud_video.frames[current_frame_id - 1].point_cloud;
+
+                curr.position = prev.position + curr.position;
+
+                curr.rotation = glm::normalize(curr.rotation * prev.rotation);
+            }
 
 
             // gicp_pass.fit(voxel_point_map, point_cloud_frames[current_frame_id].point_cloud, point_cloud_frames[current_frame_id].normal_buffer, 10);
@@ -266,9 +303,6 @@ int main() {
 
             // gicp_pass.fit(voxel_point_map, point_cloud_video.frames[current_frame_id].point_cloud, point_cloud_video.frames[current_frame_id].normal_buffer, 20);
             gicp_pass.fit(voxel_point_map, point_cloud_video.frames[current_frame_id].point_cloud, point_cloud_video.frames[current_frame_id].normal_buffer, 10);
-
-
-
 
             voxel_map_point_inserter.insert(voxel_point_map, point_cloud_video.frames[current_frame_id].point_cloud, point_cloud_video.frames[current_frame_id].normal_buffer);
             last_inserted_frame_id = current_frame_id;

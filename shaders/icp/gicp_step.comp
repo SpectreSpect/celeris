@@ -545,7 +545,7 @@ GICPPartial get_gicp_partial(uint source_point_id, mat3 R_src, vec3 source_posit
 {
     rejection_buffer.rejections[source_point_id] = 123123;
 
-    const float max_corr_dist    = 10.0;
+    const float max_corr_dist    = 5.0;
     // const float max_corr_dist    = 20.0;
     // const float max_corr_dist    = 100.0;
     const float max_corr_dist_sq = max_corr_dist * max_corr_dist;
