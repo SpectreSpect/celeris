@@ -10,6 +10,14 @@ namespace Utils {
         return (value + alignment - 1) / alignment * alignment;
     }
 
+    constexpr VkDeviceSize align_up(VkDeviceSize value, VkDeviceSize alignment) {
+        return (value + alignment - 1) / alignment * alignment;
+    }
+
+    constexpr VkDeviceSize align_down(VkDeviceSize value, VkDeviceSize alignment) {
+        return value / alignment * alignment;
+    }    
+
     inline glm::vec2 to_vec2(VkExtent2D extent) {
         return glm::vec2{
             static_cast<float>(extent.width), 
