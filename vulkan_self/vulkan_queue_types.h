@@ -18,6 +18,8 @@ inline std::string queue_type_str(VulkanQueueType type) {
         case VulkanQueueType::Compute: return "Compute";
         case VulkanQueueType::Transfer: return "Transfer";
     }
+
+    return "";
 };
 
 struct QueueRequest {

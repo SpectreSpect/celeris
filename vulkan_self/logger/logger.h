@@ -33,6 +33,9 @@ public:
         log<true>(MultiColorString(std::forward<Str>(message)));
     }
 
+//  std::string&& r; 
+//  log((std::string&)(r));
+
     ColoredStringsStream log() const;
 
     template <bool new_line = true>

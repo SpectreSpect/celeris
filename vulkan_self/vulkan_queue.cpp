@@ -129,7 +129,7 @@ VkResult VulkanQueue::present(
 
     logger.check(m_type == VulkanQueueType::Present)
         << "The queue type must be '" << clr("Present", LoggerPalette::blue)
-        << "', but it is '" << clr(queue_type_str(m_type), LoggerPalette::blue) << "'";
+        << "', but it is '" << clr(queue_type_str(m_type), LoggerPalette::blue) << "'\n";
     
     logger.check(swapchains.size() == image_indices.size(), "The number of swapchains is not equal to the number of image_indices");
 

@@ -26,5 +26,4 @@ struct ColoredStringsStream {
         strings.emplace_back(std::forward<_ClrStr>(str));
         return *this;
     }
-
 };
