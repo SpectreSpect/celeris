@@ -157,7 +157,7 @@ void VulkanDevice::retrieve_queues(const QueueAllocation& queue_allocation) {
     LOG_METHOD();
 
     auto retrieve_queue = [&](
-        std::vector<VulkanQueue>& queues,
+        std::vector<std::unique_ptr<VulkanQueue>>& queues,
         const std::vector<QueueLocation>& locations,
         VulkanQueueType type) 
     {
@@ -165,7 +165,7 @@ void VulkanDevice::retrieve_queues(const QueueAllocation& queue_allocation) {
         queues.reserve(locations.size());
 
         for (const QueueLocation& location : locations) {
-            queues.emplace_back(*this, location, type);
+            queues.push_back(std::make_unique<VulkanQueue>(*this, location, type));
         }
     };
 
@@ -176,7 +176,7 @@ void VulkanDevice::retrieve_queues(const QueueAllocation& queue_allocation) {
 }
 
 const VulkanQueue& VulkanDevice::get_queue(
-    const std::vector<VulkanQueue>& queues,
+    const std::vector<std::unique_ptr<VulkanQueue>>& queues,
     uint32_t index,
     std::string_view error_message) const
 {
@@ -184,11 +184,11 @@ const VulkanQueue& VulkanDevice::get_queue(
     logger.check(!queues.empty(), error_message.data());
     logger.check(index < queues.size(), "Queue index is out of range");
 
-    return queues[index];
+    return *queues[index];
 }
 
 VulkanQueue& VulkanDevice::get_queue(
-    std::vector<VulkanQueue>& queues,
+    std::vector<std::unique_ptr<VulkanQueue>>& queues,
     uint32_t index,
     std::string_view error_message)
 {

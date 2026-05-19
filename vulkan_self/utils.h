@@ -1,5 +1,7 @@
 #pragma once
 #include <cstdint>
+#include <concepts>
+#include <type_traits>
 #include <glm/glm.hpp>
 
 #define GLFW_INCLUDE_VULKAN
@@ -30,5 +32,12 @@ namespace Utils {
             static_cast<float>(offset.x), 
             static_cast<float>(offset.y)
         };
+    }
+
+    template<class Range>
+    requires std::ranges::sized_range<Range>
+    inline size_t size_bytes(Range&& range) {
+        using Elem = std::ranges::range_value_t<Range>;
+        return std::ranges::size(range) * sizeof(Elem);
     }
 }

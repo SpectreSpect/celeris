@@ -17,6 +17,7 @@
 class VulkanPhysicalDevice;
 class VulkanDevice;
 class VulkanCommandBuffer;
+class VulkanEngine;
 
 class VulkanBuffer {
 public:
@@ -86,7 +87,6 @@ public:
         static_assert(std::is_trivially_copyable_v<T>);
 
         read(std::span<T>(data), offset_bytes);
-        return data;
     }
     
     template<class T>
@@ -129,6 +129,29 @@ public:
         uint32_t buffer_binding = 0,
         VkDeviceSize offset = 0
     ) const;
+
+
+    static VulkanBuffer create_vertex_buffer(
+        const VulkanPhysicalDevice& physical_device,
+        const VulkanDevice& device,
+        VkDeviceSize size_bytes
+    );
+
+    static VulkanBuffer create_vertex_buffer(
+        const VulkanEngine& engine,
+        VkDeviceSize size_bytes
+    );
+
+    static VulkanBuffer create_staging_buffer(
+        const VulkanPhysicalDevice& physical_device,
+        const VulkanDevice& device,
+        VkDeviceSize size_bytes
+    );
+
+    static VulkanBuffer create_staging_buffer(
+        const VulkanEngine& engine,
+        VkDeviceSize size_bytes
+    );
 
 private:
     VkDevice m_device = VK_NULL_HANDLE;

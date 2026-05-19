@@ -48,6 +48,7 @@ add_executable(app
   vulkan_self/vulkan_buffer.cpp
   vulkan_self/vertex_layout_builder.cpp
   vulkan_self/vulkan_memory.cpp
+  vulkan_self/vulkan_resource_loader.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

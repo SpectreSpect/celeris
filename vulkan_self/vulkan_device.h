@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <string_view>
+#include <memory>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -43,14 +44,23 @@ public:
 private:
     VkDevice m_device = VK_NULL_HANDLE;
 
-    std::vector<VulkanQueue> m_graphics_queues;
-    std::vector<VulkanQueue> m_present_queues; 
-    std::vector<VulkanQueue> m_compute_queues;
-    std::vector<VulkanQueue> m_transfer_queues;
+    std::vector<std::unique_ptr<VulkanQueue>> m_graphics_queues;
+    std::vector<std::unique_ptr<VulkanQueue>> m_present_queues; 
+    std::vector<std::unique_ptr<VulkanQueue>> m_compute_queues;
+    std::vector<std::unique_ptr<VulkanQueue>> m_transfer_queues;
 
 private:
     void retrieve_queues(const QueueAllocation& queue_allocation);
     
-    const VulkanQueue& get_queue(const std::vector<VulkanQueue>& queues, uint32_t index, std::string_view error_message) const;
-    VulkanQueue& get_queue(std::vector<VulkanQueue>& queues, uint32_t index, std::string_view error_message);
+    const VulkanQueue& get_queue(
+        const std::vector<std::unique_ptr<VulkanQueue>>& queues, 
+        uint32_t index, 
+        std::string_view error_message
+    ) const;
+
+    VulkanQueue& get_queue(
+        std::vector<std::unique_ptr<VulkanQueue>>& queues, 
+        uint32_t index, 
+        std::string_view error_message
+    );
 };
