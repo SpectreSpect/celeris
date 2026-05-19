@@ -215,6 +215,76 @@ void VulkanMemory::upload(const void* data, VkDeviceSize size_bytes, VkDeviceSiz
     unmap_memory();
 }
 
+void VulkanMemory::invalidate(VkDeviceSize size_bytes, VkDeviceSize offset_bytes) const {
+    LOG_METHOD();
+
+    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(m_memory != VK_NULL_HANDLE, "Memory is not initialized");
+    logger.check(size_bytes != 0, "Attempt to invalidate zero bytes");
+    logger.check(offset_bytes <= m_size, "Invalidate offset is out of bounds");
+    logger.check(size_bytes <= m_size - offset_bytes, "Invalidate range is out of bounds");
+
+    if (is_host_coherent()) {
+        return;
+    }
+
+    const VkDeviceSize atom_size = m_non_coherent_atom_size;
+
+    const VkDeviceSize end = offset_bytes + size_bytes;
+
+    VkDeviceSize invalidate_offset = Utils::align_down(offset_bytes, atom_size);
+    VkDeviceSize invalidate_end = Utils::align_up(end, atom_size);
+
+    if (invalidate_end > m_size) {
+        invalidate_end = m_size;
+    }
+
+    VkDeviceSize invalidate_size = invalidate_end - invalidate_offset;
+
+    VkMappedMemoryRange range{};
+    range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+    range.memory = m_memory;
+    range.offset = invalidate_offset;
+    range.size = invalidate_size;
+
+    VkResult result = vkInvalidateMappedMemoryRanges(
+        m_device,
+        1,
+        &range
+    );
+
+    logger.check(result == VK_SUCCESS, "Failed to invalidate mapped memory range");
+}
+
+void VulkanMemory::invalidate() const {
+    invalidate(m_size);
+}
+
+void VulkanMemory::read(void* data, VkDeviceSize size_bytes, VkDeviceSize offset_bytes) {
+    LOG_METHOD();
+
+    logger.check(data != nullptr, "Attempt to read data into nullptr");
+    logger.check(size_bytes != 0, "Attempt to read zero bytes");
+    logger.check(offset_bytes <= m_size, "Read offset is out of bounds");
+    logger.check(size_bytes <= m_size - offset_bytes, "Read range is out of bounds");
+    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(m_memory != VK_NULL_HANDLE, "Memory is not initialized");
+    logger.check(is_host_visible(), "Attempt to read from non-host-visible memory");
+
+    void* mapped_data = nullptr;
+    map_memory(mapped_data);
+
+    invalidate(size_bytes, offset_bytes);
+
+    std::memcpy(
+        data,
+        static_cast<std::byte*>(mapped_data) + offset_bytes,
+        static_cast<size_t>(size_bytes)
+    );
+
+    unmap_memory();
+}
+
 void VulkanMemory::bind_to_buffer(VulkanBuffer& buffer, VkDeviceSize memory_offset) const {
     LOG_METHOD();
 

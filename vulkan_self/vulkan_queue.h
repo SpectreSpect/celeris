@@ -38,15 +38,15 @@ public:
         std::span<const VkPipelineStageFlags> wait_stages,
         std::span<VulkanCommandBuffer> command_buffers,
         std::span<VulkanSemaphore> signal_semaphores,
-        VulkanFence& fence
+        VulkanFence* fence
     );
 
     void submit(
-        VulkanSemaphore& wait_semaphore,
+        VulkanSemaphore* wait_semaphore,
         VkPipelineStageFlags wait_stage,
         VulkanCommandBuffer& command_buffer,
-        VulkanSemaphore& signal_semaphore,
-        VulkanFence& fence
+        VulkanSemaphore* signal_semaphore,
+        VulkanFence* fence
     );
 
     VkResult present(

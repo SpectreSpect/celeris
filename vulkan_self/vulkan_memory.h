@@ -79,6 +79,41 @@ public:
         upload(std::span<const T>(data), offset_bytes);
     }
 
+    void invalidate(VkDeviceSize size_bytes, VkDeviceSize offset_bytes = 0) const;
+    void invalidate() const;
+
+    void read(void* data, VkDeviceSize size_bytes, VkDeviceSize offset_bytes = 0);
+
+    template<class T>
+    inline void read(std::span<T> data, VkDeviceSize offset_bytes = 0) {
+        using Elem = std::remove_cv_t<T>;
+
+        static_assert(std::is_trivially_copyable_v<Elem>);
+
+        read(
+            data.data(),
+            static_cast<VkDeviceSize>(sizeof(Elem) * data.size()),
+            offset_bytes
+        );
+    }
+
+    template<class T>
+    inline void read(std::vector<T>& data, VkDeviceSize offset_bytes = 0) {
+        static_assert(std::is_trivially_copyable_v<T>);
+
+        read(std::span<T>(data), offset_bytes);
+        return data;
+    }
+    
+    template<class T>
+    inline std::vector<T> read_vector(size_t element_count, VkDeviceSize offset_bytes = 0) {
+        static_assert(std::is_trivially_copyable_v<T>);
+
+        std::vector<T> data(element_count);
+        read(std::span<T>(data), offset_bytes);
+        return data;
+    }
+
     void bind_to_buffer(VulkanBuffer& buffer, VkDeviceSize memory_offset = 0) const;
 
 private:
