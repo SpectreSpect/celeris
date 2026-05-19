@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <span>
 
 #include <vulkan/vulkan.h>
 #include "../logger/logger_header.h"
@@ -20,6 +21,9 @@ public:
     DescriptorSetLayoutBuilder& add_storage_buffer(uint32_t binding, VkShaderStageFlags shader_stage_flags);
     DescriptorSetLayoutBuilder& add_combined_image_sampler(uint32_t binding, VkShaderStageFlags shader_stage_flags);
     DescriptorSetLayoutBuilder& add_storage_image(uint32_t binding, VkShaderStageFlags shader_stage_flags);
+
+    std::span<const VkDescriptorSetLayoutBinding> get_bindings() const noexcept;
+
 private:
-    std::vector<VkDescriptorSetLayoutBinding> bindings;
+    std::vector<VkDescriptorSetLayoutBinding> m_bindings;
 };

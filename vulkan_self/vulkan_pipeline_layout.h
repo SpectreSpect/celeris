@@ -15,10 +15,12 @@
 #include "utils.h"
 
 class VulkanDevice;
+class DescriptorSetLayout;
 
 struct PipelineLayoutBuilderDesc {
     VkDevice device = VK_NULL_HANDLE;
     std::vector<VkPushConstantRange> push_constant_ranges;
+    std::vector<VkDescriptorSetLayout> descriptor_set_layouts;
 };
 
 class PipelineLayoutBuilder {
@@ -78,6 +80,8 @@ public:
         uint32_t offset,
         VkShaderStageFlags stage_flags = VK_SHADER_STAGE_VERTEX_BIT
     );
+
+    PipelineLayoutBuilder& add_descriptor_set_layout(const DescriptorSetLayout& layout);
 
     const PipelineLayoutBuilderDesc& desc() const noexcept;
 
