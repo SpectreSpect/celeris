@@ -76,14 +76,26 @@ int main() {
     pipeline_builder.add_frag_shader_stage(frag_shader_module);
     VulkanPipeline pipeline = VulkanPipeline(pipeline_builder);
 
-    std::vector<SimpleVertex> vertices = {
-        {glm::vec2{-0.5f, 0.5f}, glm::vec3{1.0f, 0.0f, 0.0f}},
-        {glm::vec2{0.5f, 0.5f}, glm::vec3{0.0f, 0.0f, 1.0f}},
-        {glm::vec2{0.5f, -0.5f}, glm::vec3{0.0f, 1.0f, 0.0f}},
+    // std::vector<SimpleVertex> vertices = {
+    //     {glm::vec2{-0.5f, 0.5f}, glm::vec3{1.0f, 0.0f, 0.0f}},
+    //     {glm::vec2{0.5f, 0.5f}, glm::vec3{0.0f, 0.0f, 1.0f}},
+    //     {glm::vec2{0.5f, -0.5f}, glm::vec3{0.0f, 1.0f, 0.0f}},
 
-        {glm::vec2{-0.5f, 0.5f}, glm::vec3{1.0f, 0.0f, 0.0f}},
-        {glm::vec2{-0.5f, -0.5f}, glm::vec3{1.0f, 1.0f, 1.0f}},
-        {glm::vec2{0.5f, -0.5f}, glm::vec3{0.0f, 1.0f, 0.0f}}
+    //     {glm::vec2{-0.5f, 0.5f}, glm::vec3{1.0f, 0.0f, 0.0f}},
+    //     {glm::vec2{-0.5f, -0.5f}, glm::vec3{1.0f, 1.0f, 1.0f}},
+    //     {glm::vec2{0.5f, -0.5f}, glm::vec3{0.0f, 1.0f, 0.0f}}
+    // };
+    
+    std::vector<SimpleVertex> vertices = {
+        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // bottom-left
+        {{ 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}}, // bottom-right
+        {{ 0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}}, // top-right
+        {{-0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}}, // top-left
+    };
+
+    std::vector<uint32_t> indices = {
+        0, 1, 2,
+        2, 3, 0
     };
 
     VulkanBuffer staging_buffer(
@@ -102,6 +114,14 @@ int main() {
         vertices.size() * sizeof(SimpleVertex),
         VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    );
+
+    VulkanBuffer index_buffer(
+        engine.physical_device(), 
+        engine.device(),
+        indices.size() * sizeof(uint32_t),
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
     );
 
     VulkanCommandBuffer loading_command_buffer(engine.device(), engine.graphics_command_pool());
@@ -142,6 +162,7 @@ int main() {
     simple_storage.color2 = glm::vec4(0, 0, 1, 1);
 
     storage_buffer.upload(&simple_storage, sizeof(storage_buffer));
+    index_buffer.upload(indices.data(), indices.size() * sizeof(uint32_t));
     
     descriptor_set.write_uniform_buffer(0, unifrom_buffer);
     descriptor_set.write_storage_buffer(1, storage_buffer);
@@ -176,6 +197,7 @@ int main() {
                 );
 
                 vertex_buffer.bind_as_vertex_buffer(command_buffer);
+                index_buffer.bind_as_index_buffer(command_buffer);
 
                 static TestPushConstants pc{
                     .offset = {0.0f, 0.0f},
@@ -190,13 +212,15 @@ int main() {
                 ubo.color = glm::vec4(pc.offset.x, 0.0f, 1.0f, 1.0f);
                 unifrom_buffer.upload(&ubo, sizeof(SimpleUniform));
                 
-                vkCmdDraw(
-                    command_buffer.handle(),
-                    6,
-                    1,
-                    0,
-                    0
-                );
+                // vkCmdDraw(
+                //     command_buffer.handle(),
+                //     6,
+                //     1,
+                //     0,
+                //     0
+                // );
+
+                vkCmdDrawIndexed(command_buffer.handle(), indices.size(), 1, 0, 0, 0);
             }
         }
 
