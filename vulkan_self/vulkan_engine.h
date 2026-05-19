@@ -94,6 +94,9 @@ public:
     SwapchainResources& swapchain_resources();
     const SwapchainResources& swapchain_resources() const;
 
+    VulkanCommandPool& graphics_command_pool();
+    const VulkanCommandPool& graphics_command_pool() const;
+
     bool aquire_free_resources(uint32_t& free_swapchain_image_index);
     VulkanCommandBuffer& get_active_command_buffer();
     void submit_graphic_commands(uint32_t current_swapchain_image_index);
@@ -106,8 +109,8 @@ private:
     VulkanPhysicalDevice m_physical_device;
     VulkanDevice m_device;
     std::optional<SwapchainResources> m_swapchain_resources;
-    VulkanCommandPool m_command_pool;
-    std::vector<VulkanCommandBuffer> m_command_buffers;
+    VulkanCommandPool m_graphics_command_pool;
+    std::vector<VulkanCommandBuffer> m_frame_command_buffers;
     std::vector<VulkanFence> m_in_flight_fences;
     std::vector<VulkanSemaphore> m_image_available_semaphores;
 

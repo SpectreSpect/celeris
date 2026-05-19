@@ -65,6 +65,65 @@ public:
         upload(std::span<const T>(data), offset_bytes);
     }
 
+    void read(void* data, VkDeviceSize size_bytes, VkDeviceSize offset_bytes);
+
+    
+    template<class T>
+    inline void read(std::span<T> data, VkDeviceSize offset_bytes = 0) {
+        using Elem = std::remove_cv_t<T>;
+
+        static_assert(std::is_trivially_copyable_v<Elem>);
+
+        read(
+            data.data(),
+            static_cast<VkDeviceSize>(sizeof(Elem) * data.size()),
+            offset_bytes
+        );
+    }
+
+    template<class T>
+    inline void read(std::vector<T>& data, VkDeviceSize offset_bytes = 0) {
+        static_assert(std::is_trivially_copyable_v<T>);
+
+        read(std::span<T>(data), offset_bytes);
+        return data;
+    }
+    
+    template<class T>
+    inline std::vector<T> read_vector(size_t element_count, VkDeviceSize offset_bytes = 0) {
+        static_assert(std::is_trivially_copyable_v<T>);
+
+        std::vector<T> data(element_count);
+        read(std::span<T>(data), offset_bytes);
+        return data;
+    }
+
+    bool has_usage(VkBufferUsageFlags usage) const noexcept;
+
+    void memory_barrier(
+        VulkanCommandBuffer& command_buffer,
+        VkPipelineStageFlags src_stage,
+        VkAccessFlags src_access,
+        VkPipelineStageFlags dst_stage,
+        VkAccessFlags dst_access,
+        VkDeviceSize offset_bytes = 0,
+        VkDeviceSize size_bytes = VK_WHOLE_SIZE
+    ) const;
+
+    void transfer_write_to_vertex_read_barrier(
+        VulkanCommandBuffer& command_buffer,
+        VkDeviceSize offset_bytes = 0,
+        VkDeviceSize size_bytes = VK_WHOLE_SIZE
+    ) const;
+
+    void copy_to(
+        VulkanCommandBuffer& command_buffer,
+        VulkanBuffer& dst_buffer,
+        VkDeviceSize size_bytes,
+        VkDeviceSize src_offset_bytes = 0,
+        VkDeviceSize dst_offset_bytes = 0
+    ) const;
+
     void bind_as_vertex_buffer(
         VulkanCommandBuffer& command_buffer,
         uint32_t buffer_binding = 0,

@@ -1,6 +1,7 @@
 #include "vulkan_queue.h"
 
 #include <vector>
+#include <string>
 
 #include "vulkan_device.h"
 #include "vulkan_command_buffer.h"
@@ -59,7 +60,7 @@ void VulkanQueue::submit(
     std::span<const VkPipelineStageFlags> wait_stages,
     std::span<VulkanCommandBuffer> command_buffers,
     std::span<VulkanSemaphore> signal_semaphores,
-    VulkanFence& fence)
+    VulkanFence* fence)
 {
     LOG_METHOD();
 
@@ -69,6 +70,21 @@ void VulkanQueue::submit(
         << "The number of simaphores (" << clr(std::to_string(wait_semaphores.size()), LoggerPalette::orange)
         << ") does not match the number of waiting stages "
         << "(" << clr(std::to_string(wait_stages.size()), LoggerPalette::orange) << ")";
+    
+    for (size_t i = 0; i < wait_semaphores.size(); i++) {
+        logger.check(wait_semaphores[i].handle() != VK_NULL_HANDLE)
+            << "Wait semaphore " << clr(std::to_string(i), LoggerPalette::blue) << " is not initialized";
+    }
+
+    for (size_t i = 0; i < command_buffers.size(); i++) {
+        logger.check(command_buffers[i].handle() != VK_NULL_HANDLE)
+            << "Command buffer " << clr(std::to_string(i), LoggerPalette::blue) << " is not initialized";
+    }
+
+    for (size_t i = 0; i < signal_semaphores.size(); i++) {
+        logger.check(signal_semaphores[i].handle() != VK_NULL_HANDLE)
+            << "Signal semaphore " << clr(std::to_string(i), LoggerPalette::blue) << " is not initialized";
+    }
 
     VkSubmitInfo submit_info{};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -91,23 +107,23 @@ void VulkanQueue::submit(
         m_queue,
         1,
         &submit_info,
-        fence.handle()
+        fence != nullptr ? fence->handle() : VK_NULL_HANDLE
     );
 
     logger.check(submit_result == VK_SUCCESS, "Failed to submit draw command buffer");
 }
 
 void VulkanQueue::submit(
-    VulkanSemaphore& wait_semaphore,
+    VulkanSemaphore* wait_semaphore,
     VkPipelineStageFlags wait_stage,
     VulkanCommandBuffer& command_buffer,
-    VulkanSemaphore& signal_semaphore,
-    VulkanFence& fence)
+    VulkanSemaphore* signal_semaphore,
+    VulkanFence* fence)
 {
-    std::span<const VulkanSemaphore> wait_semaphores = {&wait_semaphore, 1};
-    std::span<const VkPipelineStageFlags> wait_stages = {&wait_stage, 1};
+    std::span<const VulkanSemaphore> wait_semaphores(wait_semaphore, wait_semaphore != nullptr ? 1 : 0);
+    std::span<const VkPipelineStageFlags> wait_stages(&wait_stage, wait_semaphore != nullptr ? 1 : 0);
     std::span<VulkanCommandBuffer> command_buffers = {&command_buffer, 1};
-    std::span<VulkanSemaphore> signal_semaphores = {&signal_semaphore, 1};
+    std::span<VulkanSemaphore> signal_semaphores(signal_semaphore, signal_semaphore != nullptr ? 1 : 0);
 
     submit(
         wait_semaphores,

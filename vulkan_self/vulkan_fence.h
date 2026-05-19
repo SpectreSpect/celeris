@@ -15,7 +15,7 @@ class VulkanFence {
 public:
     _XCLASS_NAME(VulkanFence);
 
-    VulkanFence(const VulkanDevice& device, VkFenceCreateFlags flags = VK_FENCE_CREATE_SIGNALED_BIT);
+    VulkanFence(const VulkanDevice& device, VkFenceCreateFlags flags = 0);
     ~VulkanFence() noexcept;
     void destroy() noexcept;
 
