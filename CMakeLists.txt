@@ -48,6 +48,11 @@ add_executable(app
   vulkan_self/vulkan_buffer.cpp
   vulkan_self/vertex_layout_builder.cpp
   vulkan_self/vulkan_memory.cpp
+  vulkan_self/descriptor_set/descriptor_set_layout_builder.cpp
+  vulkan_self/descriptor_set/descriptor_set_layout.cpp
+  vulkan_self/descriptor_set/descriptor_pool_builder.cpp
+  vulkan_self/descriptor_set/descriptor_pool.cpp
+  vulkan_self/descriptor_set/descriptor_set.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

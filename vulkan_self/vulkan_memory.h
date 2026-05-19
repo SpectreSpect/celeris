@@ -33,6 +33,10 @@ public:
     );
     ~VulkanMemory() noexcept;
 
+private:
+    void destroy() noexcept;
+
+public:
     VulkanMemory(const VulkanMemory&) = delete;
     VulkanMemory& operator=(const VulkanMemory&) = delete;
     
@@ -102,7 +106,6 @@ public:
         static_assert(std::is_trivially_copyable_v<T>);
 
         read(std::span<T>(data), offset_bytes);
-        return data;
     }
     
     template<class T>
@@ -126,8 +129,6 @@ private:
     VkDeviceSize m_non_coherent_atom_size = 1;
 
 private:
-    void destroy() noexcept;
-
     void allocate(
         const VulkanPhysicalDevice& physical_device,
         const VulkanDevice& device,

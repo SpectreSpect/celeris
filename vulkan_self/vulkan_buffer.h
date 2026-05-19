@@ -86,7 +86,6 @@ public:
         static_assert(std::is_trivially_copyable_v<T>);
 
         read(std::span<T>(data), offset_bytes);
-        return data;
     }
     
     template<class T>

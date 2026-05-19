@@ -7,6 +7,7 @@
 #include "vulkan_render_pass.h"
 #include "vulkan_device.h"
 #include "vulkan_command_buffer.h"
+#include "descriptor_set/descriptor_set_layout.h"
 
 const PipelineBuliderDesc PipelineBuilder::m_default_desc = {
     .device = VK_NULL_HANDLE,
@@ -89,6 +90,12 @@ PipelineBuilder& PipelineBuilder::add_frag_shader_stage(
 
     return *this;
 }
+
+// PipelineBuilder& PipelineBuilder::add_descriptor_set_layout(const DescriptorSetLayout& layout) {
+//     m_desc.descriptor_set_layouts.push_back(layout.handle());
+
+//     return *this;
+// }
 
 PipelineBuilder& PipelineBuilder::set_vertex_layout(const VertexLayoutBuilder& layout) noexcept
 {
@@ -257,6 +264,23 @@ VulkanPipeline::VulkanPipeline(const PipelineBuilder& builder)
     color_blending.blendConstants[1] = 0.0f;
     color_blending.blendConstants[2] = 0.0f;
     color_blending.blendConstants[3] = 0.0f;
+
+
+    // if (!builder.desc().descriptor_set_layouts.empty()) {
+    //     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+    //     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    //     pipelineLayoutInfo.setLayoutCount = builder.desc().descriptor_set_layouts.size();
+    //     pipelineLayoutInfo.pSetLayouts = builder.desc().descriptor_set_layouts.data();
+    //     pipelineLayoutInfo.pushConstantRangeCount = 0;
+    //     pipelineLayoutInfo.pPushConstantRanges = nullptr;
+
+    //     VulkanEngine::vk_check(
+    //         vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipeline_layout),
+    //         "vkCreatePipelineLayout"
+    //     );
+
+    // }
+
 
     VkGraphicsPipelineCreateInfo pipeline_info{};
     pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
