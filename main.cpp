@@ -86,15 +86,40 @@ int main() {
         {glm::vec2{0.5f, -0.5f}, glm::vec3{0.0f, 1.0f, 0.0f}}
     };
 
+    VulkanBuffer staging_buffer(
+        engine.physical_device(),
+        engine.device(),
+        vertices.size() * sizeof(SimpleVertex),
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    );
+
+    staging_buffer.upload(vertices);
+
     VulkanBuffer vertex_buffer(
         engine.physical_device(), 
         engine.device(),
         vertices.size() * sizeof(SimpleVertex),
-        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     );
 
-    vertex_buffer.upload(vertices);
+    VulkanCommandBuffer loading_command_buffer(engine.device(), engine.graphics_command_pool());
+    VulkanFence loading_fence(engine.device());
+    {
+        auto loading_scope = loading_command_buffer.begin_scope();
+        staging_buffer.copy_to(loading_command_buffer, vertex_buffer, vertices.size() * sizeof(SimpleVertex));
+        vertex_buffer.transfer_write_to_vertex_read_barrier(loading_command_buffer);
+    }
+
+    engine.device().graphics_queue().submit(
+        nullptr,
+        0,
+        loading_command_buffer,
+        nullptr,
+        &loading_fence
+    );
+    loading_fence.wait();
 
     VulkanBuffer unifrom_buffer(
         engine.physical_device(), 

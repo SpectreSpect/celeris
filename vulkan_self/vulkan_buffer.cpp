@@ -128,6 +128,145 @@ void VulkanBuffer::upload(const void* data, VkDeviceSize size_bytes, VkDeviceSiz
     m_memory->upload(data, size_bytes, offset_bytes);
 }
 
+void VulkanBuffer::read(void* data, VkDeviceSize size_bytes, VkDeviceSize offset_bytes) {
+    LOG_METHOD();
+
+    logger.check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
+    logger.check(m_memory.has_value(), "Buffer memory is not initialized");
+    logger.check(data != nullptr, "Attempt to read data into nullptr");
+    logger.check(size_bytes != 0, "Attempt to read zero bytes");
+    logger.check(offset_bytes <= size(), "Read offset is out of bounds");
+    logger.check(size_bytes <= size() - offset_bytes, "Read range is out of bounds");
+
+    m_memory->read(data, size_bytes, offset_bytes);
+}
+
+bool VulkanBuffer::has_usage(VkBufferUsageFlags usage) const noexcept {
+    return (m_usage & usage) == usage;
+}
+
+void VulkanBuffer::memory_barrier(
+    VulkanCommandBuffer& command_buffer,
+    VkPipelineStageFlags src_stage,
+    VkAccessFlags src_access,
+    VkPipelineStageFlags dst_stage,
+    VkAccessFlags dst_access,
+    VkDeviceSize offset_bytes,
+    VkDeviceSize size_bytes) const
+{
+    LOG_METHOD();
+
+    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+    logger.check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
+
+    logger.check(src_stage != 0, "Source pipeline stage mask is empty");
+    logger.check(dst_stage != 0, "Destination pipeline stage mask is empty");
+
+    logger.check(offset_bytes <= size(), "Barrier offset is out of bounds");
+
+    if (size_bytes != VK_WHOLE_SIZE) {
+        logger.check(size_bytes != 0, "Attempt to create barrier for zero bytes");
+        logger.check(size_bytes <= size() - offset_bytes, "Barrier range is out of bounds");
+    }
+
+    VkBufferMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    barrier.srcAccessMask = src_access;
+    barrier.dstAccessMask = dst_access;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.buffer = m_buffer;
+    barrier.offset = offset_bytes;
+    barrier.size = size_bytes;
+
+    vkCmdPipelineBarrier(
+        command_buffer.handle(),
+        src_stage,
+        dst_stage,
+        0,
+        0,
+        nullptr,
+        1,
+        &barrier,
+        0,
+        nullptr
+    );
+}
+
+void VulkanBuffer::transfer_write_to_vertex_read_barrier(
+    VulkanCommandBuffer& command_buffer,
+    VkDeviceSize offset_bytes,
+    VkDeviceSize size_bytes) const 
+{
+    LOG_METHOD();
+
+    logger.check(
+        has_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT),
+        "Buffer was not created with VK_BUFFER_USAGE_TRANSFER_DST_BIT"
+    );
+
+    logger.check(
+        has_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT),
+        "Buffer was not created with VK_BUFFER_USAGE_VERTEX_BUFFER_BIT"
+    );
+
+    memory_barrier(
+        command_buffer,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_ACCESS_TRANSFER_WRITE_BIT,
+        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+        VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
+        offset_bytes,
+        size_bytes
+    );
+}
+
+void VulkanBuffer::copy_to(
+    VulkanCommandBuffer& command_buffer,
+    VulkanBuffer& dst_buffer,
+    VkDeviceSize size_bytes,
+    VkDeviceSize src_offset_bytes,
+    VkDeviceSize dst_offset_bytes
+) const {
+    LOG_METHOD();
+
+    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+
+    logger.check(m_buffer != VK_NULL_HANDLE, "Source buffer is not initialized");
+    logger.check(dst_buffer.handle() != VK_NULL_HANDLE, "Destination buffer is not initialized");
+
+    logger.check(
+        has_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT),
+        "Source buffer was not created with VK_BUFFER_USAGE_TRANSFER_SRC_BIT"
+    );
+
+    logger.check(
+        dst_buffer.has_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT),
+        "Destination buffer was not created with VK_BUFFER_USAGE_TRANSFER_DST_BIT"
+    );
+
+    logger.check(size_bytes != 0, "Attempt to copy zero bytes");
+
+    logger.check(src_offset_bytes <= size(), "Source copy offset is out of bounds");
+    logger.check(size_bytes <= size() - src_offset_bytes, "Source copy range is out of bounds");
+
+    logger.check(dst_offset_bytes <= dst_buffer.size(), "Destination copy offset is out of bounds");
+    logger.check(size_bytes <= dst_buffer.size() - dst_offset_bytes, "Destination copy range is out of bounds");
+
+    VkBufferCopy copy_region{};
+    copy_region.srcOffset = src_offset_bytes;
+    copy_region.dstOffset = dst_offset_bytes;
+    copy_region.size = size_bytes;
+
+    vkCmdCopyBuffer(
+        command_buffer.handle(),
+        m_buffer,
+        dst_buffer.handle(),
+        1,
+        &copy_region
+    );
+}
+
 void VulkanBuffer::bind_as_vertex_buffer(
     VulkanCommandBuffer& command_buffer,
     uint32_t buffer_binding,

@@ -14,11 +14,11 @@ VulkanEngine::VulkanEngine(
         m_physical_device(m_instance, m_surface, queue_request),
         m_device(m_physical_device),
         m_swapchain_resources(std::in_place, m_physical_device, m_device, m_surface, m_window),
-        m_command_pool(m_device, m_device.graphics_queue()),
-        m_command_buffers(
+        m_graphics_command_pool(m_device, m_device.graphics_queue()),
+        m_frame_command_buffers(
             VulkanCommandBuffer::create_command_buffers(
                 m_device, 
-                m_command_pool, 
+                m_graphics_command_pool, 
                 static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
             )
         ),
@@ -65,6 +65,14 @@ const SwapchainResources& VulkanEngine::swapchain_resources() const {
     return *m_swapchain_resources;
 }
 
+VulkanCommandPool& VulkanEngine::graphics_command_pool() {
+    return m_graphics_command_pool;
+}
+
+const VulkanCommandPool& VulkanEngine::graphics_command_pool() const {
+    return m_graphics_command_pool;
+}
+
 bool VulkanEngine::aquire_free_resources(uint32_t& free_swapchain_image_index) {
     LOG_METHOD();
 
@@ -85,7 +93,7 @@ bool VulkanEngine::aquire_free_resources(uint32_t& free_swapchain_image_index) {
     );
     
     m_in_flight_fences[m_current_frame].reset();
-    m_command_buffers[m_current_frame].reset();
+    m_frame_command_buffers[m_current_frame].reset();
 
     return true;
 }
@@ -95,18 +103,18 @@ VulkanCommandBuffer& VulkanEngine::get_active_command_buffer() {
 
     logger.check(m_current_frame < MAX_FRAMES_IN_FLIGHT, "The frame index is out of array bounds");
 
-    return m_command_buffers[m_current_frame];
+    return m_frame_command_buffers[m_current_frame];
 }
 
 void VulkanEngine::submit_graphic_commands(uint32_t current_swapchain_image_index) {
     LOG_METHOD();
 
     m_device.graphics_queue().submit(
-        m_image_available_semaphores[m_current_frame],
+        &m_image_available_semaphores[m_current_frame],
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        m_command_buffers[m_current_frame],
-        m_swapchain_resources->render_finished_semaphores[current_swapchain_image_index],
-        m_in_flight_fences[m_current_frame]
+        m_frame_command_buffers[m_current_frame],
+        &m_swapchain_resources->render_finished_semaphores[current_swapchain_image_index],
+        &m_in_flight_fences[m_current_frame]
     );
 }
 
