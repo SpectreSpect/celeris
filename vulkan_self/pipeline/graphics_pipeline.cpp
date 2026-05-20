@@ -8,6 +8,7 @@
 #include "../vulkan_device.h"
 #include "../vulkan_command_buffer.h"
 #include "../descriptor_set/descriptor_set_layout.h"
+#include "../vulkan_engine.h"
 
 const GraphicsPipelineBuliderDesc GraphicsPipelineBuilder::m_default_desc = {
     .device = VK_NULL_HANDLE,
@@ -435,4 +436,48 @@ void GraphicsPipeline::set_scissor(
     scissor.extent = extent;
 
     vkCmdSetScissor(command_buffer.handle(), 0, 1, &scissor);
+}
+
+void GraphicsPipeline::set_y_down_viewport(
+    VulkanCommandBuffer& command_buffer,
+    VulkanEngine& engine,
+    VkOffset2D origin,
+    float min_depth,
+    float max_depth)
+{
+    set_y_down_viewport(
+        command_buffer,
+        engine.swapchain_resources().swapchain.extent(),
+        origin,
+        min_depth,
+        max_depth
+    );
+}
+
+void GraphicsPipeline::set_y_up_viewport(
+    VulkanCommandBuffer& command_buffer,
+    VulkanEngine& engine,
+    VkOffset2D origin,
+    float min_depth,
+    float max_depth)
+{
+    set_y_up_viewport(
+        command_buffer,
+        engine.swapchain_resources().swapchain.extent(),
+        origin,
+        min_depth,
+        max_depth
+    );
+}
+
+void GraphicsPipeline::set_scissor(
+    VulkanCommandBuffer& command_buffer,
+    VulkanEngine& engine,
+    VkOffset2D offset)
+{
+    set_scissor(
+        command_buffer,
+        engine.swapchain_resources().swapchain.extent(),
+        offset
+    );
 }

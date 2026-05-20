@@ -33,6 +33,20 @@ struct SimpleStorage {
     glm::vec4 color2;
 };
 
+std::vector<SimpleVertex> vertices = {
+    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // bottom-left
+    {{ 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}}, // bottom-right
+    {{ 0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}}, // top-right
+    {{-0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}}, // top-left
+};
+
+std::vector<uint32_t> indices = {
+    0, 1, 2,
+    2, 3, 0
+};
+
+SimpleStorage simple_storage{glm::vec4(1, 0, 0, 1), glm::vec4(0, 0, 1, 1)};
+
 int main() {
     GlfwContext glfw_context;
     Window window(glfw_context, 1280, 720, "Vulkan engine");
@@ -44,22 +58,43 @@ int main() {
 
     VulkanEngine engine(glfw_context, window, queue_request);
 
+    VulkanShaderModule compute_shader(engine.device(), "shaders/test_compute_shader.comp.spv");
+    VulkanShaderModule vert_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.vert.spv");
+    VulkanShaderModule frag_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.frag.spv");
+
     VulkanBuffer storage_buffer = VulkanBuffer::create_storage_buffer(engine, sizeof(SimpleStorage));
     VulkanBuffer unifrom_buffer = VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(SimpleUniform));
+    VulkanBuffer vertex_buffer = VulkanBuffer::create_vertex_buffer(engine, Utils::size_bytes(vertices));
+    VulkanBuffer index_buffer = VulkanBuffer::create_index_buffer(engine, Utils::size_bytes(indices));
+
+    VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
+    resource_loader.upload_vertex_buffer(vertices.data(), Utils::size_bytes(vertices), vertex_buffer);
+    resource_loader.upload_index_buffer(indices.data(), Utils::size_bytes(indices), index_buffer);
+    resource_loader.upload_storage_buffer(&simple_storage, sizeof(SimpleStorage), storage_buffer);
+    resource_loader.submit();
+
+
 
     DescriptorSetLayoutBuilder compute_dsl_builder;
-    compute_dsl_builder
-        .add_uniform_buffer(0, ShaderStages::compute)
-        .add_storage_buffer(1, ShaderStages::compute);
-
+    compute_dsl_builder.add_uniform_buffer(0, ShaderStages::compute);
+    compute_dsl_builder.add_storage_buffer(1, ShaderStages::compute);
     DescriptorSetLayout compute_dsl(engine.device(), compute_dsl_builder);
 
-    DescriptorPoolBuilder compute_pool_builder;
-    compute_pool_builder.add_layout(compute_dsl_builder);
+    DescriptorSetLayoutBuilder dsl_builder;
+    dsl_builder.add_uniform_buffer(0, ShaderStages::fragment);
+    dsl_builder.add_storage_buffer(1, ShaderStages::fragment);
+    DescriptorSetLayout dsl(engine.device(), dsl_builder);
 
-    DescriptorPool compute_pool(engine.device(), compute_pool_builder);
+    DescriptorPoolBuilder pool_builder;
+    pool_builder.add_layout(dsl_builder);
+    pool_builder.add_layout(compute_dsl_builder);
+    DescriptorPool pool(engine.device(), pool_builder);
 
-    DescriptorSet compute_descriptor_set = compute_pool.allocate_set(compute_dsl);
+    DescriptorSet compute_descriptor_set = pool.allocate_set(compute_dsl);
+    DescriptorSet descriptor_set = pool.allocate_set(dsl);
+
+
+
 
     PipelineLayoutBuilder compute_pipeline_layout_builder = VulkanPipelineLayout::create_builder();
     compute_pipeline_layout_builder.set_device(engine.device());
@@ -67,34 +102,15 @@ int main() {
     compute_pipeline_layout_builder.add_descriptor_set_layout(compute_dsl);
     VulkanPipelineLayout compute_pipeline_layout(compute_pipeline_layout_builder);
 
-    VulkanShaderModule compute_shader(engine.device(), "shaders/test_compute_shader.comp.spv");
-
     ComputePipeline compute_pipeline(engine.device(), compute_pipeline_layout, compute_shader);
 
     // Graphics pipeline
-
-    DescriptorSetLayoutBuilder dsl_builder;
-    dsl_builder
-        .add_uniform_buffer(0, ShaderStages::fragment)
-        .add_storage_buffer(1, ShaderStages::fragment);
-
-    DescriptorSetLayout dsl(engine.device(), dsl_builder);
-
-    DescriptorPoolBuilder pool_builder;
-    pool_builder.add_layout(dsl_builder);
-
-    DescriptorPool pool(engine.device(), pool_builder);
-
-    DescriptorSet descriptor_set = pool.allocate_set(dsl);
 
     PipelineLayoutBuilder pipeline_layout_builder = VulkanPipelineLayout::create_builder();
     pipeline_layout_builder.set_device(engine.device());
     pipeline_layout_builder.add_push_constants<TestPushConstants>();
     pipeline_layout_builder.add_descriptor_set_layout(dsl);
     VulkanPipelineLayout pipeline_layout(pipeline_layout_builder);
-
-    VulkanShaderModule vert_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.vert.spv");
-    VulkanShaderModule frag_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.frag.spv");
 
     GraphicsPipelineBuilder pipeline_builder = GraphicsPipeline::create_builder();
     pipeline_builder.set_graphic_objects(engine.device(), pipeline_layout, engine.swapchain_resources().render_pass);
@@ -131,31 +147,6 @@ int main() {
         &compute_fence
     );
     compute_fence.wait();
-    
-    std::vector<SimpleVertex> vertices = {
-        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // bottom-left
-        {{ 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}}, // bottom-right
-        {{ 0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}}, // top-right
-        {{-0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}}, // top-left
-    };
-
-    std::vector<uint32_t> indices = {
-        0, 1, 2,
-        2, 3, 0
-    };
-
-    SimpleStorage simple_storage;
-    simple_storage.color1 = glm::vec4(1, 0, 0, 1);
-    simple_storage.color2 = glm::vec4(0, 0, 1, 1);
-
-    VulkanBuffer vertex_buffer = VulkanBuffer::create_vertex_buffer(engine, Utils::size_bytes(vertices));
-    VulkanBuffer index_buffer = VulkanBuffer::create_index_buffer(engine, Utils::size_bytes(indices));
-
-    VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
-    resource_loader.upload_vertex_buffer(vertices.data(), Utils::size_bytes(vertices), vertex_buffer);
-    resource_loader.upload_index_buffer(indices.data(), Utils::size_bytes(indices), index_buffer);
-    resource_loader.upload_storage_buffer(&simple_storage, sizeof(SimpleStorage), storage_buffer);
-    resource_loader.submit();
 
     descriptor_set.write_uniform_buffer(0, unifrom_buffer);
     descriptor_set.write_storage_buffer(1, storage_buffer);
@@ -167,45 +158,34 @@ int main() {
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
 
+        SimpleUniform ubo;
+        ubo.color = glm::vec4(1.0f, 0.0f, 1.0f, 1.0f);
+        unifrom_buffer.upload(&ubo, sizeof(SimpleUniform));
+
+        static TestPushConstants pc{
+            .offset = {0.0f, 0.0f},
+            .scale = 1.0f
+        };
+        pc.offset.x += 0.001f;
+
         // Запись команд
         {auto command_buffer_scope = command_buffer.begin_scope();
             {auto render_pass_scope = engine.swapchain_resources().render_pass.begin_scope(
                 command_buffer,
                 engine.swapchain_resources().framebuffers[image_index],
-                engine.swapchain_resources().swapchain,
-                {{0.05f, 0.08f, 0.12f, 1.0f}}
-            );
+                engine.swapchain_resources().swapchain, {{0.05f, 0.08f, 0.12f, 1.0f}});
 
                 pipeline.bind(command_buffer);
                 descriptor_set.bind(command_buffer, pipeline);
 
-                GraphicsPipeline::set_y_up_viewport(
-                    command_buffer,
-                    engine.swapchain_resources().swapchain.extent()
-                );
-
-                GraphicsPipeline::set_scissor(
-                    command_buffer,
-                    engine.swapchain_resources().swapchain.extent()
-                );
-
+                pipeline.set_y_up_viewport(command_buffer, engine);
+                pipeline.set_scissor(command_buffer, engine);
                 vertex_buffer.bind_as_vertex_buffer(command_buffer);
                 index_buffer.bind_as_index_buffer(command_buffer);
-
-                static TestPushConstants pc{
-                    .offset = {0.0f, 0.0f},
-                    .scale = 1.0f
-                };
-
-                pc.offset.x += 0.001f;
                 
                 pipeline_layout.push_constants(command_buffer, pc);
 
-                SimpleUniform ubo;
-                ubo.color = glm::vec4(pc.offset.x, 0.0f, 1.0f, 1.0f);
-                unifrom_buffer.upload(&ubo, sizeof(SimpleUniform));
-
-                vkCmdDrawIndexed(command_buffer.handle(), indices.size(), 1, 0, 0, 0);
+                command_buffer.draw_indexed(indices.size());
             }
         }
 

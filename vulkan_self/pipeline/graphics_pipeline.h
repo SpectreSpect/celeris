@@ -20,6 +20,7 @@ class VulkanRenderPass;
 class VulkanDevice;
 class VulkanCommandBuffer;
 class DescriptorSetLayout;
+class VulkanEngine;
 
 struct GraphicsPipelineBuliderDesc {
     VkDevice device;
@@ -160,4 +161,27 @@ public:
         VkExtent2D extent,
         VkOffset2D offset = VkOffset2D{0, 0}
     );
+
+    static void set_y_down_viewport(
+        VulkanCommandBuffer& command_buffer,
+        VulkanEngine& engine,
+        VkOffset2D origin = VkOffset2D{0, 0},
+        float min_depth = 0.0f,
+        float max_depth = 1.0f
+    );
+
+    static void set_y_up_viewport(
+        VulkanCommandBuffer& command_buffer,
+        VulkanEngine& engine,
+        VkOffset2D origin = VkOffset2D{0, 0},
+        float min_depth = 0.0f,
+        float max_depth = 1.0f
+    );
+
+    static void set_scissor(
+        VulkanCommandBuffer& command_buffer,
+        VulkanEngine& engine,
+        VkOffset2D offset = VkOffset2D{0, 0}
+    );
+
 };
