@@ -12,7 +12,7 @@ class VulkanCommandBuffer;
 
 class ComputePipeline : public Pipeline {
 public:
-    _XCLASS_NAME(ComputePipeline);
+    _XCHILD_NAME(ComputePipeline);
     
     explicit ComputePipeline(VulkanDevice& device, const VulkanPipelineLayout& pipeline_layout, VulkanShaderModule& compute_shader);
     

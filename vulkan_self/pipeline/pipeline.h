@@ -11,6 +11,8 @@ class VulkanCommandBuffer;
 
 class Pipeline {
 public:
+    _XPARENT_NAME(Pipeline);
+
     Pipeline() = default;
 
     Pipeline(const Pipeline&) = delete;

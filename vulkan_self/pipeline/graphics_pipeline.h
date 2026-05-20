@@ -82,8 +82,6 @@ public:
         std::string_view entry_point_name = m_default_desc.fragment_entry_point_name
     );
 
-    
-
     GraphicsPipelineBuilder& set_vertex_layout(const VertexLayoutBuilder& layout) noexcept;
 
     GraphicsPipelineBuilder& set_input_assembly(
@@ -117,20 +115,9 @@ public:
 
 class GraphicsPipeline : public Pipeline {
 public:
-    _XCLASS_NAME(GraphicsPipeline);
+    _XCHILD_NAME(GraphicsPipeline);
 
     explicit GraphicsPipeline(const GraphicsPipelineBuilder& builder);
-    // ~GraphicsPipeline() noexcept;
-
-    // virtual VkPipelineBindPoint get_bind_point() noexcept = 0;
-    
-    // void bind(
-    //     VulkanCommandBuffer& command_buffer, 
-    //     VkPipelineBindPoint bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS
-    // ) const;
-
-    
-    // virtual void bind(VulkanCommandBuffer& command_buffer) const override;
 
     VkPipelineBindPoint get_bind_point() const noexcept override;
 
