@@ -1,7 +1,6 @@
 #include "vulkan_self/vulkan_engine.h"
 #include "vulkan_self/vulkan_shader_module.h"
 #include "vulkan_self/pipeline/vulkan_pipeline_layout.h"
-// #include "vulkan_self/vulkan_pipeline.h"
 #include "vulkan_self/pipeline/graphics_pipeline.h"
 #include "vulkan_self/vulkan_buffer.h"
 #include "vulkan_self/vulkan_resource_loader.h"
@@ -45,29 +44,8 @@ int main() {
 
     VulkanEngine engine(glfw_context, window, queue_request);
 
-    VulkanBuffer unifrom_buffer(
-        engine.physical_device(), 
-        engine.device(),
-        sizeof(SimpleUniform),
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-    );
-
-    VulkanBuffer storage_buffer(
-        engine.physical_device(), 
-        engine.device(),
-        sizeof(SimpleStorage),
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-    );
-
-    // SimpleStorage simple_storage;
-    // simple_storage.color1 = glm::vec4(1, 0, 0, 1);
-    // simple_storage.color2 = glm::vec4(0, 0, 1, 1);
-
-    // storage_buffer.upload(&simple_storage, sizeof(SimpleStorage));
-
-
+    VulkanBuffer storage_buffer = VulkanBuffer::create_storage_buffer(engine, sizeof(SimpleStorage));
+    VulkanBuffer unifrom_buffer = VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(SimpleUniform));
 
     DescriptorSetLayoutBuilder compute_dsl_builder;
     compute_dsl_builder
@@ -92,7 +70,6 @@ int main() {
     VulkanShaderModule compute_shader(engine.device(), "shaders/test_compute_shader.comp.spv");
 
     ComputePipeline compute_pipeline(engine.device(), compute_pipeline_layout, compute_shader);
-
 
     // Graphics pipeline
 
@@ -154,16 +131,6 @@ int main() {
         &compute_fence
     );
     compute_fence.wait();
-
-    // std::vector<SimpleVertex> vertices = {
-    //     {glm::vec2{-0.5f, 0.5f}, glm::vec3{1.0f, 0.0f, 0.0f}},
-    //     {glm::vec2{0.5f, 0.5f}, glm::vec3{0.0f, 0.0f, 1.0f}},
-    //     {glm::vec2{0.5f, -0.5f}, glm::vec3{0.0f, 1.0f, 0.0f}},
-
-    //     {glm::vec2{-0.5f, 0.5f}, glm::vec3{1.0f, 0.0f, 0.0f}},
-    //     {glm::vec2{-0.5f, -0.5f}, glm::vec3{1.0f, 1.0f, 1.0f}},
-    //     {glm::vec2{0.5f, -0.5f}, glm::vec3{0.0f, 1.0f, 0.0f}}
-    // };
     
     std::vector<SimpleVertex> vertices = {
         {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // bottom-left
@@ -181,50 +148,13 @@ int main() {
     simple_storage.color1 = glm::vec4(1, 0, 0, 1);
     simple_storage.color2 = glm::vec4(0, 0, 1, 1);
 
-
     VulkanBuffer vertex_buffer = VulkanBuffer::create_vertex_buffer(engine, Utils::size_bytes(vertices));
-
-    VulkanBuffer index_buffer(
-        engine.physical_device(), 
-        engine.device(),
-        indices.size() * sizeof(uint32_t),
-        VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-    );
-
-    // VulkanBuffer storage_buffer(
-    //     engine.physical_device(), 
-    //     engine.device(),
-    //     vertices.size() * sizeof(SimpleStorage),
-    //     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-    //     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-    // );
-
-// <<<<<<< HEAD
-//     index_buffer.upload(indices.data(), indices.size() * sizeof(uint32_t));
-    
-// =======
-// >>>>>>> feature/switch-opengl-to-vulcan
-
+    VulkanBuffer index_buffer = VulkanBuffer::create_index_buffer(engine, Utils::size_bytes(indices));
 
     VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
     resource_loader.upload_vertex_buffer(vertices.data(), Utils::size_bytes(vertices), vertex_buffer);
-    resource_loader.upload(
-        indices.data(),
-        Utils::size_bytes(indices),
-        index_buffer,
-        0,
-        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-        VK_ACCESS_INDEX_READ_BIT
-    );
-    resource_loader.upload(
-        &simple_storage,
-        sizeof(SimpleStorage),
-        storage_buffer,
-        0,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_ACCESS_SHADER_READ_BIT
-    );
+    resource_loader.upload_index_buffer(indices.data(), Utils::size_bytes(indices), index_buffer);
+    resource_loader.upload_storage_buffer(&simple_storage, sizeof(SimpleStorage), storage_buffer);
     resource_loader.submit();
 
     descriptor_set.write_uniform_buffer(0, unifrom_buffer);

@@ -137,7 +137,6 @@ public:
         VkIndexType index_type = VK_INDEX_TYPE_UINT32
     ) const;
 
-
     static VulkanBuffer create_vertex_buffer(
         const VulkanPhysicalDevice& physical_device,
         const VulkanDevice& device,
@@ -156,6 +155,39 @@ public:
     );
 
     static VulkanBuffer create_staging_buffer(
+        const VulkanEngine& engine,
+        VkDeviceSize size_bytes
+    );
+
+    static VulkanBuffer create_index_buffer(
+        const VulkanPhysicalDevice& physical_device,
+        const VulkanDevice& device,
+        VkDeviceSize size_bytes
+    );
+
+    static VulkanBuffer create_index_buffer(
+        const VulkanEngine& engine,
+        VkDeviceSize size_bytes
+    );
+
+    static VulkanBuffer create_storage_buffer(
+        const VulkanPhysicalDevice& physical_device,
+        const VulkanDevice& device,
+        VkDeviceSize size_bytes
+    );
+
+    static VulkanBuffer create_storage_buffer(
+        const VulkanEngine& engine,
+        VkDeviceSize size_bytes
+    );
+
+    static VulkanBuffer create_host_visible_uniform_buffer(
+        const VulkanPhysicalDevice& physical_device,
+        const VulkanDevice& device,
+        VkDeviceSize size_bytes
+    );
+
+    static VulkanBuffer create_host_visible_uniform_buffer(
         const VulkanEngine& engine,
         VkDeviceSize size_bytes
     );
