@@ -43,6 +43,8 @@ VkPipelineLayout Pipeline::layout() const noexcept {
 }
 
 void Pipeline::set_pipeline(VkDevice device, VkPipeline pipeline, VkPipelineLayout layout) {
+    LOG_METHOD();
+
     logger.check(m_device == VK_NULL_HANDLE, "Pipeline device has already been initialized");
     logger.check(m_pipeline == VK_NULL_HANDLE, "Pipeline has already been initialized");
     logger.check(device != VK_NULL_HANDLE, "Cannot set null device");
@@ -55,7 +57,7 @@ void Pipeline::set_pipeline(VkDevice device, VkPipeline pipeline, VkPipelineLayo
 }
 
 void Pipeline::bind(VulkanCommandBuffer& command_buffer) const {
-    // LOG_METHOD();
+    LOG_METHOD();
 
     logger.check(m_pipeline != VK_NULL_HANDLE, "Pipeline is not initialized");
     logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
