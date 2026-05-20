@@ -41,8 +41,8 @@ add_executable(app
   vulkan_self/vulkan_fence.cpp
   vulkan_self/vulkan_semaphore.cpp
   vulkan_self/vulkan_shader_module.cpp
-  vulkan_self/vulkan_pipeline_layout.cpp
-  vulkan_self/vulkan_pipeline.cpp
+  vulkan_self/pipeline/vulkan_pipeline_layout.cpp
+  vulkan_self/pipeline/graphics_pipeline.cpp
   vulkan_self/vulkan_buffer.cpp
   vulkan_self/vertex_layout_builder.cpp
   vulkan_self/vulkan_memory.cpp
@@ -52,6 +52,8 @@ add_executable(app
   vulkan_self/descriptor_set/descriptor_pool_builder.cpp
   vulkan_self/descriptor_set/descriptor_pool.cpp
   vulkan_self/descriptor_set/descriptor_set.cpp
+  vulkan_self/pipeline/compute_pipeline.cpp
+  vulkan_self/pipeline/pipeline.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

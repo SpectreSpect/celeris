@@ -26,6 +26,35 @@ DescriptorSetLayout::DescriptorSetLayout(const VulkanDevice& device, const Descr
 ) : DescriptorSetLayout(device, builder.get_bindings()) {
 }
 
+DescriptorSetLayout::DescriptorSetLayout(DescriptorSetLayout&& other) noexcept
+    :   m_layout(std::exchange(other.m_layout, VK_NULL_HANDLE)),
+        m_device(std::exchange(other.m_device, VK_NULL_HANDLE)) {}
+
+
+DescriptorSetLayout& DescriptorSetLayout::operator=(DescriptorSetLayout&& other) noexcept {
+    if (this != &other) {
+        destory();
+
+        m_layout = std::exchange(other.m_layout, VK_NULL_HANDLE);
+        m_device = std::exchange(other.m_device, VK_NULL_HANDLE);
+    }
+
+    return *this;
+}
+
+DescriptorSetLayout::~DescriptorSetLayout() noexcept{
+    destory();
+}
+
+void DescriptorSetLayout::destory() noexcept {
+    if (m_device != VK_NULL_HANDLE && m_layout != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(m_device, m_layout, nullptr);
+    }
+
+    m_layout = VK_NULL_HANDLE;
+    m_device = VK_NULL_HANDLE;
+}
+
 VkDescriptorSetLayout DescriptorSetLayout::handle() const noexcept {
     return m_layout;
 }

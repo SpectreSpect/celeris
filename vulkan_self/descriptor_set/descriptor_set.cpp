@@ -1,8 +1,8 @@
 #include "descriptor_set.h"
 #include "../vulkan_buffer.h"
 #include "../vulkan_command_buffer.h"
-#include "../vulkan_pipeline_layout.h"
-
+#include "../pipeline/vulkan_pipeline_layout.h"
+#include "../pipeline/pipeline.h"
 
 void DescriptorSet::write_buffer(uint32_t binding, VulkanBuffer& buffer, VkDescriptorType descriptor_type) {
     LOG_METHOD();
@@ -36,10 +36,23 @@ void DescriptorSet::write_storage_buffer(uint32_t binding, VulkanBuffer& buffer)
     write_buffer(binding, buffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 }
 
-void DescriptorSet::bind(VulkanCommandBuffer& command_buffer, VulkanPipelineLayout& pipeline_layout) {
+void DescriptorSet::bind(VulkanCommandBuffer& command_buffer, VkPipelineLayout pipeline_layout, VkPipelineBindPoint bind_point) {
     LOG_METHOD();
-    vkCmdBindDescriptorSets(command_buffer.handle(), 
-                            VK_PIPELINE_BIND_POINT_GRAPHICS, 
-                            pipeline_layout.handle(), 0, 1,
+
+    vkCmdBindDescriptorSets(command_buffer.handle(),
+                            bind_point, 
+                            pipeline_layout, 0, 1,
                             &m_descriptor_set, 0, nullptr);
+}
+
+void DescriptorSet::bind(VulkanCommandBuffer& command_buffer, VulkanPipelineLayout& pipeline_layout, VkPipelineBindPoint bind_point) {
+    LOG_METHOD();
+    
+    bind(command_buffer, pipeline_layout.handle(), bind_point);
+}
+
+void DescriptorSet::bind(VulkanCommandBuffer& command_buffer, Pipeline& pipeline) {
+    LOG_METHOD();
+
+    bind(command_buffer, pipeline.layout(), pipeline.get_bind_point());
 }
