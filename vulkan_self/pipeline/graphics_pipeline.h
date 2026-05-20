@@ -10,8 +10,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include "logger/logger_header.h"
-#include "vertex_layout_builder.h"
+#include "../logger/logger_header.h"
+#include "../vertex_layout_builder.h"
+#include "pipeline.h"
 
 class VulkanShaderModule;
 class VulkanPipelineLayout;
@@ -20,7 +21,7 @@ class VulkanDevice;
 class VulkanCommandBuffer;
 class DescriptorSetLayout;
 
-struct PipelineBuliderDesc {
+struct GraphicsPipelineBuliderDesc {
     VkDevice device;
     VkPipelineLayout pipeline_layout;
     VkRenderPass render_pass;
@@ -52,45 +53,45 @@ struct PipelineBuliderDesc {
     bool blend_enable;
 };
 
-class PipelineBuilder {
+class GraphicsPipelineBuilder {
 private:
-    static const PipelineBuliderDesc m_default_desc;
-    PipelineBuliderDesc m_desc = m_default_desc;
+    static const GraphicsPipelineBuliderDesc m_default_desc;
+    GraphicsPipelineBuliderDesc m_desc = m_default_desc;
 
 public:
-    _XCLASS_NAME(PipelineBuilder);
+    _XCLASS_NAME(GraphicsPipelineBuilder);
 
-    PipelineBuilder() = default;
+    GraphicsPipelineBuilder() = default;
 
-    PipelineBuilder& set_device(const VulkanDevice& device) noexcept;
-    PipelineBuilder& set_layout(const VulkanPipelineLayout& pipeline_layout) noexcept;
-    PipelineBuilder& set_render_pass(const VulkanRenderPass& render_pass) noexcept;
-    PipelineBuilder& set_graphic_objects(
+    GraphicsPipelineBuilder& set_device(const VulkanDevice& device) noexcept;
+    GraphicsPipelineBuilder& set_layout(const VulkanPipelineLayout& pipeline_layout) noexcept;
+    GraphicsPipelineBuilder& set_render_pass(const VulkanRenderPass& render_pass) noexcept;
+    GraphicsPipelineBuilder& set_graphic_objects(
         const VulkanDevice& device,
         const VulkanPipelineLayout& pipeline_layout,
         const VulkanRenderPass& render_pass
     ) noexcept;
 
-    PipelineBuilder& add_vert_shader_stage(
+    GraphicsPipelineBuilder& add_vert_shader_stage(
         const VulkanShaderModule& vertex_shader_module,
         std::string_view entry_point_name = m_default_desc.vertex_entry_point_name
     );
 
-    PipelineBuilder& add_frag_shader_stage(
+    GraphicsPipelineBuilder& add_frag_shader_stage(
         const VulkanShaderModule& fragment_shader_module,
         std::string_view entry_point_name = m_default_desc.fragment_entry_point_name
     );
 
     
 
-    PipelineBuilder& set_vertex_layout(const VertexLayoutBuilder& layout) noexcept;
+    GraphicsPipelineBuilder& set_vertex_layout(const VertexLayoutBuilder& layout) noexcept;
 
-    PipelineBuilder& set_input_assembly(
+    GraphicsPipelineBuilder& set_input_assembly(
         VkPrimitiveTopology topology = m_default_desc.topology,
         bool primitive_restart_enable = m_default_desc.primitive_restart_enable
     ) noexcept;
 
-    PipelineBuilder& set_rasterizer(
+    GraphicsPipelineBuilder& set_rasterizer(
         bool depth_clamp_enable = m_default_desc.depth_clamp_enable,
         bool rasterizer_discard_enable = m_default_desc.rasterizer_discard_enable,
         VkPolygonMode polygon_mode = m_default_desc.polygon_mode,
@@ -100,42 +101,40 @@ public:
         VkBool32 depth_bias_enable = m_default_desc.depth_bias_enable
     ) noexcept;
 
-    PipelineBuilder& set_multisampling(
+    GraphicsPipelineBuilder& set_multisampling(
         bool sample_shading_enable = m_default_desc.sample_shading_enable,
         VkSampleCountFlagBits rasterization_samples = m_default_desc.rasterization_samples // Предполагаю должно быть больше для нормальной работы? #TODO
     ) noexcept;
 
     // Опять же, пока что всё по простому, чтобы не тратить просто так время. Кода пригодится - сделаю полноценно.
-    PipelineBuilder& set_color_blending(
+    GraphicsPipelineBuilder& set_color_blending(
         VkColorComponentFlags color_write_mask = m_default_desc.color_write_mask,
         bool blend_enable = m_default_desc.blend_enable
     ) noexcept;
 
-    const PipelineBuliderDesc& desc() const noexcept;
+    const GraphicsPipelineBuliderDesc& desc() const noexcept;
 };
 
-class VulkanPipeline {
+class GraphicsPipeline : public Pipeline {
 public:
-    _XCLASS_NAME(VulkanPipeline);
+    _XCLASS_NAME(GraphicsPipeline);
 
-    explicit VulkanPipeline(const PipelineBuilder& builder);
-    ~VulkanPipeline() noexcept;
-    void destroy() noexcept;
+    explicit GraphicsPipeline(const GraphicsPipelineBuilder& builder);
+    // ~GraphicsPipeline() noexcept;
 
-    VulkanPipeline(const VulkanPipeline&) = delete;
-    VulkanPipeline& operator=(const VulkanPipeline&) = delete;
+    // virtual VkPipelineBindPoint get_bind_point() noexcept = 0;
+    
+    // void bind(
+    //     VulkanCommandBuffer& command_buffer, 
+    //     VkPipelineBindPoint bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS
+    // ) const;
 
-    VulkanPipeline(VulkanPipeline&& other) noexcept;
-    VulkanPipeline& operator=(VulkanPipeline&& other) noexcept;
+    
+    // virtual void bind(VulkanCommandBuffer& command_buffer) const override;
 
-    VkPipeline handle() const noexcept;
+    VkPipelineBindPoint get_bind_point() const noexcept override;
 
-    void bind(
-        VulkanCommandBuffer& command_buffer, 
-        VkPipelineBindPoint bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS
-    ) const;
-
-    static PipelineBuilder create_builder() noexcept; // Микро функция для удобства
+    static GraphicsPipelineBuilder create_builder() noexcept; // Микро функция для удобства
 
     static void set_y_down_viewport(
         VulkanCommandBuffer& command_buffer, 
@@ -174,9 +173,4 @@ public:
         VkExtent2D extent,
         VkOffset2D offset = VkOffset2D{0, 0}
     );
-
-private:
-    
-    VkPipeline m_pipeline = VK_NULL_HANDLE;
-    VkDevice m_device = VK_NULL_HANDLE;
 };

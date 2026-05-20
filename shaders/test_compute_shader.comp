@@ -1,0 +1,21 @@
+#version 460
+layout(local_size_x = 256) in;
+
+layout(set = 0, binding = 0) uniform UniformBufferObject {
+    vec4 color;
+} ubo;
+
+layout(set = 0, binding = 1) buffer SimpleStorageBuffer {
+    vec4 color1;
+    vec4 color2;
+} simple_storage_buffer;
+
+void main() {
+    uint x_id = gl_GlobalInvocationID.x;
+
+    if (x_id == 0) {
+        simple_storage_buffer.color1 = vec4(0, 1, 1, 1);
+    } else if (x_id == 1) {
+        simple_storage_buffer.color2 = vec4(1, 1, 0, 1);
+    }
+}
