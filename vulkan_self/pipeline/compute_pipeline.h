@@ -17,5 +17,4 @@ public:
     explicit ComputePipeline(VulkanDevice& device, const VulkanPipelineLayout& pipeline_layout, VulkanShaderModule& compute_shader);
     
     VkPipelineBindPoint get_bind_point() const noexcept override;
-    // void bind(VulkanCommandBuffer& command_buffer) const override;
 };

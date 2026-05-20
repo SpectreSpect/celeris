@@ -16,7 +16,7 @@ Pipeline& Pipeline::operator=(Pipeline&& other) noexcept {
     return *this;
 }
 
-Pipeline::~Pipeline() {
+Pipeline::~Pipeline() noexcept {
     destroy();
 }
 
@@ -28,7 +28,6 @@ void Pipeline::destroy() noexcept {
     m_device = VK_NULL_HANDLE;
     m_pipeline = VK_NULL_HANDLE;
 }
-
 
 
 VkPipeline Pipeline::handle() const noexcept {

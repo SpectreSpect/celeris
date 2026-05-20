@@ -13,13 +13,13 @@ class Pipeline {
 public:
     Pipeline() = default;
 
-    Pipeline(Pipeline&) = delete;
-    Pipeline& operator=(Pipeline&) = delete;
+    Pipeline(const Pipeline&) = delete;
+    Pipeline& operator=(const Pipeline&) = delete;
 
     Pipeline(Pipeline&& other) noexcept;
     Pipeline& operator=(Pipeline&& other) noexcept;
 
-    ~Pipeline();
+    ~Pipeline() noexcept;
     
 private:
     void destroy() noexcept;

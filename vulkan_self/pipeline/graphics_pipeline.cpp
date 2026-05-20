@@ -267,23 +267,6 @@ GraphicsPipeline::GraphicsPipeline(const GraphicsPipelineBuilder& builder)
     color_blending.blendConstants[2] = 0.0f;
     color_blending.blendConstants[3] = 0.0f;
 
-
-    // if (!builder.desc().descriptor_set_layouts.empty()) {
-    //     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-    //     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    //     pipelineLayoutInfo.setLayoutCount = builder.desc().descriptor_set_layouts.size();
-    //     pipelineLayoutInfo.pSetLayouts = builder.desc().descriptor_set_layouts.data();
-    //     pipelineLayoutInfo.pushConstantRangeCount = 0;
-    //     pipelineLayoutInfo.pPushConstantRanges = nullptr;
-
-    //     VulkanEngine::vk_check(
-    //         vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipeline_layout),
-    //         "vkCreatePipelineLayout"
-    //     );
-
-    // }
-
-
     VkGraphicsPipelineCreateInfo pipeline_info{};
     pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipeline_info.stageCount = 2;
