@@ -5,6 +5,7 @@
 #include "vulkan_physical_device.h"
 #include "vulkan_device.h"
 #include "vulkan_command_buffer.h"
+#include "vulkan_engine.h"
 
 VulkanBuffer::VulkanBuffer(
     const VulkanPhysicalDevice& physical_device,
@@ -285,8 +286,12 @@ void VulkanBuffer::bind_as_vertex_buffer(
     vkCmdBindVertexBuffers(command_buffer.handle(), buffer_binding, 1, &m_buffer, &offset);
 }
 
-void VulkanBuffer::bind_as_index_buffer(VulkanCommandBuffer& command_buffer, 
-                                        uint32_t buffer_binding, VkDeviceSize offset, VkIndexType index_type) const {
+void VulkanBuffer::bind_as_index_buffer(
+    VulkanCommandBuffer& command_buffer,
+    uint32_t buffer_binding,
+    VkDeviceSize offset,
+    VkIndexType index_type) const
+{
     LOG_METHOD();
 
     logger.check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
@@ -299,3 +304,66 @@ void VulkanBuffer::bind_as_index_buffer(VulkanCommandBuffer& command_buffer,
     // Позже сделать возможность использовать несколько биндингов. #TODO
     vkCmdBindIndexBuffer(command_buffer.handle(), m_buffer, offset, VK_INDEX_TYPE_UINT32);
 }
+
+VulkanBuffer VulkanBuffer::create_vertex_buffer(
+    const VulkanPhysicalDevice& physical_device,
+    const VulkanDevice& device,
+    VkDeviceSize size_bytes) 
+{
+    LOG_NAMED("VulkanBuffer");
+
+    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(size_bytes != 0, "Attempt to create buffer with zero size");
+
+    return VulkanBuffer(
+        physical_device, 
+        device,
+        size_bytes,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    );
+}
+
+VulkanBuffer VulkanBuffer::create_vertex_buffer(
+    const VulkanEngine& engine,
+    VkDeviceSize size_bytes)
+{
+    return create_vertex_buffer(
+        engine.physical_device(), 
+        engine.device(), 
+        size_bytes
+    );
+}
+
+VulkanBuffer VulkanBuffer::create_staging_buffer(
+    const VulkanPhysicalDevice& physical_device,
+    const VulkanDevice& device,
+    VkDeviceSize size_bytes) 
+{
+    LOG_NAMED("VulkanBuffer");
+
+    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(size_bytes != 0, "Attempt to create buffer with zero size");
+
+    return VulkanBuffer(
+        physical_device, 
+        device,
+        size_bytes,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    );
+}
+
+VulkanBuffer VulkanBuffer::create_staging_buffer(
+    const VulkanEngine& engine,
+    VkDeviceSize size_bytes)
+{
+    return create_staging_buffer(
+        engine.physical_device(), 
+        engine.device(), 
+        size_bytes
+    );
+}
+

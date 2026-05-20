@@ -16,6 +16,7 @@ VulkanEngine::VulkanEngine(
         m_swapchain_resources(std::in_place, m_physical_device, m_device, m_surface, m_window),
         m_graphics_command_pool(m_device, m_device.graphics_queue()),
         m_compute_command_pool(m_device, m_device.compute_queue()),
+        m_upload_command_pool(m_device, m_device.graphics_queue()), // В теории здесь нужна transfer очередь #TODO
         m_frame_command_buffers(
             VulkanCommandBuffer::create_command_buffers(
                 m_device, 
@@ -66,13 +67,14 @@ const SwapchainResources& VulkanEngine::swapchain_resources() const {
     return *m_swapchain_resources;
 }
 
-VulkanCommandPool& VulkanEngine::graphics_command_pool() {
+VulkanCommandPool& VulkanEngine::graphics_command_pool() noexcept {
     return m_graphics_command_pool;
 }
 
-const VulkanCommandPool& VulkanEngine::graphics_command_pool() const {
+const VulkanCommandPool& VulkanEngine::graphics_command_pool() const noexcept {
     return m_graphics_command_pool;
 }
+
 
 VulkanCommandPool& VulkanEngine::compute_command_pool() noexcept {
     return m_compute_command_pool;
@@ -80,6 +82,14 @@ VulkanCommandPool& VulkanEngine::compute_command_pool() noexcept {
 
 const VulkanCommandPool& VulkanEngine::compute_command_pool() const noexcept {
     return m_compute_command_pool;
+}
+
+VulkanCommandPool& VulkanEngine::upload_command_pool() noexcept {
+    return m_upload_command_pool;
+}
+
+const VulkanCommandPool& VulkanEngine::upload_command_pool() const noexcept {
+    return m_upload_command_pool;
 }
 
 bool VulkanEngine::aquire_free_resources(uint32_t& free_swapchain_image_index) {

@@ -94,8 +94,11 @@ public:
     SwapchainResources& swapchain_resources();
     const SwapchainResources& swapchain_resources() const;
 
-    VulkanCommandPool& graphics_command_pool();
-    const VulkanCommandPool& graphics_command_pool() const;
+    VulkanCommandPool& graphics_command_pool() noexcept;
+    const VulkanCommandPool& graphics_command_pool() const noexcept;
+
+    VulkanCommandPool& upload_command_pool() noexcept;
+    const VulkanCommandPool& upload_command_pool() const noexcept;
 
     VulkanCommandPool& compute_command_pool() noexcept;
     const VulkanCommandPool& compute_command_pool() const noexcept;
@@ -114,6 +117,7 @@ private:
     std::optional<SwapchainResources> m_swapchain_resources;
     VulkanCommandPool m_graphics_command_pool;
     VulkanCommandPool m_compute_command_pool;
+    VulkanCommandPool m_upload_command_pool;
     std::vector<VulkanCommandBuffer> m_frame_command_buffers;
     std::vector<VulkanFence> m_in_flight_fences;
     std::vector<VulkanSemaphore> m_image_available_semaphores;
