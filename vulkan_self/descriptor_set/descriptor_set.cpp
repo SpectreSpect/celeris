@@ -4,7 +4,6 @@
 #include "../pipeline/vulkan_pipeline_layout.h"
 #include "../pipeline/pipeline.h"
 
-
 void DescriptorSet::write_buffer(uint32_t binding, VulkanBuffer& buffer, VkDescriptorType descriptor_type) {
     LOG_METHOD();
 

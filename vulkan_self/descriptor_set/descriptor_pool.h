@@ -20,7 +20,15 @@ public:
     DescriptorPool(const DescriptorPool&) = delete;
     DescriptorPool& operator=(const DescriptorPool&) = delete;
 
-    ~DescriptorPool();
+    DescriptorPool(DescriptorPool&& other) noexcept;
+    DescriptorPool& operator=(DescriptorPool&& other) noexcept;
+
+    ~DescriptorPool() noexcept;
+
+private:
+    void destory() noexcept;
+
+public:
 
     VkDescriptorPool handle() const noexcept;
     std::vector<DescriptorSet> allocate_sets(const DescriptorSetLayout& layout, uint32_t set_count);

@@ -18,8 +18,18 @@ public:
     DescriptorSetLayout(const DescriptorSetLayout&) = delete;
     DescriptorSetLayout& operator=(const DescriptorSetLayout&) = delete;
 
+    DescriptorSetLayout(DescriptorSetLayout&& other) noexcept;
+    DescriptorSetLayout& operator=(DescriptorSetLayout&& other) noexcept;
+
+    ~DescriptorSetLayout() noexcept;
+
+private:
+    void destory() noexcept;
+
+public:
     VkDescriptorSetLayout handle() const noexcept;
+
 private:
     VkDescriptorSetLayout m_layout = VK_NULL_HANDLE;
-    const VkDevice m_device = VK_NULL_HANDLE;
+    VkDevice m_device = VK_NULL_HANDLE;
 };
