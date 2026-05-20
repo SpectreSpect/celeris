@@ -17,6 +17,7 @@
 class VulkanPhysicalDevice;
 class VulkanDevice;
 class VulkanCommandBuffer;
+class VulkanEngine;
 
 class VulkanBuffer {
 public:
@@ -135,6 +136,29 @@ public:
         VkDeviceSize offset = 0,
         VkIndexType index_type = VK_INDEX_TYPE_UINT32
     ) const;
+
+
+    static VulkanBuffer create_vertex_buffer(
+        const VulkanPhysicalDevice& physical_device,
+        const VulkanDevice& device,
+        VkDeviceSize size_bytes
+    );
+
+    static VulkanBuffer create_vertex_buffer(
+        const VulkanEngine& engine,
+        VkDeviceSize size_bytes
+    );
+
+    static VulkanBuffer create_staging_buffer(
+        const VulkanPhysicalDevice& physical_device,
+        const VulkanDevice& device,
+        VkDeviceSize size_bytes
+    );
+
+    static VulkanBuffer create_staging_buffer(
+        const VulkanEngine& engine,
+        VkDeviceSize size_bytes
+    );
 
 private:
     VkDevice m_device = VK_NULL_HANDLE;

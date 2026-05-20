@@ -3,11 +3,13 @@
 #include "vulkan_self/vulkan_pipeline_layout.h"
 #include "vulkan_self/vulkan_pipeline.h"
 #include "vulkan_self/vulkan_buffer.h"
+#include "vulkan_self/vulkan_resource_loader.h"
 #include "vulkan_self/descriptor_set/descriptor_set_layout_builder.h"
 #include "vulkan_self/descriptor_set/descriptor_set_layout.h"
 #include "vulkan_self/descriptor_set/descriptor_pool_builder.h"
 #include "vulkan_self/descriptor_set/descriptor_pool.h"
 #include "vulkan_self/descriptor_set/descriptor_set.h"
+#include "path_utils.h"
 
 #include <vector>
 
@@ -60,8 +62,8 @@ int main() {
     pipeline_layout_builder.add_descriptor_set_layout(dsl);
     VulkanPipelineLayout pipeline_layout(pipeline_layout_builder);
 
-    VulkanShaderModule vert_shader_module(engine.device(), "shaders/triangle.vert.spv");
-    VulkanShaderModule frag_shader_module(engine.device(), "shaders/triangle.frag.spv");
+    VulkanShaderModule vert_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.vert.spv");
+    VulkanShaderModule frag_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.frag.spv");
 
     PipelineBuilder pipeline_builder = VulkanPipeline::create_builder();
     pipeline_builder.set_graphic_objects(engine.device(), pipeline_layout, engine.swapchain_resources().render_pass);
@@ -75,16 +77,6 @@ int main() {
     pipeline_builder.add_vert_shader_stage(vert_shader_module);
     pipeline_builder.add_frag_shader_stage(frag_shader_module);
     VulkanPipeline pipeline = VulkanPipeline(pipeline_builder);
-
-    // std::vector<SimpleVertex> vertices = {
-    //     {glm::vec2{-0.5f, 0.5f}, glm::vec3{1.0f, 0.0f, 0.0f}},
-    //     {glm::vec2{0.5f, 0.5f}, glm::vec3{0.0f, 0.0f, 1.0f}},
-    //     {glm::vec2{0.5f, -0.5f}, glm::vec3{0.0f, 1.0f, 0.0f}},
-
-    //     {glm::vec2{-0.5f, 0.5f}, glm::vec3{1.0f, 0.0f, 0.0f}},
-    //     {glm::vec2{-0.5f, -0.5f}, glm::vec3{1.0f, 1.0f, 1.0f}},
-    //     {glm::vec2{0.5f, -0.5f}, glm::vec3{0.0f, 1.0f, 0.0f}}
-    // };
     
     std::vector<SimpleVertex> vertices = {
         {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // bottom-left
@@ -98,48 +90,28 @@ int main() {
         2, 3, 0
     };
 
-    VulkanBuffer staging_buffer(
-        engine.physical_device(),
-        engine.device(),
-        vertices.size() * sizeof(SimpleVertex),
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-    );
+    SimpleStorage simple_storage;
+    simple_storage.color1 = glm::vec4(1, 0, 0, 1);
+    simple_storage.color2 = glm::vec4(0, 0, 1, 1);
 
-    staging_buffer.upload(vertices);
 
-    VulkanBuffer vertex_buffer(
-        engine.physical_device(), 
-        engine.device(),
-        vertices.size() * sizeof(SimpleVertex),
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-    );
+    VulkanBuffer vertex_buffer = VulkanBuffer::create_vertex_buffer(engine, Utils::size_bytes(vertices));
 
     VulkanBuffer index_buffer(
         engine.physical_device(), 
         engine.device(),
         indices.size() * sizeof(uint32_t),
-        VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     );
 
-    VulkanCommandBuffer loading_command_buffer(engine.device(), engine.graphics_command_pool());
-    VulkanFence loading_fence(engine.device());
-    {
-        auto loading_scope = loading_command_buffer.begin_scope();
-        staging_buffer.copy_to(loading_command_buffer, vertex_buffer, vertices.size() * sizeof(SimpleVertex));
-        vertex_buffer.transfer_write_to_vertex_read_barrier(loading_command_buffer);
-    }
-
-    engine.device().graphics_queue().submit(
-        nullptr,
-        0,
-        loading_command_buffer,
-        nullptr,
-        &loading_fence
+    VulkanBuffer storage_buffer(
+        engine.physical_device(), 
+        engine.device(),
+        vertices.size() * sizeof(SimpleStorage),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     );
-    loading_fence.wait();
 
     VulkanBuffer unifrom_buffer(
         engine.physical_device(), 
@@ -149,21 +121,26 @@ int main() {
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
     );
 
-    VulkanBuffer storage_buffer(
-        engine.physical_device(), 
-        engine.device(),
-        vertices.size() * sizeof(SimpleStorage),
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
+    resource_loader.upload_vertex_buffer(vertices.data(), Utils::size_bytes(vertices), vertex_buffer);
+    resource_loader.upload(
+        indices.data(),
+        Utils::size_bytes(indices),
+        index_buffer,
+        0,
+        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+        VK_ACCESS_INDEX_READ_BIT
     );
+    resource_loader.upload(
+        &simple_storage,
+        sizeof(SimpleStorage),
+        storage_buffer,
+        0,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT
+    );
+    resource_loader.submit();
 
-    SimpleStorage simple_storage;
-    simple_storage.color1 = glm::vec4(1, 0, 0, 1);
-    simple_storage.color2 = glm::vec4(0, 0, 1, 1);
-
-    storage_buffer.upload(&simple_storage, sizeof(storage_buffer));
-    index_buffer.upload(indices.data(), indices.size() * sizeof(uint32_t));
-    
     descriptor_set.write_uniform_buffer(0, unifrom_buffer);
     descriptor_set.write_storage_buffer(1, storage_buffer);
 
@@ -211,14 +188,6 @@ int main() {
                 SimpleUniform ubo;
                 ubo.color = glm::vec4(pc.offset.x, 0.0f, 1.0f, 1.0f);
                 unifrom_buffer.upload(&ubo, sizeof(SimpleUniform));
-                
-                // vkCmdDraw(
-                //     command_buffer.handle(),
-                //     6,
-                //     1,
-                //     0,
-                //     0
-                // );
 
                 vkCmdDrawIndexed(command_buffer.handle(), indices.size(), 1, 0, 0, 0);
             }
