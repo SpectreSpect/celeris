@@ -57,6 +57,8 @@ public:
 
     void reset();
 
+    void dispatch(uint32_t x_groups, uint32_t y_groups, uint32_t z_groups);
+
     static std::vector<VulkanCommandBuffer> create_command_buffers(
         const VulkanDevice& device,
         const VulkanCommandPool& command_pool,

@@ -137,3 +137,11 @@ void VulkanCommandBuffer::reset() {
     VkResult result = vkResetCommandBuffer(m_command_buffer, 0);
     logger.check(result == VK_SUCCESS, "Failed to reset command buffer");
 }
+
+void VulkanCommandBuffer::dispatch(uint32_t x_groups, uint32_t y_groups, uint32_t z_groups) {
+    LOG_METHOD();
+
+    logger.check(m_command_buffer != VK_NULL_HANDLE, "Command buffer was not initialized");
+
+    vkCmdDispatch(m_command_buffer, x_groups, y_groups, z_groups);
+}
