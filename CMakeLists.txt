@@ -2,15 +2,13 @@ cmake_minimum_required(VERSION 3.20)
 
 project(app LANGUAGES CXX)
 
-# set(CMAKE_CXX_STANDARD 20)
-# set(CMAKE_CXX_STANDARD_REQUIRED ON)
-# set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Optional: silence OpenGL CMP0072 warning on Ubuntu
 if(POLICY CMP0072)
   cmake_policy(SET CMP0072 NEW)
 endif()
+
 set(OpenGL_GL_PREFERENCE GLVND)
 
 find_package(OpenGL REQUIRED)
@@ -49,15 +47,19 @@ add_executable(app
   vulkan_self/vertex_layout_builder.cpp
   vulkan_self/vulkan_memory.cpp
   vulkan_self/vulkan_resource_loader.cpp
+  vulkan_self/descriptor_set/descriptor_set_layout_builder.cpp
+  vulkan_self/descriptor_set/descriptor_set_layout.cpp
+  vulkan_self/descriptor_set/descriptor_pool_builder.cpp
+  vulkan_self/descriptor_set/descriptor_pool.cpp
+  vulkan_self/descriptor_set/descriptor_set.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
 
 # ---------------- ImGui (FetchContent, no submodule) ----------------
+
 include(FetchContent)
 
-# Kept at your old pin to minimize code churn.
-# You can update later after the Vulkan integration is stable.
 FetchContent_Declare(
   imgui
   GIT_REPOSITORY https://github.com/ocornut/imgui.git
@@ -75,7 +77,7 @@ target_sources(app PRIVATE
   ${imgui_SOURCE_DIR}/imgui_draw.cpp
   ${imgui_SOURCE_DIR}/imgui_tables.cpp
   ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-  ${imgui_SOURCE_DIR}/imgui_demo.cpp        # optional, but useful while integrating
+  ${imgui_SOURCE_DIR}/imgui_demo.cpp
 
   ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
   ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
@@ -86,15 +88,42 @@ target_include_directories(app PRIVATE
   ${imgui_SOURCE_DIR}/backends
 )
 
-find_program(GLSLANG_VALIDATOR
-  NAMES glslangValidator glslangValidator.exe
+# ---------------- Vulkan shaders ----------------
+
+find_program(GLSLC_EXECUTABLE
+  NAMES
+    glslc
+    glslc.exe
   HINTS
-    ENV VULKAN_SDK
-  PATH_SUFFIXES
-    Bin
-    bin
-  REQUIRED
+    "$ENV{VULKAN_SDK}/Bin"
+    "$ENV{VULKAN_SDK}/bin"
 )
+
+find_program(GLSLANG_VALIDATOR_EXECUTABLE
+  NAMES
+    glslangValidator
+    glslangValidator.exe
+  HINTS
+    "$ENV{VULKAN_SDK}/Bin"
+    "$ENV{VULKAN_SDK}/bin"
+)
+
+if(GLSLC_EXECUTABLE)
+  set(VULKAN_SHADER_COMPILER "${GLSLC_EXECUTABLE}")
+  set(VULKAN_SHADER_COMPILER_KIND "glslc")
+elseif(GLSLANG_VALIDATOR_EXECUTABLE)
+  set(VULKAN_SHADER_COMPILER "${GLSLANG_VALIDATOR_EXECUTABLE}")
+  set(VULKAN_SHADER_COMPILER_KIND "glslangValidator")
+else()
+  message(FATAL_ERROR
+    "Could not find Vulkan shader compiler. "
+    "Install Vulkan SDK and make sure glslc/glslangValidator is available. "
+    "On Windows, check that VULKAN_SDK points to your Vulkan SDK directory."
+  )
+endif()
+
+message(STATUS "Vulkan shader compiler: ${VULKAN_SHADER_COMPILER}")
+message(STATUS "Vulkan shader compiler kind: ${VULKAN_SHADER_COMPILER_KIND}")
 
 set(SHADERS_SRC_DIR "${CMAKE_SOURCE_DIR}/shaders")
 set(SHADERS_BUILD_DIR "${CMAKE_BINARY_DIR}/shaders")
@@ -111,22 +140,42 @@ foreach(SHADER ${SHADER_SOURCES})
   get_filename_component(SHADER_NAME "${SHADER}" NAME)
   set(SPIRV_OUTPUT "${SHADERS_BUILD_DIR}/${SHADER_NAME}.spv")
 
-  add_custom_command(
-    OUTPUT "${SPIRV_OUTPUT}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${SHADERS_BUILD_DIR}"
-    COMMAND "${GLSLANG_VALIDATOR}" -V "${SHADER}" -o "${SPIRV_OUTPUT}"
-    DEPENDS "${SHADER}"
-    COMMENT "Compiling shader ${SHADER_NAME}"
-    VERBATIM
-  )
+  if(VULKAN_SHADER_COMPILER_KIND STREQUAL "glslc")
+    add_custom_command(
+      OUTPUT "${SPIRV_OUTPUT}"
+      COMMAND ${CMAKE_COMMAND} -E make_directory "${SHADERS_BUILD_DIR}"
+      COMMAND "${VULKAN_SHADER_COMPILER}"
+              "${SHADER}"
+              -o "${SPIRV_OUTPUT}"
+      DEPENDS "${SHADER}"
+      COMMENT "Compiling shader ${SHADER_NAME}"
+      VERBATIM
+    )
+  else()
+    add_custom_command(
+      OUTPUT "${SPIRV_OUTPUT}"
+      COMMAND ${CMAKE_COMMAND} -E make_directory "${SHADERS_BUILD_DIR}"
+      COMMAND "${VULKAN_SHADER_COMPILER}"
+              -V
+              "${SHADER}"
+              -o "${SPIRV_OUTPUT}"
+      DEPENDS "${SHADER}"
+      COMMENT "Compiling shader ${SHADER_NAME}"
+      VERBATIM
+    )
+  endif()
 
   list(APPEND SPIRV_OUTPUTS "${SPIRV_OUTPUT}")
 endforeach()
 
-add_custom_target(compile_shaders ALL DEPENDS ${SPIRV_OUTPUTS})
+add_custom_target(compile_shaders ALL
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${SHADERS_BUILD_DIR}"
+  DEPENDS ${SPIRV_OUTPUTS}
+  COMMENT "Compiling Vulkan shaders"
+)
+
 add_dependencies(app compile_shaders)
 
-# Копируем уже скомпилированные .spv рядом с app.exe / app
 add_custom_command(TARGET app POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:app>/shaders"
   COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -135,24 +184,21 @@ add_custom_command(TARGET app POST_BUILD
   COMMENT "Copying compiled shaders next to app"
 )
 
+# ---------------- Assets ----------------
 
 set(ASSETS_SRC "${CMAKE_SOURCE_DIR}/assets")
-add_custom_target(copy_assets ALL
-  COMMAND ${CMAKE_COMMAND} -E copy_directory
-          "${ASSETS_SRC}"
-          "$<TARGET_FILE_DIR:app>/assets"
-  COMMENT "Copying assets next to app"
-)
-add_dependencies(copy_assets app)
 
-# set(SHADERS_SRC "${CMAKE_SOURCE_DIR}/shaders")
-# add_custom_target(copy_shaders ALL
-#   COMMAND ${CMAKE_COMMAND} -E copy_directory
-#           "${SHADERS_SRC}"
-#           "$<TARGET_FILE_DIR:app>/shaders"
-#   COMMENT "Copying shaders next to app"
-# )
-# add_dependencies(copy_shaders app)
+if(EXISTS "${ASSETS_SRC}")
+  add_custom_command(TARGET app POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:app>/assets"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${ASSETS_SRC}"
+            "$<TARGET_FILE_DIR:app>/assets"
+    COMMENT "Copying assets next to app"
+  )
+endif()
+
+# ---------------- Link libraries ----------------
 
 target_link_libraries(app PRIVATE
   glfw
@@ -162,7 +208,7 @@ target_link_libraries(app PRIVATE
   Vulkan::Vulkan
 )
 
-if (WIN32)
+if(WIN32)
   target_compile_definitions(app PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
   set_target_properties(app PROPERTIES WIN32_EXECUTABLE OFF)
 endif()

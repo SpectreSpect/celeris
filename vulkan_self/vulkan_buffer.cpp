@@ -286,6 +286,25 @@ void VulkanBuffer::bind_as_vertex_buffer(
     vkCmdBindVertexBuffers(command_buffer.handle(), buffer_binding, 1, &m_buffer, &offset);
 }
 
+void VulkanBuffer::bind_as_index_buffer(
+    VulkanCommandBuffer& command_buffer,
+    uint32_t buffer_binding,
+    VkDeviceSize offset,
+    VkIndexType index_type) const
+{
+    LOG_METHOD();
+
+    logger.check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
+    logger.check(
+        (m_usage & VK_BUFFER_USAGE_INDEX_BUFFER_BIT) != 0,
+        "Attempt to bind buffer as index buffer, but it was not created with VK_BUFFER_USAGE_INDEX_BUFFER_BIT"
+    );
+    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+
+    // Позже сделать возможность использовать несколько биндингов. #TODO
+    vkCmdBindIndexBuffer(command_buffer.handle(), m_buffer, offset, VK_INDEX_TYPE_UINT32);
+}
+
 VulkanBuffer VulkanBuffer::create_vertex_buffer(
     const VulkanPhysicalDevice& physical_device,
     const VulkanDevice& device,
@@ -347,3 +366,4 @@ VulkanBuffer VulkanBuffer::create_staging_buffer(
         size_bytes
     );
 }
+

@@ -18,6 +18,7 @@ class VulkanPipelineLayout;
 class VulkanRenderPass;
 class VulkanDevice;
 class VulkanCommandBuffer;
+class DescriptorSetLayout;
 
 struct PipelineBuliderDesc {
     VkDevice device;
@@ -79,6 +80,8 @@ public:
         const VulkanShaderModule& fragment_shader_module,
         std::string_view entry_point_name = m_default_desc.fragment_entry_point_name
     );
+
+    
 
     PipelineBuilder& set_vertex_layout(const VertexLayoutBuilder& layout) noexcept;
 
@@ -173,6 +176,7 @@ public:
     );
 
 private:
+    
     VkPipeline m_pipeline = VK_NULL_HANDLE;
     VkDevice m_device = VK_NULL_HANDLE;
 };

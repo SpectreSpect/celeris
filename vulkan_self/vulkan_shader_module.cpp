@@ -2,10 +2,15 @@
 
 #include <fstream>
 #include <utility>
+#include <string>
 
 #include "vulkan_device.h"
 
-VulkanShaderModule::VulkanShaderModule(const VulkanDevice& device, std::string_view file_path) : m_device(device.handle()) {
+VulkanShaderModule::VulkanShaderModule(
+    const VulkanDevice& device, 
+    const std::filesystem::path& file_path) 
+    :   m_device(device.handle()) 
+{
     LOG_METHOD();
 
     std::vector<char> code = read_file(file_path);
@@ -60,13 +65,14 @@ VkShaderModule VulkanShaderModule::handle() const noexcept {
     return m_shader_module;
 }
 
-std::vector<char> VulkanShaderModule::read_file(std::string_view filename) {
+std::vector<char> VulkanShaderModule::read_file(std::filesystem::path filename) {
     LOG_NAMED("VulkanShaderModule");
 
-    std::string filename_str = std::string(filename);
-    std::ifstream file(filename_str, std::ios::ate | std::ios::binary);
+    std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
-    logger.check(file.is_open(), "Failed to open file: " + filename_str);
+    logger.check(file.is_open())
+        << "Failed to open file: "
+        <<  clr(filename.filename().string(), LoggerPalette::blue) << "\n";
 
     size_t file_size = static_cast<size_t>(file.tellg());
     std::vector<char> buffer(file_size);

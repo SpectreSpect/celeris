@@ -33,6 +33,10 @@ public:
     );
     ~VulkanMemory() noexcept;
 
+private:
+    void destroy() noexcept;
+
+public:
     VulkanMemory(const VulkanMemory&) = delete;
     VulkanMemory& operator=(const VulkanMemory&) = delete;
     
@@ -125,8 +129,6 @@ private:
     VkDeviceSize m_non_coherent_atom_size = 1;
 
 private:
-    void destroy() noexcept;
-
     void allocate(
         const VulkanPhysicalDevice& physical_device,
         const VulkanDevice& device,

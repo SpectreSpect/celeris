@@ -4,6 +4,12 @@
 #include "vulkan_self/vulkan_pipeline.h"
 #include "vulkan_self/vulkan_buffer.h"
 #include "vulkan_self/vulkan_resource_loader.h"
+#include "vulkan_self/descriptor_set/descriptor_set_layout_builder.h"
+#include "vulkan_self/descriptor_set/descriptor_set_layout.h"
+#include "vulkan_self/descriptor_set/descriptor_pool_builder.h"
+#include "vulkan_self/descriptor_set/descriptor_pool.h"
+#include "vulkan_self/descriptor_set/descriptor_set.h"
+#include "path_utils.h"
 
 #include <vector>
 
@@ -17,24 +23,47 @@ struct SimpleVertex {
     glm::vec3 color;
 };
 
+struct SimpleUniform {
+    glm::vec4 color;
+};
+
+struct SimpleStorage {
+    glm::vec4 color1;
+    glm::vec4 color2;
+};
+
 int main() {
     GlfwContext glfw_context;
     Window window(glfw_context, 1280, 720, "Vulkan engine");
-    
+
     QueueRequest queue_request;
     queue_request.graphics_count = 1;
     queue_request.present_count = 1;
 
     VulkanEngine engine(glfw_context, window, queue_request);
 
+    DescriptorSetLayoutBuilder dsl_builder;
+    dsl_builder
+        .add_uniform_buffer(0, ShaderStages::fragment)
+        .add_storage_buffer(1, ShaderStages::fragment);
+
+    DescriptorSetLayout dsl(engine.device(), dsl_builder);
+
+    DescriptorPoolBuilder pool_builder;
+    pool_builder.add_layout(dsl_builder);
+
+    DescriptorPool pool(engine.device(), pool_builder);
+
+    DescriptorSet descriptor_set = pool.allocate_set(dsl);
+
     PipelineLayoutBuilder pipeline_layout_builder = VulkanPipelineLayout::create_builder();
     pipeline_layout_builder.set_device(engine.device());
     pipeline_layout_builder.add_push_constants<TestPushConstants>();
+    pipeline_layout_builder.add_descriptor_set_layout(dsl);
     VulkanPipelineLayout pipeline_layout(pipeline_layout_builder);
 
-
-    VulkanShaderModule vert_shader_module(engine.device(), "shaders/triangle.vert.spv");
-    VulkanShaderModule frag_shader_module(engine.device(), "shaders/triangle.frag.spv");
+    VulkanShaderModule vert_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.vert.spv");
+    VulkanShaderModule frag_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.frag.spv");
 
     PipelineBuilder pipeline_builder = VulkanPipeline::create_builder();
     pipeline_builder.set_graphic_objects(engine.device(), pipeline_layout, engine.swapchain_resources().render_pass);
@@ -48,22 +77,72 @@ int main() {
     pipeline_builder.add_vert_shader_stage(vert_shader_module);
     pipeline_builder.add_frag_shader_stage(frag_shader_module);
     VulkanPipeline pipeline = VulkanPipeline(pipeline_builder);
-
+    
     std::vector<SimpleVertex> vertices = {
-        {glm::vec2{-0.5f, 0.5f}, glm::vec3{1.0f, 0.0f, 0.0f}},
-        {glm::vec2{0.5f, 0.5f}, glm::vec3{0.0f, 0.0f, 1.0f}},
-        {glm::vec2{0.5f, -0.5f}, glm::vec3{0.0f, 1.0f, 0.0f}},
-
-        {glm::vec2{-0.5f, 0.5f}, glm::vec3{1.0f, 0.0f, 0.0f}},
-        {glm::vec2{-0.5f, -0.5f}, glm::vec3{1.0f, 1.0f, 1.0f}},
-        {glm::vec2{0.5f, -0.5f}, glm::vec3{0.0f, 1.0f, 0.0f}}
+        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // bottom-left
+        {{ 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}}, // bottom-right
+        {{ 0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}}, // top-right
+        {{-0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}}, // top-left
     };
+
+    std::vector<uint32_t> indices = {
+        0, 1, 2,
+        2, 3, 0
+    };
+
+    SimpleStorage simple_storage;
+    simple_storage.color1 = glm::vec4(1, 0, 0, 1);
+    simple_storage.color2 = glm::vec4(0, 0, 1, 1);
+
 
     VulkanBuffer vertex_buffer = VulkanBuffer::create_vertex_buffer(engine, Utils::size_bytes(vertices));
 
-    VulkanResourceLoader resource_loader(engine, Utils::size_bytes(vertices) * 3);
+    VulkanBuffer index_buffer(
+        engine.physical_device(), 
+        engine.device(),
+        indices.size() * sizeof(uint32_t),
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    );
+
+    VulkanBuffer storage_buffer(
+        engine.physical_device(), 
+        engine.device(),
+        vertices.size() * sizeof(SimpleStorage),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    );
+
+    VulkanBuffer unifrom_buffer(
+        engine.physical_device(), 
+        engine.device(),
+        vertices.size() * sizeof(SimpleUniform),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    );
+
+    VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
     resource_loader.upload_vertex_buffer(vertices.data(), Utils::size_bytes(vertices), vertex_buffer);
+    resource_loader.upload(
+        indices.data(),
+        Utils::size_bytes(indices),
+        index_buffer,
+        0,
+        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+        VK_ACCESS_INDEX_READ_BIT
+    );
+    resource_loader.upload(
+        &simple_storage,
+        sizeof(SimpleStorage),
+        storage_buffer,
+        0,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT
+    );
     resource_loader.submit();
+
+    descriptor_set.write_uniform_buffer(0, unifrom_buffer);
+    descriptor_set.write_storage_buffer(1, storage_buffer);
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
@@ -82,6 +161,7 @@ int main() {
             );
 
                 pipeline.bind(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
+                descriptor_set.bind(command_buffer, pipeline_layout);
 
                 VulkanPipeline::set_y_up_viewport(
                     command_buffer,
@@ -94,23 +174,22 @@ int main() {
                 );
 
                 vertex_buffer.bind_as_vertex_buffer(command_buffer);
+                index_buffer.bind_as_index_buffer(command_buffer);
 
                 static TestPushConstants pc{
                     .offset = {0.0f, 0.0f},
                     .scale = 1.0f
                 };
 
-                pc.offset.x += 0.0001f;
+                pc.offset.x += 0.001f;
                 
                 pipeline_layout.push_constants(command_buffer, pc);
-                
-                vkCmdDraw(
-                    command_buffer.handle(),
-                    6,
-                    1,
-                    0,
-                    0
-                );
+
+                SimpleUniform ubo;
+                ubo.color = glm::vec4(pc.offset.x, 0.0f, 1.0f, 1.0f);
+                unifrom_buffer.upload(&ubo, sizeof(SimpleUniform));
+
+                vkCmdDrawIndexed(command_buffer.handle(), indices.size(), 1, 0, 0, 0);
             }
         }
 

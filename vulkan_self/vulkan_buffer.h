@@ -130,6 +130,13 @@ public:
         VkDeviceSize offset = 0
     ) const;
 
+    void bind_as_index_buffer(
+        VulkanCommandBuffer& command_buffer,
+        uint32_t buffer_binding = 0,
+        VkDeviceSize offset = 0,
+        VkIndexType index_type = VK_INDEX_TYPE_UINT32
+    ) const;
+
 
     static VulkanBuffer create_vertex_buffer(
         const VulkanPhysicalDevice& physical_device,

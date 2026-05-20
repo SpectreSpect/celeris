@@ -2,6 +2,7 @@
 
 #include "vulkan_device.h"
 #include "vulkan_command_buffer.h"
+#include "descriptor_set/descriptor_set_layout.h"
 
 #include <utility>
 
@@ -39,6 +40,15 @@ PipelineLayoutBuilder& PipelineLayoutBuilder::add_push_constants(
     return *this;
 }
 
+PipelineLayoutBuilder& PipelineLayoutBuilder::add_descriptor_set_layout(const DescriptorSetLayout& layout) {
+    LOG_METHOD();
+
+    m_desc.descriptor_set_layouts.push_back(layout.handle());
+
+    return *this;
+}
+
+
 const PipelineLayoutBuilderDesc& PipelineLayoutBuilder::desc() const noexcept {
     return m_desc;
 }
@@ -73,8 +83,15 @@ VulkanPipelineLayout::VulkanPipelineLayout(const PipelineLayoutBuilder& builder)
 
     VkPipelineLayoutCreateInfo pipeline_layout_info{};
     pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipeline_layout_info.setLayoutCount = 0;
-    pipeline_layout_info.pSetLayouts = nullptr;
+    
+    if (!builder.desc().descriptor_set_layouts.empty()) {
+        pipeline_layout_info.setLayoutCount = static_cast<uint32_t>(builder.desc().descriptor_set_layouts.size());
+        pipeline_layout_info.pSetLayouts = builder.desc().descriptor_set_layouts.data();
+    } else {
+        pipeline_layout_info.setLayoutCount = 0;
+        pipeline_layout_info.pSetLayouts = nullptr;
+    }
+
     pipeline_layout_info.pushConstantRangeCount = static_cast<uint32_t>(builder.desc().push_constant_ranges.size());
     pipeline_layout_info.pPushConstantRanges = builder.desc().push_constant_ranges.data();
 
