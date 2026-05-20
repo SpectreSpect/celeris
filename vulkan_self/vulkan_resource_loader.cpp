@@ -110,6 +110,46 @@ void VulkanResourceLoader::upload_vertex_buffer(
     );
 }
 
+void VulkanResourceLoader::upload_index_buffer(
+    const void* src_data,
+    VkDeviceSize size_bytes,
+    VulkanBuffer& dst_buffer,
+    VkDeviceSize dst_offset)
+{
+    LOG_METHOD();
+
+    logger.check(dst_buffer.has_usage(VK_BUFFER_USAGE_INDEX_BUFFER_BIT), "Destinition buffer must be a index buffer");
+
+    upload(
+        src_data, 
+        size_bytes, 
+        dst_buffer, 
+        dst_offset,
+        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+        VK_ACCESS_INDEX_READ_BIT
+    );
+}
+
+void VulkanResourceLoader::upload_storage_buffer(
+    const void* src_data,
+    VkDeviceSize size_bytes,
+    VulkanBuffer& dst_buffer,
+    VkDeviceSize dst_offset)
+{
+    LOG_METHOD();
+
+    logger.check(dst_buffer.has_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), "Destinition buffer must be a index buffer");
+
+    upload(
+        src_data, 
+        size_bytes, 
+        dst_buffer, 
+        dst_offset,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT
+    );
+}
+
 void VulkanResourceLoader::submit() {
     LOG_METHOD();
 

@@ -50,6 +50,20 @@ public:
         VkDeviceSize dst_offset = 0
     );
 
+    void upload_index_buffer(
+        const void* src_data,
+        VkDeviceSize size_bytes,
+        VulkanBuffer& dst_buffer,
+        VkDeviceSize dst_offset = 0
+    );
+
+    void upload_storage_buffer(
+        const void* src_data,
+        VkDeviceSize size_bytes,
+        VulkanBuffer& dst_buffer,
+        VkDeviceSize dst_offset = 0
+    );
+
     void submit();
 
 private:
