@@ -17,6 +17,7 @@
 #include "camera/camera.h"
 #include "camera/controllers/fps_camera_controller.h"
 #include "renderer/transform.h"
+#include "renderer/mesh.h"
 
 #include <vector>
 
@@ -41,18 +42,6 @@ struct SimpleStorage {
     glm::vec4 color1;
     glm::vec4 color2;
 };
-
-// std::vector<SimpleVertex> vertices = {
-//     {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // bottom-left
-//     {{ 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}}, // bottom-right
-//     {{ 0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}}, // top-right
-//     {{-0.5f,  0.5f}, {1.0f, 1.0f, 0.0f}}, // top-left
-// };
-
-// std::vector<uint32_t> indices = {
-//     0, 1, 2,
-//     2, 3, 0
-// };
 
 std::vector<SimpleVertex3D> cube_vertices = {
     {{-0.5f, -0.5f, -0.5f, 1.0f}}, // 0: back-bottom-left
@@ -108,7 +97,7 @@ int main() {
     Camera camera;
     FPSCameraController camera_controller(camera);
 
-    Transform object_transform;
+    // Transform object_transform;
 
     VulkanShaderModule compute_shader(engine.device(), "shaders/test_compute_shader.comp.spv");
     VulkanShaderModule vert_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.vert.spv");
@@ -116,17 +105,16 @@ int main() {
 
     VulkanBuffer storage_buffer = VulkanBuffer::create_storage_buffer(engine, sizeof(SimpleStorage));
     VulkanBuffer unifrom_buffer = VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(SimpleUniform));
-    VulkanBuffer vertex_buffer = VulkanBuffer::create_vertex_buffer(engine, Utils::size_bytes(cube_vertices));
-    VulkanBuffer index_buffer = VulkanBuffer::create_index_buffer(engine, Utils::size_bytes(cube_indices));
 
     MaterialSystem material_system(engine.device());
     MaterialInstance blin_phong_red_material = material_system.create_blin_phong_material(unifrom_buffer, glm::vec4(1, 0, 0, 1));
 
     VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
-    resource_loader.upload_vertex_buffer(cube_vertices.data(), Utils::size_bytes(cube_vertices), vertex_buffer);
-    resource_loader.upload_index_buffer(cube_indices.data(), Utils::size_bytes(cube_indices), index_buffer);
     resource_loader.upload_storage_buffer(&simple_storage, sizeof(SimpleStorage), storage_buffer);
     resource_loader.submit();
+
+    Mesh cube(engine, resource_loader, cube_vertices.data(), Utils::size_bytes(cube_vertices), 
+                                       cube_indices.data(), Utils::size_bytes(cube_indices));
 
     FrameResources frame_resources(engine.physical_device(), engine.device(), engine.num_frames_in_flight());
 
@@ -221,15 +209,10 @@ int main() {
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
 
-        // SimpleUniform ubo;
-        // ubo.color = glm::vec4(1.0f, 0.0f, 1.0f, 1.0f);
-        // unifrom_buffer.upload(&ubo, sizeof(SimpleUniform));
-
-        object_transform.position.x += 1.0f * delta_time;
+        cube.transform.position.x += 1.0f * delta_time;
 
         static TestPushConstants pc;
-        pc.model = object_transform.get_model_matrix();
-        // pc.offset.x += 0.001f;
+        pc.model = cube.transform.get_model_matrix();
 
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), camera);
@@ -248,12 +231,14 @@ int main() {
 
                 pipeline.set_y_up_viewport(command_buffer, engine);
                 pipeline.set_scissor(command_buffer, engine);
-                vertex_buffer.bind_as_vertex_buffer(command_buffer);
-                index_buffer.bind_as_index_buffer(command_buffer);
+
+                cube.bind_vertex_buffer(command_buffer);
+                cube.bind_index_buffer(command_buffer);
                 
                 pipeline_layout.push_constants(command_buffer, pc);
 
-                command_buffer.draw_indexed(cube_indices.size());
+                command_buffer.draw_indexed(cube.index_count());
+                
             }
         }
 
