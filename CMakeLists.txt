@@ -54,6 +54,10 @@ add_executable(app
   vulkan_self/descriptor_set/descriptor_set.cpp
   vulkan_self/pipeline/compute_pipeline.cpp
   vulkan_self/pipeline/pipeline.cpp
+  vulkan_self/material/material_system.cpp
+  vulkan_self/material/blin_phong_material_layout.cpp
+  vulkan_self/material/material_layout.cpp
+  vulkan_self/material/material_instance.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

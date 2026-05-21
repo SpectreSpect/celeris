@@ -16,6 +16,7 @@ public:
     }
 
     const DescriptorSetLayoutBuilder& descriptor_set_layout_builder() const noexcept {
+        std::cout << dsl_builder.get_bindings().size() << std::endl;
         return dsl_builder;
     }
 

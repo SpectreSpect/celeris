@@ -25,7 +25,7 @@ DescriptorPoolBuilder& DescriptorPoolBuilder::add_descriptors(VkDescriptorType t
 DescriptorPoolBuilder& DescriptorPoolBuilder::add_layout(const DescriptorSetLayoutBuilder& layout_builder, uint32_t set_count) {
     LOG_METHOD();
 
-    logger.check(set_count, "set_count must be greater than 0");
+    logger.check(set_count > 0, "set_count must be greater than 0");
 
     std::span<const VkDescriptorSetLayoutBinding> bindings = layout_builder.get_bindings();
 

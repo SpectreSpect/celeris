@@ -9,9 +9,12 @@ class MaterialInstance {
 public:
     _XCLASS_NAME(MaterialLayout);
 
-    MaterialInstance(DescriptorPool& pool, MaterialLayout& layout) 
-        :   descriptor_set(pool.allocate_set(layout.ds_layout)) {};
+    MaterialInstance(DescriptorPool& pool, const MaterialLayout& layout) 
+        :   descriptor_set(pool.allocate_set(layout.descriptor_set_layout())) {};
+    
+    void bind(VulkanCommandBuffer& command_buffer, Pipeline& pipeline);
 
-protected:
     DescriptorSet descriptor_set;
+// protected:
+    
 };

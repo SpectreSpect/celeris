@@ -11,6 +11,8 @@
 #include "vulkan_self/descriptor_set/descriptor_set.h"
 #include "vulkan_self/pipeline/compute_pipeline.h"
 #include "path_utils.h"
+#include "vulkan_self/material/material_system.h"
+#include "vulkan_self/material/material_instance.h"
 
 #include <vector>
 
@@ -58,6 +60,8 @@ int main() {
 
     VulkanEngine engine(glfw_context, window, queue_request);
 
+
+
     VulkanShaderModule compute_shader(engine.device(), "shaders/test_compute_shader.comp.spv");
     VulkanShaderModule vert_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.vert.spv");
     VulkanShaderModule frag_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.frag.spv");
@@ -66,6 +70,10 @@ int main() {
     VulkanBuffer unifrom_buffer = VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(SimpleUniform));
     VulkanBuffer vertex_buffer = VulkanBuffer::create_vertex_buffer(engine, Utils::size_bytes(vertices));
     VulkanBuffer index_buffer = VulkanBuffer::create_index_buffer(engine, Utils::size_bytes(indices));
+    
+
+    MaterialSystem material_system(engine.device());
+    MaterialInstance blin_phong_red_material = material_system.create_blin_phong_material(unifrom_buffer, glm::vec4(1, 0, 0, 1));
 
     VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
     resource_loader.upload_vertex_buffer(vertices.data(), Utils::size_bytes(vertices), vertex_buffer);
@@ -109,7 +117,8 @@ int main() {
     PipelineLayoutBuilder pipeline_layout_builder = VulkanPipelineLayout::create_builder();
     pipeline_layout_builder.set_device(engine.device());
     pipeline_layout_builder.add_push_constants<TestPushConstants>();
-    pipeline_layout_builder.add_descriptor_set_layout(dsl);
+    // pipeline_layout_builder.add_descriptor_set_layout(dsl);
+    pipeline_layout_builder.add_descriptor_set_layout(material_system.m_blin_phong_layout.descriptor_set_layout());
     VulkanPipelineLayout pipeline_layout(pipeline_layout_builder);
 
     GraphicsPipelineBuilder pipeline_builder = GraphicsPipeline::create_builder();
@@ -158,9 +167,9 @@ int main() {
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
 
-        SimpleUniform ubo;
-        ubo.color = glm::vec4(1.0f, 0.0f, 1.0f, 1.0f);
-        unifrom_buffer.upload(&ubo, sizeof(SimpleUniform));
+        // SimpleUniform ubo;
+        // ubo.color = glm::vec4(1.0f, 0.0f, 1.0f, 1.0f);
+        // unifrom_buffer.upload(&ubo, sizeof(SimpleUniform));
 
         static TestPushConstants pc{
             .offset = {0.0f, 0.0f},
@@ -176,7 +185,8 @@ int main() {
                 engine.swapchain_resources().swapchain, {{0.05f, 0.08f, 0.12f, 1.0f}});
 
                 pipeline.bind(command_buffer);
-                descriptor_set.bind(command_buffer, pipeline);
+                // descriptor_set.bind(command_buffer, pipeline);
+                blin_phong_red_material.bind(command_buffer, pipeline);
 
                 pipeline.set_y_up_viewport(command_buffer, engine);
                 pipeline.set_scissor(command_buffer, engine);

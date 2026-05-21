@@ -17,9 +17,11 @@ public:
 
     MaterialInstance create_blin_phong_material(VulkanBuffer& blin_phong_uniform, glm::vec4 albedo);
 
-private:
+    BlinPhongMaterialLayout m_blin_phong_layout;
     DescriptorPool m_descriptor_pool;
-    BlinPhongMaterialLayout blin_phong_layout;
+
+private:
+    
 
     DescriptorPool build_descriptor_pool(VulkanDevice& device);
 };
