@@ -5,9 +5,9 @@
 #include "../logger/logger_header.h"
 #include "../descriptor_set/descriptor_pool.h"
 #include "blin_phong_material_layout.h"
-
-class MaterialInstance;
-class VulkanBuffer;
+#include "../vulkan_buffer.h"
+#include "../descriptor_set/descriptor_pool.h"
+#include "material_instance.h"
 
 class MaterialSystem {
 public:
@@ -21,7 +21,5 @@ public:
     DescriptorPool m_descriptor_pool;
 
 private:
-    
-
     DescriptorPool build_descriptor_pool(VulkanDevice& device);
 };

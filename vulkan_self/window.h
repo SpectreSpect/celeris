@@ -10,6 +10,7 @@
 
 #include "logger/logger_header.h"
 #include "glfw_context.h"
+#include "mouse_state.h"
 
 class Window {
 public:
@@ -33,9 +34,14 @@ public:
     bool should_close() const;
     void poll_events() const;
 
+    void disable_cursor();
+    void hide_cursor();
+    void show_cursor();
+
     uint32_t width() const noexcept;
     uint32_t height() const noexcept;
     const std::string& title() const noexcept;
+    MouseState mouse_state() const noexcept;
 
     void wait_until_framebuffer_available();
 
@@ -44,8 +50,12 @@ private:
     uint32_t m_height = 0;
     std::string m_title;
 
+    MouseState m_mouse_state;
+
     GLFWwindow* m_window = nullptr;
 
 private:
     static void resize_callback(GLFWwindow* handle, int width, int height);
+    static void mouse_callback(GLFWwindow* handle, double xpos, double ypos);
+    static void mouse_button_callback(GLFWwindow* handle, int button, int action, int mods);
 };

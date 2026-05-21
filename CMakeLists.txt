@@ -58,6 +58,10 @@ add_executable(app
   vulkan_self/material/blin_phong_material_layout.cpp
   vulkan_self/material/material_layout.cpp
   vulkan_self/material/material_instance.cpp
+  renderer/resources/frame_resources.cpp
+  camera/camera.cpp
+  camera/controllers/fps_camera_controller.cpp
+  vulkan_self/vulkan_image_temp.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

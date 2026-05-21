@@ -12,7 +12,7 @@ public:
     MaterialInstance(DescriptorPool& pool, const MaterialLayout& layout) 
         :   descriptor_set(pool.allocate_set(layout.descriptor_set_layout())) {};
     
-    void bind(VulkanCommandBuffer& command_buffer, Pipeline& pipeline);
+    void bind(VulkanCommandBuffer& command_buffer, Pipeline& pipeline, uint32_t set_binding);
 
     DescriptorSet descriptor_set;
 // protected:

@@ -24,9 +24,9 @@ public:
     void write_uniform_buffer(uint32_t binding, VulkanBuffer& buffer);
     void write_storage_buffer(uint32_t binding, VulkanBuffer& buffer);
 
-    void bind(VulkanCommandBuffer& command_buffer, VkPipelineLayout pipeline_layout, VkPipelineBindPoint bind_point);
-    void bind(VulkanCommandBuffer& command_buffer, VulkanPipelineLayout& pipeline_layout, VkPipelineBindPoint bind_point);
-    void bind(VulkanCommandBuffer& command_buffer, Pipeline& pipeline);
+    void bind(VulkanCommandBuffer& command_buffer, VkPipelineLayout pipeline_layout, VkPipelineBindPoint bind_point, uint32_t set_binding);
+    void bind(VulkanCommandBuffer& command_buffer, VulkanPipelineLayout& pipeline_layout, VkPipelineBindPoint bind_point, uint32_t set_binding);
+    void bind(VulkanCommandBuffer& command_buffer, Pipeline& pipeline, uint32_t set_binding);
     
 private:
     VkDescriptorSet m_descriptor_set = VK_NULL_HANDLE;

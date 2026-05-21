@@ -24,6 +24,7 @@
 #include "vulkan_device.h"
 #include "vulkan_swapchain.h"
 #include "vulkan_image_view.h"
+#include "vulkan_image_temp.h"
 #include "vulkan_render_pass.h"
 #include "vulkan_framebuffer.h"
 #include "vulkan_command_pool.h"
@@ -35,6 +36,11 @@
 struct SwapchainResources {
     VulkanSwapchain swapchain;
     std::vector<VulkanImageView> image_views;
+
+    VkFormat depth_format;
+    std::vector<VulkanImageTemp> depth_images;
+    std::vector<VulkanImageView> depth_image_views;
+
     VulkanRenderPass render_pass;
     std::vector<VulkanFramebuffer> framebuffers;
     std::vector<VulkanSemaphore> render_finished_semaphores;
@@ -46,15 +52,39 @@ struct SwapchainResources {
         Window& window)
         :   swapchain(physical_device, device, surface, window),
             image_views(VulkanImageView::from_swapchain(device, swapchain)),
-            render_pass(device, swapchain),
+
+            depth_format(VK_FORMAT_D32_SFLOAT),
+
+            depth_images(
+                VulkanImageTemp::create_depth_images(
+                    physical_device,
+                    device,
+                    swapchain.extent(),
+                    depth_format,
+                    swapchain.images().size()
+                )
+            ),
+
+            depth_image_views(
+                VulkanImageView::from_depth_images(
+                    device,
+                    depth_images,
+                    depth_format
+                )
+            ),
+
+            render_pass(device, swapchain, depth_format),
+
             framebuffers(
                 VulkanFramebuffer::from_image_views(
                     image_views,
+                    depth_image_views,
                     device,
                     render_pass,
                     swapchain.extent()
                 )
             ),
+
             render_finished_semaphores(
                 VulkanSemaphore::create_semaphores(
                     device,
@@ -102,6 +132,9 @@ public:
 
     VulkanCommandPool& compute_command_pool() noexcept;
     const VulkanCommandPool& compute_command_pool() const noexcept;
+
+    size_t current_frame() const noexcept;
+    uint32_t num_frames_in_flight() const noexcept;
 
     bool aquire_free_resources(uint32_t& free_swapchain_image_index);
     VulkanCommandBuffer& get_active_command_buffer();

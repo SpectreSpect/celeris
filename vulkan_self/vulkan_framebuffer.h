@@ -43,6 +43,14 @@ public:
         uint32_t layers = 1
     );
 
+    static std::vector<VulkanFramebuffer> from_image_views(
+        const std::vector<VulkanImageView>& color_image_views,
+        const std::vector<VulkanImageView>& depth_image_views,
+        const VulkanDevice& device,
+        const VulkanRenderPass& render_pass,
+        VkExtent2D extent
+    );
+
 private:
     VkFramebuffer m_framebuffer = VK_NULL_HANDLE;
     VkDevice m_device = VK_NULL_HANDLE;
