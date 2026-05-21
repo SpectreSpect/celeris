@@ -16,12 +16,12 @@
 #include "renderer/resources/frame_resources.h"
 #include "camera/camera.h"
 #include "camera/controllers/fps_camera_controller.h"
+#include "renderer/transform.h"
 
 #include <vector>
 
 struct TestPushConstants {
-    glm::vec4 offset; // xyz = position, w unused
-    float scale;
+    glm::mat4 model;
 };
 
 struct SimpleVertex {
@@ -107,6 +107,8 @@ int main() {
 
     Camera camera;
     FPSCameraController camera_controller(camera);
+
+    Transform object_transform;
 
     VulkanShaderModule compute_shader(engine.device(), "shaders/test_compute_shader.comp.spv");
     VulkanShaderModule vert_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.vert.spv");
@@ -223,11 +225,11 @@ int main() {
         // ubo.color = glm::vec4(1.0f, 0.0f, 1.0f, 1.0f);
         // unifrom_buffer.upload(&ubo, sizeof(SimpleUniform));
 
-        static TestPushConstants pc{
-            .offset = {0.0f, 0.0f, 0, 0},
-            .scale = 1.0f
-        };
-        pc.offset.x += 0.001f;
+        object_transform.position.x += 1.0f * delta_time;
+
+        static TestPushConstants pc;
+        pc.model = object_transform.get_model_matrix();
+        // pc.offset.x += 0.001f;
 
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), camera);

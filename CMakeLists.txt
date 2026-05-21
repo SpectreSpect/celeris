@@ -62,6 +62,7 @@ add_executable(app
   camera/camera.cpp
   camera/controllers/fps_camera_controller.cpp
   vulkan_self/vulkan_image_temp.cpp
+  renderer/transform.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
