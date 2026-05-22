@@ -1,3 +1,5 @@
 #include "render_object.h"
 
-RenderObject::RenderObject(Mesh& mesh) : m_mesh(mesh) {}
+RenderObject::RenderObject(Mesh& mesh, MaterialInstanceTemp& material) : m_mesh(mesh) {
+    m_material = &material;
+}

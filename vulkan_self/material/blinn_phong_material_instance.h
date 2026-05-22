@@ -8,6 +8,7 @@ class BlinnPhongMaterialInstance : public MaterialInstanceTemp {
 public:
     struct BlinnPhongUniform {
         glm::vec4 color;
+        glm::vec4 material;
     };
 
     explicit BlinnPhongMaterialInstance(VulkanEngine& engine, DescriptorPool& descriptor_pool, MaterialPass& blinn_phong_material_pass);

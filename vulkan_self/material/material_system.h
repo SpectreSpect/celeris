@@ -24,6 +24,11 @@ public:
                                                const DescriptorSetLayout& frame_resources_descriptor_layout,
                                                const VulkanShaderModule& vertex_shader,
                                                const VulkanShaderModule& fragment_shader);
+    
+    static MaterialPass create_unlit_pass(VulkanEngine& engine,
+                                               const DescriptorSetLayout& frame_resources_descriptor_layout,
+                                               const VulkanShaderModule& vertex_shader,
+                                               const VulkanShaderModule& fragment_shader);
 
     BlinPhongMaterialLayout m_blin_phong_layout;
     DescriptorPool m_descriptor_pool;

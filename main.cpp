@@ -23,8 +23,45 @@
 #include "vulkan_self/material/blin_phong_material_pass.h"
 #include "vulkan_self/material/material_instance_temp.h"
 #include "vulkan_self/material/blinn_phong_material_instance.h"
+#include "vulkan_self/material/unlit_material_instance.h"
 
 #include <vector>
+
+
+class Renderer {
+public:
+    Renderer(VulkanEngine& engine, FrameResources& frame_resources) {
+        m_engine = &engine;
+        m_frame_resources = &frame_resources;
+    };
+
+    void render(VulkanCommandBuffer& command_buffer, RenderObject& render_object) {
+        static TransformPushConstants pc;
+        pc.model = render_object.transform.get_model_matrix();
+
+        // blinn_phong_material_instance.bind(command_buffer);
+        render_object.m_material->bind(command_buffer);
+        MaterialPass& pass = render_object.m_material->m_pass;
+
+        m_frame_resources->bind(m_engine->current_frame(), command_buffer, pass.pipeline(), 1);
+
+        pass.pipeline().set_y_up_viewport(command_buffer, *m_engine);
+        pass.pipeline().set_scissor(command_buffer, *m_engine);
+
+        render_object.m_mesh.bind_vertex_buffer(command_buffer);
+        render_object.m_mesh.bind_index_buffer(command_buffer);
+
+        pass.pipeline_layout().push_constants(command_buffer, pc);
+        
+        command_buffer.draw_indexed(render_object.m_mesh.index_count());
+    };
+
+private:
+    VulkanEngine* m_engine = nullptr;
+    FrameResources* m_frame_resources = nullptr;
+};
+
+
 
 // struct TestPushConstants {
 //     glm::mat4 model;
@@ -35,9 +72,7 @@ struct SimpleVertex {
     glm::vec3 color;
 };
 
-struct SimpleVertex3D {
-    glm::vec4 pos;
-};
+
 
 struct SimpleUniform {
     glm::vec4 color;
@@ -48,42 +83,73 @@ struct SimpleStorage {
     glm::vec4 color2;
 };
 
-std::vector<SimpleVertex3D> cube_vertices = {
-    {{-0.5f, -0.5f, -0.5f, 1.0f}}, // 0: back-bottom-left
-    {{ 0.5f, -0.5f, -0.5f, 1.0f}}, // 1: back-bottom-right
-    {{ 0.5f,  0.5f, -0.5f, 1.0f}}, // 2: back-top-right
-    {{-0.5f,  0.5f, -0.5f, 1.0f}}, // 3: back-top-left
+struct SimpleVertex3D {
+    glm::vec4 position;
+    glm::vec4 normal;
+};
 
-    {{-0.5f, -0.5f,  0.5f, 1.0f}}, // 4: front-bottom-left
-    {{ 0.5f, -0.5f,  0.5f, 1.0f}}, // 5: front-bottom-right
-    {{ 0.5f,  0.5f,  0.5f, 1.0f}}, // 6: front-top-right
-    {{-0.5f,  0.5f,  0.5f, 1.0f}}, // 7: front-top-left
+std::vector<SimpleVertex3D> cube_vertices = {
+    // Front face, normal +Z
+    {{-0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 0.0f}}, // 0
+    {{ 0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 0.0f}}, // 1
+    {{ 0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 0.0f}}, // 2
+    {{-0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 0.0f}}, // 3
+
+    // Back face, normal -Z
+    {{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f, -1.0f, 0.0f}}, // 4
+    {{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f, -1.0f, 0.0f}}, // 5
+    {{-0.5f,  0.5f, -0.5f, 1.0f}, {0.0f, 0.0f, -1.0f, 0.0f}}, // 6
+    {{ 0.5f,  0.5f, -0.5f, 1.0f}, {0.0f, 0.0f, -1.0f, 0.0f}}, // 7
+
+    // Left face, normal -X
+    {{-0.5f, -0.5f, -0.5f, 1.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}}, // 8
+    {{-0.5f, -0.5f,  0.5f, 1.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}}, // 9
+    {{-0.5f,  0.5f,  0.5f, 1.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}}, // 10
+    {{-0.5f,  0.5f, -0.5f, 1.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}}, // 11
+
+    // Right face, normal +X
+    {{ 0.5f, -0.5f,  0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 0.0f}}, // 12
+    {{ 0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 0.0f}}, // 13
+    {{ 0.5f,  0.5f, -0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 0.0f}}, // 14
+    {{ 0.5f,  0.5f,  0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 0.0f}}, // 15
+
+    // Top face, normal +Y
+    {{-0.5f,  0.5f, -0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 0.0f}}, // 16
+    {{-0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 0.0f}}, // 17
+    {{ 0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 0.0f}}, // 18
+    {{ 0.5f,  0.5f, -0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 0.0f}}, // 19
+
+    // Bottom face, normal -Y
+    {{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, -1.0f, 0.0f, 0.0f}}, // 20
+    {{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, -1.0f, 0.0f, 0.0f}}, // 21
+    {{ 0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, -1.0f, 0.0f, 0.0f}}, // 22
+    {{-0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, -1.0f, 0.0f, 0.0f}}, // 23
 };
 
 std::vector<uint32_t> cube_indices = {
     // Front face
+    0, 1, 2,
+    2, 3, 0,
+
+    // Back face
     4, 5, 6,
     6, 7, 4,
 
-    // Back face
-    1, 0, 3,
-    3, 2, 1,
-
     // Left face
-    0, 4, 7,
-    7, 3, 0,
+    8, 9, 10,
+    10, 11, 8,
 
     // Right face
-    5, 1, 2,
-    2, 6, 5,
+    12, 13, 14,
+    14, 15, 12,
 
     // Top face
-    3, 7, 6,
-    6, 2, 3,
+    16, 17, 18,
+    18, 19, 16,
 
     // Bottom face
-    0, 1, 5,
-    5, 4, 0
+    20, 21, 22,
+    22, 23, 20
 };
 
 SimpleStorage simple_storage{glm::vec4(1, 0, 0, 1), glm::vec4(0, 0, 1, 1)};
@@ -105,24 +171,37 @@ int main() {
     VulkanShaderModule vert_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.vert.spv");
     VulkanShaderModule frag_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.frag.spv");
 
-    MaterialSystem material_system(engine.device());
-
-    VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
-
-    Mesh cube_mesh(engine, resource_loader, cube_vertices.data(), Utils::size_bytes(cube_vertices), 
-                                       cube_indices.data(), Utils::size_bytes(cube_indices));
-    RenderObject cube(cube_mesh);
+    VulkanShaderModule unlit_vs(engine.device(), path_utils::executable_dir() / "shaders" / "unlit.vert.spv");
+    VulkanShaderModule unlit_fs(engine.device(), path_utils::executable_dir() / "shaders" / "unlit.frag.spv");
 
     FrameResources frame_resources(engine.physical_device(), engine.device(), engine.num_frames_in_flight());
 
-    MaterialPass blin_phong_material_pass = material_system.create_blin_phong_pass(engine, frame_resources.descriptor_layout(), vert_shader_module, frag_shader_module);
-
-    BlinnPhongMaterialInstance blinn_phong_material_instance(engine, material_system.m_descriptor_pool, blin_phong_material_pass);
+    Renderer renderer(engine, frame_resources);
     
-    blinn_phong_material_instance.set_color(glm::vec4(1, 0, 0, 1));
+    MaterialSystem material_system(engine.device());
 
+    MaterialPass blin_phong_material_pass = material_system.create_blin_phong_pass(engine, frame_resources.descriptor_layout(), vert_shader_module, frag_shader_module);
+    MaterialPass unlit_material_pass = material_system.create_unlit_pass(engine, frame_resources.descriptor_layout(), unlit_vs, unlit_fs);
+    
+    BlinnPhongMaterialInstance blinn_phong_material_instance(engine, material_system.m_descriptor_pool, blin_phong_material_pass);
+    UnlitMaterialInstance unlit_material_instance(engine, material_system.m_descriptor_pool, unlit_material_pass);
+
+    VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
+
+    blinn_phong_material_instance.set_color(glm::vec4(1, 0, 0, 1));
+    unlit_material_instance.set_color(glm::vec4(0, 0, 1, 1));
+
+    Mesh cube_mesh(engine, resource_loader, cube_vertices.data(), Utils::size_bytes(cube_vertices), 
+                                       cube_indices.data(), Utils::size_bytes(cube_indices));
+
+    RenderObject blinn_phong_cube(cube_mesh, blinn_phong_material_instance);
+    RenderObject unlit_cube(cube_mesh, unlit_material_instance);
+
+    unlit_cube.transform.position.x = 2;
+    
     float last_frame_time = 0.0f;
     float start_time = (float)glfwGetTime();
+    float timer = 0;
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
@@ -130,15 +209,13 @@ int main() {
         float current_frame_time = (float)glfwGetTime() - start_time;
         float delta_time = current_frame_time - last_frame_time;
         last_frame_time = current_frame_time;
+        timer += delta_time;
         
         uint32_t image_index = 0;
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
         
-        cube.transform.position.x += 1.0f * delta_time;
-
-        static TransformPushConstants pc;
-        pc.model = cube.transform.get_model_matrix();
+        // cube.transform.position.x += 1.0f * delta_time;
 
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), camera);
@@ -150,20 +227,11 @@ int main() {
                 engine.swapchain_resources().framebuffers[image_index],
                 engine.swapchain_resources().swapchain, {{0.05f, 0.08f, 0.12f, 1.0f}});
 
-                blinn_phong_material_instance.bind(command_buffer);
-                MaterialPass& pass = blinn_phong_material_instance.m_pass;
-
-                frame_resources.bind(engine.current_frame(), command_buffer, pass.pipeline(), 1);
-
-                pass.pipeline().set_y_up_viewport(command_buffer, engine);
-                pass.pipeline().set_scissor(command_buffer, engine);
-
-                cube.m_mesh.bind_vertex_buffer(command_buffer);
-                cube.m_mesh.bind_index_buffer(command_buffer);
-
-                pass.pipeline_layout().push_constants(command_buffer, pc);
+                unlit_cube.transform.position.x = 3 + sin(timer);
+                blinn_phong_cube.transform.position.y = cos(timer);
                 
-                command_buffer.draw_indexed(cube.m_mesh.index_count());
+                renderer.render(command_buffer, unlit_cube);
+                renderer.render(command_buffer, blinn_phong_cube);
             }
         }
 

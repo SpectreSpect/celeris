@@ -4,6 +4,7 @@
 #include "mesh.h"
 
 #include "../vulkan_self/logger/logger_header.h"
+#include "../vulkan_self/material/material_instance_temp.h"
 
 class RenderObject {
 public:
@@ -11,7 +12,8 @@ public:
 
     Transform transform;
 
-    RenderObject(Mesh& mesh);
+    RenderObject(Mesh& mesh, MaterialInstanceTemp& material);
 
     Mesh& m_mesh;
+    MaterialInstanceTemp* m_material = nullptr;
 };
