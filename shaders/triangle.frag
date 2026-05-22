@@ -2,6 +2,7 @@
 
 layout(location = 0) in vec3 frag_world_pos;
 layout(location = 1) in vec3 frag_normal;
+layout(location = 2) in vec2 frag_uv;
 
 layout(location = 0) out vec4 out_color;
 
@@ -15,6 +16,8 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     vec4 material;
 } ubo;
 
+layout(set = 0, binding = 1) uniform sampler2D texSampler;
+
 layout(set = 1, binding = 0) uniform CameraUniform {
     mat4 view;
     mat4 proj;
@@ -22,7 +25,8 @@ layout(set = 1, binding = 0) uniform CameraUniform {
 } camera_uniform;
 
 void main() {
-    vec3 base_color = ubo.color.rgb;
+    // vec3 base_color = ubo.color.rgb;
+    vec3 base_color = texture(texSampler, frag_uv).xyz;
 
     float ambient_strength  = ubo.material.x;
     float diffuse_strength  = ubo.material.y;
@@ -52,4 +56,5 @@ void main() {
     vec3 final_color = ambient + diffuse_c + specular_c;
 
     out_color = vec4(final_color, ubo.color.a);
+    // out_color = ;
 }

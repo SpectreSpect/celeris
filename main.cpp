@@ -89,44 +89,45 @@ struct SimpleStorage {
 struct SimpleVertex3D {
     glm::vec4 position;
     glm::vec4 normal;
+    glm::vec2 uv;
 };
 
 std::vector<SimpleVertex3D> cube_vertices = {
     // Front face, normal +Z
-    {{-0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 0.0f}}, // 0
-    {{ 0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 0.0f}}, // 1
-    {{ 0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 0.0f}}, // 2
-    {{-0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 0.0f}}, // 3
+    {{-0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}, // 0
+    {{ 0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}}, // 1
+    {{ 0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}}, // 2
+    {{-0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}}, // 3
 
     // Back face, normal -Z
-    {{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f, -1.0f, 0.0f}}, // 4
-    {{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f, -1.0f, 0.0f}}, // 5
-    {{-0.5f,  0.5f, -0.5f, 1.0f}, {0.0f, 0.0f, -1.0f, 0.0f}}, // 6
-    {{ 0.5f,  0.5f, -0.5f, 1.0f}, {0.0f, 0.0f, -1.0f, 0.0f}}, // 7
+    {{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}}, // 4
+    {{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}}, // 5
+    {{-0.5f,  0.5f, -0.5f, 1.0f}, {0.0f, 0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}}, // 6
+    {{ 0.5f,  0.5f, -0.5f, 1.0f}, {0.0f, 0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}}, // 7
 
     // Left face, normal -X
-    {{-0.5f, -0.5f, -0.5f, 1.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}}, // 8
-    {{-0.5f, -0.5f,  0.5f, 1.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}}, // 9
-    {{-0.5f,  0.5f,  0.5f, 1.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}}, // 10
-    {{-0.5f,  0.5f, -0.5f, 1.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}}, // 11
+    {{-0.5f, -0.5f, -0.5f, 1.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}}, // 8
+    {{-0.5f, -0.5f,  0.5f, 1.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // 9
+    {{-0.5f,  0.5f,  0.5f, 1.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // 10
+    {{-0.5f,  0.5f, -0.5f, 1.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // 11
 
     // Right face, normal +X
-    {{ 0.5f, -0.5f,  0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 0.0f}}, // 12
-    {{ 0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 0.0f}}, // 13
-    {{ 0.5f,  0.5f, -0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 0.0f}}, // 14
-    {{ 0.5f,  0.5f,  0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 0.0f}}, // 15
+    {{ 0.5f, -0.5f,  0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}}, // 12
+    {{ 0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // 13
+    {{ 0.5f,  0.5f, -0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // 14
+    {{ 0.5f,  0.5f,  0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // 15
 
     // Top face, normal +Y
-    {{-0.5f,  0.5f, -0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 0.0f}}, // 16
-    {{-0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 0.0f}}, // 17
-    {{ 0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 0.0f}}, // 18
-    {{ 0.5f,  0.5f, -0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 0.0f}}, // 19
+    {{-0.5f,  0.5f, -0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}}, // 16
+    {{-0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // 17
+    {{ 0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // 18
+    {{ 0.5f,  0.5f, -0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // 19
 
     // Bottom face, normal -Y
-    {{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, -1.0f, 0.0f, 0.0f}}, // 20
-    {{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, -1.0f, 0.0f, 0.0f}}, // 21
-    {{ 0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, -1.0f, 0.0f, 0.0f}}, // 22
-    {{-0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, -1.0f, 0.0f, 0.0f}}, // 23
+    {{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // 20
+    {{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // 21
+    {{ 0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // 22
+    {{-0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}}, // 23
 };
 
 std::vector<uint32_t> cube_indices = {
@@ -186,20 +187,26 @@ int main() {
     MaterialPass blin_phong_material_pass = material_system.create_blin_phong_pass(engine, frame_resources.descriptor_layout(), vert_shader_module, frag_shader_module);
     MaterialPass unlit_material_pass = material_system.create_unlit_pass(engine, frame_resources.descriptor_layout(), unlit_vs, unlit_fs);
     
-    BlinnPhongMaterialInstance blinn_phong_material_instance(engine, material_system.m_descriptor_pool, blin_phong_material_pass);
-    UnlitMaterialInstance unlit_material_instance(engine, material_system.m_descriptor_pool, unlit_material_pass);
-
-    CpuImage cpu_image = CpuImage::load_rgba8_image(
+    CpuImage dirt_cpu_image = CpuImage::load_rgba8_image(
         path_utils::executable_dir() / "assets" / "textures" / "minecraft_dirt" / "texture.png"
     );
 
-    VulkanTexture2D texture(
+    VulkanTexture2D dirt_texture(
         engine.physical_device(),
         engine.device(),
-        cpu_image.extent2d()
+        dirt_cpu_image.extent2d()
     );
 
-    // VulkanImage texture_image(
+    VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
+    resource_loader.upload_sampled_texture_2d(dirt_cpu_image, dirt_texture);
+    resource_loader.submit();
+
+    BlinnPhongMaterialInstance blinn_phong_material_instance(engine, material_system.m_descriptor_pool, blin_phong_material_pass, dirt_texture);
+    UnlitMaterialInstance unlit_material_instance(engine, material_system.m_descriptor_pool, unlit_material_pass);
+
+
+
+    // VulkanImage dirt_image(
     //     engine.physical_device(),
     //     engine.device(),
     //     cpu_image.extent(),
@@ -208,9 +215,10 @@ int main() {
     //     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     // );
 
-    VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
-    resource_loader.upload_sampled_texture_2d(cpu_image, texture);
-    resource_loader.submit();
+    // VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
+    // resource_loader.upload_sampled_texture_2d(cpu_image, texture);
+    // resource_loader.upload_sampled_image_2d(cpu_image.image_data().data(), cpu_image.extent2d(), dirt_image);
+    // resource_loader.submit();
 
     blinn_phong_material_instance.set_color(glm::vec4(1, 0, 0, 1));
     unlit_material_instance.set_color(glm::vec4(0, 0, 1, 1));
