@@ -302,6 +302,23 @@ void VulkanMemory::bind_to_buffer(VulkanBuffer& buffer, VkDeviceSize memory_offs
     logger.check(result == VK_SUCCESS, "Failed to bind buffer memory");
 }
 
+void VulkanMemory::bind_to_image(VkImage image, VkDeviceSize memory_offset) const {
+    LOG_METHOD();
+
+    logger.check(m_memory != VK_NULL_HANDLE, "Memory is not initialized");
+    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(image != VK_NULL_HANDLE, "Image is not initialized");
+
+    VkResult result = vkBindImageMemory(
+        m_device,
+        image,
+        m_memory,
+        memory_offset
+    );
+
+    logger.check(result == VK_SUCCESS, "Failed to bind image memory");
+}
+
 void VulkanMemory::allocate(
     const VulkanPhysicalDevice& physical_device,
     const VulkanDevice& device,

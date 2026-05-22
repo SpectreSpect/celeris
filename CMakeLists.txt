@@ -19,6 +19,7 @@ find_package(Vulkan REQUIRED)
 
 add_executable(app
   main.cpp
+  stb_image_impl.cpp
   vulkan_self/vulkan_engine.cpp
   vulkan_self/colored_string/colored_string.cpp
   vulkan_self/colored_string/multicolor_string.cpp
@@ -52,6 +53,8 @@ add_executable(app
   vulkan_self/descriptor_set/descriptor_pool_builder.cpp
   vulkan_self/descriptor_set/descriptor_pool.cpp
   vulkan_self/descriptor_set/descriptor_set.cpp
+  vulkan_self/vulkan_image.cpp
+  vulkan_self/image/cpu_image.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
