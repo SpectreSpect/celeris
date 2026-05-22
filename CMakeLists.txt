@@ -54,6 +54,20 @@ add_executable(app
   vulkan_self/descriptor_set/descriptor_set.cpp
   vulkan_self/pipeline/compute_pipeline.cpp
   vulkan_self/pipeline/pipeline.cpp
+  vulkan_self/material/material_system.cpp
+  vulkan_self/material/blin_phong_material_layout.cpp
+  vulkan_self/material/material_layout.cpp
+  vulkan_self/material/material_instance.cpp
+  renderer/resources/frame_resources.cpp
+  camera/camera.cpp
+  camera/controllers/fps_camera_controller.cpp
+  vulkan_self/vulkan_image_temp.cpp
+  renderer/transform.cpp
+  renderer/mesh.cpp
+  renderer/render_object.cpp
+  vulkan_self/material/material_instance_temp.cpp
+  vulkan_self/material/blinn_phong_material_instance.cpp
+  vulkan_self/material/unlit_material_instance.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

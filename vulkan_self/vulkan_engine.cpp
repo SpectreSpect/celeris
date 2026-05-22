@@ -92,6 +92,14 @@ const VulkanCommandPool& VulkanEngine::upload_command_pool() const noexcept {
     return m_upload_command_pool;
 }
 
+size_t VulkanEngine::current_frame() const noexcept {
+    return m_current_frame;
+}
+
+uint32_t VulkanEngine::num_frames_in_flight() const noexcept {
+    return MAX_FRAMES_IN_FLIGHT;
+}
+
 bool VulkanEngine::aquire_free_resources(uint32_t& free_swapchain_image_index) {
     LOG_METHOD();
 

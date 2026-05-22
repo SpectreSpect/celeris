@@ -43,7 +43,7 @@ public:
     _XCLASS_NAME(VulkanRenderPass);
 
     explicit VulkanRenderPass(const VulkanDevice& device, const VkRenderPassCreateInfo& desc);
-    explicit VulkanRenderPass(const VulkanDevice& device, const VulkanSwapchain& swapchain);
+    explicit VulkanRenderPass(const VulkanDevice& device, const VulkanSwapchain& swapchain, VkFormat depth_format);
 
     ~VulkanRenderPass();
     void destroy();
