@@ -44,9 +44,7 @@ MaterialPass MaterialSystem::create_blin_phong_pass(
     pipeline_layout_builder.set_device(engine.device());
 
     pipeline_layout_builder.add_push_constants<TransformPushConstants>();
-
     pipeline_layout_builder.add_descriptor_set_layout(material_descriptor_set_layout);
-
     pipeline_layout_builder.add_descriptor_set_layout(frame_resources_descriptor_layout);
 
     VulkanPipelineLayout pipeline_layout(pipeline_layout_builder);

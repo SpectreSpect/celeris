@@ -102,120 +102,24 @@ int main() {
     Camera camera;
     FPSCameraController camera_controller(camera);
 
-    // Transform object_transform;
-
-    VulkanShaderModule compute_shader(engine.device(), "shaders/test_compute_shader.comp.spv");
     VulkanShaderModule vert_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.vert.spv");
     VulkanShaderModule frag_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.frag.spv");
 
-    VulkanBuffer storage_buffer = VulkanBuffer::create_storage_buffer(engine, sizeof(SimpleStorage));
-    VulkanBuffer unifrom_buffer = VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(SimpleUniform));
-
     MaterialSystem material_system(engine.device());
-    // MaterialInstance blin_phong_red_material = material_system.create_blin_phong_material(unifrom_buffer, glm::vec4(1, 0, 0, 1));
 
     VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
-    resource_loader.upload_storage_buffer(&simple_storage, sizeof(SimpleStorage), storage_buffer);
-    resource_loader.submit();
 
     Mesh cube_mesh(engine, resource_loader, cube_vertices.data(), Utils::size_bytes(cube_vertices), 
                                        cube_indices.data(), Utils::size_bytes(cube_indices));
     RenderObject cube(cube_mesh);
-    // Transform cube_transform;
 
     FrameResources frame_resources(engine.physical_device(), engine.device(), engine.num_frames_in_flight());
 
-    // BlinPhongMaterialPass blin_phong_material_pass(engine, frame_resources.descriptor_layout(), vert_shader_module, frag_shader_module);
-
     MaterialPass blin_phong_material_pass = material_system.create_blin_phong_pass(engine, frame_resources.descriptor_layout(), vert_shader_module, frag_shader_module);
 
-    MaterialInstanceTemp blin_phong_material(material_system.m_descriptor_pool, blin_phong_material_pass);
-    blin_phong_material.descriptor_set.write_uniform_buffer(0, unifrom_buffer);
-
     BlinnPhongMaterialInstance blinn_phong_material_instance(engine, material_system.m_descriptor_pool, blin_phong_material_pass);
+    
     blinn_phong_material_instance.set_color(glm::vec4(1, 0, 0, 1));
-
-    // blin_phong_uniform.upload(&albedo, sizeof(glm::vec4));
-
-    // MaterialInstance instance(m_descriptor_pool, m_blin_phong_layout);
-
-    // blin_phong_material.bind();
-
-    DescriptorSetLayoutBuilder compute_dsl_builder;
-    compute_dsl_builder.add_uniform_buffer(0, ShaderStages::compute);
-    compute_dsl_builder.add_storage_buffer(1, ShaderStages::compute);
-    DescriptorSetLayout compute_dsl(engine.device(), compute_dsl_builder);
-
-    DescriptorSetLayoutBuilder dsl_builder;
-    dsl_builder.add_uniform_buffer(0, ShaderStages::fragment);
-    dsl_builder.add_storage_buffer(1, ShaderStages::fragment);
-    DescriptorSetLayout dsl(engine.device(), dsl_builder);
-
-    DescriptorPoolBuilder pool_builder;
-    pool_builder.add_layout(dsl_builder);
-    pool_builder.add_layout(compute_dsl_builder);
-    DescriptorPool pool(engine.device(), pool_builder);
-
-    DescriptorSet compute_descriptor_set = pool.allocate_set(compute_dsl);
-    DescriptorSet descriptor_set = pool.allocate_set(dsl);
-
-    PipelineLayoutBuilder compute_pipeline_layout_builder = VulkanPipelineLayout::create_builder();
-    compute_pipeline_layout_builder.set_device(engine.device());
-    compute_pipeline_layout_builder.add_push_constants<TransformPushConstants>();
-    compute_pipeline_layout_builder.add_descriptor_set_layout(compute_dsl);
-    VulkanPipelineLayout compute_pipeline_layout(compute_pipeline_layout_builder);
-
-    ComputePipeline compute_pipeline(engine.device(), compute_pipeline_layout, compute_shader);
-
-    // Graphics pipeline
-
-    PipelineLayoutBuilder pipeline_layout_builder = VulkanPipelineLayout::create_builder();
-    pipeline_layout_builder.set_device(engine.device());
-    pipeline_layout_builder.add_push_constants<TransformPushConstants>();
-    // pipeline_layout_builder.add_descriptor_set_layout(dsl);
-    pipeline_layout_builder.add_descriptor_set_layout(material_system.m_blin_phong_layout.descriptor_set_layout());
-    pipeline_layout_builder.add_descriptor_set_layout(frame_resources.descriptor_layout());
-
-    VulkanPipelineLayout pipeline_layout(pipeline_layout_builder);
-
-    GraphicsPipelineBuilder pipeline_builder = GraphicsPipeline::create_builder();
-    pipeline_builder.set_graphic_objects(engine.device(), pipeline_layout, engine.swapchain_resources().render_pass);
-
-    VertexLayoutBuilder vertex_layout;
-    vertex_layout.add_binding(0, sizeof(SimpleVertex3D));
-    vertex_layout.add_attribute(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(SimpleVertex, pos));
-    // vertex_layout.add_attribute(1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(SimpleVertex, color));
-
-    pipeline_builder.set_vertex_layout(vertex_layout);
-    pipeline_builder.add_vert_shader_stage(vert_shader_module);
-    pipeline_builder.add_frag_shader_stage(frag_shader_module);
-    GraphicsPipeline pipeline = GraphicsPipeline(pipeline_builder);
-
-    VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
-    VulkanFence compute_fence(engine.device());
-    {
-        auto compute_scope = compute_command_buffer.begin_scope();
-
-        compute_descriptor_set.write_uniform_buffer(0, unifrom_buffer);
-        compute_descriptor_set.write_storage_buffer(1, storage_buffer);
-        
-        compute_pipeline.bind(compute_command_buffer);
-        compute_descriptor_set.bind(compute_command_buffer, compute_pipeline, 0);
-
-        compute_command_buffer.dispatch(1, 1, 1);
-    }
-
-    engine.device().compute_queue().submit(
-        nullptr,
-        0,
-        compute_command_buffer,
-        nullptr,
-        &compute_fence
-    );
-    compute_fence.wait();
-
-    descriptor_set.write_uniform_buffer(0, unifrom_buffer);
-    descriptor_set.write_storage_buffer(1, storage_buffer);
 
     float last_frame_time = 0.0f;
     float start_time = (float)glfwGetTime();
@@ -246,22 +150,19 @@ int main() {
                 engine.swapchain_resources().framebuffers[image_index],
                 engine.swapchain_resources().swapchain, {{0.05f, 0.08f, 0.12f, 1.0f}});
 
-                // pipeline.bind(command_buffer);
-                // // descriptor_set.bind(command_buffer, pipeline);
-                // blin_phong_red_material.bind(command_buffer, pipeline, 0);
-                
                 blinn_phong_material_instance.bind(command_buffer);
+                MaterialPass& pass = blinn_phong_material_instance.m_pass;
 
-                frame_resources.bind(engine.current_frame(), command_buffer, pipeline, 1);
+                frame_resources.bind(engine.current_frame(), command_buffer, pass.pipeline(), 1);
 
-                pipeline.set_y_up_viewport(command_buffer, engine);
-                pipeline.set_scissor(command_buffer, engine);
+                pass.pipeline().set_y_up_viewport(command_buffer, engine);
+                pass.pipeline().set_scissor(command_buffer, engine);
 
                 cube.m_mesh.bind_vertex_buffer(command_buffer);
                 cube.m_mesh.bind_index_buffer(command_buffer);
-                
-                pipeline_layout.push_constants(command_buffer, pc);
 
+                pass.pipeline_layout().push_constants(command_buffer, pc);
+                
                 command_buffer.draw_indexed(cube.m_mesh.index_count());
             }
         }
