@@ -3,7 +3,8 @@
 
 Pipeline::Pipeline(Pipeline&& other) noexcept
     :   m_pipeline(std::exchange(other.m_pipeline, VK_NULL_HANDLE)),
-        m_device(std::exchange(other.m_device, VK_NULL_HANDLE)) {}
+        m_device(std::exchange(other.m_device, VK_NULL_HANDLE)),
+        m_layout(std::exchange(other.m_layout, VK_NULL_HANDLE)) {}
 
 Pipeline& Pipeline::operator=(Pipeline&& other) noexcept {
     if (this != &other) {

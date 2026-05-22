@@ -55,41 +55,24 @@ MaterialPass MaterialSystem::create_blin_phong_pass(
 
     pipeline_layout_builder.add_push_constants<TransformPushConstants>();
 
-    pipeline_layout_builder.add_descriptor_set_layout(
-        material_descriptor_set_layout
-    );
+    pipeline_layout_builder.add_descriptor_set_layout(material_descriptor_set_layout);
 
-    pipeline_layout_builder.add_descriptor_set_layout(
-        frame_resources_descriptor_layout
-    );
+    pipeline_layout_builder.add_descriptor_set_layout(frame_resources_descriptor_layout);
 
     VulkanPipelineLayout pipeline_layout(pipeline_layout_builder);
 
-    GraphicsPipelineBuilder pipeline_builder =
-        GraphicsPipeline::create_builder();
+    GraphicsPipelineBuilder pipeline_builder = GraphicsPipeline::create_builder();
 
-    pipeline_builder.set_graphic_objects(
-        engine.device(),
-        pipeline_layout,
-        engine.swapchain_resources().render_pass
-    );
+    pipeline_builder.set_graphic_objects(engine.device(), pipeline_layout, engine.swapchain_resources().render_pass);
 
     struct BlinPhongVertex {
         glm::vec4 position;
     };
 
     VertexLayoutBuilder vertex_layout;
-    vertex_layout.add_binding(
-        0,
-        sizeof(BlinPhongVertex)
-    );
+    vertex_layout.add_binding(0, sizeof(BlinPhongVertex));
 
-    vertex_layout.add_attribute(
-        0,
-        0,
-        VK_FORMAT_R32G32B32A32_SFLOAT,
-        offsetof(BlinPhongVertex, position)
-    );
+    vertex_layout.add_attribute(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BlinPhongVertex, position));
 
     pipeline_builder.set_vertex_layout(vertex_layout);
 
