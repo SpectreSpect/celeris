@@ -42,11 +42,11 @@ static MultiColorString header_str(std::string_view class_name, std::string_view
 #define LOG_METHOD()                                                             \
     static_assert(                                                               \
         has_class_name<std::remove_cvref_t<decltype(*this)>>,                    \
-        "LOG_METHOD() requires static k_class_name in the enclosing class"       \
+        "LOG_METHOD() requires k_class_name method in the enclosing class"       \
     );                                                                           \
     LevelMarker XROBOCROSS_CAT(_logger_level_marker_, __LINE__)(                 \
         logger,                                                                  \
-        header_str(std::remove_cvref_t<decltype(*this)>::k_class_name, __func__) \
+        header_str(this->k_class_name(), __func__) \
     )
 
 #define LOG_NAMED(NAME)                                          \

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <vector>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -44,10 +45,6 @@ public:
 
     ~VulkanImage() noexcept;
 
-private:
-    void destroy() noexcept;
-
-public:
     VulkanImage(const VulkanImage&) = delete;
     VulkanImage& operator=(const VulkanImage&) = delete;
 
@@ -101,6 +98,18 @@ public:
         uint32_t layer_count = 1,
         VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT
     ) const;
+
+    
+    static std::vector<VulkanImage> create_images(
+        size_t count_images,
+        const VulkanPhysicalDevice& physical_device,
+        const VulkanDevice& device,
+        VkExtent2D extent,
+        VkFormat format,
+        VkImageUsageFlags usage,
+        VkMemoryPropertyFlags memory_properties,
+        VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL
+    );
     
 private:
     VkDevice m_device = VK_NULL_HANDLE;
@@ -116,4 +125,7 @@ private:
     VkSampleCountFlagBits m_samples = VK_SAMPLE_COUNT_1_BIT;
 
     std::optional<VulkanMemory> m_memory = std::nullopt;
+
+private:
+    void destroy() noexcept;
 };

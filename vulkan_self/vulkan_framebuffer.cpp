@@ -111,3 +111,41 @@ std::vector<VulkanFramebuffer> VulkanFramebuffer::from_image_views(
 
     return framebuffers;
 }
+
+std::vector<VulkanFramebuffer> VulkanFramebuffer::from_image_views(
+    const std::vector<VulkanImageView>& color_image_views,
+    const std::vector<VulkanImageView>& depth_image_views,
+    const VulkanDevice& device,
+    const VulkanRenderPass& render_pass,
+    VkExtent2D extent)
+{
+    LOG_NAMED("VulkanFramebuffer");
+
+    logger.check(
+        color_image_views.size() == depth_image_views.size(),
+        "Color image views and depth image views count must match"
+    );
+
+    std::vector<VulkanFramebuffer> framebuffers;
+    framebuffers.reserve(color_image_views.size());
+
+    for (size_t i = 0; i < color_image_views.size(); i++) {
+        std::array<VkImageView, 2> attachments = {
+            color_image_views[i].handle(),
+            depth_image_views[i].handle()
+        };
+
+        VkFramebufferCreateInfo framebuffer_info{};
+        framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebuffer_info.renderPass = render_pass.handle();
+        framebuffer_info.attachmentCount = static_cast<uint32_t>(attachments.size());
+        framebuffer_info.pAttachments = attachments.data();
+        framebuffer_info.width = extent.width;
+        framebuffer_info.height = extent.height;
+        framebuffer_info.layers = 1;
+
+        framebuffers.emplace_back(device, framebuffer_info);
+    }
+
+    return framebuffers;
+}

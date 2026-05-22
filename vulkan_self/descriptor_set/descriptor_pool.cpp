@@ -30,13 +30,32 @@ DescriptorPool::DescriptorPool(const VulkanDevice& device, const DescriptorPoolB
 ) : DescriptorPool(device, builder.pool_sizes(), builder.max_sets()) {
 }
 
-DescriptorPool::~DescriptorPool() {
-    LOG_METHOD();
+DescriptorPool::DescriptorPool(DescriptorPool&& other) noexcept 
+    :   m_pool(std::exchange(other.m_pool, VK_NULL_HANDLE)),
+        m_device(std::exchange(other.m_device, VK_NULL_HANDLE)) {}
+    
+DescriptorPool& DescriptorPool::operator=(DescriptorPool&& other) noexcept {
+    if (this != &other) {
+        destory();
 
-    if (m_pool != VK_NULL_HANDLE) {
-        vkDestroyDescriptorPool(m_device, m_pool, nullptr);
-        m_pool = VK_NULL_HANDLE;
+        m_pool = std::exchange(m_pool, VK_NULL_HANDLE);
+        m_device = std::exchange(m_device, VK_NULL_HANDLE);
     }
+    
+    return *this;
+}
+
+DescriptorPool::~DescriptorPool() {
+    destory();
+}
+
+void DescriptorPool::destory() noexcept {
+    if (m_device != VK_NULL_HANDLE && m_pool != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(m_device, m_pool, nullptr);
+    }
+
+    m_device = VK_NULL_HANDLE;
+    m_pool = VK_NULL_HANDLE;
 }
 
 VkDescriptorPool DescriptorPool::handle() const noexcept {

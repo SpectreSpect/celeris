@@ -4,6 +4,7 @@
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <vector>
 
 #include "../logger/logger_header.h"
 
@@ -34,6 +35,16 @@ public:
     VulkanImageView& operator=(VulkanImageView&& other) noexcept;
 
     VkImageView handle() const noexcept;
+
+    static std::vector<VulkanImageView> create_image_views(
+        const std::vector<VulkanImage>& images,
+        const VulkanDevice& device,
+        VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT,
+        uint32_t base_mip_level = 0,
+        uint32_t mip_levels_count = 1,
+        uint32_t base_array_level = 0,
+        uint32_t array_levels_count = 1
+    );
 
     static VkImageViewCreateInfo create_swapchain_desc(VkImage image, VkFormat format);
     static std::vector<VulkanImageView> from_swapchain(const VulkanDevice& device, const VulkanSwapchain& swapchain);

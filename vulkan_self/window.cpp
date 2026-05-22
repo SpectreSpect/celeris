@@ -19,6 +19,8 @@ Window::Window(const GlfwContext&, uint32_t width, uint32_t height, std::string_
 
     glfwSetWindowUserPointer(m_window, this);
     glfwSetFramebufferSizeCallback(m_window, resize_callback);
+    glfwSetCursorPosCallback(m_window, mouse_callback);
+    glfwSetMouseButtonCallback(m_window, mouse_button_callback);
 
     logger.check(m_window, "Failed to create GLFW window");
 }
@@ -69,6 +71,24 @@ void Window::poll_events() const {
     glfwPollEvents();
 }
 
+void Window::disable_cursor() {
+    LOG_METHOD();
+    glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    m_mouse_state.mode = MouseMode::DISABLED;
+}
+
+void Window::hide_cursor() {
+    LOG_METHOD();
+    glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+    m_mouse_state.mode = MouseMode::HIDDEN;
+}
+
+void Window::show_cursor() {
+    LOG_METHOD();
+    glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    m_mouse_state.mode = MouseMode::NORMAL;
+}
+
 uint32_t Window::width() const noexcept {
     return m_width;
 }
@@ -79,6 +99,10 @@ uint32_t Window::height() const noexcept {
 
 const std::string& Window::title() const noexcept {
     return m_title;
+}
+
+MouseState Window::mouse_state() const noexcept {
+    return m_mouse_state;
 }
 
 void Window::wait_until_framebuffer_available() {
@@ -102,4 +126,27 @@ void Window::resize_callback(GLFWwindow* handle, int width, int height) {
     window->m_width = width;
     window->m_height = height;
     window->is_window_resized = true;
+}
+
+void Window::mouse_callback(GLFWwindow* handle, double xpos, double ypos) {
+    LOG_NAMED("Window");
+    Window* window = static_cast<Window*>(glfwGetWindowUserPointer(handle));
+    if (!window) return;
+
+    window->m_mouse_state.x = xpos;
+    window->m_mouse_state.y = ypos;
+    window->m_mouse_state.initialized = true;
+}
+
+void Window::mouse_button_callback(GLFWwindow* handle, int button, int action, int mods) {
+    LOG_NAMED("Window");
+    Window* window = static_cast<Window*>(glfwGetWindowUserPointer(handle));
+    if (!window) return;
+
+    switch (button) {
+        case GLFW_MOUSE_BUTTON_LEFT:   window->m_mouse_state.left_pressed   = (action == GLFW_PRESS); break;
+        case GLFW_MOUSE_BUTTON_RIGHT:  window->m_mouse_state.right_pressed  = (action == GLFW_PRESS); break;
+        case GLFW_MOUSE_BUTTON_MIDDLE: window->m_mouse_state.middle_pressed = (action == GLFW_PRESS); break;
+        default: break;
+    }
 }

@@ -41,8 +41,8 @@ add_executable(app
   vulkan_self/vulkan_fence.cpp
   vulkan_self/vulkan_semaphore.cpp
   vulkan_self/vulkan_shader_module.cpp
-  vulkan_self/vulkan_pipeline_layout.cpp
-  vulkan_self/vulkan_pipeline.cpp
+  vulkan_self/pipeline/vulkan_pipeline_layout.cpp
+  vulkan_self/pipeline/graphics_pipeline.cpp
   vulkan_self/vulkan_buffer.cpp
   vulkan_self/vertex_layout_builder.cpp
   vulkan_self/vulkan_memory.cpp
@@ -57,6 +57,22 @@ add_executable(app
   vulkan_self/image/vulkan_image.cpp
   vulkan_self/image/vulkan_sampler.cpp
   vulkan_self/image/vulkan_texture_2d.cpp
+  vulkan_self/pipeline/compute_pipeline.cpp
+  vulkan_self/pipeline/pipeline.cpp
+  vulkan_self/material/material_system.cpp
+  vulkan_self/material/blin_phong_material_layout.cpp
+  vulkan_self/material/material_layout.cpp
+  vulkan_self/material/material_instance.cpp
+  vulkan_self/material/material_instance_temp.cpp
+  vulkan_self/material/blinn_phong_material_instance.cpp
+  vulkan_self/material/unlit_material_instance.cpp
+  renderer/resources/frame_resources.cpp
+  camera/camera.cpp
+  camera/controllers/fps_camera_controller.cpp
+  vulkan_self/vulkan_image_temp.cpp
+  renderer/transform.cpp
+  renderer/mesh.cpp
+  renderer/render_object.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

@@ -10,9 +10,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include "logger/logger_header.h"
-#include "vulkan_command_buffer.h"
-#include "utils.h"
+#include "../logger/logger_header.h"
+#include "../vulkan_command_buffer.h"
+#include "../utils.h"
 
 class VulkanDevice;
 class DescriptorSetLayout;

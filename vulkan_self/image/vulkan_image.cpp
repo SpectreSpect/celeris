@@ -360,3 +360,43 @@ void VulkanImage::copy_from_buffer(
         &copy_region
     );
 }
+
+std::vector<VulkanImage> VulkanImage::create_images(
+    size_t count_images,
+    const VulkanPhysicalDevice& physical_device,
+    const VulkanDevice& device,
+    VkExtent2D extent,
+    VkFormat format,
+    VkImageUsageFlags usage,
+    VkMemoryPropertyFlags memory_properties,
+    VkImageTiling tiling)
+{
+    LOG_NAMED("VulkanImage");
+
+    logger.check(count_images != 0, "Attempt to create zero images");
+    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+
+    logger.check(extent.width != 0, "Image width is zero");
+    logger.check(extent.height != 0, "Image height is zero");
+
+    logger.check(format != VK_FORMAT_UNDEFINED, "Image format is undefined");
+    logger.check(usage != 0, "Image usage flags are empty");
+    
+    std::vector<VulkanImage> images;
+    images.reserve(count_images);
+
+    for (size_t i = 0; i < count_images; i++) {
+        images.emplace_back(
+            physical_device,
+            device,
+            extent,
+            format,
+            usage,
+            memory_properties,
+            tiling
+        );
+    }
+
+    return images;
+}

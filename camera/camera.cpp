@@ -18,6 +18,5 @@ glm::mat4 Camera::get_view_matrix() const {
 
 glm::mat4 Camera::get_projection_matrix(float aspect_ratio) const {
     glm::mat4 proj = glm::perspective(glm::radians(fov), aspect_ratio, near_plane, far_plane);
-    proj[1][1] *= -1.0f;
     return proj;
 }

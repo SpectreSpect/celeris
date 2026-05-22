@@ -57,6 +57,14 @@ public:
 
     void reset();
 
+    void dispatch(uint32_t x_groups, uint32_t y_groups, uint32_t z_groups);
+
+    void draw_indexed(uint32_t index_count, 
+                      uint32_t instance_count = 1, 
+                      uint32_t first_index = 0, 
+                      uint32_t vertex_offset = 0, 
+                      uint32_t first_instance = 0);
+
     static std::vector<VulkanCommandBuffer> create_command_buffers(
         const VulkanDevice& device,
         const VulkanCommandPool& command_pool,

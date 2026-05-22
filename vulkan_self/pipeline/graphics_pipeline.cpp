@@ -1,15 +1,16 @@
-#include "vulkan_pipeline.h"
+#include "graphics_pipeline.h"
 
 #include <utility>
 
-#include "vulkan_shader_module.h"
+#include "../vulkan_shader_module.h"
 #include "vulkan_pipeline_layout.h"
-#include "vulkan_render_pass.h"
-#include "vulkan_device.h"
-#include "vulkan_command_buffer.h"
-#include "descriptor_set/descriptor_set_layout.h"
+#include "../vulkan_render_pass.h"
+#include "../vulkan_device.h"
+#include "../vulkan_command_buffer.h"
+#include "../descriptor_set/descriptor_set_layout.h"
+#include "../vulkan_engine.h"
 
-const PipelineBuliderDesc PipelineBuilder::m_default_desc = {
+const GraphicsPipelineBuliderDesc GraphicsPipelineBuilder::m_default_desc = {
     .device = VK_NULL_HANDLE,
     .pipeline_layout = VK_NULL_HANDLE,
     .render_pass = VK_NULL_HANDLE,
@@ -42,24 +43,24 @@ const PipelineBuliderDesc PipelineBuilder::m_default_desc = {
     .blend_enable = false
 };
 
-PipelineBuilder& PipelineBuilder::set_device(const VulkanDevice& device) noexcept {
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_device(const VulkanDevice& device) noexcept {
     m_desc.device = device.handle();
 
     return *this;
 }
 
-PipelineBuilder& PipelineBuilder::set_layout(const VulkanPipelineLayout& pipeline_layout) noexcept {
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_layout(const VulkanPipelineLayout& pipeline_layout) noexcept {
     m_desc.pipeline_layout = pipeline_layout.handle();
 
     return *this;
 }
 
-PipelineBuilder& PipelineBuilder::set_render_pass(const VulkanRenderPass& render_pass) noexcept {
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_render_pass(const VulkanRenderPass& render_pass) noexcept {
     m_desc.render_pass = render_pass.handle();
 
     return *this;
 }
-PipelineBuilder& PipelineBuilder::set_graphic_objects(
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_graphic_objects(
     const VulkanDevice& device,
     const VulkanPipelineLayout& pipeline_layout,
     const VulkanRenderPass& render_pass) noexcept
@@ -71,7 +72,7 @@ PipelineBuilder& PipelineBuilder::set_graphic_objects(
     return *this;
 }
 
-PipelineBuilder& PipelineBuilder::add_vert_shader_stage(
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::add_vert_shader_stage(
     const VulkanShaderModule& vertex_shader_module,
     std::string_view entry_point_name)
 {
@@ -81,7 +82,7 @@ PipelineBuilder& PipelineBuilder::add_vert_shader_stage(
     return *this;
 }
 
-PipelineBuilder& PipelineBuilder::add_frag_shader_stage(
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::add_frag_shader_stage(
     const VulkanShaderModule& fragment_shader_module,
     std::string_view entry_point_name)
 {
@@ -91,20 +92,20 @@ PipelineBuilder& PipelineBuilder::add_frag_shader_stage(
     return *this;
 }
 
-// PipelineBuilder& PipelineBuilder::add_descriptor_set_layout(const DescriptorSetLayout& layout) {
+// GraphicsPipelineBuilder& GraphicsPipelineBuilder::add_descriptor_set_layout(const DescriptorSetLayout& layout) {
 //     m_desc.descriptor_set_layouts.push_back(layout.handle());
 
 //     return *this;
 // }
 
-PipelineBuilder& PipelineBuilder::set_vertex_layout(const VertexLayoutBuilder& layout) noexcept
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_vertex_layout(const VertexLayoutBuilder& layout) noexcept
 {
     m_desc.vertex_bindings = layout.bindings();
     m_desc.vertex_attributes = layout.attributes();
     return *this;
 }
 
-PipelineBuilder& PipelineBuilder::set_input_assembly(
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_input_assembly(
     VkPrimitiveTopology topology,
     bool primitive_restart_enable) noexcept
 {
@@ -114,7 +115,7 @@ PipelineBuilder& PipelineBuilder::set_input_assembly(
     return *this;
 }
 
-PipelineBuilder& PipelineBuilder::set_rasterizer(
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_rasterizer(
     bool depth_clamp_enable,
     bool rasterizer_discard_enable,
     VkPolygonMode polygon_mode,
@@ -134,7 +135,7 @@ PipelineBuilder& PipelineBuilder::set_rasterizer(
     return *this;
 }
 
-PipelineBuilder& PipelineBuilder::set_multisampling(
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_multisampling(
     bool sample_shading_enable,
     VkSampleCountFlagBits rasterization_samples) noexcept
 {
@@ -144,7 +145,7 @@ PipelineBuilder& PipelineBuilder::set_multisampling(
     return *this;
 }
 
-PipelineBuilder& PipelineBuilder::set_color_blending(
+GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_color_blending(
     VkColorComponentFlags color_write_mask,
     bool blend_enable) noexcept
 {
@@ -154,16 +155,18 @@ PipelineBuilder& PipelineBuilder::set_color_blending(
     return *this;
 }
 
-const PipelineBuliderDesc& PipelineBuilder::desc() const noexcept {
+const GraphicsPipelineBuliderDesc& GraphicsPipelineBuilder::desc() const noexcept {
     return m_desc;
 }
 
-VulkanPipeline::VulkanPipeline(const PipelineBuilder& builder)
-    : m_device(builder.desc().device)
+GraphicsPipeline::GraphicsPipeline(const GraphicsPipelineBuilder& builder)
 {
+    VkDevice device = builder.desc().device;
+    VkPipeline pipeline = VK_NULL_HANDLE;
+
     LOG_METHOD();
 
-    logger.check(m_device != VK_NULL_HANDLE)
+    logger.check(device != VK_NULL_HANDLE)
         << "Device is not initialized. Init it or specify in methods "
         << VSCODE_CLR_STREAM("PipelineBulider", "set_device") << " or "
         << VSCODE_CLR_STREAM("PipelineBulider", "set_graphic_objects") << "\n";
@@ -265,22 +268,15 @@ VulkanPipeline::VulkanPipeline(const PipelineBuilder& builder)
     color_blending.blendConstants[2] = 0.0f;
     color_blending.blendConstants[3] = 0.0f;
 
-
-    // if (!builder.desc().descriptor_set_layouts.empty()) {
-    //     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-    //     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    //     pipelineLayoutInfo.setLayoutCount = builder.desc().descriptor_set_layouts.size();
-    //     pipelineLayoutInfo.pSetLayouts = builder.desc().descriptor_set_layouts.data();
-    //     pipelineLayoutInfo.pushConstantRangeCount = 0;
-    //     pipelineLayoutInfo.pPushConstantRanges = nullptr;
-
-    //     VulkanEngine::vk_check(
-    //         vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipeline_layout),
-    //         "vkCreatePipelineLayout"
-    //     );
-
-    // }
-
+    VkPipelineDepthStencilStateCreateInfo depth_stencil{};
+    depth_stencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depth_stencil.depthTestEnable = VK_TRUE;
+    depth_stencil.depthWriteEnable = VK_TRUE;
+    depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depth_stencil.depthBoundsTestEnable = VK_FALSE;
+    depth_stencil.minDepthBounds = 0.0f;
+    depth_stencil.maxDepthBounds = 1.0f;
+    depth_stencil.stencilTestEnable = VK_FALSE;
 
     VkGraphicsPipelineCreateInfo pipeline_info{};
     pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -292,7 +288,7 @@ VulkanPipeline::VulkanPipeline(const PipelineBuilder& builder)
     pipeline_info.pDynamicState = &dynamic_state;
     pipeline_info.pRasterizationState = &rasterizer;
     pipeline_info.pMultisampleState = &multisampling;
-    pipeline_info.pDepthStencilState = nullptr;
+    pipeline_info.pDepthStencilState = &depth_stencil;
     pipeline_info.pColorBlendState = &color_blending;
     pipeline_info.layout = builder.desc().pipeline_layout;
     pipeline_info.renderPass = builder.desc().render_pass;
@@ -301,74 +297,79 @@ VulkanPipeline::VulkanPipeline(const PipelineBuilder& builder)
     pipeline_info.basePipelineIndex = -1;
 
     VkResult result = vkCreateGraphicsPipelines(
-        m_device,
+        device,
         VK_NULL_HANDLE,
         1,
         &pipeline_info,
         nullptr,
-        &m_pipeline
+        &pipeline
     );
 
     logger.check(result == VK_SUCCESS, "Failed to create graphics pipeline");
+
+    set_pipeline(device, pipeline, builder.desc().pipeline_layout);
 }
 
-VulkanPipeline::~VulkanPipeline() noexcept {
-    destroy();
+// GraphicsPipeline::~GraphicsPipeline() noexcept {
+//     destroy();
+// }
+
+// void GraphicsPipeline::destroy() noexcept {
+//     if (m_device != VK_NULL_HANDLE && m_pipeline != VK_NULL_HANDLE) {
+//         vkDestroyPipeline(m_device, m_pipeline, nullptr);
+//     }
+
+//     m_device = VK_NULL_HANDLE;
+//     m_pipeline = VK_NULL_HANDLE;
+// }
+
+// GraphicsPipeline::GraphicsPipeline(GraphicsPipeline&& other) noexcept
+//     :   m_pipeline(std::exchange(other.m_pipeline, VK_NULL_HANDLE)),
+//         m_device(std::exchange(other.m_device, VK_NULL_HANDLE)) {}
+
+// GraphicsPipeline::GraphicsPipeline(GraphicsPipeline&& other) noexcept
+//     :   Pipeline(std::move(other)) {}
+
+// GraphicsPipeline& GraphicsPipeline::operator=(GraphicsPipeline&& other) noexcept {
+//     if (this != &other) {
+//         destroy();
+
+//         m_pipeline = std::exchange(other.m_pipeline, VK_NULL_HANDLE);
+//         m_device = std::exchange(other.m_device, VK_NULL_HANDLE);
+//     }
+
+//     return *this;
+// }
+
+// void GraphicsPipeline::bind(VulkanCommandBuffer& command_buffer, VkPipelineBindPoint bind_point) const {
+//     LOG_METHOD();
+
+//     logger.check(m_pipeline != VK_NULL_HANDLE, "Pipeline is not initialized");
+//     logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+
+//     vkCmdBindPipeline(
+//         command_buffer.handle(),
+//         bind_point,
+//         m_pipeline
+//     );
+// }
+
+VkPipelineBindPoint GraphicsPipeline::get_bind_point() const noexcept {
+    return VK_PIPELINE_BIND_POINT_GRAPHICS;
 }
 
-void VulkanPipeline::destroy() noexcept {
-    if (m_device != VK_NULL_HANDLE && m_pipeline != VK_NULL_HANDLE) {
-        vkDestroyPipeline(m_device, m_pipeline, nullptr);
-    }
-
-    m_device = VK_NULL_HANDLE;
-    m_pipeline = VK_NULL_HANDLE;
+GraphicsPipelineBuilder GraphicsPipeline::create_builder() noexcept {
+    return GraphicsPipelineBuilder();
 }
 
-VulkanPipeline::VulkanPipeline(VulkanPipeline&& other) noexcept
-    :   m_pipeline(std::exchange(other.m_pipeline, VK_NULL_HANDLE)),
-        m_device(std::exchange(other.m_device, VK_NULL_HANDLE)) {}
-
-VulkanPipeline& VulkanPipeline::operator=(VulkanPipeline&& other) noexcept {
-    if (this != &other) {
-        destroy();
-
-        m_pipeline = std::exchange(other.m_pipeline, VK_NULL_HANDLE);
-        m_device = std::exchange(other.m_device, VK_NULL_HANDLE);
-    }
-
-    return *this;
-}
-
-VkPipeline VulkanPipeline::handle() const noexcept {
-    return m_pipeline;
-}
-
-void VulkanPipeline::bind(VulkanCommandBuffer& command_buffer, VkPipelineBindPoint bind_point) const {
-    LOG_METHOD();
-
-    logger.check(m_pipeline != VK_NULL_HANDLE, "Pipeline is not initialized");
-    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
-
-    vkCmdBindPipeline(
-        command_buffer.handle(),
-        bind_point,
-        m_pipeline
-    );
-}
-
-PipelineBuilder VulkanPipeline::create_builder() noexcept {
-    return PipelineBuilder();
-}
-
-void VulkanPipeline::set_y_down_viewport(
+void GraphicsPipeline::set_y_down_viewport(
     VulkanCommandBuffer& command_buffer, 
     glm::vec2 size,
     glm::vec2 origin,
     float min_depth,
     float max_depth) 
 {
-    LOG_NAMED("VulkanPipeline");
+    LOG_NAMED("GraphicsPipeline");
 
     logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
 
@@ -383,7 +384,7 @@ void VulkanPipeline::set_y_down_viewport(
     vkCmdSetViewport(command_buffer.handle(), 0, 1, &viewport);
 }
 
-void VulkanPipeline::set_y_down_viewport(
+void GraphicsPipeline::set_y_down_viewport(
     VulkanCommandBuffer& command_buffer, 
     VkExtent2D size,
     VkOffset2D origin,
@@ -399,7 +400,7 @@ void VulkanPipeline::set_y_down_viewport(
     );
 }
 
-void VulkanPipeline::set_y_up_viewport(
+void GraphicsPipeline::set_y_up_viewport(
     VulkanCommandBuffer& command_buffer, 
     glm::vec2 size,
     glm::vec2 origin,
@@ -415,7 +416,7 @@ void VulkanPipeline::set_y_up_viewport(
     );
 }
 
-void VulkanPipeline::set_y_up_viewport(
+void GraphicsPipeline::set_y_up_viewport(
     VulkanCommandBuffer& command_buffer, 
     VkExtent2D size,
     VkOffset2D origin,
@@ -431,12 +432,12 @@ void VulkanPipeline::set_y_up_viewport(
     );
 }
 
-void VulkanPipeline::set_scissor(
+void GraphicsPipeline::set_scissor(
     VulkanCommandBuffer& command_buffer,
     VkExtent2D extent,
     VkOffset2D offset)
 {
-    LOG_NAMED("VulkanPipeline");
+    LOG_NAMED("GraphicsPipeline");
 
     logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
 
@@ -445,4 +446,48 @@ void VulkanPipeline::set_scissor(
     scissor.extent = extent;
 
     vkCmdSetScissor(command_buffer.handle(), 0, 1, &scissor);
+}
+
+void GraphicsPipeline::set_y_down_viewport(
+    VulkanCommandBuffer& command_buffer,
+    VulkanEngine& engine,
+    VkOffset2D origin,
+    float min_depth,
+    float max_depth)
+{
+    set_y_down_viewport(
+        command_buffer,
+        engine.swapchain_resources().swapchain.extent(),
+        origin,
+        min_depth,
+        max_depth
+    );
+}
+
+void GraphicsPipeline::set_y_up_viewport(
+    VulkanCommandBuffer& command_buffer,
+    VulkanEngine& engine,
+    VkOffset2D origin,
+    float min_depth,
+    float max_depth)
+{
+    set_y_up_viewport(
+        command_buffer,
+        engine.swapchain_resources().swapchain.extent(),
+        origin,
+        min_depth,
+        max_depth
+    );
+}
+
+void GraphicsPipeline::set_scissor(
+    VulkanCommandBuffer& command_buffer,
+    VulkanEngine& engine,
+    VkOffset2D offset)
+{
+    set_scissor(
+        command_buffer,
+        engine.swapchain_resources().swapchain.extent(),
+        offset
+    );
 }
