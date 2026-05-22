@@ -64,6 +64,8 @@ add_executable(app
   vulkan_self/vulkan_image_temp.cpp
   renderer/transform.cpp
   renderer/mesh.cpp
+  renderer/render_object.cpp
+  vulkan_self/material/material_instance_temp.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

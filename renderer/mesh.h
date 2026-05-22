@@ -7,7 +7,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "transform.h"
 #include "../vulkan_self/vulkan_buffer.h"
 #include "../vulkan_self/vulkan_engine.h"
 #include "../vulkan_self/utils.h"
@@ -17,9 +16,7 @@
 
 class Mesh {
 public:
-    _XCLASS_NAME(VulkanEngine);
-
-    Transform transform;
+    _XCLASS_NAME(Mesh);
 
     Mesh(VulkanEngine& engine, VulkanResourceLoader& resource_loader, 
          void* vertex_data, uint32_t vertex_data_size_bytes, 
@@ -28,10 +25,6 @@ public:
     uint32_t index_count() const noexcept;
     void bind_vertex_buffer(VulkanCommandBuffer& command_buffer, uint32_t buffer_binding = 0, VkDeviceSize offset = 0);
     void bind_index_buffer(VulkanCommandBuffer& command_buffer, uint32_t buffer_binding = 0, VkDeviceSize offset = 0);
-
-    // VulkanCommandBuffer& command_buffer,
-    // uint32_t buffer_binding,
-    // VkDeviceSize offset
 
 private:
     VulkanBuffer m_vertex_buffer;

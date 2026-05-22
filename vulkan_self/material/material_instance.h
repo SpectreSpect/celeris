@@ -7,7 +7,7 @@
 
 class MaterialInstance {
 public:
-    _XCLASS_NAME(MaterialLayout);
+    _XCLASS_NAME(MaterialInstance);
 
     MaterialInstance(DescriptorPool& pool, const MaterialLayout& layout) 
         :   descriptor_set(pool.allocate_set(layout.descriptor_set_layout())) {};

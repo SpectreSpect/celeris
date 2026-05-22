@@ -18,12 +18,16 @@
 #include "camera/controllers/fps_camera_controller.h"
 #include "renderer/transform.h"
 #include "renderer/mesh.h"
+#include "renderer/render_object.h"
+#include "renderer/transform_push_constants.h"
+#include "vulkan_self/material/blin_phong_material_pass.h"
+#include "vulkan_self/material/material_instance_temp.h"
 
 #include <vector>
 
-struct TestPushConstants {
-    glm::mat4 model;
-};
+// struct TestPushConstants {
+//     glm::mat4 model;
+// };
 
 struct SimpleVertex {
     glm::vec2 pos;
@@ -109,14 +113,31 @@ int main() {
     MaterialSystem material_system(engine.device());
     MaterialInstance blin_phong_red_material = material_system.create_blin_phong_material(unifrom_buffer, glm::vec4(1, 0, 0, 1));
 
+    
     VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
     resource_loader.upload_storage_buffer(&simple_storage, sizeof(SimpleStorage), storage_buffer);
     resource_loader.submit();
 
-    Mesh cube(engine, resource_loader, cube_vertices.data(), Utils::size_bytes(cube_vertices), 
+    Mesh cube_mesh(engine, resource_loader, cube_vertices.data(), Utils::size_bytes(cube_vertices), 
                                        cube_indices.data(), Utils::size_bytes(cube_indices));
+    RenderObject cube(cube_mesh);
+    // Transform cube_transform;
 
     FrameResources frame_resources(engine.physical_device(), engine.device(), engine.num_frames_in_flight());
+
+    // BlinPhongMaterialPass blin_phong_material_pass(engine, frame_resources.descriptor_layout(), vert_shader_module, frag_shader_module);
+
+    MaterialPass blin_phong_material_pass = material_system.create_blin_phong_pass(engine, frame_resources.descriptor_layout(), vert_shader_module, frag_shader_module);
+
+    MaterialInstanceTemp blin_phong_material(material_system.m_descriptor_pool, blin_phong_material_pass);
+    blin_phong_material.descriptor_set.write_uniform_buffer(0, unifrom_buffer);
+    // blin_phong_uniform.upload(&albedo, sizeof(glm::vec4));
+
+    // MaterialInstance instance(m_descriptor_pool, m_blin_phong_layout);
+
+    // blin_phong_material.bind();
+    
+
 
     DescriptorSetLayoutBuilder compute_dsl_builder;
     compute_dsl_builder.add_uniform_buffer(0, ShaderStages::compute);
@@ -139,7 +160,7 @@ int main() {
 
     PipelineLayoutBuilder compute_pipeline_layout_builder = VulkanPipelineLayout::create_builder();
     compute_pipeline_layout_builder.set_device(engine.device());
-    compute_pipeline_layout_builder.add_push_constants<TestPushConstants>();
+    compute_pipeline_layout_builder.add_push_constants<TransformPushConstants>();
     compute_pipeline_layout_builder.add_descriptor_set_layout(compute_dsl);
     VulkanPipelineLayout compute_pipeline_layout(compute_pipeline_layout_builder);
 
@@ -149,7 +170,7 @@ int main() {
 
     PipelineLayoutBuilder pipeline_layout_builder = VulkanPipelineLayout::create_builder();
     pipeline_layout_builder.set_device(engine.device());
-    pipeline_layout_builder.add_push_constants<TestPushConstants>();
+    pipeline_layout_builder.add_push_constants<TransformPushConstants>();
     // pipeline_layout_builder.add_descriptor_set_layout(dsl);
     pipeline_layout_builder.add_descriptor_set_layout(material_system.m_blin_phong_layout.descriptor_set_layout());
     pipeline_layout_builder.add_descriptor_set_layout(frame_resources.descriptor_layout());
@@ -208,10 +229,10 @@ int main() {
         uint32_t image_index = 0;
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
-
+        
         cube.transform.position.x += 1.0f * delta_time;
 
-        static TestPushConstants pc;
+        static TransformPushConstants pc;
         pc.model = cube.transform.get_model_matrix();
 
         camera_controller.update(window, delta_time);
@@ -224,21 +245,23 @@ int main() {
                 engine.swapchain_resources().framebuffers[image_index],
                 engine.swapchain_resources().swapchain, {{0.05f, 0.08f, 0.12f, 1.0f}});
 
-                pipeline.bind(command_buffer);
-                // descriptor_set.bind(command_buffer, pipeline);
-                blin_phong_red_material.bind(command_buffer, pipeline, 0);
+                // pipeline.bind(command_buffer);
+                // // descriptor_set.bind(command_buffer, pipeline);
+                // blin_phong_red_material.bind(command_buffer, pipeline, 0);
+
+                blin_phong_material.bind(command_buffer);
+
                 frame_resources.bind(engine.current_frame(), command_buffer, pipeline, 1);
 
                 pipeline.set_y_up_viewport(command_buffer, engine);
                 pipeline.set_scissor(command_buffer, engine);
 
-                cube.bind_vertex_buffer(command_buffer);
-                cube.bind_index_buffer(command_buffer);
+                cube.m_mesh.bind_vertex_buffer(command_buffer);
+                cube.m_mesh.bind_index_buffer(command_buffer);
                 
                 pipeline_layout.push_constants(command_buffer, pc);
 
-                command_buffer.draw_indexed(cube.index_count());
-                
+                command_buffer.draw_indexed(cube.m_mesh.index_count());
             }
         }
 
