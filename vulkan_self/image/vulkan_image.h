@@ -1,14 +1,17 @@
 #pragma once
 
+#include <optional>
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include "logger/logger_header.h"
-#include "vulkan_memory.h"
+#include "../logger/logger_header.h"
+#include "../vulkan_memory.h"
 
 class VulkanPhysicalDevice;
 class VulkanDevice;
 class VulkanCommandBuffer;
+class VulkanBuffer;
 
 class VulkanImage {
 public:
@@ -53,6 +56,7 @@ public:
 
     VkImage handle() const noexcept;
     VkExtent3D extent() const noexcept;
+    VkExtent2D extent2d() const noexcept;
     VkFormat format() const noexcept;
     VkImageUsageFlags usage() const noexcept;
     uint32_t mip_levels() const noexcept;
@@ -69,9 +73,9 @@ public:
         VkImageLayout old_layout,
         VkImageLayout new_layout,
         VkImageAspectFlags aspect_mask,
-        uint32_t base_mip_level = 1,
+        uint32_t base_mip_level = 0,
         uint32_t level_count = 1,
-        uint32_t base_array_layer = 1,
+        uint32_t base_array_layer = 0,
         uint32_t layer_count = 1
     ) const;
 

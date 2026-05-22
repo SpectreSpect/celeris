@@ -9,8 +9,9 @@
 #include "vulkan_self/descriptor_set/descriptor_pool_builder.h"
 #include "vulkan_self/descriptor_set/descriptor_pool.h"
 #include "vulkan_self/descriptor_set/descriptor_set.h"
-#include "vulkan_self/vulkan_image.h"
+#include "vulkan_self/image/vulkan_image.h"
 #include "vulkan_self/image/cpu_image.h"
+#include "vulkan_self/image/vulkan_texture_2d.h"
 #include "path_utils.h"
 
 #include <vector>
@@ -105,20 +106,27 @@ int main() {
         path_utils::executable_dir() / "assets" / "textures" / "minecraft_dirt" / "texture.png"
     );
 
-    VulkanImage texture_image(
+    VulkanTexture2D texture(
         engine.physical_device(),
         engine.device(),
-        VkExtent3D{16, 16, 1},
-        VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        cpu_image.extent2d()
     );
+
+    // VulkanImage texture_image(
+    //     engine.physical_device(),
+    //     engine.device(),
+    //     cpu_image.extent(),
+    //     VK_FORMAT_R8G8B8A8_SRGB,
+    //     VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+    //     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    // );
 
     VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
     resource_loader.upload_vertex_buffer(vertices.data(), Utils::size_bytes(vertices), vertex_buffer);
     resource_loader.upload_index_buffer(indices.data(), Utils::size_bytes(indices), index_buffer);
     resource_loader.upload_compute_storage_buffer(&simple_storage, sizeof(SimpleStorage), storage_buffer);
-    resource_loader.upload_sampled_image_2d(cpu_image.image_data().data(), cpu_image.extent2d(), texture_image);
+    // resource_loader.upload_sampled_image_2d(cpu_image.image_data().data(), cpu_image.extent2d(), texture_image);
+    resource_loader.upload_sampled_texture_2d(cpu_image, texture);
     resource_loader.submit();
 
     descriptor_set.write_uniform_buffer(0, unifrom_buffer);

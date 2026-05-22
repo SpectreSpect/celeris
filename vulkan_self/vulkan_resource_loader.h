@@ -17,6 +17,8 @@ class VulkanQueue;
 class VulkanCommandPool;
 class VulkanEngine;
 class VulkanImage;
+class VulkanTexture2D;
+class CpuImage;
 
 class VulkanResourceLoader {
 public:
@@ -69,6 +71,11 @@ public:
         VkOffset3D image_offset = {0, 0, 0},
         uint32_t mip_level = 0,
         uint32_t base_array_layer = 0
+    );
+
+    void upload_sampled_texture_2d(
+        const CpuImage& cpu_image,
+        VulkanTexture2D& texture
     );
 
     void upload_vertex_buffer(
@@ -136,6 +143,11 @@ private:
         VkAccessFlags dst_finish_access = 0;
     };
 
+    struct TextureLayoutUpdate {
+        VulkanTexture2D* texture = nullptr;
+        VkImageLayout final_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    };
+
 private:
     VulkanBuffer m_staging_buffer;
     VulkanQueue* m_queue = nullptr;
@@ -145,4 +157,5 @@ private:
 
     std::vector<BufferUploadRequest> m_buffer_upload_requests;
     std::vector<ImageUploadRequest> m_image_upload_requests;
+    std::vector<TextureLayoutUpdate> m_texture_upload_requests;
 };

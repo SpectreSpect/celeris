@@ -5,7 +5,9 @@
 #include "vulkan_device.h"
 #include "vulkan_queue.h"
 #include "vulkan_engine.h"
-#include "vulkan_image.h"
+#include "image/cpu_image.h"
+#include "image/vulkan_image.h"
+#include "image/vulkan_texture_2d.h"
 #include "utils.h"
 
 VulkanResourceLoader::VulkanResourceLoader(
@@ -186,6 +188,90 @@ void VulkanResourceLoader::upload(
     m_loaded_data_size += src_size_bytes;
 }
 
+void VulkanResourceLoader::upload_sampled_image_2d(
+    const void* src_data,
+    VkExtent2D extent,
+    VulkanImage& dst_image,
+    VkPipelineStageFlags shader_stage,
+    VkOffset3D image_offset,
+    uint32_t mip_level,
+    uint32_t base_array_layer)
+{
+    upload(
+        src_data,
+        VkExtent3D{extent.width, extent.height, 1},
+        1,
+        dst_image,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        image_offset,
+        mip_level,
+        base_array_layer,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        0,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        shader_stage,
+        VK_ACCESS_SHADER_READ_BIT
+    );
+}
+
+void VulkanResourceLoader::upload_sampled_texture_2d(
+    const CpuImage& cpu_image,
+    VulkanTexture2D& texture)
+{
+    LOG_METHOD();
+
+    logger.check(texture.image().handle() != VK_NULL_HANDLE, "Texture image is not initialized");
+
+    logger.check(cpu_image.format() == texture.format())
+        << "CpuImage format does not match texture format\n";
+    
+    logger.check(
+        cpu_image.extent().width == texture.extent().width &&
+        cpu_image.extent().height == texture.extent().height &&
+        cpu_image.extent().depth == texture.extent().depth
+    ) << "CpuImage extent does not match texture extent\n";
+
+    VkExtent3D cpu_image_extent = cpu_image.extent();
+    logger.check(cpu_image_extent.width != 0 && cpu_image_extent.height != 0 && cpu_image_extent.depth != 0)
+        << "Incorrect" << clr("cpu_image", LoggerPalette::orange) << "extent "
+        << "(" << clr(std::to_string(cpu_image_extent.width), LoggerPalette::blue) << ", "
+        << clr(std::to_string(cpu_image_extent.height), LoggerPalette::blue) << ", "
+        << clr(std::to_string(cpu_image_extent.depth), LoggerPalette::blue) << ")\n";
+
+    logger.check(cpu_image.format() != VK_FORMAT_UNDEFINED)
+        << clr("Cpu image", LoggerPalette::orange) << "format is undefined\n";
+
+    upload(
+        cpu_image.image_data().data(),
+        cpu_image.extent(),
+        1,
+        texture.image(),
+
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        VkOffset3D{0, 0, 0},
+        0,
+        0,
+
+        texture.layout(),
+        texture.layout() == VK_IMAGE_LAYOUT_UNDEFINED
+            ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+            : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        texture.layout() == VK_IMAGE_LAYOUT_UNDEFINED
+            ? 0
+            : VK_ACCESS_SHADER_READ_BIT,
+
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT
+    );
+
+    m_texture_upload_requests.push_back(TextureLayoutUpdate{
+        .texture = &texture,
+        .final_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    });
+}
+
 void VulkanResourceLoader::upload_vertex_buffer(
     const void* src_data,
     VkDeviceSize size_bytes,
@@ -267,7 +353,10 @@ void VulkanResourceLoader::upload_compute_storage_buffer(
 void VulkanResourceLoader::submit() {
     LOG_METHOD();
 
-    if (m_buffer_upload_requests.empty() && m_image_upload_requests.empty()) {
+    if (
+        m_buffer_upload_requests.empty() && 
+        m_image_upload_requests.empty() &&
+        m_texture_upload_requests.empty()) {
         return;
     }
 
@@ -357,34 +446,13 @@ void VulkanResourceLoader::submit() {
     m_queue->submit(nullptr, 0, m_command_buffer, nullptr, &m_fence);
     m_fence.wait();
 
+    for (const TextureLayoutUpdate& request : m_texture_upload_requests) {
+        logger.check(request.texture != nullptr, "Pointer to texture specify to null");
+        request.texture->set_layout(request.final_layout);
+    }
+
     m_buffer_upload_requests.clear();
     m_image_upload_requests.clear();
+    m_texture_upload_requests.clear();
     m_loaded_data_size = 0;
-}
-
-void VulkanResourceLoader::upload_sampled_image_2d(
-    const void* src_data,
-    VkExtent2D extent,
-    VulkanImage& dst_image,
-    VkPipelineStageFlags shader_stage,
-    VkOffset3D image_offset,
-    uint32_t mip_level,
-    uint32_t base_array_layer)
-{
-    upload(
-        src_data,
-        VkExtent3D{extent.width, extent.height, 1},
-        1,
-        dst_image,
-        VK_IMAGE_ASPECT_COLOR_BIT,
-        image_offset,
-        mip_level,
-        base_array_layer,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-        0,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        shader_stage,
-        VK_ACCESS_SHADER_READ_BIT
-    );
 }

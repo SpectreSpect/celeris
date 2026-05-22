@@ -2,10 +2,10 @@
 
 #include <utility>
 
-#include "vulkan_device.h"
-#include "vulkan_physical_device.h"
-#include "vulkan_command_buffer.h"
-#include "vulkan_buffer.h"
+#include "../vulkan_device.h"
+#include "../vulkan_physical_device.h"
+#include "../vulkan_command_buffer.h"
+#include "../vulkan_buffer.h"
 
 VulkanImage::VulkanImage(
     const VulkanPhysicalDevice& physical_device,
@@ -177,6 +177,13 @@ VkImage VulkanImage::handle() const noexcept {
 
 VkExtent3D VulkanImage::extent() const noexcept {
     return m_extent;
+}
+
+VkExtent2D VulkanImage::extent2d() const noexcept {
+    return VkExtent2D{
+        m_extent.width,
+        m_extent.height
+    };
 }
 
 VkFormat VulkanImage::format() const noexcept {

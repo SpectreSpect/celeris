@@ -34,7 +34,6 @@ add_executable(app
   vulkan_self/vulkan_device.cpp
   vulkan_self/vulkan_queue.cpp
   vulkan_self/vulkan_swapchain.cpp
-  vulkan_self/vulkan_image_view.cpp
   vulkan_self/vulkan_render_pass.cpp
   vulkan_self/vulkan_framebuffer.cpp
   vulkan_self/vulkan_command_pool.cpp
@@ -53,8 +52,11 @@ add_executable(app
   vulkan_self/descriptor_set/descriptor_pool_builder.cpp
   vulkan_self/descriptor_set/descriptor_pool.cpp
   vulkan_self/descriptor_set/descriptor_set.cpp
-  vulkan_self/vulkan_image.cpp
   vulkan_self/image/cpu_image.cpp
+  vulkan_self/image/vulkan_image_view.cpp
+  vulkan_self/image/vulkan_image.cpp
+  vulkan_self/image/vulkan_sampler.cpp
+  vulkan_self/image/vulkan_texture_2d.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
