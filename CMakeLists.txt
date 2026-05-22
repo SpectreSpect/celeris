@@ -19,6 +19,7 @@ find_package(Vulkan REQUIRED)
 
 add_executable(app
   main.cpp
+  stb_image_impl.cpp
   vulkan_self/vulkan_engine.cpp
   vulkan_self/colored_string/colored_string.cpp
   vulkan_self/colored_string/multicolor_string.cpp
@@ -33,7 +34,6 @@ add_executable(app
   vulkan_self/vulkan_device.cpp
   vulkan_self/vulkan_queue.cpp
   vulkan_self/vulkan_swapchain.cpp
-  vulkan_self/vulkan_image_view.cpp
   vulkan_self/vulkan_render_pass.cpp
   vulkan_self/vulkan_framebuffer.cpp
   vulkan_self/vulkan_command_pool.cpp
@@ -52,12 +52,20 @@ add_executable(app
   vulkan_self/descriptor_set/descriptor_pool_builder.cpp
   vulkan_self/descriptor_set/descriptor_pool.cpp
   vulkan_self/descriptor_set/descriptor_set.cpp
+  vulkan_self/image/cpu_image.cpp
+  vulkan_self/image/vulkan_image_view.cpp
+  vulkan_self/image/vulkan_image.cpp
+  vulkan_self/image/vulkan_sampler.cpp
+  vulkan_self/image/vulkan_texture_2d.cpp
   vulkan_self/pipeline/compute_pipeline.cpp
   vulkan_self/pipeline/pipeline.cpp
   vulkan_self/material/material_system.cpp
   vulkan_self/material/blin_phong_material_layout.cpp
   vulkan_self/material/material_layout.cpp
   vulkan_self/material/material_instance.cpp
+  vulkan_self/material/material_instance_temp.cpp
+  vulkan_self/material/blinn_phong_material_instance.cpp
+  vulkan_self/material/unlit_material_instance.cpp
   renderer/resources/frame_resources.cpp
   camera/camera.cpp
   camera/controllers/fps_camera_controller.cpp
@@ -65,9 +73,6 @@ add_executable(app
   renderer/transform.cpp
   renderer/mesh.cpp
   renderer/render_object.cpp
-  vulkan_self/material/material_instance_temp.cpp
-  vulkan_self/material/blinn_phong_material_instance.cpp
-  vulkan_self/material/unlit_material_instance.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

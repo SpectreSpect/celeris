@@ -1,7 +1,51 @@
 #include "vulkan_engine.h"
 
-#include <fstream>
-#include <array>
+#include "utils.h"
+#include "window.h"
+#include "glfw_context.h"
+
+SwapchainResources::SwapchainResources(
+    const VulkanPhysicalDevice& physical_device,
+    const VulkanDevice& device,
+    const VulkanSurface& surface,
+    Window& window)
+    :   swapchain(physical_device, device, surface, window),
+        image_views(VulkanImageView::from_swapchain(device, swapchain)),
+        depth_format(VK_FORMAT_D32_SFLOAT),
+        depth_images(
+            VulkanImage::create_images(
+                swapchain.images().size(),
+                physical_device,
+                device,
+                swapchain.extent(),
+                depth_format,
+                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                VK_IMAGE_TILING_OPTIMAL
+            )
+        ),
+        depth_image_views(
+            VulkanImageView::create_image_views(
+                depth_images,
+                device,
+                VK_IMAGE_ASPECT_DEPTH_BIT)
+        ),
+        render_pass(device, swapchain, depth_format),
+        framebuffers(
+            VulkanFramebuffer::from_image_views(
+                image_views,
+                depth_image_views,
+                device,
+                render_pass,
+                swapchain.extent()
+            )
+        ),
+        render_finished_semaphores(
+            VulkanSemaphore::create_semaphores(
+                device,
+                swapchain.images().size()
+            )
+        ) {}
 
 VulkanEngine::VulkanEngine(
     const GlfwContext& glfw_context,

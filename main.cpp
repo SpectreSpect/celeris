@@ -9,6 +9,9 @@
 #include "vulkan_self/descriptor_set/descriptor_pool_builder.h"
 #include "vulkan_self/descriptor_set/descriptor_pool.h"
 #include "vulkan_self/descriptor_set/descriptor_set.h"
+#include "vulkan_self/image/vulkan_image.h"
+#include "vulkan_self/image/cpu_image.h"
+#include "vulkan_self/image/vulkan_texture_2d.h"
 #include "vulkan_self/pipeline/compute_pipeline.h"
 #include "path_utils.h"
 #include "vulkan_self/material/material_system.h"
@@ -186,7 +189,28 @@ int main() {
     BlinnPhongMaterialInstance blinn_phong_material_instance(engine, material_system.m_descriptor_pool, blin_phong_material_pass);
     UnlitMaterialInstance unlit_material_instance(engine, material_system.m_descriptor_pool, unlit_material_pass);
 
+    CpuImage cpu_image = CpuImage::load_rgba8_image(
+        path_utils::executable_dir() / "assets" / "textures" / "minecraft_dirt" / "texture.png"
+    );
+
+    VulkanTexture2D texture(
+        engine.physical_device(),
+        engine.device(),
+        cpu_image.extent2d()
+    );
+
+    // VulkanImage texture_image(
+    //     engine.physical_device(),
+    //     engine.device(),
+    //     cpu_image.extent(),
+    //     VK_FORMAT_R8G8B8A8_SRGB,
+    //     VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+    //     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    // );
+
     VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
+    resource_loader.upload_sampled_texture_2d(cpu_image, texture);
+    resource_loader.submit();
 
     blinn_phong_material_instance.set_color(glm::vec4(1, 0, 0, 1));
     unlit_material_instance.set_color(glm::vec4(0, 0, 1, 1));

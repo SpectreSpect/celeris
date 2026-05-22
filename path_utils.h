@@ -3,16 +3,16 @@
 #include <filesystem>
 #include <string>
 
-namespace path_utils {
-    #if defined(_WIN32)
+#if defined(_WIN32)
     #include <windows.h>
-    #elif defined(__APPLE__)
+#elif defined(__APPLE__)
     #include <mach-o/dyld.h>
-    #else
+#else
     #include <unistd.h>
     #include <limits.h>
-    #endif
+#endif
 
+namespace path_utils {
     inline std::filesystem::path executable_path() {
     #if defined(_WIN32)
         wchar_t buf[32768];
