@@ -22,6 +22,7 @@
 #include "renderer/transform_push_constants.h"
 #include "vulkan_self/material/blin_phong_material_pass.h"
 #include "vulkan_self/material/material_instance_temp.h"
+#include "vulkan_self/material/blinn_phong_material_instance.h"
 
 #include <vector>
 
@@ -111,9 +112,8 @@ int main() {
     VulkanBuffer unifrom_buffer = VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(SimpleUniform));
 
     MaterialSystem material_system(engine.device());
-    MaterialInstance blin_phong_red_material = material_system.create_blin_phong_material(unifrom_buffer, glm::vec4(1, 0, 0, 1));
+    // MaterialInstance blin_phong_red_material = material_system.create_blin_phong_material(unifrom_buffer, glm::vec4(1, 0, 0, 1));
 
-    
     VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
     resource_loader.upload_storage_buffer(&simple_storage, sizeof(SimpleStorage), storage_buffer);
     resource_loader.submit();
@@ -131,13 +131,15 @@ int main() {
 
     MaterialInstanceTemp blin_phong_material(material_system.m_descriptor_pool, blin_phong_material_pass);
     blin_phong_material.descriptor_set.write_uniform_buffer(0, unifrom_buffer);
+
+    BlinnPhongMaterialInstance blinn_phong_material_instance(engine, material_system.m_descriptor_pool, blin_phong_material_pass);
+    blinn_phong_material_instance.set_color(glm::vec4(1, 0, 0, 1));
+
     // blin_phong_uniform.upload(&albedo, sizeof(glm::vec4));
 
     // MaterialInstance instance(m_descriptor_pool, m_blin_phong_layout);
 
     // blin_phong_material.bind();
-    
-
 
     DescriptorSetLayoutBuilder compute_dsl_builder;
     compute_dsl_builder.add_uniform_buffer(0, ShaderStages::compute);
@@ -156,7 +158,6 @@ int main() {
 
     DescriptorSet compute_descriptor_set = pool.allocate_set(compute_dsl);
     DescriptorSet descriptor_set = pool.allocate_set(dsl);
-
 
     PipelineLayoutBuilder compute_pipeline_layout_builder = VulkanPipelineLayout::create_builder();
     compute_pipeline_layout_builder.set_device(engine.device());
@@ -248,8 +249,8 @@ int main() {
                 // pipeline.bind(command_buffer);
                 // // descriptor_set.bind(command_buffer, pipeline);
                 // blin_phong_red_material.bind(command_buffer, pipeline, 0);
-
-                blin_phong_material.bind(command_buffer);
+                
+                blinn_phong_material_instance.bind(command_buffer);
 
                 frame_resources.bind(engine.current_frame(), command_buffer, pipeline, 1);
 

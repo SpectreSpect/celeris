@@ -14,5 +14,5 @@ layout(set = 1, binding = 0) uniform CameraUniform {
 } camera_uniform;
 
 void main() {
-    out_color = frag_color;
+    out_color = ubo.color;
 }

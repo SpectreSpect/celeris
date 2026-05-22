@@ -66,6 +66,7 @@ add_executable(app
   renderer/mesh.cpp
   renderer/render_object.cpp
   vulkan_self/material/material_instance_temp.cpp
+  vulkan_self/material/blinn_phong_material_instance.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

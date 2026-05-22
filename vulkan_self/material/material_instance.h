@@ -15,6 +15,4 @@ public:
     void bind(VulkanCommandBuffer& command_buffer, Pipeline& pipeline, uint32_t set_binding);
 
     DescriptorSet descriptor_set;
-// protected:
-    
 };

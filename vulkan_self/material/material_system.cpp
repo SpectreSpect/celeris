@@ -23,7 +23,6 @@ MaterialInstance MaterialSystem::create_blin_phong_material(VulkanBuffer& blin_p
     MaterialInstance instance(m_descriptor_pool, m_blin_phong_layout);
     instance.descriptor_set.write_uniform_buffer(0, blin_phong_uniform);
 
-    
     return instance;
 }
 
@@ -35,21 +34,12 @@ MaterialPass MaterialSystem::create_blin_phong_pass(
 ) {
     LOG_NAMED("MaterialSystem");
 
-    /*
-        set = 0 -> material data
-        set = 1 -> frame/camera data
-    */
-
     DescriptorSetLayoutBuilder material_dsl_builder;
     material_dsl_builder.add_uniform_buffer(0, ShaderStages::fragment);
 
-    DescriptorSetLayout material_descriptor_set_layout(
-        engine.device(),
-        material_dsl_builder
-    );
+    DescriptorSetLayout material_descriptor_set_layout(engine.device(), material_dsl_builder);
 
-    PipelineLayoutBuilder pipeline_layout_builder =
-        VulkanPipelineLayout::create_builder();
+    PipelineLayoutBuilder pipeline_layout_builder = VulkanPipelineLayout::create_builder();
 
     pipeline_layout_builder.set_device(engine.device());
 
@@ -85,6 +75,6 @@ MaterialPass MaterialSystem::create_blin_phong_pass(
         std::move(material_descriptor_set_layout),
         std::move(pipeline_layout),
         std::move(pipeline),
-        0 // material_set_index
+        0
     );
 }
