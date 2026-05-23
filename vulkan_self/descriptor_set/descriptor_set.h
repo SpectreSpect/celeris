@@ -1,6 +1,7 @@
 #pragma once
 
-#include <vulkan/vulkan.h>
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
 
 #include "../logger/logger_header.h"
 
@@ -11,6 +12,7 @@ class VulkanBuffer;
 class VulkanCommandBuffer;
 class VulkanPipelineLayout;
 class Pipeline;
+class VulkanTexture2D;
 
 class DescriptorSet {
 public:
@@ -20,9 +22,10 @@ public:
         : m_device(device), m_descriptor_set(descriptor_set) {};
     
     void write_buffer(uint32_t binding, VulkanBuffer& buffer, VkDescriptorType descriptor_type);
-    
     void write_uniform_buffer(uint32_t binding, VulkanBuffer& buffer);
     void write_storage_buffer(uint32_t binding, VulkanBuffer& buffer);
+
+    void write_texture(uint32_t binding, const VulkanTexture2D& texture);
 
     void bind(VulkanCommandBuffer& command_buffer, VkPipelineLayout pipeline_layout, VkPipelineBindPoint bind_point, uint32_t set_binding);
     void bind(VulkanCommandBuffer& command_buffer, VulkanPipelineLayout& pipeline_layout, VkPipelineBindPoint bind_point, uint32_t set_binding);

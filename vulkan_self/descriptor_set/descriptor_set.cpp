@@ -3,6 +3,7 @@
 #include "../vulkan_command_buffer.h"
 #include "../pipeline/vulkan_pipeline_layout.h"
 #include "../pipeline/pipeline.h"
+#include "../image/vulkan_texture_2d.h"
 
 void DescriptorSet::write_buffer(uint32_t binding, VulkanBuffer& buffer, VkDescriptorType descriptor_type) {
     LOG_METHOD();
@@ -34,6 +35,45 @@ void DescriptorSet::write_uniform_buffer(uint32_t binding, VulkanBuffer& buffer)
 void DescriptorSet::write_storage_buffer(uint32_t binding, VulkanBuffer& buffer) {
     LOG_METHOD();
     write_buffer(binding, buffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+}
+
+void DescriptorSet::write_texture(
+    uint32_t binding,
+    const VulkanTexture2D& texture)
+{
+    LOG_METHOD();
+
+    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(m_descriptor_set != VK_NULL_HANDLE, "Descriptor set is not initialized");
+
+    logger.check(texture.view().handle() != VK_NULL_HANDLE, "Texture image view is not initialized");
+    logger.check(texture.sampler().handle() != VK_NULL_HANDLE, "Texture sampler is not initialized");
+    logger.check(
+        texture.texture_layout() == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        "Texture image layout must be VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL"
+    );
+
+    VkDescriptorImageInfo image_info{};
+    image_info.sampler = texture.sampler().handle();
+    image_info.imageView = texture.view().handle();
+    image_info.imageLayout = texture.texture_layout();
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = m_descriptor_set;
+    write.dstBinding = binding;
+    write.dstArrayElement = 0;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    write.descriptorCount = 1;
+    write.pImageInfo = &image_info;
+
+    vkUpdateDescriptorSets(
+        m_device,
+        1,
+        &write,
+        0,
+        nullptr
+    );
 }
 
 void DescriptorSet::bind(VulkanCommandBuffer& command_buffer, VkPipelineLayout pipeline_layout, VkPipelineBindPoint bind_point, uint32_t set_binding) {
