@@ -10,7 +10,7 @@
 #include "../descriptor_set/descriptor_set_layout.h"
 #include "../vulkan_engine.h"
 
-const GraphicsPipelineBuliderDesc GraphicsPipelineBuilder::m_default_desc = {
+const GraphicsPipelineBuliderDesc GraphicsPipelineBuilder::default_desc = {
     .device = VK_NULL_HANDLE,
     .pipeline_layout = VK_NULL_HANDLE,
     .render_pass = VK_NULL_HANDLE,

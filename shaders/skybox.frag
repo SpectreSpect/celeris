@@ -12,6 +12,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
 
 layout(set = 0, binding = 1) uniform samplerCube envMap;
 
+layout(set = 0, binding = 1) uniform samplerCube textures[];
 
 void main() { 
     vec3 dir = normalize(inDir.xyz);

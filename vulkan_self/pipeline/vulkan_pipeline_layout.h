@@ -82,6 +82,7 @@ public:
     );
 
     PipelineLayoutBuilder& add_descriptor_set_layout(const DescriptorSetLayout& layout);
+    PipelineLayoutBuilder& prepend_descriptor_set_layout(const DescriptorSetLayout& layout);
 
     const PipelineLayoutBuilderDesc& desc() const noexcept;
 

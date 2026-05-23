@@ -14,7 +14,6 @@ public:
 
     void set_color(glm::vec4 color);
 
-private:
     UnlitUniform m_uniform_data;
     VulkanBuffer m_unifrom_buffer;
 };

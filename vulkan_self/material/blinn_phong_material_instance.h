@@ -25,7 +25,6 @@ private:
         glm::vec4 material = {1.0f, 1.0f, 1.0f, 1.0f};
     };
 
-private:
     BlinnPhongUniform m_uniform_data;
     VulkanBuffer m_unifrom_buffer;
 };

@@ -56,11 +56,12 @@ struct GraphicsPipelineBuliderDesc {
 
 class GraphicsPipelineBuilder {
 private:
-    static const GraphicsPipelineBuliderDesc m_default_desc;
-    GraphicsPipelineBuliderDesc m_desc = m_default_desc;
+    GraphicsPipelineBuliderDesc m_desc = default_desc;
 
 public:
     _XCLASS_NAME(GraphicsPipelineBuilder);
+
+    static const GraphicsPipelineBuliderDesc default_desc;
 
     GraphicsPipelineBuilder() = default;
 
@@ -75,40 +76,40 @@ public:
 
     GraphicsPipelineBuilder& add_vert_shader_stage(
         const VulkanShaderModule& vertex_shader_module,
-        std::string_view entry_point_name = m_default_desc.vertex_entry_point_name
+        std::string_view entry_point_name = default_desc.vertex_entry_point_name
     );
 
     GraphicsPipelineBuilder& add_frag_shader_stage(
         const VulkanShaderModule& fragment_shader_module,
-        std::string_view entry_point_name = m_default_desc.fragment_entry_point_name
+        std::string_view entry_point_name = default_desc.fragment_entry_point_name
     );
 
     GraphicsPipelineBuilder& set_vertex_layout(const VertexLayoutBuilder& layout) noexcept;
 
     GraphicsPipelineBuilder& set_input_assembly(
-        VkPrimitiveTopology topology = m_default_desc.topology,
-        bool primitive_restart_enable = m_default_desc.primitive_restart_enable
+        VkPrimitiveTopology topology = default_desc.topology,
+        bool primitive_restart_enable = default_desc.primitive_restart_enable
     ) noexcept;
 
     GraphicsPipelineBuilder& set_rasterizer(
-        bool depth_clamp_enable = m_default_desc.depth_clamp_enable,
-        bool rasterizer_discard_enable = m_default_desc.rasterizer_discard_enable,
-        VkPolygonMode polygon_mode = m_default_desc.polygon_mode,
-        float line_width = m_default_desc.line_width,
-        VkCullModeFlags cull_mode = m_default_desc.cull_mode, // Потом не забыть поменять!!! #TODO
-        VkFrontFace front_face = m_default_desc.front_face,
-        VkBool32 depth_bias_enable = m_default_desc.depth_bias_enable
+        bool depth_clamp_enable = default_desc.depth_clamp_enable,
+        bool rasterizer_discard_enable = default_desc.rasterizer_discard_enable,
+        VkPolygonMode polygon_mode = default_desc.polygon_mode,
+        float line_width = default_desc.line_width,
+        VkCullModeFlags cull_mode = default_desc.cull_mode, // Потом не забыть поменять!!! #TODO
+        VkFrontFace front_face = default_desc.front_face,
+        VkBool32 depth_bias_enable = default_desc.depth_bias_enable
     ) noexcept;
 
     GraphicsPipelineBuilder& set_multisampling(
-        bool sample_shading_enable = m_default_desc.sample_shading_enable,
-        VkSampleCountFlagBits rasterization_samples = m_default_desc.rasterization_samples // Предполагаю должно быть больше для нормальной работы? #TODO
+        bool sample_shading_enable = default_desc.sample_shading_enable,
+        VkSampleCountFlagBits rasterization_samples = default_desc.rasterization_samples // Предполагаю должно быть больше для нормальной работы? #TODO
     ) noexcept;
 
     // Опять же, пока что всё по простому, чтобы не тратить просто так время. Кода пригодится - сделаю полноценно.
     GraphicsPipelineBuilder& set_color_blending(
-        VkColorComponentFlags color_write_mask = m_default_desc.color_write_mask,
-        bool blend_enable = m_default_desc.blend_enable
+        VkColorComponentFlags color_write_mask = default_desc.color_write_mask,
+        bool blend_enable = default_desc.blend_enable
     ) noexcept;
 
     const GraphicsPipelineBuliderDesc& desc() const noexcept;

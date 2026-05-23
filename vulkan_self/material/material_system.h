@@ -18,8 +18,6 @@ public:
 
     explicit MaterialSystem(VulkanDevice& device);
 
-    MaterialInstance create_blin_phong_material(VulkanBuffer& blin_phong_uniform, glm::vec4 albedo);
-
     static MaterialPass create_blin_phong_pass(VulkanEngine& engine,
                                                const DescriptorSetLayout& frame_resources_descriptor_layout,
                                                const VulkanShaderModule& vertex_shader,
@@ -30,9 +28,10 @@ public:
                                                const VulkanShaderModule& vertex_shader,
                                                const VulkanShaderModule& fragment_shader);
 
-    BlinPhongMaterialLayout m_blin_phong_layout;
+    DescriptorPool& descriptor_pool() noexcept;
+    
+private:
     DescriptorPool m_descriptor_pool;
 
-private:
     DescriptorPool build_descriptor_pool(VulkanDevice& device);
 };

@@ -27,6 +27,8 @@
 #include "vulkan_self/material/material_instance_temp.h"
 #include "vulkan_self/material/blinn_phong_material_instance.h"
 #include "vulkan_self/material/unlit_material_instance.h"
+#include "renderer/shader_manager.h"
+#include "renderer/material_manager.h"
 
 #include <vector>
 
@@ -172,21 +174,13 @@ int main() {
     Camera camera;
     FPSCameraController camera_controller(camera);
 
-    VulkanShaderModule vert_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.vert.spv");
-    VulkanShaderModule frag_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.frag.spv");
-
-    VulkanShaderModule unlit_vs(engine.device(), path_utils::executable_dir() / "shaders" / "unlit.vert.spv");
-    VulkanShaderModule unlit_fs(engine.device(), path_utils::executable_dir() / "shaders" / "unlit.frag.spv");
-
     FrameResources frame_resources(engine.physical_device(), engine.device(), engine.num_frames_in_flight());
 
-    Renderer renderer(engine, frame_resources);
-    
-    MaterialSystem material_system(engine.device());
+    ShaderManager shader_manager(engine.device());
+    MaterialManager material_manager(engine, shader_manager, frame_resources);
 
-    MaterialPass blin_phong_material_pass = material_system.create_blin_phong_pass(engine, frame_resources.descriptor_layout(), vert_shader_module, frag_shader_module);
-    MaterialPass unlit_material_pass = material_system.create_unlit_pass(engine, frame_resources.descriptor_layout(), unlit_vs, unlit_fs);
-    
+    Renderer renderer(engine, frame_resources);
+
     CpuImage dirt_cpu_image = CpuImage::load_rgba8_image(
         path_utils::executable_dir() / "assets" / "textures" / "minecraft_dirt" / "texture.png"
     );
@@ -201,24 +195,8 @@ int main() {
     resource_loader.upload_sampled_texture_2d(dirt_cpu_image, dirt_texture);
     resource_loader.submit();
 
-    BlinnPhongMaterialInstance blinn_phong_material_instance(engine, material_system.m_descriptor_pool, blin_phong_material_pass, dirt_texture);
-    UnlitMaterialInstance unlit_material_instance(engine, material_system.m_descriptor_pool, unlit_material_pass);
-
-
-
-    // VulkanImage dirt_image(
-    //     engine.physical_device(),
-    //     engine.device(),
-    //     cpu_image.extent(),
-    //     VK_FORMAT_R8G8B8A8_SRGB,
-    //     VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-    //     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-    // );
-
-    // VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
-    // resource_loader.upload_sampled_texture_2d(cpu_image, texture);
-    // resource_loader.upload_sampled_image_2d(cpu_image.image_data().data(), cpu_image.extent2d(), dirt_image);
-    // resource_loader.submit();
+    BlinnPhongMaterialInstance blinn_phong_material_instance(engine, material_manager.descriptor_pool(), material_manager.blin_phong_mp, dirt_texture);
+    UnlitMaterialInstance unlit_material_instance(engine, material_manager.descriptor_pool(), material_manager.unlit_mp);
 
     blinn_phong_material_instance.set_color(glm::vec4(1, 0, 0, 1));
     unlit_material_instance.set_color(glm::vec4(0, 0, 1, 1));
@@ -230,11 +208,25 @@ int main() {
     RenderObject unlit_cube(cube_mesh, unlit_material_instance);
 
     unlit_cube.transform.position.x = 2;
+
+    // struct MaterialData {
+    //     glm::vec4 color;
+    //     float roughness;
+    //     float metalic;
+    //     float pad1;
+    //     float pad2;
+    // };
+    // uint32_t num_slots = 1000;
+    // VulkanBuffer material_buffer_gpu = VulkanBuffer::create_storage_buffer(engine, num_slots * sizeof(MaterialData)); // GPU version of the material buffer
+    // std::vector<MaterialData> material_buffer_cpu; // CPU version of the material buffer
+    // std::vector<uint32_t> free_slots; // free slots
+    // std::vector<uint32_t> dirty_slots; // slots that should be updated
+
+    
     
     float last_frame_time = 0.0f;
     float start_time = (float)glfwGetTime();
     float timer = 0;
-
     while (!engine.window().should_close()) {
         engine.window().poll_events();
 

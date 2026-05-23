@@ -4,12 +4,14 @@
 #include "../descriptor_set/descriptor_set_layout.h"
 #include "../pipeline/vulkan_pipeline_layout.h"
 #include "../pipeline/graphics_pipeline.h"
+#include "material_pass_builder.h"
+#include "../vulkan_engine.h"
 
 class MaterialPass {
 public:
     _XCLASS_NAME(MaterialPass);
 
-    MaterialPass(
+    explicit MaterialPass(
         DescriptorSetLayout&& descriptor_set_layout,
         VulkanPipelineLayout&& pipeline_layout,
         GraphicsPipeline&& pipeline,
@@ -19,6 +21,9 @@ public:
             m_pipeline_layout(std::move(pipeline_layout)),
             m_pipeline(std::move(pipeline)),
             m_material_set_index(material_set_index) {}
+    
+    explicit MaterialPass(VulkanDevice& device, VulkanRenderPass& render_pass, MaterialPassBuilder& builder);
+    explicit MaterialPass(VulkanEngine& engine, MaterialPassBuilder& builder);
 
     MaterialPass(const MaterialPass&) = delete;
     MaterialPass& operator=(const MaterialPass&) = delete;
