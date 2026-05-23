@@ -27,7 +27,8 @@
 #include "vulkan_self/material/material_instance_temp.h"
 #include "vulkan_self/material/blinn_phong_material_instance.h"
 #include "vulkan_self/material/unlit_material_instance.h"
-// #include "vulkan_self/material/material_pass_builder.h"
+#include "renderer/shader_manager.h"
+#include "renderer/material_manager.h"
 
 #include <vector>
 
@@ -173,21 +174,13 @@ int main() {
     Camera camera;
     FPSCameraController camera_controller(camera);
 
-    VulkanShaderModule vert_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.vert.spv");
-    VulkanShaderModule frag_shader_module(engine.device(), path_utils::executable_dir() / "shaders" / "triangle.frag.spv");
-
-    VulkanShaderModule unlit_vs(engine.device(), path_utils::executable_dir() / "shaders" / "unlit.vert.spv");
-    VulkanShaderModule unlit_fs(engine.device(), path_utils::executable_dir() / "shaders" / "unlit.frag.spv");
-
     FrameResources frame_resources(engine.physical_device(), engine.device(), engine.num_frames_in_flight());
 
-    Renderer renderer(engine, frame_resources);
-    
-    MaterialSystem material_system(engine.device());
+    ShaderManager shader_manager(engine.device());
+    MaterialManager material_manager(engine, shader_manager, frame_resources);
 
-    MaterialPass blin_phong_material_pass = material_system.create_blin_phong_pass(engine, frame_resources.descriptor_layout(), vert_shader_module, frag_shader_module);
-    MaterialPass unlit_material_pass = material_system.create_unlit_pass(engine, frame_resources.descriptor_layout(), unlit_vs, unlit_fs);
-    
+    Renderer renderer(engine, frame_resources);
+
     CpuImage dirt_cpu_image = CpuImage::load_rgba8_image(
         path_utils::executable_dir() / "assets" / "textures" / "minecraft_dirt" / "texture.png"
     );
@@ -202,8 +195,8 @@ int main() {
     resource_loader.upload_sampled_texture_2d(dirt_cpu_image, dirt_texture);
     resource_loader.submit();
 
-    BlinnPhongMaterialInstance blinn_phong_material_instance(engine, material_system.descriptor_pool(), blin_phong_material_pass, dirt_texture);
-    UnlitMaterialInstance unlit_material_instance(engine, material_system.descriptor_pool(), unlit_material_pass);
+    BlinnPhongMaterialInstance blinn_phong_material_instance(engine, material_manager.descriptor_pool(), material_manager.blin_phong_mp, dirt_texture);
+    UnlitMaterialInstance unlit_material_instance(engine, material_manager.descriptor_pool(), material_manager.unlit_mp);
 
     blinn_phong_material_instance.set_color(glm::vec4(1, 0, 0, 1));
     unlit_material_instance.set_color(glm::vec4(0, 0, 1, 1));

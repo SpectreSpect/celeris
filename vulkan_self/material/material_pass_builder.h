@@ -25,6 +25,7 @@ public:
     VulkanPipelineLayout create_pipeline_layout(VulkanDevice& device, const DescriptorSetLayout& material_ds_layout);
     GraphicsPipeline create_graphics_pipeline(VulkanDevice& device, VulkanRenderPass& render_pass, VulkanPipelineLayout& pipeline_layout);
 
+    DescriptorSetLayoutBuilder material_dsl_builder() const;
 private:
     DescriptorSetLayoutBuilder m_material_dsl_builder;
     PipelineLayoutBuilder m_pipeline_layout_builder;

@@ -47,3 +47,7 @@ GraphicsPipeline MaterialPassBuilder::create_graphics_pipeline(VulkanDevice& dev
     m_pipeline_builder.set_vertex_layout(m_vertex_layout);
     return GraphicsPipeline(m_pipeline_builder);
 }
+
+DescriptorSetLayoutBuilder MaterialPassBuilder::material_dsl_builder() const {
+    return m_material_dsl_builder;
+}

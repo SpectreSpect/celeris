@@ -5,6 +5,7 @@
 #include "../vulkan_buffer.h"
 #include "material_instance.h"
 #include "material_pass_builder.h"
+#include "../formats.h"
 
 MaterialSystem::MaterialSystem(VulkanDevice& device) 
     :   m_descriptor_pool(build_descriptor_pool(device)){}
@@ -43,9 +44,9 @@ MaterialPass MaterialSystem::create_blin_phong_pass(
     builder.add_descriptor_set_layout(frame_resources_descriptor_layout);
 
     builder.add_vertex_binding(0, sizeof(BlinPhongVertex));
-    builder.add_vertex_attribute(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BlinPhongVertex, position));
-    builder.add_vertex_attribute(1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BlinPhongVertex, normal));
-    builder.add_vertex_attribute(2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(BlinPhongVertex, uv));
+    builder.add_vertex_attribute(0, 0, Formats::vec4, offsetof(BlinPhongVertex, position));
+    builder.add_vertex_attribute(1, 0, Formats::vec4, offsetof(BlinPhongVertex, normal));
+    builder.add_vertex_attribute(2, 0, Formats::vec2, offsetof(BlinPhongVertex, uv));
 
     builder.add_vertex_shader(vertex_shader);
     builder.add_fragment_shader(fragment_shader);
@@ -76,9 +77,9 @@ MaterialPass MaterialSystem::create_unlit_pass(
     builder.add_descriptor_set_layout(frame_resources_descriptor_layout);
 
     builder.add_vertex_binding(0, sizeof(UnlitVertex));
-    builder.add_vertex_attribute(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(UnlitVertex, position));
-    builder.add_vertex_attribute(1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(UnlitVertex, normal));
-    builder.add_vertex_attribute(2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(UnlitVertex, uv));
+    builder.add_vertex_attribute(0, 0, Formats::vec4, offsetof(UnlitVertex, position));
+    builder.add_vertex_attribute(1, 0, Formats::vec4, offsetof(UnlitVertex, normal));
+    builder.add_vertex_attribute(2, 0, Formats::vec2, offsetof(UnlitVertex, uv));
 
     builder.add_vertex_shader(vertex_shader);
     builder.add_fragment_shader(fragment_shader);

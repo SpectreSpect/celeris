@@ -75,7 +75,8 @@ add_executable(app
   renderer/transform.cpp
   renderer/mesh.cpp
   renderer/render_object.cpp
-  
+  renderer/shader_manager.cpp
+  renderer/material_manager.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
