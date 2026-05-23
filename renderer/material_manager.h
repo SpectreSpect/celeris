@@ -34,4 +34,5 @@ public:
                                    const VulkanShaderModule& vs, const VulkanShaderModule& fs);
 private:
     DescriptorPool m_pool;
+    static constexpr uint32_t m_max_material_instances = 256;
 };

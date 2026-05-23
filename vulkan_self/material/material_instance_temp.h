@@ -15,8 +15,7 @@ public:
             m_pass(pass) {};
     
     void bind(VulkanCommandBuffer& command_buffer);
-
+    
     DescriptorSet descriptor_set;
     MaterialPass& m_pass;
-// protected:
 };

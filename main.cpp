@@ -208,11 +208,25 @@ int main() {
     RenderObject unlit_cube(cube_mesh, unlit_material_instance);
 
     unlit_cube.transform.position.x = 2;
+
+    // struct MaterialData {
+    //     glm::vec4 color;
+    //     float roughness;
+    //     float metalic;
+    //     float pad1;
+    //     float pad2;
+    // };
+    // uint32_t num_slots = 1000;
+    // VulkanBuffer material_buffer_gpu = VulkanBuffer::create_storage_buffer(engine, num_slots * sizeof(MaterialData)); // GPU version of the material buffer
+    // std::vector<MaterialData> material_buffer_cpu; // CPU version of the material buffer
+    // std::vector<uint32_t> free_slots; // free slots
+    // std::vector<uint32_t> dirty_slots; // slots that should be updated
+
+    
     
     float last_frame_time = 0.0f;
     float start_time = (float)glfwGetTime();
     float timer = 0;
-
     while (!engine.window().should_close()) {
         engine.window().poll_events();
 

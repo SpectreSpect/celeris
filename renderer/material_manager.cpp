@@ -16,9 +16,9 @@ MaterialPass MaterialManager::create_pass(VulkanEngine& engine, MaterialPassBuil
                                           const VulkanShaderModule& vs, const VulkanShaderModule& fs) {
     builder.add_vertex_shader(vs);
     builder.add_fragment_shader(fs);
-
-    m_pool_builder.add_layout(builder.material_dsl_builder());
-
+    
+    m_pool_builder.add_layout(builder.material_dsl_builder(), m_max_material_instances);
+    
     return MaterialPass(engine, builder);
 }
 
@@ -51,6 +51,7 @@ MaterialPass MaterialManager::create_blin_phong_pass(VulkanEngine& engine, Frame
 
     return create_pass(engine, builder, vs, fs);
 }
+
 
 MaterialPass MaterialManager::create_unlit_pass(VulkanEngine& engine, FrameResources& frame_resources, 
                                                 const VulkanShaderModule& vs, const VulkanShaderModule& fs) {
