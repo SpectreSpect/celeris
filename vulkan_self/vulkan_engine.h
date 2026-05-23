@@ -1,44 +1,39 @@
 #pragma once
 
-#include <set>
 #include <vector>
-#include <string>
-#include <limits>
 #include <cstdint>
-#include <iostream>
+#include <cstddef>
 #include <optional>
-#include <algorithm>
-#include <stdexcept>
 #include <string_view>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 #include "logger/logger_header.h"
-#include "glfw_context.h"
-#include "window.h"
 
 #include "vulkan_instance.h"
 #include "vulkan_surface.h"
 #include "vulkan_physical_device.h"
 #include "vulkan_device.h"
 #include "vulkan_swapchain.h"
-#include "vulkan_image_view.h"
-#include "vulkan_image_temp.h"
 #include "vulkan_render_pass.h"
-#include "vulkan_framebuffer.h"
 #include "vulkan_command_pool.h"
-#include "vulkan_command_buffer.h"
-#include "vulkan_fence.h"
+#include "vulkan_framebuffer.h"
+#include "image/vulkan_image.h"
+#include "image/vulkan_image_view.h"
 #include "vulkan_semaphore.h"
-#include "utils.h"
+#include "vulkan_fence.h"
+#include "vulkan_command_buffer.h"
+
+class Window;
+class GlfwContext;
 
 struct SwapchainResources {
     VulkanSwapchain swapchain;
     std::vector<VulkanImageView> image_views;
 
     VkFormat depth_format;
-    std::vector<VulkanImageTemp> depth_images;
+    std::vector<VulkanImage> depth_images;
     std::vector<VulkanImageView> depth_image_views;
 
     VulkanRenderPass render_pass;
@@ -49,48 +44,8 @@ struct SwapchainResources {
         const VulkanPhysicalDevice& physical_device,
         const VulkanDevice& device,
         const VulkanSurface& surface,
-        Window& window)
-        :   swapchain(physical_device, device, surface, window),
-            image_views(VulkanImageView::from_swapchain(device, swapchain)),
-
-            depth_format(VK_FORMAT_D32_SFLOAT),
-
-            depth_images(
-                VulkanImageTemp::create_depth_images(
-                    physical_device,
-                    device,
-                    swapchain.extent(),
-                    depth_format,
-                    swapchain.images().size()
-                )
-            ),
-
-            depth_image_views(
-                VulkanImageView::from_depth_images(
-                    device,
-                    depth_images,
-                    depth_format
-                )
-            ),
-
-            render_pass(device, swapchain, depth_format),
-
-            framebuffers(
-                VulkanFramebuffer::from_image_views(
-                    image_views,
-                    depth_image_views,
-                    device,
-                    render_pass,
-                    swapchain.extent()
-                )
-            ),
-
-            render_finished_semaphores(
-                VulkanSemaphore::create_semaphores(
-                    device,
-                    swapchain.images().size()
-                )
-            ) {}
+        Window& window
+    );
 };
 
 class VulkanEngine {
@@ -157,7 +112,6 @@ private:
 
     static constexpr size_t MAX_FRAMES_IN_FLIGHT = 2;
     size_t m_current_frame = 0;
-
 
 private:
     void recreate_swapchain();

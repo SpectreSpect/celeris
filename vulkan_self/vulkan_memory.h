@@ -118,6 +118,7 @@ public:
     }
 
     void bind_to_buffer(VulkanBuffer& buffer, VkDeviceSize memory_offset = 0) const;
+    void bind_to_image(VkImage image, VkDeviceSize memory_offset = 0) const;
 
 private:
     VkDeviceMemory m_memory = VK_NULL_HANDLE;

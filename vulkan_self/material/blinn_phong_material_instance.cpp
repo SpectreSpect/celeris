@@ -1,9 +1,24 @@
 #include "blinn_phong_material_instance.h"
 
-BlinnPhongMaterialInstance::BlinnPhongMaterialInstance(VulkanEngine& engine, DescriptorPool& descriptor_pool, MaterialPass& blinn_phong_material_pass) 
+#include "../vulkan_engine.h"
+#include "material_pass.h"
+#include "../image/vulkan_texture_2d.h"
+
+BlinnPhongMaterialInstance::BlinnPhongMaterialInstance(
+    VulkanEngine& engine, 
+    DescriptorPool& descriptor_pool, 
+    MaterialPass& blinn_phong_material_pass,
+    VulkanTexture2D& texture)
     :   MaterialInstanceTemp(descriptor_pool, blinn_phong_material_pass), 
-        m_unifrom_buffer(VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(BlinnPhongUniform))) {
+        m_unifrom_buffer(
+            VulkanBuffer::create_host_visible_uniform_buffer(
+                engine, 
+                sizeof(BlinnPhongUniform)
+            )
+        )
+{
     descriptor_set.write_uniform_buffer(0, m_unifrom_buffer);
+    descriptor_set.write_texture(1, texture);
 }
 
 void BlinnPhongMaterialInstance::set_color(glm::vec4 color) {
