@@ -27,6 +27,7 @@
 #include "vulkan_self/material/material_instance_temp.h"
 #include "vulkan_self/material/blinn_phong_material_instance.h"
 #include "vulkan_self/material/unlit_material_instance.h"
+// #include "vulkan_self/material/material_pass_builder.h"
 
 #include <vector>
 
@@ -201,24 +202,8 @@ int main() {
     resource_loader.upload_sampled_texture_2d(dirt_cpu_image, dirt_texture);
     resource_loader.submit();
 
-    BlinnPhongMaterialInstance blinn_phong_material_instance(engine, material_system.m_descriptor_pool, blin_phong_material_pass, dirt_texture);
-    UnlitMaterialInstance unlit_material_instance(engine, material_system.m_descriptor_pool, unlit_material_pass);
-
-
-
-    // VulkanImage dirt_image(
-    //     engine.physical_device(),
-    //     engine.device(),
-    //     cpu_image.extent(),
-    //     VK_FORMAT_R8G8B8A8_SRGB,
-    //     VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-    //     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-    // );
-
-    // VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
-    // resource_loader.upload_sampled_texture_2d(cpu_image, texture);
-    // resource_loader.upload_sampled_image_2d(cpu_image.image_data().data(), cpu_image.extent2d(), dirt_image);
-    // resource_loader.submit();
+    BlinnPhongMaterialInstance blinn_phong_material_instance(engine, material_system.descriptor_pool(), blin_phong_material_pass, dirt_texture);
+    UnlitMaterialInstance unlit_material_instance(engine, material_system.descriptor_pool(), unlit_material_pass);
 
     blinn_phong_material_instance.set_color(glm::vec4(1, 0, 0, 1));
     unlit_material_instance.set_color(glm::vec4(0, 0, 1, 1));

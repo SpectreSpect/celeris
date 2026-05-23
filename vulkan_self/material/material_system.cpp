@@ -4,27 +4,20 @@
 #include "blin_phong_material_layout.h"
 #include "../vulkan_buffer.h"
 #include "material_instance.h"
+#include "material_pass_builder.h"
 
 MaterialSystem::MaterialSystem(VulkanDevice& device) 
-    :   m_blin_phong_layout(device),
-        m_descriptor_pool(build_descriptor_pool(device)){}
+    :   m_descriptor_pool(build_descriptor_pool(device)){}
 
 DescriptorPool MaterialSystem::build_descriptor_pool(VulkanDevice& device) {
     DescriptorPoolBuilder pool_builder;
 
-    pool_builder.add_layout(m_blin_phong_layout.descriptor_set_layout_builder(), 256);
+    pool_builder.set_max_sets(256);
+    pool_builder.add_descriptors(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 256);
+    pool_builder.add_descriptors(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 256);
     pool_builder.add_descriptors(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 256);
 
     return DescriptorPool(device, pool_builder);
-}
-
-MaterialInstance MaterialSystem::create_blin_phong_material(VulkanBuffer& blin_phong_uniform, glm::vec4 albedo) {
-    blin_phong_uniform.upload(&albedo, sizeof(glm::vec4));
-
-    MaterialInstance instance(m_descriptor_pool, m_blin_phong_layout);
-    instance.descriptor_set.write_uniform_buffer(0, blin_phong_uniform);
-
-    return instance;
 }
 
 MaterialPass MaterialSystem::create_blin_phong_pass(
@@ -35,43 +28,29 @@ MaterialPass MaterialSystem::create_blin_phong_pass(
 {
     LOG_NAMED("MaterialSystem");
 
-    DescriptorSetLayoutBuilder material_dsl_builder;
-    material_dsl_builder.add_uniform_buffer(0, ShaderStages::fragment);
-    material_dsl_builder.add_combined_image_sampler(1, ShaderStages::fragment);
-    DescriptorSetLayout material_descriptor_set_layout(engine.device(), material_dsl_builder);
-
-    PipelineLayoutBuilder pipeline_layout_builder = VulkanPipelineLayout::create_builder();
-    pipeline_layout_builder.set_device(engine.device());
-    pipeline_layout_builder.add_push_constants<TransformPushConstants>();
-    pipeline_layout_builder.add_descriptor_set_layout(material_descriptor_set_layout);
-    pipeline_layout_builder.add_descriptor_set_layout(frame_resources_descriptor_layout);
-    VulkanPipelineLayout pipeline_layout(pipeline_layout_builder);
-
     struct BlinPhongVertex {
         glm::vec4 position;
         glm::vec4 normal;
         glm::vec2 uv;
     };
 
-    VertexLayoutBuilder vertex_layout;
-    vertex_layout.add_binding(0, sizeof(BlinPhongVertex));
-    vertex_layout.add_attribute(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BlinPhongVertex, position));
-    vertex_layout.add_attribute(1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BlinPhongVertex, normal));
-    vertex_layout.add_attribute(2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(BlinPhongVertex, uv));
+    MaterialPassBuilder builder;
 
-    GraphicsPipelineBuilder pipeline_builder = GraphicsPipeline::create_builder();
-    pipeline_builder.set_graphic_objects(engine.device(), pipeline_layout, engine.swapchain_resources().render_pass);
-    pipeline_builder.set_vertex_layout(vertex_layout);
-    pipeline_builder.add_vert_shader_stage(vertex_shader);
-    pipeline_builder.add_frag_shader_stage(fragment_shader);
-    GraphicsPipeline pipeline(pipeline_builder);
+    builder.add_uniform_buffer(0, ShaderStages::fragment);
+    builder.add_combined_image_sampler(1, ShaderStages::fragment);
 
-    return MaterialPass(
-        std::move(material_descriptor_set_layout),
-        std::move(pipeline_layout),
-        std::move(pipeline),
-        0
-    );
+    builder.add_push_constants(sizeof(TransformPushConstants), 0);
+    builder.add_descriptor_set_layout(frame_resources_descriptor_layout);
+
+    builder.add_vertex_binding(0, sizeof(BlinPhongVertex));
+    builder.add_vertex_attribute(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BlinPhongVertex, position));
+    builder.add_vertex_attribute(1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(BlinPhongVertex, normal));
+    builder.add_vertex_attribute(2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(BlinPhongVertex, uv));
+
+    builder.add_vertex_shader(vertex_shader);
+    builder.add_fragment_shader(fragment_shader);
+
+    return MaterialPass(engine, builder);
 }
 
 MaterialPass MaterialSystem::create_unlit_pass(
@@ -82,47 +61,31 @@ MaterialPass MaterialSystem::create_unlit_pass(
 ) {
     LOG_NAMED("MaterialSystem");
 
-    DescriptorSetLayoutBuilder material_dsl_builder;
-    material_dsl_builder.add_uniform_buffer(0, ShaderStages::fragment);
-
-    DescriptorSetLayout material_descriptor_set_layout(engine.device(), material_dsl_builder);
-
-    PipelineLayoutBuilder pipeline_layout_builder = VulkanPipelineLayout::create_builder();
-
-    pipeline_layout_builder.set_device(engine.device());
-
-    pipeline_layout_builder.add_push_constants<TransformPushConstants>();
-    pipeline_layout_builder.add_descriptor_set_layout(material_descriptor_set_layout);
-    pipeline_layout_builder.add_descriptor_set_layout(frame_resources_descriptor_layout);
-
-    VulkanPipelineLayout pipeline_layout(pipeline_layout_builder);
-
-    GraphicsPipelineBuilder pipeline_builder = GraphicsPipeline::create_builder();
-
-    pipeline_builder.set_graphic_objects(engine.device(), pipeline_layout, engine.swapchain_resources().render_pass);
-
     struct UnlitVertex {
         glm::vec4 position;
         glm::vec4 normal;
+        glm::vec2 uv;
     };
 
-    VertexLayoutBuilder vertex_layout;
-    vertex_layout.add_binding(0, sizeof(UnlitVertex));
+    MaterialPassBuilder builder;
 
-    vertex_layout.add_attribute(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(UnlitVertex, position));
-    vertex_layout.add_attribute(1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(UnlitVertex, normal));
+    builder.add_uniform_buffer(0, ShaderStages::fragment);
+    builder.add_combined_image_sampler(1, ShaderStages::fragment);
 
-    pipeline_builder.set_vertex_layout(vertex_layout);
+    builder.add_push_constants(sizeof(TransformPushConstants), 0);
+    builder.add_descriptor_set_layout(frame_resources_descriptor_layout);
 
-    pipeline_builder.add_vert_shader_stage(vertex_shader);
-    pipeline_builder.add_frag_shader_stage(fragment_shader);
+    builder.add_vertex_binding(0, sizeof(UnlitVertex));
+    builder.add_vertex_attribute(0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(UnlitVertex, position));
+    builder.add_vertex_attribute(1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(UnlitVertex, normal));
+    builder.add_vertex_attribute(2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(UnlitVertex, uv));
 
-    GraphicsPipeline pipeline(pipeline_builder);
+    builder.add_vertex_shader(vertex_shader);
+    builder.add_fragment_shader(fragment_shader);
 
-    return MaterialPass(
-        std::move(material_descriptor_set_layout),
-        std::move(pipeline_layout),
-        std::move(pipeline),
-        0
-    );
+    return MaterialPass(engine, builder);
+}
+
+DescriptorPool& MaterialSystem::descriptor_pool() noexcept {
+    return m_descriptor_pool;
 }

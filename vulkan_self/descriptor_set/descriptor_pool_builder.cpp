@@ -45,6 +45,13 @@ std::span<const VkDescriptorPoolSize> DescriptorPoolBuilder::pool_sizes() const 
     return m_pool_sizes;
 }
 
+
+
 uint32_t DescriptorPoolBuilder::max_sets() const noexcept {
     return m_max_sets;
 }
+
+void DescriptorPoolBuilder::set_max_sets(uint32_t max_sets) noexcept {
+    m_max_sets = max_sets;
+}
+

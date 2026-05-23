@@ -48,6 +48,16 @@ PipelineLayoutBuilder& PipelineLayoutBuilder::add_descriptor_set_layout(const De
     return *this;
 }
 
+PipelineLayoutBuilder& PipelineLayoutBuilder::prepend_descriptor_set_layout(const DescriptorSetLayout& layout) {
+    LOG_METHOD();
+
+    std::vector<VkDescriptorSetLayout>& layouts = m_desc.descriptor_set_layouts;
+
+    layouts.insert(layouts.begin(), layout.handle());
+
+    return *this;
+}
+
 
 const PipelineLayoutBuilderDesc& PipelineLayoutBuilder::desc() const noexcept {
     return m_desc;

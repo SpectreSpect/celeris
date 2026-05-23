@@ -19,6 +19,7 @@ public:
 
     std::span<const VkDescriptorPoolSize> pool_sizes() const noexcept;
     uint32_t max_sets() const noexcept;
+    void set_max_sets(uint32_t max_sets) noexcept;
 private:
     std::vector<VkDescriptorPoolSize> m_pool_sizes;
     uint32_t m_max_sets = 0;

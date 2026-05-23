@@ -66,6 +66,8 @@ add_executable(app
   vulkan_self/material/material_instance_temp.cpp
   vulkan_self/material/blinn_phong_material_instance.cpp
   vulkan_self/material/unlit_material_instance.cpp
+  vulkan_self/material/material_pass.cpp
+  vulkan_self/material/material_pass_builder.cpp
   renderer/resources/frame_resources.cpp
   camera/camera.cpp
   camera/controllers/fps_camera_controller.cpp
@@ -73,6 +75,7 @@ add_executable(app
   renderer/transform.cpp
   renderer/mesh.cpp
   renderer/render_object.cpp
+  
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
