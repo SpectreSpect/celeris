@@ -16,7 +16,6 @@ void Renderer::render(VulkanCommandBuffer& command_buffer, RenderObject& render_
     pc.model = transform;
     pc.material_data_id = render_object.material_data_id;
 
-    // blinn_phong_material_instance.bind(command_buffer);
     render_object.m_material->bind(command_buffer);
     MaterialPass& pass = render_object.m_material->m_pass;
 

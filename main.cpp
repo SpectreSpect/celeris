@@ -41,8 +41,30 @@
 #include "renderer/manager_bundle.h"
 #include "renderer/point_cloud/point_cloud.h"
 #include "renderer/scene.h"
+#include "renderer/point_cloud/lidar/lidar_scan.h"
 
 #include <vector>
+
+float srgb_to_linear(float c) {
+    if (c <= 0.04045f) {
+        return c / 12.92f;
+    }
+
+    return std::pow((c + 0.055f) / 1.055f, 2.4f);
+}
+
+VkClearValue make_clear_color_srgb(glm::vec4 color) {
+    VkClearValue clear_color{};
+
+    clear_color.color.float32[0] = srgb_to_linear(color.r);
+    clear_color.color.float32[1] = srgb_to_linear(color.g);
+    clear_color.color.float32[2] = srgb_to_linear(color.b);
+    clear_color.color.float32[3] = color.a;
+
+    return clear_color;
+}
+
+VkClearValue clear_color = make_clear_color_srgb({0.05f, 0.05f, 0.05f, 1.0f});
 
 int main() {
     GlfwContext glfw_context;
@@ -57,6 +79,7 @@ int main() {
 
     Camera camera;
     FPSCameraController camera_controller(camera);
+    camera_controller.speed = 20;
 
     FrameResources frame_resources(engine.physical_device(), engine.device(), engine.num_frames_in_flight());
     
@@ -90,6 +113,7 @@ int main() {
         }
     
     PointCloud point_cloud(manager_bundle, points);
+    LidarScan lidar_scan(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording/frame_000000.bin");
 
     unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
@@ -111,8 +135,9 @@ int main() {
     unlit_cube4.add_child(point_cloud);
 
     Scene scene;
-    
+
     scene.add(unlit_cube);
+    scene.add(lidar_scan);
     
     float last_frame_time = 0.0f;
     float start_time = (float)glfwGetTime();
@@ -144,7 +169,6 @@ int main() {
         delta = glm::angleAxis(angle, glm::normalize(axis));
         unlit_cube3.transform.rotation = delta * unlit_cube3.transform.rotation;
 
-
         axis = glm::vec3(1.0f, 0.0f, 0.0f); // Y axis
         angle = sin(timer * 3.14f / 2.0f);
         delta = glm::angleAxis(angle, glm::normalize(axis));
@@ -155,7 +179,10 @@ int main() {
             {auto render_pass_scope = engine.swapchain_resources().render_pass.begin_scope(
                 command_buffer,
                 engine.swapchain_resources().framebuffers[image_index],
-                engine.swapchain_resources().swapchain, {{0.05f, 0.08f, 0.12f, 1.0f}});
+                // engine.swapchain_resources().swapchain, {{0.05f, 0.05f, 0.05f, 1.0f}});
+                engine.swapchain_resources().swapchain, clear_color);
+                // rgba(37, 150, 190)
+
 
                 renderer.render(command_buffer, scene);
             }
