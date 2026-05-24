@@ -6,11 +6,15 @@
 
 #include "transform.h"
 
+#include "../../../vulkan_self/logger/logger.h"
+
 class Renderer;
 class VulkanCommandBuffer;
 
 class SceneObject {
 public:
+    _XPARENT_NAME(SceneObject);
+
     Transform transform;
 
     SceneObject* parent = nullptr;

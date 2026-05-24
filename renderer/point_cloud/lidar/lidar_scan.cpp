@@ -7,13 +7,17 @@ LidarScan::LidarScan(ManagerBundle& manager_bundle, const std::filesystem::path&
     add_child(point_cloud);
 }
 
+void LidarScan::set_timestamp_ns(uint32_t timestamp_ns) {
+    m_timestamp_ns = timestamp_ns;
+}
+
 PointCloud LidarScan::load_from_file(ManagerBundle& manager_bundle, const std::filesystem::path& path) {
     std::ifstream in(path, std::ios::binary);
     if (!in) throw std::runtime_error("Failed to open: " + path.string());
 
     uint32_t count = 0;
 
-    in.read(reinterpret_cast<char*>(&timestamp_ns), sizeof(uint64_t));
+    in.read(reinterpret_cast<char*>(&m_timestamp_ns), sizeof(uint64_t));
     in.read(reinterpret_cast<char*>(&count), sizeof(uint32_t));
     if (!in) throw std::runtime_error("Bad header in: " + path.string());
 
