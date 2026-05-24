@@ -22,11 +22,6 @@ public:
     Pipeline& operator=(Pipeline&& other) noexcept;
 
     ~Pipeline() noexcept;
-    
-private:
-    void destroy() noexcept;
-
-public:
 
     virtual VkPipelineBindPoint get_bind_point() const noexcept = 0;
     void bind(VulkanCommandBuffer& command_buffer) const;
@@ -43,4 +38,7 @@ private:
     VkDevice m_device = VK_NULL_HANDLE;
 
     VkPipelineLayout m_layout = VK_NULL_HANDLE;
+
+private:
+    void destroy() noexcept;
 };

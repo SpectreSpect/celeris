@@ -1,13 +1,17 @@
 #pragma once
 
-#include "../vulkan_self/logger/logger_header.h"
-#include "../vulkan_self/material/material_pass.h"
-#include "../vulkan_self/descriptor_set/descriptor_pool.h"
-#include "../vulkan_self/descriptor_set/descriptor_pool_builder.h"
+#include <cstdint>
 
-class VulkanDevice;
+#include "../vulkan_self/logger/logger_header.h"
+#include "../vulkan_self/descriptor_set/descriptor_pool_builder.h"
+#include "../vulkan_self/descriptor_set/descriptor_pool.h"
+#include "../vulkan_self/material/material_pass.h"
+
+class VulkanEngine;
 class ShaderManager;
 class FrameResources;
+class MaterialPassBuilder;
+class VulkanShaderModule;
 
 class MaterialManager {
 public:
@@ -22,16 +26,30 @@ public:
 
     MaterialManager(VulkanEngine& engine, ShaderManager& shader_manager, FrameResources& frame_resources);
 
+    DescriptorPool& descriptor_pool() noexcept;
 
     DescriptorPoolBuilder create_pool_builder();
-    MaterialPass create_pass(VulkanEngine& engine, MaterialPassBuilder& builder, 
-                                              const VulkanShaderModule& vs, const VulkanShaderModule& fs);
-    DescriptorPool& descriptor_pool() noexcept;
+    MaterialPass create_pass(
+        VulkanEngine& engine,
+        MaterialPassBuilder& builder,
+        const VulkanShaderModule& vs,
+        const VulkanShaderModule& fs
+    );
                                               
-    MaterialPass create_blin_phong_pass(VulkanEngine& engine, FrameResources& frame_resources, 
-                                        const VulkanShaderModule& vs, const VulkanShaderModule& fs);
-    MaterialPass create_unlit_pass(VulkanEngine& engine, FrameResources& frame_resources, 
-                                   const VulkanShaderModule& vs, const VulkanShaderModule& fs);
+    MaterialPass create_blin_phong_pass(
+        VulkanEngine& engine,
+        FrameResources& frame_resources,
+        const VulkanShaderModule& vs,
+        const VulkanShaderModule& fs
+    );
+
+    MaterialPass create_unlit_pass(
+        VulkanEngine& engine,
+        FrameResources& frame_resources,
+        const VulkanShaderModule& vs,
+        const VulkanShaderModule& fs
+    );
+    
 private:
     DescriptorPool m_pool;
     static constexpr uint32_t m_max_material_instances = 256;

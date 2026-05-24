@@ -1,16 +1,17 @@
 #include "material_manager.h"
 
-#include "../vulkan_self/material/material_pass.h"
-#include "shader_manager.h"
-#include "resources/frame_resources.h"
+#include "../vulkan_self/vulkan_engine.h"
+#include "../renderer/shader_manager.h"
+#include "../renderer/resources/frame_resources.h"
+#include "../vulkan_self/material/material_pass_builder.h"
+#include "../vulkan_self/vulkan_shader_module.h"
 #include "../vulkan_self/formats.h"
-#include "transform_push_constants.h"
-
+#include "../renderer/transform_push_constants.h"
 
 MaterialManager::MaterialManager(VulkanEngine& engine, ShaderManager& shader_manager, FrameResources& frame_resources)
-:   blin_phong_mp(create_blin_phong_pass(engine, frame_resources, shader_manager.blinn_phong_vs, shader_manager.blinn_phong_fs)),
-    unlit_mp(create_unlit_pass(engine, frame_resources, shader_manager.unlit_vs, shader_manager.unlit_fs)),
-    m_pool(engine.device(), m_pool_builder) {}
+    :   blin_phong_mp(create_blin_phong_pass(engine, frame_resources, shader_manager.blinn_phong_vs, shader_manager.blinn_phong_fs)),
+        unlit_mp(create_unlit_pass(engine, frame_resources, shader_manager.unlit_vs, shader_manager.unlit_fs)),
+        m_pool(engine.device(), m_pool_builder) {}
 
 MaterialPass MaterialManager::create_pass(VulkanEngine& engine, MaterialPassBuilder& builder, 
                                           const VulkanShaderModule& vs, const VulkanShaderModule& fs) {

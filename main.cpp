@@ -1,7 +1,7 @@
 #include "vulkan_self/vulkan_engine.h"
 #include "vulkan_self/vulkan_shader_module.h"
 #include "vulkan_self/pipeline/vulkan_pipeline_layout.h"
-#include "vulkan_self/pipeline/graphics_pipeline.h"
+#include "vulkan_self/pipeline/graphics_pipeline/graphics_pipeline.h"
 #include "vulkan_self/vulkan_buffer.h"
 #include "vulkan_self/vulkan_resource_loader.h"
 #include "vulkan_self/descriptor_set/descriptor_set_layout_builder.h"
@@ -208,7 +208,7 @@ int main() {
     RenderObject unlit_cube(cube_mesh, unlit_material_instance);
 
     unlit_cube.transform.position.x = 2;
-
+    
     // struct MaterialData {
     //     glm::vec4 color;
     //     float roughness;
@@ -222,7 +222,54 @@ int main() {
     // std::vector<uint32_t> free_slots; // free slots
     // std::vector<uint32_t> dirty_slots; // slots that should be updated
 
-    
+
+
+
+    // DescriptorSetLayoutBuilder compute_dsl_builder;
+    // compute_dsl_builder.add_uniform_buffer(0, ShaderStages::compute);
+    // compute_dsl_builder.add_storage_buffer(1, ShaderStages::compute);
+    // DescriptorSetLayout compute_dsl(engine.device(), compute_dsl_builder);
+
+    // DescriptorPoolBuilder pool_builder;
+    // pool_builder.add_layout(compute_dsl_builder);
+    // DescriptorPool pool(engine.device(), pool_builder);
+
+    // DescriptorSet compute_descriptor_set = pool.allocate_set(compute_dsl);
+
+    // PipelineLayoutBuilder compute_pipeline_layout_builder = VulkanPipelineLayout::create_builder();
+    // compute_pipeline_layout_builder.set_device(engine.device());
+    // compute_pipeline_layout_builder.add_push_constants<TransformPushConstants>();
+    // compute_pipeline_layout_builder.add_descriptor_set_layout(compute_dsl);
+    // VulkanPipelineLayout compute_pipeline_layout(compute_pipeline_layout_builder);
+
+    // ComputePipeline compute_pipeline(engine.device(), compute_pipeline_layout, compute_shader);
+
+    // VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
+    // VulkanFence compute_fence(engine.device());
+    // {
+    //     auto compute_scope = compute_command_buffer.begin_scope();
+
+    //     compute_descriptor_set.write_uniform_buffer(0, unifrom_buffer);
+    //     compute_descriptor_set.write_storage_buffer(1, storage_buffer);
+        
+    //     compute_pipeline.bind(compute_command_buffer);
+    //     compute_descriptor_set.bind(compute_command_buffer, compute_pipeline, 0);
+
+    //     compute_command_buffer.dispatch(1, 1, 1);
+    // }
+
+    // engine.device().compute_queue().submit(
+    //     nullptr,
+    //     0,
+    //     compute_command_buffer,
+    //     nullptr,
+    //     &compute_fence
+    // );
+    // compute_fence.wait();
+
+
+
+
     
     float last_frame_time = 0.0f;
     float start_time = (float)glfwGetTime();
