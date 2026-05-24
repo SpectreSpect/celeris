@@ -6,6 +6,9 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         blinn_phong_fs(device, path_utils::executable_dir() / "shaders" / "triangle.frag.spv"),
 
         unlit_vs(device, path_utils::executable_dir() / "shaders" / "unlit.vert.spv"),
-        unlit_fs(device, path_utils::executable_dir() / "shaders" / "unlit.frag.spv")
+        unlit_fs(device, path_utils::executable_dir() / "shaders" / "unlit.frag.spv"),
+
+        point_vs(device, path_utils::executable_dir() / "shaders" / "point_cloud.vert.spv"),
+        point_fs(device, path_utils::executable_dir() / "shaders" / "point_cloud.frag.spv")
     {
 }

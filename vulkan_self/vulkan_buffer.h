@@ -202,7 +202,18 @@ public:
         const VulkanEngine& engine,
         VkDeviceSize size_bytes
     );
-    
+
+    static VulkanBuffer create_host_visible_vertex_buffer(
+        const VulkanPhysicalDevice& physical_device,
+        const VulkanDevice& device,
+        VkDeviceSize size_bytes
+    );
+
+    static VulkanBuffer create_host_visible_vertex_buffer(
+        const VulkanEngine& engine,
+        VkDeviceSize size_bytes
+    );
+        
 private:
     VkDevice m_device = VK_NULL_HANDLE;
     VkBuffer m_buffer = VK_NULL_HANDLE;

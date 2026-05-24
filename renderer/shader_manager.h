@@ -13,4 +13,7 @@ public:
 
     VulkanShaderModule unlit_vs;
     VulkanShaderModule unlit_fs;
+
+    VulkanShaderModule point_vs;
+    VulkanShaderModule point_fs;
 };

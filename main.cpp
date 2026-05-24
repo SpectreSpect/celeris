@@ -31,6 +31,8 @@
 #include "renderer/shader_manager.h"
 #include "renderer/material_manager.h"
 #include "vulkan_self/material/material_buffer.h"
+#include "renderer/instanced_render_object.h"
+#include "renderer/instance_batch.h"
 
 #include <vector>
 
@@ -62,6 +64,30 @@ public:
         pass.pipeline_layout().push_constants(command_buffer, pc);
         
         command_buffer.draw_indexed(render_object.m_mesh.index_count());
+    };
+
+    void render(VulkanCommandBuffer& command_buffer, InstancedRenderObject& render_object) {
+        static TransformPushConstants pc;
+        pc.model = render_object.transform.get_model_matrix();
+        pc.material_data_id = render_object.material_data_id;
+
+        // blinn_phong_material_instance.bind(command_buffer);
+        render_object.m_material->bind(command_buffer);
+        MaterialPass& pass = render_object.m_material->m_pass;
+
+        m_frame_resources->bind(m_engine->current_frame(), command_buffer, pass.pipeline(), 1);
+
+        pass.pipeline().set_y_up_viewport(command_buffer, *m_engine);
+        pass.pipeline().set_scissor(command_buffer, *m_engine);
+
+        render_object.m_mesh.bind_vertex_buffer(command_buffer, 0);
+        render_object.instance_data.buffer().bind_as_vertex_buffer(command_buffer, 1);
+
+        render_object.m_mesh.bind_index_buffer(command_buffer);
+
+        pass.pipeline_layout().push_constants(command_buffer, pc);
+        
+        command_buffer.draw_indexed(render_object.m_mesh.index_count(), render_object.instance_data.instance_count());
     };
 
 private:
@@ -161,6 +187,18 @@ std::vector<uint32_t> cube_indices = {
     22, 23, 20
 };
 
+const float quad_corners[] = { // vertex buffer
+        -1.0f, -1.0f,  // v0
+        -1.0f, +1.0f,  // v1
+        +1.0f, -1.0f,  // v2
+        +1.0f, +1.0f   // v3
+    };
+
+unsigned int quad_indices[] = { // index_buffer
+    0, 1, 2,
+    2, 1, 3
+};
+
 SimpleStorage simple_storage{glm::vec4(1, 0, 0, 1), glm::vec4(0, 0, 1, 1)};
 
 int main() {
@@ -219,9 +257,28 @@ int main() {
         glm::vec4 color;
     };
 
+    struct alignas(16) PointInstance {
+        glm::vec4 pos;
+        glm::vec4 color;
+    };
+
+    struct PointUniform {
+        float point_size_px;
+        float point_size_world;
+        int screen_space_size;
+        float pad;
+    };
+
     MaterialInstance unlit_material_instance(engine, material_manager.descriptor_pool(), material_manager.unlit_mp, sizeof(MaterialData));
     MaterialInstance rock_material = material_manager.create_blinn_phong_material(engine, rock_texture);
     MaterialInstance dirt_material = material_manager.create_blinn_phong_material(engine, dirt_texture);
+
+    VulkanBuffer point_uniform_buffer = VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(PointUniform));
+    PointUniform point_uniform{2, 0.005, 1, 0};
+    point_uniform_buffer.upload(&point_uniform, sizeof(point_uniform));
+    
+    MaterialInstance point_material_instance(engine, material_manager.descriptor_pool(), material_manager.point_mp, sizeof(MaterialData));
+    point_material_instance.descriptor_set.write_uniform_buffer(1, point_uniform_buffer);
 
     Mesh cube_mesh(engine, resource_loader, cube_vertices.data(), Utils::size_bytes(cube_vertices), 
                                        cube_indices.data(), Utils::size_bytes(cube_indices));
@@ -230,6 +287,26 @@ int main() {
     RenderObject unlit_cube2(cube_mesh, dirt_material);
     RenderObject unlit_cube3(cube_mesh, rock_material);
     RenderObject unlit_cube4(cube_mesh, rock_material);
+
+    
+    Mesh point_quad_mesh(engine, resource_loader, (void*)quad_corners, sizeof(quad_corners), quad_indices, sizeof(quad_indices));
+
+    std::vector<PointInstance> points;
+
+    for (int x = 0; x < 100; x++)
+        for (int z = 0; z < 100; z++) {
+            static PointInstance point;
+
+            point.pos.x = x * 0.01;
+            point.pos.z = z * 0.01;
+            point.color = glm::vec4(x / 100.0f, 0, z / 100.0f, 1);
+
+            points.push_back(point);
+        }
+
+    InstancedRenderObject point_cloud(engine, point_quad_mesh, point_material_instance, points.size(), sizeof(PointInstance));
+
+    point_cloud.instance_data.buffer().upload(points.data(), points.size() * sizeof(PointInstance));
 
     unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
@@ -269,10 +346,12 @@ int main() {
                 engine.swapchain_resources().framebuffers[image_index],
                 engine.swapchain_resources().swapchain, {{0.05f, 0.08f, 0.12f, 1.0f}});
 
-                renderer.render(command_buffer, unlit_cube);
-                renderer.render(command_buffer, unlit_cube2);
-                renderer.render(command_buffer, unlit_cube3);
-                renderer.render(command_buffer, unlit_cube4);
+                // renderer.render(command_buffer, unlit_cube);
+                // renderer.render(command_buffer, unlit_cube2);
+                // renderer.render(command_buffer, unlit_cube3);
+                // renderer.render(command_buffer, unlit_cube4);
+
+                renderer.render(command_buffer, point_cloud);
             }
         }
 

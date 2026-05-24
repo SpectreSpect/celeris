@@ -489,3 +489,34 @@ VulkanBuffer VulkanBuffer::create_host_visible_storage_buffer(
         size_bytes
     );
 }
+
+VulkanBuffer VulkanBuffer::create_host_visible_vertex_buffer(
+    const VulkanPhysicalDevice& physical_device,
+    const VulkanDevice& device,
+    VkDeviceSize size_bytes)
+{
+    LOG_NAMED("VulkanBuffer");
+
+    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(size_bytes != 0, "Attempt to create buffer with zero size");
+
+    return VulkanBuffer(
+        physical_device,
+        device,
+        size_bytes,
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    );
+}
+
+VulkanBuffer VulkanBuffer::create_host_visible_vertex_buffer(
+    const VulkanEngine& engine,
+    VkDeviceSize size_bytes)
+{
+    return create_host_visible_vertex_buffer(
+        engine.physical_device(),
+        engine.device(),
+        size_bytes
+    );
+}
