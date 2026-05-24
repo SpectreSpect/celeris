@@ -3,9 +3,9 @@
 
 class Scene {
 public:
-    std::vector<RenderObject*> render_objects;
+    std::vector<SceneObject*> scene_objects;
 
     Scene() = default;
 
-    void add_object(RenderObject& render_object);
+    void add(SceneObject& scene_object);
 };

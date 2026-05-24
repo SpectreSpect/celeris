@@ -57,23 +57,17 @@ void Renderer::render(VulkanCommandBuffer& command_buffer, InstancedRenderObject
         command_buffer.draw_indexed(render_object.m_mesh.index_count(), render_object.instance_data.instance_count());
 };
 
-void Renderer::render(VulkanCommandBuffer& command_buffer, std::vector<RenderObject*> render_objects, glm::mat4 transform) {
-    for (RenderObject* render_object : render_objects) {
-        glm::mat4 local_transform = render_object->transform.get_model_matrix();
+void Renderer::render(VulkanCommandBuffer& command_buffer, std::vector<SceneObject*> scene_objects, glm::mat4 transform) {
+    for (SceneObject* scene_object : scene_objects) {
+        glm::mat4 local_transform = scene_object->transform.get_model_matrix();
         glm::mat4 world_transform = transform * local_transform;
 
-        if (dynamic_cast<InstancedRenderObject*>(render_object))
-            render(command_buffer, *(InstancedRenderObject*)render_object, world_transform);
-        else
-            render(command_buffer, *render_object, world_transform);
-
-        render_object->m_material->material_buffer.sync();
-
+        scene_object->render(*this, command_buffer, world_transform);
         
-        render(command_buffer, render_object->children, world_transform);
+        render(command_buffer, scene_object->children, world_transform);
     }
 }
 
 void Renderer::render(VulkanCommandBuffer& command_buffer, Scene& scene) {
-    render(command_buffer, scene.render_objects);
+    render(command_buffer, scene.scene_objects);
 }

@@ -1,5 +1,6 @@
 #include "render_object.h"
 #include "../vulkan_self/material/material_instance.h"
+#include "renderer.h"
 
 RenderObject::~RenderObject() {
     if (m_material && material_data_id != UINT32_MAX) {
@@ -8,7 +9,7 @@ RenderObject::~RenderObject() {
 }
 
 RenderObject::RenderObject(RenderObject&& other) noexcept
-    : transform(std::move(other.transform)),
+    : SceneObject(std::move(other)),
       m_mesh(other.m_mesh),
       m_material(other.m_material),
       material_data_id(other.material_data_id)
@@ -36,8 +37,11 @@ RenderObject& RenderObject::operator=(RenderObject&& other) noexcept {
     return *this;
 }
 
-RenderObject& RenderObject::add_child(RenderObject& child) {
-    child.parent = &child;
-    children.push_back(&child);
-    return child;
+void RenderObject::sync_material() {
+    m_material->material_buffer.sync();
+}
+
+void RenderObject::render(Renderer& renderer, VulkanCommandBuffer& command_buffer, const glm::mat4& world_transform) {
+    sync_material();
+    renderer.render(command_buffer, *this, world_transform);
 }

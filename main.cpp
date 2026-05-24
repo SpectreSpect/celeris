@@ -105,7 +105,6 @@ int main() {
     unlit_cube3.transform.position.x = 4;
     unlit_cube4.transform.position.x = 6;
 
-
     unlit_cube.add_child(unlit_cube2);
     unlit_cube2.add_child(unlit_cube3);
     unlit_cube3.add_child(unlit_cube4);
@@ -113,7 +112,7 @@ int main() {
 
     Scene scene;
     
-    scene.add_object(unlit_cube);
+    scene.add(unlit_cube);
     
     float last_frame_time = 0.0f;
     float start_time = (float)glfwGetTime();
@@ -135,12 +134,10 @@ int main() {
 
         // unlit_cube.transform.position.x = sin(timer) * 5 ;
 
-
         glm::vec3 axis = glm::vec3(0.0f, 1.0f, 0.0f); // Y axis
         float angle = delta_time;
         glm::quat delta = glm::angleAxis(angle, glm::normalize(axis));
         unlit_cube.transform.rotation = delta * unlit_cube.transform.rotation;
-
 
         axis = glm::vec3(0.0f, 0.0f, 1.0f); // Y axis
         angle = delta_time;

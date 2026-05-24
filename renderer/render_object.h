@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <utility>
 
+#include "scene_object.h"
+
 #include "transform.h"
 #include "mesh.h"
 
@@ -10,7 +12,7 @@
 #include "../vulkan_self/material/material_instance.h"
 
 
-class RenderObject {
+class RenderObject : public SceneObject {
 public:
     _XCLASS_NAME(RenderObject);
 
@@ -58,14 +60,17 @@ public:
         material_data_id = new_material.material_buffer.create_slot<SlotType>(data);
     }
 
-    RenderObject& add_child(RenderObject& child);
+    void sync_material();
 
-    Transform transform;
+    // RenderObject& add_child(RenderObject& child);
+    
+    virtual void render(Renderer& renderer, VulkanCommandBuffer& command_buffer, const glm::mat4& world_transform);
+    
 
     Mesh& m_mesh;
     MaterialInstance* m_material = nullptr;
     uint32_t material_data_id = UINT32_MAX;
 
-    RenderObject* parent = nullptr;
-    std::vector<RenderObject*> children;
+    // RenderObject* parent = nullptr;
+    // std::vector<RenderObject*> children;
 };

@@ -85,6 +85,7 @@ add_executable(app
   renderer/manager_bundle.cpp
   renderer/point_cloud/point_cloud.cpp
   renderer/scene.cpp
+  renderer/scene_object.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
