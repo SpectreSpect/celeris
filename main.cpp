@@ -27,8 +27,10 @@
 #include "vulkan_self/material/material_instance_temp.h"
 #include "vulkan_self/material/blinn_phong_material_instance.h"
 #include "vulkan_self/material/unlit_material_instance.h"
+#include "vulkan_self/material/material_instance.h"
 #include "renderer/shader_manager.h"
 #include "renderer/material_manager.h"
+#include "vulkan_self/material/material_buffer.h"
 
 #include <vector>
 
@@ -43,6 +45,7 @@ public:
     void render(VulkanCommandBuffer& command_buffer, RenderObject& render_object) {
         static TransformPushConstants pc;
         pc.model = render_object.transform.get_model_matrix();
+        pc.material_data_id = render_object.material_data_id;
 
         // blinn_phong_material_instance.bind(command_buffer);
         render_object.m_material->bind(command_buffer);
@@ -195,32 +198,64 @@ int main() {
     resource_loader.upload_sampled_texture_2d(dirt_cpu_image, dirt_texture);
     resource_loader.submit();
 
+    struct MaterialData {
+        glm::vec4 color;
+    };
+
+
+    MaterialInstance blinn_phong_material_instance2(engine, material_manager.descriptor_pool(), material_manager.unlit_mp, sizeof(MaterialData));
+
+
+    blinn_phong_material_instance2.material_buffer.create_slot<MaterialData>({glm::vec4(1, 0, 0, 1)});
+    blinn_phong_material_instance2.material_buffer.create_slot<MaterialData>({glm::vec4(0, 1, 0, 1)});
+    blinn_phong_material_instance2.material_buffer.create_slot<MaterialData>({glm::vec4(0, 0, 1, 1)});
+    blinn_phong_material_instance2.material_buffer.sync();
+
     BlinnPhongMaterialInstance blinn_phong_material_instance(engine, material_manager.descriptor_pool(), material_manager.blin_phong_mp, dirt_texture);
-    UnlitMaterialInstance unlit_material_instance(engine, material_manager.descriptor_pool(), material_manager.unlit_mp);
+    // UnlitMaterialInstance unlit_material_instance(engine, material_manager.descriptor_pool(), material_manager.unlit_mp);
 
     blinn_phong_material_instance.set_color(glm::vec4(1, 0, 0, 1));
-    unlit_material_instance.set_color(glm::vec4(0, 0, 1, 1));
+    // unlit_material_instance.set_color(glm::vec4(0, 0, 1, 1));
 
     Mesh cube_mesh(engine, resource_loader, cube_vertices.data(), Utils::size_bytes(cube_vertices), 
                                        cube_indices.data(), Utils::size_bytes(cube_indices));
 
-    RenderObject blinn_phong_cube(cube_mesh, blinn_phong_material_instance);
-    RenderObject unlit_cube(cube_mesh, unlit_material_instance);
+    // RenderObject blinn_phong_cube(cube_mesh, blinn_phong_material_instance);
+    // RenderObject unlit_cube(cube_mesh, unlit_material_instance);
+    RenderObject unlit_cube(cube_mesh, blinn_phong_material_instance2);
+    RenderObject unlit_cube2(cube_mesh, blinn_phong_material_instance2);
+    RenderObject unlit_cube3(cube_mesh, blinn_phong_material_instance2);
+    RenderObject unlit_cube4(cube_mesh, blinn_phong_material_instance2);
 
-    unlit_cube.transform.position.x = 2;
+    unlit_cube.m_material->material_buffer.update_slot<MaterialData>(unlit_cube.material_data_id, {glm::vec4(1, 0, 0, 1)});
+    unlit_cube2.m_material->material_buffer.update_slot<MaterialData>(unlit_cube2.material_data_id, {glm::vec4(0, 1, 0, 1)});
+    unlit_cube3.m_material->material_buffer.update_slot<MaterialData>(unlit_cube3.material_data_id, {glm::vec4(0, 0, 1, 1)});
+    unlit_cube4.m_material->material_buffer.update_slot<MaterialData>(unlit_cube4.material_data_id, {glm::vec4(1, 1, 1, 1)});
 
-    // struct MaterialData {
-    //     glm::vec4 color;
-    //     float roughness;
-    //     float metalic;
-    //     float pad1;
-    //     float pad2;
-    // };
-    // uint32_t num_slots = 1000;
-    // VulkanBuffer material_buffer_gpu = VulkanBuffer::create_storage_buffer(engine, num_slots * sizeof(MaterialData)); // GPU version of the material buffer
-    // std::vector<MaterialData> material_buffer_cpu; // CPU version of the material buffer
-    // std::vector<uint32_t> free_slots; // free slots
-    // std::vector<uint32_t> dirty_slots; // slots that should be updated
+    unlit_cube.m_material->material_buffer.sync();
+
+    unlit_cube.transform.position.x = 0;
+    unlit_cube2.transform.position.x = 2;
+    unlit_cube3.transform.position.x = 4;
+    unlit_cube4.transform.position.x = 6;
+
+    MaterialBuffer material_buffer = MaterialBuffer::create<MaterialData>(engine, 1000);
+
+    uint32_t material_data_id = material_buffer.allocate_slot();
+
+    const MaterialData& material_data = material_buffer.read<MaterialData>(material_data_id);
+
+    auto& color = material_data.color;
+
+    std::cout << "old color: (" << color.x << ", " << color.y << ", " << color.z << ", " << color.a << ")" << std::endl;
+
+    material_buffer.edit_slot<MaterialData>(material_data_id, [&](MaterialData& data) {
+        data.color = glm::vec4(1, 0, 0, 1);
+    });
+
+    std::cout << "new data: (" << color.x << ", " << color.y << ", " << color.z << ", " << color.a << ")" << std::endl;
+
+    material_buffer.sync();
 
     
     
@@ -251,11 +286,14 @@ int main() {
                 engine.swapchain_resources().framebuffers[image_index],
                 engine.swapchain_resources().swapchain, {{0.05f, 0.08f, 0.12f, 1.0f}});
 
-                unlit_cube.transform.position.x = 3 + sin(timer);
-                blinn_phong_cube.transform.position.y = cos(timer);
+                // unlit_cube.transform.position.x = 3 + sin(timer);
+                // blinn_phong_cube.transform.position.y = cos(timer);
                 
                 renderer.render(command_buffer, unlit_cube);
-                renderer.render(command_buffer, blinn_phong_cube);
+                renderer.render(command_buffer, unlit_cube2);
+                renderer.render(command_buffer, unlit_cube3);
+                renderer.render(command_buffer, unlit_cube4);
+                // renderer.render(command_buffer, blinn_phong_cube);
             }
         }
 

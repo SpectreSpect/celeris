@@ -62,7 +62,6 @@ add_executable(app
   vulkan_self/material/material_system.cpp
   vulkan_self/material/blin_phong_material_layout.cpp
   vulkan_self/material/material_layout.cpp
-  vulkan_self/material/material_instance.cpp
   vulkan_self/material/material_instance_temp.cpp
   vulkan_self/material/blinn_phong_material_instance.cpp
   vulkan_self/material/unlit_material_instance.cpp

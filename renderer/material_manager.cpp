@@ -65,8 +65,9 @@ MaterialPass MaterialManager::create_unlit_pass(VulkanEngine& engine, FrameResou
 
     MaterialPassBuilder builder;
 
-    builder.add_uniform_buffer(0, ShaderStages::fragment);
-    builder.add_combined_image_sampler(1, ShaderStages::fragment);
+    // builder.add_uniform_buffer(0, ShaderStages::fragment);
+    builder.add_storage_buffer(0, ShaderStages::fragment);
+    // builder.add_combined_image_sampler(1, ShaderStages::fragment);
 
     builder.add_push_constants(sizeof(TransformPushConstants), 0);
     builder.add_descriptor_set_layout(frame_resources.descriptor_layout());
