@@ -68,5 +68,5 @@ void Renderer::render(VulkanCommandBuffer& command_buffer, std::vector<SceneObje
 }
 
 void Renderer::render(VulkanCommandBuffer& command_buffer, Scene& scene) {
-    render(command_buffer, scene.scene_objects);
+    render(command_buffer , scene.scene_objects);
 }

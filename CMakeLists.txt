@@ -94,6 +94,7 @@ add_executable(app
   renderer/scene.cpp
   renderer/scene_object.cpp
   renderer/point_cloud/lidar/lidar_scan.cpp
+  renderer/point_cloud/lidar/lidar_video.cpp
 )
 
 
