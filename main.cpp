@@ -152,7 +152,8 @@ int main() {
         }
     
     PointCloud point_cloud(manager_bundle, points);
-    LidarScan lidar_scan(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording/frame_000000.bin");
+    LidarScan lidar_scan(manager_bundle, path_utils::executable_dir() / "assets" / "lidar_scans" / "frame_000000.bin");
+    
 
     unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
