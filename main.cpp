@@ -34,194 +34,12 @@
 #include "renderer/instanced_render_object.h"
 #include "renderer/instance_batch.h"
 #include "renderer/texture_manager.h"
+#include "renderer/material_instance_manager.h"
+#include "renderer/point_instance.h"
+#include "renderer/renderer.h"
+#include "renderer/mesh_manager.h"
 
 #include <vector>
-
-
-class Renderer {
-public:
-    Renderer(VulkanEngine& engine, FrameResources& frame_resources) {
-        m_engine = &engine;
-        m_frame_resources = &frame_resources;
-    };
-
-    void render(VulkanCommandBuffer& command_buffer, RenderObject& render_object) {
-        static TransformPushConstants pc;
-        pc.model = render_object.transform.get_model_matrix();
-        pc.material_data_id = render_object.material_data_id;
-
-        // blinn_phong_material_instance.bind(command_buffer);
-        render_object.m_material->bind(command_buffer);
-        MaterialPass& pass = render_object.m_material->m_pass;
-
-        m_frame_resources->bind(m_engine->current_frame(), command_buffer, pass.pipeline(), 1);
-
-        pass.pipeline().set_y_up_viewport(command_buffer, *m_engine);
-        pass.pipeline().set_scissor(command_buffer, *m_engine);
-
-        render_object.m_mesh.bind_vertex_buffer(command_buffer);
-        render_object.m_mesh.bind_index_buffer(command_buffer);
-
-        pass.pipeline_layout().push_constants(command_buffer, pc);
-        
-        command_buffer.draw_indexed(render_object.m_mesh.index_count());
-    };
-
-    void render(VulkanCommandBuffer& command_buffer, InstancedRenderObject& render_object) {
-        static TransformPushConstants pc;
-        pc.model = render_object.transform.get_model_matrix();
-        pc.material_data_id = render_object.material_data_id;
-
-        // blinn_phong_material_instance.bind(command_buffer);
-        render_object.m_material->bind(command_buffer);
-        MaterialPass& pass = render_object.m_material->m_pass;
-
-        m_frame_resources->bind(m_engine->current_frame(), command_buffer, pass.pipeline(), 1);
-
-        pass.pipeline().set_y_up_viewport(command_buffer, *m_engine);
-        pass.pipeline().set_scissor(command_buffer, *m_engine);
-
-        render_object.m_mesh.bind_vertex_buffer(command_buffer, 0);
-        render_object.instance_data.buffer().bind_as_vertex_buffer(command_buffer, 1);
-
-        render_object.m_mesh.bind_index_buffer(command_buffer);
-
-        pass.pipeline_layout().push_constants(command_buffer, pc);
-        
-        command_buffer.draw_indexed(render_object.m_mesh.index_count(), render_object.instance_data.instance_count());
-    };
-
-private:
-    VulkanEngine* m_engine = nullptr;
-    FrameResources* m_frame_resources = nullptr;
-};
-
-
-
-// struct TestPushConstants {
-//     glm::mat4 model;
-// };
-
-struct SimpleVertex {
-    glm::vec2 pos;
-    glm::vec3 color;
-};
-
-
-
-struct SimpleUniform {
-    glm::vec4 color;
-};
-
-struct SimpleStorage {
-    glm::vec4 color1;
-    glm::vec4 color2;
-};
-
-struct SimpleVertex3D {
-    glm::vec4 position;
-    glm::vec4 normal;
-    glm::vec2 uv;
-};
-
-std::vector<SimpleVertex3D> cube_vertices = {
-    // Front face, normal +Z
-    {{-0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}}, // 0
-    {{ 0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}}, // 1
-    {{ 0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}}, // 2
-    {{-0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}}, // 3
-
-    // Back face, normal -Z
-    {{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}}, // 4
-    {{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}}, // 5
-    {{-0.5f,  0.5f, -0.5f, 1.0f}, {0.0f, 0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}}, // 6
-    {{ 0.5f,  0.5f, -0.5f, 1.0f}, {0.0f, 0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}}, // 7
-
-    // Left face, normal -X
-    {{-0.5f, -0.5f, -0.5f, 1.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}}, // 8
-    {{-0.5f, -0.5f,  0.5f, 1.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // 9
-    {{-0.5f,  0.5f,  0.5f, 1.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // 10
-    {{-0.5f,  0.5f, -0.5f, 1.0f}, {-1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // 11
-
-    // Right face, normal +X
-    {{ 0.5f, -0.5f,  0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 1.0f}}, // 12
-    {{ 0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // 13
-    {{ 0.5f,  0.5f, -0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // 14
-    {{ 0.5f,  0.5f,  0.5f, 1.0f}, {1.0f, 0.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // 15
-
-    // Top face, normal +Y
-    {{-0.5f,  0.5f, -0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}}, // 16
-    {{-0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // 17
-    {{ 0.5f,  0.5f,  0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // 18
-    {{ 0.5f,  0.5f, -0.5f, 1.0f}, {0.0f, 1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // 19
-
-    // Bottom face, normal -Y
-    {{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, // 20
-    {{ 0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // 21
-    {{ 0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}}, // 22
-    {{-0.5f, -0.5f,  0.5f, 1.0f}, {0.0f, -1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}}, // 23
-};
-
-std::vector<uint32_t> cube_indices = {
-    // Front face
-    0, 1, 2,
-    2, 3, 0,
-
-    // Back face
-    4, 5, 6,
-    6, 7, 4,
-
-    // Left face
-    8, 9, 10,
-    10, 11, 8,
-
-    // Right face
-    12, 13, 14,
-    14, 15, 12,
-
-    // Top face
-    16, 17, 18,
-    18, 19, 16,
-
-    // Bottom face
-    20, 21, 22,
-    22, 23, 20
-};
-
-const float quad_corners[] = { // vertex buffer
-        -1.0f, -1.0f,  // v0
-        -1.0f, +1.0f,  // v1
-        +1.0f, -1.0f,  // v2
-        +1.0f, +1.0f   // v3
-    };
-
-unsigned int quad_indices[] = { // index_buffer
-    0, 1, 2,
-    2, 1, 3
-};
-
-SimpleStorage simple_storage{glm::vec4(1, 0, 0, 1), glm::vec4(0, 0, 1, 1)};
-
-struct MaterialData {
-    glm::vec4 color;
-};
-
-struct BlinPhongMaterialData {
-    glm::vec4 material;
-    glm::vec4 color;
-};
-
-struct alignas(16) PointInstance {
-    glm::vec4 pos;
-    glm::vec4 color;
-};
-
-struct PointUniform {
-    float point_size_px;
-    float point_size_world;
-    int screen_space_size;
-    float pad;
-};
 
 int main() {
     GlfwContext glfw_context;
@@ -242,31 +60,17 @@ int main() {
     VulkanResourceLoader resource_loader(engine, 1024 * 1024 * 100); // 1 Мб
 
     ShaderManager shader_manager(engine.device());
-    MaterialManager material_manager(engine, shader_manager, frame_resources);
     TextureManager texture_manager(engine, resource_loader);
+    MaterialManager material_manager(engine, shader_manager, frame_resources);
+    MaterialInstanceManager material_instance_manager(engine, material_manager, texture_manager);
+    MeshManager mesh_manager(engine, resource_loader);
 
     Renderer renderer(engine, frame_resources);
 
-    MaterialInstance unlit_material_instance(engine, material_manager.descriptor_pool(), material_manager.unlit_mp, sizeof(MaterialData));
-    MaterialInstance rock_material = material_manager.create_blinn_phong_material(engine, texture_manager.rock_texture);
-    MaterialInstance dirt_material = material_manager.create_blinn_phong_material(engine, texture_manager.dirt_texture);
-
-    VulkanBuffer point_uniform_buffer = VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(PointUniform));
-    PointUniform point_uniform{2, 0.005, 1, 0};
-    point_uniform_buffer.upload(&point_uniform, sizeof(point_uniform));
-    
-    MaterialInstance point_material_instance(engine, material_manager.descriptor_pool(), material_manager.point_mp, sizeof(MaterialData));
-    point_material_instance.descriptor_set.write_uniform_buffer(1, point_uniform_buffer);
-
-    Mesh cube_mesh(engine, resource_loader, cube_vertices.data(), Utils::size_bytes(cube_vertices), 
-                                       cube_indices.data(), Utils::size_bytes(cube_indices));
-
-    RenderObject unlit_cube(cube_mesh, dirt_material);
-    RenderObject unlit_cube2(cube_mesh, dirt_material);
-    RenderObject unlit_cube3(cube_mesh, rock_material);
-    RenderObject unlit_cube4(cube_mesh, rock_material);
-
-    Mesh point_quad_mesh(engine, resource_loader, (void*)quad_corners, sizeof(quad_corners), quad_indices, sizeof(quad_indices));
+    RenderObject unlit_cube(mesh_manager.cube, material_instance_manager.dirt_blinn_phong);
+    RenderObject unlit_cube2(mesh_manager.cube, material_instance_manager.dirt_blinn_phong);
+    RenderObject unlit_cube3(mesh_manager.cube, material_instance_manager.rock_blinn_phong);
+    RenderObject unlit_cube4(mesh_manager.cube, material_instance_manager.unlit);
 
     std::vector<PointInstance> points;
 
@@ -281,17 +85,19 @@ int main() {
             points.push_back(point);
         }
 
-    InstancedRenderObject point_cloud(engine, point_quad_mesh, point_material_instance, points.size(), sizeof(PointInstance));
+    InstancedRenderObject point_cloud(engine, mesh_manager.point_cloud_quad, 
+                                      material_instance_manager.point_cloud, points.size(), sizeof(PointInstance));
 
     point_cloud.instance_data.buffer().upload(points.data(), points.size() * sizeof(PointInstance));
 
     unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube3.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
-    unlit_cube4.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
+    unlit_cube4.set_material_data<UnlitMaterialData>({glm::vec4(0, 1, 1, 1)});
 
-    rock_material.material_buffer.sync();
-    dirt_material.material_buffer.sync();
+    material_instance_manager.unlit.material_buffer.sync();
+    material_instance_manager.rock_blinn_phong.material_buffer.sync();
+    material_instance_manager.dirt_blinn_phong.material_buffer.sync();
 
     unlit_cube.transform.position.x = 0;
     unlit_cube2.transform.position.x = 2;

@@ -11,15 +11,10 @@ class FrameResources;
 class MaterialInstance;
 class VulkanTexture2D;
 
-struct BlinPhongMaterialData {
-        glm::vec4 material;
-        glm::vec4 color;
-};
-
 class MaterialManager {
 public:
     _XCLASS_NAME(MaterialManager);
-    
+
 private:
     DescriptorPoolBuilder m_pool_builder;
 

@@ -7,6 +7,7 @@
 #include "transform_push_constants.h"
 #include "../vulkan_self/material/material_instance.h"
 #include "../vulkan_self/image/vulkan_texture_2d.h"
+#include "material_data_types.h"
 
 
 MaterialManager::MaterialManager(VulkanEngine& engine, ShaderManager& shader_manager, FrameResources& frame_resources)

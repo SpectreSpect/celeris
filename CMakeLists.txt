@@ -79,6 +79,9 @@ add_executable(app
   renderer/instanced_render_object.cpp
   renderer/instance_batch.cpp
   renderer/texture_manager.cpp
+  renderer/material_instance_manager.cpp
+  renderer/renderer.cpp
+  renderer/mesh_manager.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
