@@ -1,13 +1,21 @@
 #include "compute_pipeline.h"
 
 #include <vulkan/vk_enum_string_helper.h>
+#include <string>
 
-#include "vulkan_pipeline_layout.h"
-#include "../vulkan_device.h"
-#include "../vulkan_shader_module.h"
+#include "../vulkan_pipeline_layout.h"
+#include "../../vulkan_device.h"
+#include "../../vulkan_shader_module.h"
 
-ComputePipeline::ComputePipeline(VulkanDevice& device, const VulkanPipelineLayout& pipeline_layout, VulkanShaderModule& compute_shader) {
+ComputePipeline::ComputePipeline(
+    VulkanDevice& device,
+    const VulkanPipelineLayout& pipeline_layout,
+    VulkanShaderModule& compute_shader,
+    std::string_view entry_point)
+{
     LOG_METHOD();
+
+    std::string entry_point_str = std::string(entry_point);
 
     logger.check(compute_shader.handle() != VK_NULL_HANDLE, "compute_shader was null");
     logger.check(pipeline_layout.handle() != VK_NULL_HANDLE, "pipeline_layout was null");
@@ -17,7 +25,7 @@ ComputePipeline::ComputePipeline(VulkanDevice& device, const VulkanPipelineLayou
     shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
     shaderStageInfo.module = compute_shader.handle();
-    shaderStageInfo.pName = "main";
+    shaderStageInfo.pName = entry_point_str.c_str();
 
     VkComputePipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
@@ -27,7 +35,9 @@ ComputePipeline::ComputePipeline(VulkanDevice& device, const VulkanPipelineLayou
     VkPipeline pipeline = VK_NULL_HANDLE;
 
     VkResult result = vkCreateComputePipelines(device.handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline);
-    logger.check(result == VK_SUCCESS) << "Failed to create compute pipeline: " << clr(string_VkResult(result), LoggerPalette::blue) << "\n";
+    logger.check(result == VK_SUCCESS) 
+        << "Failed to create compute pipeline: " 
+        << clr(string_VkResult(result), LoggerPalette::blue) << "\n";
 
     set_pipeline(device.handle(), pipeline, pipeline_layout.handle());
 }
@@ -35,12 +45,3 @@ ComputePipeline::ComputePipeline(VulkanDevice& device, const VulkanPipelineLayou
 VkPipelineBindPoint ComputePipeline::get_bind_point() const noexcept {
     return VK_PIPELINE_BIND_POINT_COMPUTE;
 }
-
-// void ComputePipeline::bind(VulkanCommandBuffer& command_buffer) const {
-//     LOG_METHOD();
-
-//     logger.check(m_pipeline != VK_NULL_HANDLE, "Pipeline is not initialized");
-//     logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
-
-//     vkCmdBindPipeline(command_buffer.handle(), get_bind_point(), m_pipeline);
-// }

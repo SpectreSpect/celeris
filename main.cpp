@@ -1,7 +1,5 @@
 #include "vulkan_self/vulkan_engine.h"
 #include "vulkan_self/vulkan_shader_module.h"
-#include "vulkan_self/pipeline/vulkan_pipeline_layout.h"
-#include "vulkan_self/pipeline/graphics_pipeline/graphics_pipeline.h"
 #include "vulkan_self/vulkan_buffer.h"
 #include "vulkan_self/vulkan_resource_loader.h"
 #include "vulkan_self/descriptor_set/descriptor_set_layout_builder.h"
@@ -9,10 +7,14 @@
 #include "vulkan_self/descriptor_set/descriptor_pool_builder.h"
 #include "vulkan_self/descriptor_set/descriptor_pool.h"
 #include "vulkan_self/descriptor_set/descriptor_set.h"
+#include "vulkan_self/pipeline/vulkan_pipeline_layout.h"
+#include "vulkan_self/pipeline/graphics_pipeline/graphics_pipeline.h"
+#include "vulkan_self/pipeline/compute_pipeline/compute_pipeline.h"
+#include "vulkan_self/pipeline/pipeline_pass_builder.h"
+#include "vulkan_self/compute/compute_pass.h"
 #include "vulkan_self/image/vulkan_image.h"
 #include "vulkan_self/image/cpu_image.h"
 #include "vulkan_self/image/vulkan_texture_2d.h"
-#include "vulkan_self/pipeline/compute_pipeline.h"
 #include "path_utils.h"
 #include "vulkan_self/material/material_system.h"
 #include "vulkan_self/material/material_instance.h"
@@ -29,6 +31,8 @@
 #include "vulkan_self/material/unlit_material_instance.h"
 #include "renderer/shader_manager.h"
 #include "renderer/material_manager.h"
+#include "vulkan_self/compute/compute_pass_builder.h"
+#include "renderer/compute_pass_manager.h"
 
 #include <vector>
 
@@ -178,6 +182,7 @@ int main() {
 
     ShaderManager shader_manager(engine.device());
     MaterialManager material_manager(engine, shader_manager, frame_resources);
+    ComputePassManager compute_pass_manager(engine.device(), shader_manager);
 
     Renderer renderer(engine, frame_resources);
 
@@ -195,7 +200,48 @@ int main() {
     resource_loader.upload_sampled_texture_2d(dirt_cpu_image, dirt_texture);
     resource_loader.submit();
 
+
+    VulkanBuffer test_uniform = VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(SimpleUniform));
+    VulkanBuffer test_ssbo = VulkanBuffer::create_storage_buffer(engine, sizeof(SimpleStorage));
+
+    DescriptorSet compute_descriptor_set = compute_pass_manager.descriptor_pool().allocate_set(compute_pass_manager.test_compute_pass.descriptor_set_layout());
+    
+
+    VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
+    VulkanFence compute_fence(engine.device());
+    {
+        auto compute_scope = compute_command_buffer.begin_scope();
+
+        compute_descriptor_set.write_uniform_buffer(0, test_uniform);
+        compute_descriptor_set.write_storage_buffer(1, test_ssbo);
+        
+        compute_pass_manager.test_compute_pass.pipeline().bind(compute_command_buffer);
+        compute_descriptor_set.bind(compute_command_buffer, compute_pass_manager.test_compute_pass.pipeline(), 0);
+
+        compute_command_buffer.dispatch(1, 1, 1);
+    }
+
+    engine.device().compute_queue().submit(
+        nullptr,
+        0,
+        compute_command_buffer,
+        nullptr,
+        &compute_fence
+    );
+    compute_fence.wait();
+
+
+
+
+
+
+
+
+
     BlinnPhongMaterialInstance blinn_phong_material_instance(engine, material_manager.descriptor_pool(), material_manager.blin_phong_mp, dirt_texture);
+    blinn_phong_material_instance.descriptor_set.write_uniform_buffer(2, test_uniform);
+    blinn_phong_material_instance.descriptor_set.write_storage_buffer(3, test_ssbo);
+
     UnlitMaterialInstance unlit_material_instance(engine, material_manager.descriptor_pool(), material_manager.unlit_mp);
 
     blinn_phong_material_instance.set_color(glm::vec4(1, 0, 0, 1));
@@ -208,67 +254,6 @@ int main() {
     RenderObject unlit_cube(cube_mesh, unlit_material_instance);
 
     unlit_cube.transform.position.x = 2;
-    
-    // struct MaterialData {
-    //     glm::vec4 color;
-    //     float roughness;
-    //     float metalic;
-    //     float pad1;
-    //     float pad2;
-    // };
-    // uint32_t num_slots = 1000;
-    // VulkanBuffer material_buffer_gpu = VulkanBuffer::create_storage_buffer(engine, num_slots * sizeof(MaterialData)); // GPU version of the material buffer
-    // std::vector<MaterialData> material_buffer_cpu; // CPU version of the material buffer
-    // std::vector<uint32_t> free_slots; // free slots
-    // std::vector<uint32_t> dirty_slots; // slots that should be updated
-
-
-
-
-    // DescriptorSetLayoutBuilder compute_dsl_builder;
-    // compute_dsl_builder.add_uniform_buffer(0, ShaderStages::compute);
-    // compute_dsl_builder.add_storage_buffer(1, ShaderStages::compute);
-    // DescriptorSetLayout compute_dsl(engine.device(), compute_dsl_builder);
-
-    // DescriptorPoolBuilder pool_builder;
-    // pool_builder.add_layout(compute_dsl_builder);
-    // DescriptorPool pool(engine.device(), pool_builder);
-
-    // DescriptorSet compute_descriptor_set = pool.allocate_set(compute_dsl);
-
-    // PipelineLayoutBuilder compute_pipeline_layout_builder = VulkanPipelineLayout::create_builder();
-    // compute_pipeline_layout_builder.set_device(engine.device());
-    // compute_pipeline_layout_builder.add_push_constants<TransformPushConstants>();
-    // compute_pipeline_layout_builder.add_descriptor_set_layout(compute_dsl);
-    // VulkanPipelineLayout compute_pipeline_layout(compute_pipeline_layout_builder);
-
-    // ComputePipeline compute_pipeline(engine.device(), compute_pipeline_layout, compute_shader);
-
-    // VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
-    // VulkanFence compute_fence(engine.device());
-    // {
-    //     auto compute_scope = compute_command_buffer.begin_scope();
-
-    //     compute_descriptor_set.write_uniform_buffer(0, unifrom_buffer);
-    //     compute_descriptor_set.write_storage_buffer(1, storage_buffer);
-        
-    //     compute_pipeline.bind(compute_command_buffer);
-    //     compute_descriptor_set.bind(compute_command_buffer, compute_pipeline, 0);
-
-    //     compute_command_buffer.dispatch(1, 1, 1);
-    // }
-
-    // engine.device().compute_queue().submit(
-    //     nullptr,
-    //     0,
-    //     compute_command_buffer,
-    //     nullptr,
-    //     &compute_fence
-    // );
-    // compute_fence.wait();
-
-
-
 
     
     float last_frame_time = 0.0f;

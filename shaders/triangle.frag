@@ -18,6 +18,15 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
 
 layout(set = 0, binding = 1) uniform sampler2D texSampler;
 
+layout(set = 0, binding = 2) uniform SimpleUniform {
+    vec4 color;
+} simple_uniform;
+
+layout(set = 0, binding = 3, std430) readonly buffer SimpleStorage {
+    vec4 color1;
+    vec4 color2;
+} simple_storage;
+
 layout(set = 1, binding = 0) uniform CameraUniform {
     mat4 view;
     mat4 proj;
@@ -26,7 +35,7 @@ layout(set = 1, binding = 0) uniform CameraUniform {
 
 void main() {
     // vec3 base_color = ubo.color.rgb;
-    vec3 base_color = texture(texSampler, frag_uv).xyz;
+    vec3 base_color = texture(texSampler, frag_uv).xyz * simple_storage.color1.xyz;
 
     float ambient_strength  = ubo.material.x;
     float diffuse_strength  = ubo.material.y;

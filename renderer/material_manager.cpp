@@ -41,6 +41,8 @@ MaterialPass MaterialManager::create_blin_phong_pass(VulkanEngine& engine, Frame
 
     builder.add_uniform_buffer(0, ShaderStages::fragment);
     builder.add_combined_image_sampler(1, ShaderStages::fragment);
+    builder.add_uniform_buffer(2, ShaderStages::fragment);
+    builder.add_storage_buffer(3, ShaderStages::fragment);
 
     builder.add_push_constants(sizeof(TransformPushConstants), 0);
     builder.add_descriptor_set_layout(frame_resources.descriptor_layout());

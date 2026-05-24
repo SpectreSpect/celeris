@@ -18,6 +18,7 @@ public:
     PipelinePassBuilder() = default;
 
     void add_uniform_buffer(uint32_t binding, VkShaderStageFlags shader_stage_flags);
+    void add_storage_buffer(uint32_t binding, VkShaderStageFlags shader_stage_flags);
     void add_combined_image_sampler(uint32_t binding, VkShaderStageFlags shader_stage_flags);
     void add_push_constants(uint32_t size_bytes, uint32_t offset = 0, VkShaderStageFlags stage_flags = VK_SHADER_STAGE_VERTEX_BIT);
     void add_descriptor_set_layout(const DescriptorSetLayout& layout);

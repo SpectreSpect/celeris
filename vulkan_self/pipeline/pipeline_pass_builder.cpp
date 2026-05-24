@@ -1,4 +1,4 @@
-#include "pipeline_pass_builer.h"
+#include "pipeline_pass_builder.h"
 
 #include "../descriptor_set/descriptor_set_layout.h"
 #include "vulkan_pipeline_layout.h"
@@ -6,6 +6,10 @@
 
 void PipelinePassBuilder::add_uniform_buffer(uint32_t binding, VkShaderStageFlags shader_stage_flags) {
     m_material_dsl_builder.add_uniform_buffer(binding, shader_stage_flags);
+}
+
+void PipelinePassBuilder::add_storage_buffer(uint32_t binding, VkShaderStageFlags shader_stage_flags) {
+    m_material_dsl_builder.add_storage_buffer(binding, shader_stage_flags);
 }
 
 void PipelinePassBuilder::add_combined_image_sampler(uint32_t binding, VkShaderStageFlags shader_stage_flags) {

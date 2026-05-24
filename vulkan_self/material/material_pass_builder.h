@@ -3,9 +3,9 @@
 #include <cstdint>
 #include <string_view>
 #include <vulkan/vulkan.h>
-
 #include "../logger/logger_header.h"
-#include "../pipeline/pipeline_pass_builer.h"
+
+#include "../pipeline/pipeline_pass_builder.h"
 #include "../pipeline/graphics_pipeline/graphics_pipeline_builder.h"
 #include "../vertex_layout_builder.h"
 
