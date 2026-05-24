@@ -6,7 +6,6 @@
 #include "../pipeline/vulkan_pipeline_layout.h"
 #include "../pipeline/graphics_pipeline/graphics_pipeline.h"
 
-
 void MaterialPassBuilder::add_vertex_binding(uint32_t binding, uint32_t stride, VkVertexInputRate input_rate) {
     LOG_METHOD(); // Добавить проверки #TODO
     m_vertex_layout.add_binding(binding, stride, input_rate);

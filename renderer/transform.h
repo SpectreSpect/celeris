@@ -22,5 +22,7 @@ public:
     Transform() = default;
     Transform(glm::vec3 position, glm::vec3 scale, glm::vec3 rotation);
 
+    Transform& operator*(Transform& other);
+
     glm::mat4 get_model_matrix() const;
 };

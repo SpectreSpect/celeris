@@ -65,7 +65,6 @@ add_executable(app
   vulkan_self/material/material_system.cpp
   vulkan_self/material/blin_phong_material_layout.cpp
   vulkan_self/material/material_layout.cpp
-  vulkan_self/material/material_instance.cpp
   vulkan_self/material/material_instance_temp.cpp
   vulkan_self/material/blinn_phong_material_instance.cpp
   vulkan_self/material/unlit_material_instance.cpp
@@ -84,6 +83,16 @@ add_executable(app
   renderer/material_manager.cpp
   renderer/compute_pass_manager.cpp
   renderer/compute_pass_instance.cpp
+  renderer/instanced_render_object.cpp
+  renderer/instance_batch.cpp
+  renderer/texture_manager.cpp
+  renderer/material_instance_manager.cpp
+  renderer/renderer.cpp
+  renderer/mesh_manager.cpp
+  renderer/manager_bundle.cpp
+  renderer/point_cloud/point_cloud.cpp
+  renderer/scene.cpp
+  renderer/scene_object.cpp
 )
 
 

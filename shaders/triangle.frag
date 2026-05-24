@@ -6,26 +6,26 @@ layout(location = 2) in vec2 frag_uv;
 
 layout(location = 0) out vec4 out_color;
 
-layout(set = 0, binding = 0) uniform UniformBufferObject {
-    vec4 color;
-
-    // x = ambient strength
-    // y = diffuse strength
-    // z = specular strength
-    // w = shininess
+struct MaterialData {
     vec4 material;
-} ubo;
+    vec4 color;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer MaterialBuffer {
+    MaterialData materials[];
+} material_buffer;
+
+// layout(set = 0, binding = 1) uniform UniformBufferObject {
+//     vec4 color;
+
+//     // x = ambient strength
+//     // y = diffuse strength
+//     // z = specular strength
+//     // w = shininess
+//     vec4 material;
+// } ubo;
 
 layout(set = 0, binding = 1) uniform sampler2D texSampler;
-
-layout(set = 0, binding = 2) uniform SimpleUniform {
-    vec4 color;
-} simple_uniform;
-
-layout(set = 0, binding = 3, std430) readonly buffer SimpleStorage {
-    vec4 color1;
-    vec4 color2;
-} simple_storage;
 
 layout(set = 1, binding = 0) uniform CameraUniform {
     mat4 view;
@@ -33,14 +33,23 @@ layout(set = 1, binding = 0) uniform CameraUniform {
     vec4 viewPos;
 } camera_uniform;
 
+layout(push_constant) uniform PushConstants {
+    mat4 model;
+    uint material_data_id;
+} pc;
+
 void main() {
     // vec3 base_color = ubo.color.rgb;
-    vec3 base_color = texture(texSampler, frag_uv).xyz * simple_storage.color1.xyz;
+    MaterialData material_data = material_buffer.materials[pc.material_data_id];
 
-    float ambient_strength  = ubo.material.x;
-    float diffuse_strength  = ubo.material.y;
-    float specular_strength = ubo.material.z;
-    float shininess         = max(ubo.material.w, 1.0);
+    vec3 base_color = texture(texSampler, frag_uv).xyz * material_data.color.xyz;
+
+    vec4 material = material_data.material;
+
+    float ambient_strength  = material.x;
+    float diffuse_strength  = material.y;
+    float specular_strength = material.z;
+    float shininess         = max(material.w, 1.0);
 
     vec3 N = normalize(frag_normal);
     vec3 V = normalize(camera_uniform.viewPos.xyz - frag_world_pos);
@@ -64,6 +73,6 @@ void main() {
 
     vec3 final_color = ambient + diffuse_c + specular_c;
 
-    out_color = vec4(final_color, ubo.color.a);
+    out_color = vec4(final_color, 1);
     // out_color = ;
 }

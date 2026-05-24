@@ -15,4 +15,6 @@ public:
     VulkanShaderModule unlit_fs;
 
     VulkanShaderModule test_cs;
+    VulkanShaderModule point_vs;
+    VulkanShaderModule point_fs;
 };
