@@ -1,0 +1,1 @@
+#include "material_instance_manager.h"

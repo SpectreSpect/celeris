@@ -33,6 +33,7 @@
 #include "vulkan_self/material/material_buffer.h"
 #include "renderer/instanced_render_object.h"
 #include "renderer/instance_batch.h"
+#include "renderer/texture_manager.h"
 
 #include <vector>
 
@@ -201,6 +202,27 @@ unsigned int quad_indices[] = { // index_buffer
 
 SimpleStorage simple_storage{glm::vec4(1, 0, 0, 1), glm::vec4(0, 0, 1, 1)};
 
+struct MaterialData {
+    glm::vec4 color;
+};
+
+struct BlinPhongMaterialData {
+    glm::vec4 material;
+    glm::vec4 color;
+};
+
+struct alignas(16) PointInstance {
+    glm::vec4 pos;
+    glm::vec4 color;
+};
+
+struct PointUniform {
+    float point_size_px;
+    float point_size_world;
+    int screen_space_size;
+    float pad;
+};
+
 int main() {
     GlfwContext glfw_context;
     Window window(glfw_context, 1280, 720, "Vulkan engine");
@@ -216,62 +238,18 @@ int main() {
     FPSCameraController camera_controller(camera);
 
     FrameResources frame_resources(engine.physical_device(), engine.device(), engine.num_frames_in_flight());
+    
+    VulkanResourceLoader resource_loader(engine, 1024 * 1024 * 100); // 1 Мб
 
     ShaderManager shader_manager(engine.device());
     MaterialManager material_manager(engine, shader_manager, frame_resources);
+    TextureManager texture_manager(engine, resource_loader);
 
     Renderer renderer(engine, frame_resources);
 
-    CpuImage dirt_cpu_image = CpuImage::load_rgba8_image(
-        path_utils::executable_dir() / "assets" / "textures" / "minecraft_dirt" / "texture.png"
-    );
-
-    CpuImage rock_cpu_image = CpuImage::load_rgba8_image(
-        path_utils::executable_dir() / "assets" / "textures" / "rock" / "albedo.jpg"
-    );
-
-    VulkanTexture2D dirt_texture(
-        engine.physical_device(),
-        engine.device(),
-        dirt_cpu_image.extent2d()
-    );
-
-    VulkanTexture2D rock_texture(
-        engine.physical_device(),
-        engine.device(),
-        rock_cpu_image.extent2d()
-    );
-
-    VulkanResourceLoader resource_loader(engine, 1024 * 1024 * 100); // 1 Мб
-    resource_loader.upload_sampled_texture_2d(rock_cpu_image, rock_texture);
-    resource_loader.upload_sampled_texture_2d(dirt_cpu_image, dirt_texture);
-    
-    resource_loader.submit();
-
-    struct MaterialData {
-        glm::vec4 color;
-    };
-
-    struct BlinPhongMaterialData {
-        glm::vec4 material;
-        glm::vec4 color;
-    };
-
-    struct alignas(16) PointInstance {
-        glm::vec4 pos;
-        glm::vec4 color;
-    };
-
-    struct PointUniform {
-        float point_size_px;
-        float point_size_world;
-        int screen_space_size;
-        float pad;
-    };
-
     MaterialInstance unlit_material_instance(engine, material_manager.descriptor_pool(), material_manager.unlit_mp, sizeof(MaterialData));
-    MaterialInstance rock_material = material_manager.create_blinn_phong_material(engine, rock_texture);
-    MaterialInstance dirt_material = material_manager.create_blinn_phong_material(engine, dirt_texture);
+    MaterialInstance rock_material = material_manager.create_blinn_phong_material(engine, texture_manager.rock_texture);
+    MaterialInstance dirt_material = material_manager.create_blinn_phong_material(engine, texture_manager.dirt_texture);
 
     VulkanBuffer point_uniform_buffer = VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(PointUniform));
     PointUniform point_uniform{2, 0.005, 1, 0};
@@ -288,7 +266,6 @@ int main() {
     RenderObject unlit_cube3(cube_mesh, rock_material);
     RenderObject unlit_cube4(cube_mesh, rock_material);
 
-    
     Mesh point_quad_mesh(engine, resource_loader, (void*)quad_corners, sizeof(quad_corners), quad_indices, sizeof(quad_indices));
 
     std::vector<PointInstance> points;
@@ -346,10 +323,10 @@ int main() {
                 engine.swapchain_resources().framebuffers[image_index],
                 engine.swapchain_resources().swapchain, {{0.05f, 0.08f, 0.12f, 1.0f}});
 
-                // renderer.render(command_buffer, unlit_cube);
-                // renderer.render(command_buffer, unlit_cube2);
-                // renderer.render(command_buffer, unlit_cube3);
-                // renderer.render(command_buffer, unlit_cube4);
+                renderer.render(command_buffer, unlit_cube);
+                renderer.render(command_buffer, unlit_cube2);
+                renderer.render(command_buffer, unlit_cube3);
+                renderer.render(command_buffer, unlit_cube4);
 
                 renderer.render(command_buffer, point_cloud);
             }

@@ -78,6 +78,7 @@ add_executable(app
   renderer/material_manager.cpp
   renderer/instanced_render_object.cpp
   renderer/instance_batch.cpp
+  renderer/texture_manager.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
