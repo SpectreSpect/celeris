@@ -35,3 +35,9 @@ RenderObject& RenderObject::operator=(RenderObject&& other) noexcept {
 
     return *this;
 }
+
+RenderObject& RenderObject::add_child(RenderObject& child) {
+    child.parent = &child;
+    children.push_back(&child);
+    return child;
+}

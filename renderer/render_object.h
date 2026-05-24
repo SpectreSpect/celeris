@@ -58,9 +58,14 @@ public:
         material_data_id = new_material.material_buffer.create_slot<SlotType>(data);
     }
 
+    RenderObject& add_child(RenderObject& child);
+
     Transform transform;
 
     Mesh& m_mesh;
     MaterialInstance* m_material = nullptr;
     uint32_t material_data_id = UINT32_MAX;
+
+    RenderObject* parent = nullptr;
+    std::vector<RenderObject*> children;
 };
