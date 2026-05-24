@@ -82,6 +82,8 @@ add_executable(app
   renderer/material_instance_manager.cpp
   renderer/renderer.cpp
   renderer/mesh_manager.cpp
+  renderer/manager_bundle.cpp
+  renderer/point_cloud/point_cloud.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

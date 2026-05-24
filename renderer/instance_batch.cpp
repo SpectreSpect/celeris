@@ -20,3 +20,8 @@ VulkanBuffer& InstanceBatch::buffer() {
 uint32_t InstanceBatch::instance_count() const {
     return m_instance_count;
 }
+
+void InstanceBatch::set_instance_count(uint32_t instance_count) {
+    logger.check(instance_count <= m_instance_count, "Tried to increase instance_count. TODO note: this shouldn't be like this. Ideally, you shoulnd't be able to change the instance count like that without changing the size of the video buffer. This should be changed.");
+    m_instance_count = instance_count;
+}

@@ -35,9 +35,11 @@
 #include "renderer/instance_batch.h"
 #include "renderer/texture_manager.h"
 #include "renderer/material_instance_manager.h"
-#include "renderer/point_instance.h"
+#include "renderer/point_cloud/point_instance.h"
 #include "renderer/renderer.h"
 #include "renderer/mesh_manager.h"
+#include "renderer/manager_bundle.h"
+#include "renderer/point_cloud/point_cloud.h"
 
 #include <vector>
 
@@ -64,6 +66,7 @@ int main() {
     MaterialManager material_manager(engine, shader_manager, frame_resources);
     MaterialInstanceManager material_instance_manager(engine, material_manager, texture_manager);
     MeshManager mesh_manager(engine, resource_loader);
+    ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
 
     Renderer renderer(engine, frame_resources);
 
@@ -84,11 +87,8 @@ int main() {
 
             points.push_back(point);
         }
-
-    InstancedRenderObject point_cloud(engine, mesh_manager.point_cloud_quad, 
-                                      material_instance_manager.point_cloud, points.size(), sizeof(PointInstance));
-
-    point_cloud.instance_data.buffer().upload(points.data(), points.size() * sizeof(PointInstance));
+    
+    PointCloud point_cloud(manager_bundle, points);
 
     unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
@@ -122,6 +122,8 @@ int main() {
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), camera);
 
+        point_cloud.transform.position.x = sin(timer) * 5 ;
+
         // Запись команд
         {auto command_buffer_scope = command_buffer.begin_scope();
             {auto render_pass_scope = engine.swapchain_resources().render_pass.begin_scope(
@@ -129,11 +131,12 @@ int main() {
                 engine.swapchain_resources().framebuffers[image_index],
                 engine.swapchain_resources().swapchain, {{0.05f, 0.08f, 0.12f, 1.0f}});
 
+                
+
                 renderer.render(command_buffer, unlit_cube);
                 renderer.render(command_buffer, unlit_cube2);
                 renderer.render(command_buffer, unlit_cube3);
                 renderer.render(command_buffer, unlit_cube4);
-
                 renderer.render(command_buffer, point_cloud);
             }
         }
