@@ -20,6 +20,7 @@ public:
         glm::mat4 view;
         glm::mat4 proj;
         glm::vec4 view_pos;
+        glm::vec2 viewport;
     };
 
     FrameResources(VulkanPhysicalDevice& physical_device, VulkanDevice& device, uint32_t num_frames_in_flight);

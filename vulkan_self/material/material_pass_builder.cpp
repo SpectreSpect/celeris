@@ -4,6 +4,10 @@ void MaterialPassBuilder::add_uniform_buffer(uint32_t binding, VkShaderStageFlag
     m_material_dsl_builder.add_uniform_buffer(binding, shader_stage_flags);
 }
 
+void MaterialPassBuilder::add_storage_buffer(uint32_t binding, VkShaderStageFlags shader_stage_flags) {
+    m_material_dsl_builder.add_storage_buffer(binding, shader_stage_flags);
+}
+
 void MaterialPassBuilder::add_combined_image_sampler(uint32_t binding, VkShaderStageFlags shader_stage_flags) {
     m_material_dsl_builder.add_combined_image_sampler(binding, shader_stage_flags);
 }

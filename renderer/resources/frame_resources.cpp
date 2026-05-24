@@ -34,6 +34,7 @@ void FrameResources::update_camera(uint32_t frame_id, const Camera& camera) {
     ubo.proj = camera.get_projection_matrix(aspect);
     ubo.view = camera.get_view_matrix();
     ubo.view_pos = glm::vec4(camera.position, 1.0f);
+    ubo.viewport = {1280.0f, 720.0f};
     
     camera_uniforms[frame_id].upload(&ubo, sizeof(CameraUniform));
 }
