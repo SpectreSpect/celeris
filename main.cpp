@@ -218,22 +218,8 @@ int main() {
         compute_command_buffer.dispatch(1, 1, 1);
     }
 
-    engine.device().compute_queue().submit(
-        nullptr,
-        0,
-        compute_command_buffer,
-        nullptr,
-        &compute_fence
-    );
+    engine.compute_submit(compute_command_buffer, &compute_fence);
     compute_fence.wait();
-
-
-
-
-
-
-
-
 
     BlinnPhongMaterialInstance blinn_phong_material_instance(engine, material_manager.descriptor_pool(), material_manager.blin_phong_mp, dirt_texture);
     blinn_phong_material_instance.descriptor_set.write_uniform_buffer(2, test_uniform);

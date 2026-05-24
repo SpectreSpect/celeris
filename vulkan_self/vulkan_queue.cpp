@@ -134,6 +134,19 @@ void VulkanQueue::submit(
     );
 }
 
+void VulkanQueue::submit(
+    VulkanCommandBuffer& command_buffer,
+    VulkanFence* fence)
+{
+    submit(
+        nullptr,
+        0,
+        command_buffer,
+        nullptr,
+        fence
+    );
+}
+
 VkResult VulkanQueue::present(
     std::span<const VulkanSemaphore> wait_semaphores,
     std::span<const VulkanSwapchain> swapchains,
