@@ -5,6 +5,8 @@
 #include "resources/frame_resources.h"
 #include "../vulkan_self/formats.h"
 #include "transform_push_constants.h"
+#include "../vulkan_self/material/material_instance.h"
+#include "../vulkan_self/image/vulkan_texture_2d.h"
 
 
 MaterialManager::MaterialManager(VulkanEngine& engine, ShaderManager& shader_manager, FrameResources& frame_resources)
@@ -38,7 +40,8 @@ MaterialPass MaterialManager::create_blin_phong_pass(VulkanEngine& engine, Frame
 
     MaterialPassBuilder builder;
 
-    builder.add_uniform_buffer(0, ShaderStages::fragment);
+    builder.add_storage_buffer(0, ShaderStages::fragment);
+    // builder.add_uniform_buffer(1, ShaderStages::fragment);
     builder.add_combined_image_sampler(1, ShaderStages::fragment);
 
     builder.add_push_constants(sizeof(TransformPushConstants), 0);
@@ -78,4 +81,12 @@ MaterialPass MaterialManager::create_unlit_pass(VulkanEngine& engine, FrameResou
     builder.add_vertex_attribute(2, 0, Formats::vec2, offsetof(UnlitVertex, uv));
 
     return create_pass(engine, builder, vs, fs);
+}
+
+MaterialInstance MaterialManager::create_blinn_phong_material(VulkanEngine& engine, VulkanTexture2D& albedo){
+    MaterialInstance material(engine, m_pool, blin_phong_mp, sizeof(BlinPhongMaterialData));
+    
+    material.descriptor_set.write_texture(1, albedo);
+
+    return material;
 }

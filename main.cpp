@@ -188,76 +188,61 @@ int main() {
         path_utils::executable_dir() / "assets" / "textures" / "minecraft_dirt" / "texture.png"
     );
 
+    CpuImage rock_cpu_image = CpuImage::load_rgba8_image(
+        path_utils::executable_dir() / "assets" / "textures" / "rock" / "albedo.jpg"
+    );
+
     VulkanTexture2D dirt_texture(
         engine.physical_device(),
         engine.device(),
         dirt_cpu_image.extent2d()
     );
 
-    VulkanResourceLoader resource_loader(engine, 1024 * 1024); // 1 Мб
+    VulkanTexture2D rock_texture(
+        engine.physical_device(),
+        engine.device(),
+        rock_cpu_image.extent2d()
+    );
+
+    VulkanResourceLoader resource_loader(engine, 1024 * 1024 * 100); // 1 Мб
+    resource_loader.upload_sampled_texture_2d(rock_cpu_image, rock_texture);
     resource_loader.upload_sampled_texture_2d(dirt_cpu_image, dirt_texture);
+    
     resource_loader.submit();
 
     struct MaterialData {
         glm::vec4 color;
     };
 
+    struct BlinPhongMaterialData {
+        glm::vec4 material;
+        glm::vec4 color;
+    };
 
-    MaterialInstance blinn_phong_material_instance2(engine, material_manager.descriptor_pool(), material_manager.unlit_mp, sizeof(MaterialData));
-
-
-    blinn_phong_material_instance2.material_buffer.create_slot<MaterialData>({glm::vec4(1, 0, 0, 1)});
-    blinn_phong_material_instance2.material_buffer.create_slot<MaterialData>({glm::vec4(0, 1, 0, 1)});
-    blinn_phong_material_instance2.material_buffer.create_slot<MaterialData>({glm::vec4(0, 0, 1, 1)});
-    blinn_phong_material_instance2.material_buffer.sync();
-
-    BlinnPhongMaterialInstance blinn_phong_material_instance(engine, material_manager.descriptor_pool(), material_manager.blin_phong_mp, dirt_texture);
-    // UnlitMaterialInstance unlit_material_instance(engine, material_manager.descriptor_pool(), material_manager.unlit_mp);
-
-    blinn_phong_material_instance.set_color(glm::vec4(1, 0, 0, 1));
-    // unlit_material_instance.set_color(glm::vec4(0, 0, 1, 1));
+    MaterialInstance unlit_material_instance(engine, material_manager.descriptor_pool(), material_manager.unlit_mp, sizeof(MaterialData));
+    MaterialInstance rock_material = material_manager.create_blinn_phong_material(engine, rock_texture);
+    MaterialInstance dirt_material = material_manager.create_blinn_phong_material(engine, dirt_texture);
 
     Mesh cube_mesh(engine, resource_loader, cube_vertices.data(), Utils::size_bytes(cube_vertices), 
                                        cube_indices.data(), Utils::size_bytes(cube_indices));
 
-    // RenderObject blinn_phong_cube(cube_mesh, blinn_phong_material_instance);
-    // RenderObject unlit_cube(cube_mesh, unlit_material_instance);
-    RenderObject unlit_cube(cube_mesh, blinn_phong_material_instance2);
-    RenderObject unlit_cube2(cube_mesh, blinn_phong_material_instance2);
-    RenderObject unlit_cube3(cube_mesh, blinn_phong_material_instance2);
-    RenderObject unlit_cube4(cube_mesh, blinn_phong_material_instance2);
+    RenderObject unlit_cube(cube_mesh, dirt_material);
+    RenderObject unlit_cube2(cube_mesh, dirt_material);
+    RenderObject unlit_cube3(cube_mesh, rock_material);
+    RenderObject unlit_cube4(cube_mesh, rock_material);
 
-    unlit_cube.m_material->material_buffer.update_slot<MaterialData>(unlit_cube.material_data_id, {glm::vec4(1, 0, 0, 1)});
-    unlit_cube2.m_material->material_buffer.update_slot<MaterialData>(unlit_cube2.material_data_id, {glm::vec4(0, 1, 0, 1)});
-    unlit_cube3.m_material->material_buffer.update_slot<MaterialData>(unlit_cube3.material_data_id, {glm::vec4(0, 0, 1, 1)});
-    unlit_cube4.m_material->material_buffer.update_slot<MaterialData>(unlit_cube4.material_data_id, {glm::vec4(1, 1, 1, 1)});
+    unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
+    unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
+    unlit_cube3.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
+    unlit_cube4.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
 
-    unlit_cube.m_material->material_buffer.sync();
+    rock_material.material_buffer.sync();
+    dirt_material.material_buffer.sync();
 
     unlit_cube.transform.position.x = 0;
     unlit_cube2.transform.position.x = 2;
     unlit_cube3.transform.position.x = 4;
     unlit_cube4.transform.position.x = 6;
-
-    MaterialBuffer material_buffer = MaterialBuffer::create<MaterialData>(engine, 1000);
-
-    uint32_t material_data_id = material_buffer.allocate_slot();
-
-    const MaterialData& material_data = material_buffer.read<MaterialData>(material_data_id);
-
-    auto& color = material_data.color;
-
-    std::cout << "old color: (" << color.x << ", " << color.y << ", " << color.z << ", " << color.a << ")" << std::endl;
-
-    material_buffer.edit_slot<MaterialData>(material_data_id, [&](MaterialData& data) {
-        data.color = glm::vec4(1, 0, 0, 1);
-    });
-
-    std::cout << "new data: (" << color.x << ", " << color.y << ", " << color.z << ", " << color.a << ")" << std::endl;
-
-    material_buffer.sync();
-
-    
     
     float last_frame_time = 0.0f;
     float start_time = (float)glfwGetTime();
@@ -273,8 +258,6 @@ int main() {
         uint32_t image_index = 0;
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
-        
-        // cube.transform.position.x += 1.0f * delta_time;
 
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), camera);
@@ -286,14 +269,10 @@ int main() {
                 engine.swapchain_resources().framebuffers[image_index],
                 engine.swapchain_resources().swapchain, {{0.05f, 0.08f, 0.12f, 1.0f}});
 
-                // unlit_cube.transform.position.x = 3 + sin(timer);
-                // blinn_phong_cube.transform.position.y = cos(timer);
-                
                 renderer.render(command_buffer, unlit_cube);
                 renderer.render(command_buffer, unlit_cube2);
                 renderer.render(command_buffer, unlit_cube3);
                 renderer.render(command_buffer, unlit_cube4);
-                // renderer.render(command_buffer, blinn_phong_cube);
             }
         }
 
