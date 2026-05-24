@@ -47,12 +47,15 @@ void Renderer::render(VulkanCommandBuffer& command_buffer, InstancedRenderObject
         pass.pipeline().set_scissor(command_buffer, *m_engine);
 
         render_object.m_mesh.bind_vertex_buffer(command_buffer, 0);
-        render_object.instance_data.buffer().bind_as_vertex_buffer(command_buffer, 1);
+        if (render_object.instance_data.external_buffer)
+            render_object.instance_data.external_buffer->bind_as_vertex_buffer(command_buffer, 1);
+        else
+            render_object.instance_data.buffer().bind_as_vertex_buffer(command_buffer, 1);
 
         render_object.m_mesh.bind_index_buffer(command_buffer);
 
         pass.pipeline_layout().push_constants(command_buffer, pc);
-        
+
         command_buffer.draw_indexed(render_object.m_mesh.index_count(), render_object.instance_data.instance_count());
 };
 

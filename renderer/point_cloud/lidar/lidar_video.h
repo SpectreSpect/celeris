@@ -47,6 +47,8 @@ public:
     void previous_frame();
     void set_frame(uint32_t id);
 
+    LidarScan& get_scan(uint32_t scan_id);
+
     size_t get_frame_id(float time, size_t search_start_id = 0) const;
 
     void move(float time);

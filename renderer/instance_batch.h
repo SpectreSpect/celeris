@@ -17,11 +17,15 @@ public:
     
     InstanceBatch(VulkanEngine& engine, uint32_t instance_count, uint32_t instance_size_bytes);
 
+    InstanceBatch(VulkanEngine& engine, VulkanBuffer& m_buffer, uint32_t instance_count, uint32_t instance_size_bytes);
+
     
 
     VulkanBuffer& buffer();
     uint32_t instance_count() const;
     void set_instance_count(uint32_t instance_count);
+
+    VulkanBuffer* external_buffer = nullptr;
 
 private:
     VulkanBuffer m_buffer;

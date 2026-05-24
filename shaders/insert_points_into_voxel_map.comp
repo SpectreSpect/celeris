@@ -1,0 +1,199 @@
+#version 460
+layout(local_size_x = 256) in;
+
+struct PointInstance {
+    vec4 position;
+    vec4 color;
+};
+
+layout(std140, set = 0, binding = 0) uniform ParamsBuffer {
+    uint source_point_count;
+    uint max_map_point_count;
+    uint num_hash_table_slots;
+    mat4 source_model;
+    vec4 color;
+} params;
+
+layout(std430, set = 0, binding = 1) readonly buffer SourcePointBuffer {
+    PointInstance points[];
+} source_point_buffer;
+
+layout(std430, set = 0, binding = 2) readonly buffer SourceNormalBuffer {
+    vec4 normals[];
+} source_normal_buffer;
+
+layout(std430, set = 0, binding = 3) buffer MapPointCountBuffer {
+    uint count;
+} map_point_count_buffer;
+
+layout(std430, set = 0, binding = 4) buffer MapPointBuffer {
+    PointInstance points[];
+} map_point_buffer;
+
+layout(std430, set = 0, binding = 5) buffer MapNormalBuffer {
+    vec4 normals[];
+} map_normal_buffer;
+
+#ifndef VOXEL_MAX_PROBES
+#define VOXEL_MAX_PROBES 128u
+#endif
+
+#define VOXEL_INVALID_ID     0xFFFFFFFFu
+#define VOXEL_SLOT_EMPTY     0xFFFFFFFFu
+#define VOXEL_SLOT_LOCKED    0xFFFFFFFEu
+#define VOXEL_SLOT_OCCUPIED  0xFFFFFFFCu
+
+ivec3 voxel_key_from_world_pos(vec3 world_pos, float voxel_size)
+{
+    return ivec3(floor(world_pos / voxel_size));
+}
+
+uint hash_voxel_key(ivec3 key)
+{
+    uvec3 k = uvec3(key);
+
+    uint h = 2166136261u;
+    h = (h ^ k.x) * 16777619u;
+    h = (h ^ k.y) * 16777619u;
+    h = (h ^ k.z) * 16777619u;
+
+    h ^= h >> 16;
+    h *= 0x7feb352du;
+    h ^= h >> 15;
+    h *= 0x846ca68bu;
+    h ^= h >> 16;
+
+    return h;
+}
+
+bool voxel_key_equal(ivec4 stored_key, ivec3 query_key)
+{
+    return all(equal(stored_key.xyz, query_key));
+}
+
+struct VoxelHashSlot {
+    uint  state;
+    ivec4 key;
+    uint  value;
+};
+
+layout(std430, set = 0, binding = 6) coherent buffer VoxelHashTableBuffer {
+    VoxelHashSlot slots[];
+} voxel_table;
+
+bool voxel_insert_point_and_normal(
+    ivec3 key,
+    vec4 world_position,
+    vec4 world_normal,
+    vec4 color
+) {
+    uint slot_count = params.num_hash_table_slots;
+    if (slot_count == 0u)
+        return false;
+
+    uint max_probes = min(slot_count, VOXEL_MAX_PROBES);
+    uint idx = hash_voxel_key(key) % slot_count;
+
+    for (uint probe = 0u; probe < max_probes; ++probe) {
+        uint state = atomicAdd(voxel_table.slots[idx].state, 0u);
+
+        if (state == VOXEL_SLOT_OCCUPIED) {
+            memoryBarrierBuffer();
+
+            if (voxel_key_equal(voxel_table.slots[idx].key, key)) {
+                return true;
+            }
+
+            idx = (idx + 1u) % slot_count;
+            continue;
+        }
+
+        if (state == VOXEL_SLOT_EMPTY) {
+            uint prev = atomicCompSwap(
+                voxel_table.slots[idx].state,
+                VOXEL_SLOT_EMPTY,
+                VOXEL_SLOT_LOCKED
+            );
+
+            if (prev == VOXEL_SLOT_EMPTY) {
+                uint map_point_id = atomicAdd(map_point_count_buffer.count, 1u);
+
+                if (map_point_id >= params.max_map_point_count) {
+                    atomicAdd(map_point_count_buffer.count, 0xFFFFFFFFu);
+                    atomicExchange(voxel_table.slots[idx].state, VOXEL_SLOT_EMPTY);
+                    return false;
+                }
+
+                voxel_table.slots[idx].key = ivec4(key, 0);
+                voxel_table.slots[idx].value = map_point_id;
+
+                map_point_buffer.points[map_point_id].position = world_position;
+                map_point_buffer.points[map_point_id].color = color;
+                map_normal_buffer.normals[map_point_id] = world_normal;
+
+                memoryBarrierBuffer();
+                atomicExchange(voxel_table.slots[idx].state, VOXEL_SLOT_OCCUPIED);
+                return true;
+            }
+
+            continue;
+        }
+
+        if (state == VOXEL_SLOT_LOCKED) {
+            uint spin_count = 0u;
+            while (spin_count < 1024u) {
+                uint s = atomicAdd(voxel_table.slots[idx].state, 0u);
+                if (s != VOXEL_SLOT_LOCKED)
+                    break;
+                spin_count++;
+            }
+
+            idx = (idx + 1u) % slot_count;
+            continue;
+        }
+
+        idx = (idx + 1u) % slot_count;
+    }
+
+    return false;
+}
+
+void main()
+{
+    uint source_point_id = gl_GlobalInvocationID.x;
+
+    if (source_point_id >= params.source_point_count)
+        return;
+
+    PointInstance src_point = source_point_buffer.points[source_point_id];
+    vec4 src_normal4 = vec4(0, 1, 0, 0);
+    // vec4 src_normal4 = source_normal_buffer.normals[source_point_id];
+
+    // Skip missed rays / invalid generated points
+    // if (src_point.color.a <= 0.001)
+    //     return;
+
+    vec3 n_local = src_normal4.xyz;
+    float n_len = length(n_local);
+
+    // Skip invalid zero normals
+    // if (n_len <= 0.00001)
+    //     return;
+
+    float voxel_size = 0.5;
+
+    vec3 p_local = src_point.position.xyz;
+    vec3 p_world = (params.source_model * vec4(p_local, 1.0)).xyz;
+
+    mat3 normal_matrix = transpose(inverse(mat3(params.source_model)));
+    vec3 n_world = normalize(normal_matrix * (n_local / n_len));
+
+    ivec3 key = voxel_key_from_world_pos(p_world, voxel_size);
+
+    voxel_insert_point_and_normal(
+        key,
+        vec4(p_world, 1.0),
+        vec4(n_world, 0.0),
+        src_point.color
+    );
+}

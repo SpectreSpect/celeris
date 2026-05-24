@@ -3,8 +3,8 @@
 #include "../../manager_bundle.h"
 
 LidarScan::LidarScan(ManagerBundle& manager_bundle, const std::filesystem::path& path) 
-    :   point_cloud(load_from_file(manager_bundle, path)) {
-    add_child(point_cloud);
+    :   m_point_cloud(load_from_file(manager_bundle, path)) {
+    add_child(m_point_cloud);
 }
 
 void LidarScan::set_timestamp_ns(uint32_t timestamp_ns) {
@@ -168,7 +168,11 @@ glm::mat3 LidarScan::rpy_to_mat3_zyx(float roll, float pitch, float yaw)
         return Rz * Ry * Rx;
     }
 
-    glm::vec3 LidarScan::ros_pos_to_engine(const glm::vec3& p_ros)
-    {
-        return glm::vec3(-p_ros.x, p_ros.z, p_ros.y); // (-x, z, y)
-    }
+glm::vec3 LidarScan::ros_pos_to_engine(const glm::vec3& p_ros)
+{
+    return glm::vec3(-p_ros.x, p_ros.z, p_ros.y); // (-x, z, y)
+}
+    
+PointCloud& LidarScan::point_cloud() {
+    return m_point_cloud;
+}

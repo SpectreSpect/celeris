@@ -276,6 +276,14 @@ void LidarVideo::set_frame(uint32_t id) {
     sync();
 }
 
+LidarScan& LidarVideo::get_scan(uint32_t scan_id) {
+    LOG_METHOD();
+
+    logger.check(scan_id >= 0 && scan_id < m_scans.size(), "Lidar video frame index was out of bounds");
+
+    return m_scans[scan_id];
+}
+
 void LidarVideo::sync() {
     LOG_METHOD();
 

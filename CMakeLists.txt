@@ -95,6 +95,9 @@ add_executable(app
   renderer/scene_object.cpp
   renderer/point_cloud/lidar/lidar_scan.cpp
   renderer/point_cloud/lidar/lidar_video.cpp
+  renderer/point_cloud/gicp/gicp_pass.cpp
+  renderer/point_cloud/gicp/voxel_point_map.cpp
+  renderer/point_cloud/gicp/voxel_map_poin_inserter.cpp
 )
 
 

@@ -48,6 +48,9 @@
 #include "renderer/scene.h"
 #include "renderer/point_cloud/lidar/lidar_scan.h"
 #include "renderer/point_cloud/lidar/lidar_video.h"
+#include "renderer/point_cloud/gicp/gicp_pass.h"
+#include "renderer/point_cloud/gicp/voxel_point_map.h"
+#include "renderer/point_cloud/gicp/voxel_map_poin_inserter.h"
 
 #include <vector>
 
@@ -105,10 +108,14 @@ int main() {
     TextureManager texture_manager(engine, resource_loader);
     MaterialManager material_manager(engine, shader_manager, frame_resources);
     ComputePassManager compute_pass_manager(engine.device(), shader_manager);
-
     MaterialInstanceManager material_instance_manager(engine, material_manager, texture_manager);
     MeshManager mesh_manager(engine, resource_loader);
     ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
+
+    GICPPass gicp_pass(engine, compute_pass_manager);
+    VoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);
+
+    
 
     // Compute pass
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -153,8 +160,21 @@ int main() {
         }
     
     PointCloud point_cloud(manager_bundle, points);
+    PointCloud voxel_map_point_cloud(manager_bundle, 57000);
     // LidarScan lidar_scan(manager_bundle, path_utils::executable_dir() / "assets" / "lidar_scans" / "frame_000000.bin");
     LidarVideo lidar_video(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 50);
+
+    PointCloud& source_point_cloud = lidar_video.get_scan(0).point_cloud();
+
+    VulkanBuffer normal_buffer(VulkanBuffer::create_storage_buffer(engine, sizeof(GICPPass::GICPPartial) * source_point_cloud.instance_data.instance_count()));
+
+    VoxelPointMap voxel_point_map(engine, 1500000, 1500000);
+
+    voxel_map_inserter.insert(voxel_point_map, source_point_cloud, normal_buffer);
+
+    voxel_map_point_cloud.instance_data.external_buffer = &voxel_point_map.map_point_buffer;
+    // voxel_map_point_cloud.instance_data.external_buffer = &source_point_cloud.instance_data.buffer();
+
 
     unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
@@ -178,8 +198,10 @@ int main() {
     Scene scene;
 
     // scene.add(unlit_cube);
-    scene.add(lidar_video);
-    lidar_video.set_looped(true);
+    // scene.add(lidar_video);
+    scene.add(voxel_map_point_cloud);
+    
+    // lidar_video.set_looped(true);
     // scene.add(lidar_scan);
     
     float last_frame_time = 0.0f;
@@ -217,7 +239,7 @@ int main() {
         delta = glm::angleAxis(angle, glm::normalize(axis));
         unlit_cube2.transform.rotation = delta * glm::quat(1.0f, 0.0f, 0.0f, 0.0f);;
 
-        lidar_video.move(timer);
+        // lidar_video.move(timer);
 
         // Запись команд
         {auto command_buffer_scope = command_buffer.begin_scope();
