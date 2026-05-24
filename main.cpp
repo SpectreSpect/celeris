@@ -33,6 +33,7 @@
 #include "renderer/material_manager.h"
 #include "vulkan_self/compute/compute_pass_builder.h"
 #include "renderer/compute_pass_manager.h"
+#include "renderer/compute_pass_instance.h"
 
 #include <vector>
 
@@ -204,20 +205,16 @@ int main() {
     VulkanBuffer test_uniform = VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(SimpleUniform));
     VulkanBuffer test_ssbo = VulkanBuffer::create_storage_buffer(engine, sizeof(SimpleStorage));
 
-    DescriptorSet compute_descriptor_set = compute_pass_manager.descriptor_pool().allocate_set(compute_pass_manager.test_compute_pass.descriptor_set_layout());
-    
+    ComputePassInstance test_instance(compute_pass_manager.descriptor_pool(), compute_pass_manager.test_compute_pass);
+    test_instance.set_uniform_buffer(0, test_uniform);
+    test_instance.set_storage_buffer(1, test_ssbo);
 
     VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
     VulkanFence compute_fence(engine.device());
     {
         auto compute_scope = compute_command_buffer.begin_scope();
-
-        compute_descriptor_set.write_uniform_buffer(0, test_uniform);
-        compute_descriptor_set.write_storage_buffer(1, test_ssbo);
         
-        compute_pass_manager.test_compute_pass.pipeline().bind(compute_command_buffer);
-        compute_descriptor_set.bind(compute_command_buffer, compute_pass_manager.test_compute_pass.pipeline(), 0);
-
+        test_instance.bind(compute_command_buffer);
         compute_command_buffer.dispatch(1, 1, 1);
     }
 

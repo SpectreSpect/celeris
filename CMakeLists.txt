@@ -83,6 +83,7 @@ add_executable(app
   renderer/shader_manager.cpp
   renderer/material_manager.cpp
   renderer/compute_pass_manager.cpp
+  renderer/compute_pass_instance.cpp
 )
 
 
