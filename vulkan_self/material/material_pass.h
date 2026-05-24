@@ -1,26 +1,28 @@
 #pragma once
 
-#include "../logger/logger_header.h"
-#include "../descriptor_set/descriptor_set_layout.h"
-#include "../pipeline/vulkan_pipeline_layout.h"
-#include "../pipeline/graphics_pipeline.h"
-#include "material_pass_builder.h"
-#include "../vulkan_engine.h"
+#include <cstdint>
 
-class MaterialPass {
+#include "../logger/logger_header.h"
+#include "../pipeline/pipeline_pass.h"
+#include "../pipeline/graphics_pipeline/graphics_pipeline.h"
+
+class VulkanPipelineLayout;
+class DescriptorSetLayout;
+class MaterialPassBuilder;
+class VulkanRenderPass;
+class VulkanEngine;
+class VulkanDevice;
+
+class MaterialPass : public PipelinePass {
 public:
-    _XCLASS_NAME(MaterialPass);
+    _XCHILD_NAME(MaterialPass);
 
     explicit MaterialPass(
         DescriptorSetLayout&& descriptor_set_layout,
         VulkanPipelineLayout&& pipeline_layout,
         GraphicsPipeline&& pipeline,
         uint32_t material_set_index = 0
-    )
-        :   m_descriptor_set_layout(std::move(descriptor_set_layout)),
-            m_pipeline_layout(std::move(pipeline_layout)),
-            m_pipeline(std::move(pipeline)),
-            m_material_set_index(material_set_index) {}
+    );
     
     explicit MaterialPass(VulkanDevice& device, VulkanRenderPass& render_pass, MaterialPassBuilder& builder);
     explicit MaterialPass(VulkanEngine& engine, MaterialPassBuilder& builder);
@@ -31,28 +33,27 @@ public:
     MaterialPass(MaterialPass&&) noexcept = default;
     MaterialPass& operator=(MaterialPass&&) noexcept = default;
 
-    const DescriptorSetLayout& descriptor_set_layout() const noexcept {
-        return m_descriptor_set_layout;
-    }
+    GraphicsPipeline& pipeline() noexcept;
 
-    const VulkanPipelineLayout& pipeline_layout() const noexcept {
-        return m_pipeline_layout;
-    }
-
-    GraphicsPipeline& pipeline() noexcept {
-        return m_pipeline;
-    }
-
-    uint32_t material_set_index() const noexcept {
-        return m_material_set_index;
-    }
+    virtual VkPipelineBindPoint bind_point() const noexcept override;
 
 private:
-    DescriptorSetLayout m_descriptor_set_layout;
-    VulkanPipelineLayout m_pipeline_layout;
-    GraphicsPipeline m_pipeline;
+    struct BuildData {
+        DescriptorSetLayout descriptor_set_layout;
+        VulkanPipelineLayout pipeline_layout;
+        GraphicsPipeline pipeline;
+    };
 
-    uint32_t m_material_set_index = 0;
+    static BuildData build(
+        VulkanDevice& device,
+        VulkanRenderPass& render_pass,
+        MaterialPassBuilder& builder
+    );
+    
+    explicit MaterialPass(BuildData data);
+
+private:
+    GraphicsPipeline m_pipeline;
 };
 
 // #pragma once

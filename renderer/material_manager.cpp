@@ -1,14 +1,15 @@
 #include "material_manager.h"
 
-#include "../vulkan_self/material/material_pass.h"
-#include "shader_manager.h"
-#include "resources/frame_resources.h"
+#include "../vulkan_self/vulkan_engine.h"
+#include "../renderer/shader_manager.h"
+#include "../renderer/resources/frame_resources.h"
+#include "../vulkan_self/material/material_pass_builder.h"
+#include "../vulkan_self/vulkan_shader_module.h"
 #include "../vulkan_self/formats.h"
 #include "transform_push_constants.h"
 #include "../vulkan_self/material/material_instance.h"
 #include "../vulkan_self/image/vulkan_texture_2d.h"
 #include "material_data_types.h"
-
 
 MaterialManager::MaterialManager(VulkanEngine& engine, ShaderManager& shader_manager, FrameResources& frame_resources)
 :   blin_phong_mp(create_blin_phong_pass(engine, frame_resources, shader_manager.blinn_phong_vs, shader_manager.blinn_phong_fs)),
@@ -45,6 +46,8 @@ MaterialPass MaterialManager::create_blin_phong_pass(VulkanEngine& engine, Frame
     builder.add_storage_buffer(0, ShaderStages::fragment);
     // builder.add_uniform_buffer(1, ShaderStages::fragment);
     builder.add_combined_image_sampler(1, ShaderStages::fragment);
+    builder.add_uniform_buffer(2, ShaderStages::fragment);
+    builder.add_storage_buffer(3, ShaderStages::fragment);
 
     builder.add_push_constants(sizeof(TransformPushConstants), 0);
     builder.add_descriptor_set_layout(frame_resources.descriptor_layout());

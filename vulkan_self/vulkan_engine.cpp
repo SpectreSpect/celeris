@@ -136,6 +136,65 @@ const VulkanCommandPool& VulkanEngine::upload_command_pool() const noexcept {
     return m_upload_command_pool;
 }
 
+const VulkanQueue& VulkanEngine::graphics_queue(uint32_t index) const {
+    return device().graphics_queue();
+}
+
+VulkanQueue& VulkanEngine::graphics_queue(uint32_t index) {
+    return device().graphics_queue();
+}
+
+const VulkanQueue& VulkanEngine::present_queue(uint32_t index) const {
+    return device().present_queue();
+}
+
+VulkanQueue& VulkanEngine::present_queue(uint32_t index) {
+    return device().present_queue();
+}
+
+const VulkanQueue& VulkanEngine::compute_queue(uint32_t index) const {
+    return device().compute_queue();
+}
+
+VulkanQueue& VulkanEngine::compute_queue(uint32_t index) {
+    return device().compute_queue();
+}
+
+const VulkanQueue& VulkanEngine::transfer_queue(uint32_t index) const {
+    return device().transfer_queue();
+}
+
+VulkanQueue& VulkanEngine::transfer_queue(uint32_t index) {
+    return device().transfer_queue();
+}
+
+void VulkanEngine::compute_submit(
+    VulkanSemaphore* wait_semaphore,
+    VkPipelineStageFlags wait_stage,
+    VulkanCommandBuffer& command_buffer,
+    VulkanSemaphore* signal_semaphore,
+    VulkanFence* fence,
+    uint32_t queue_index)
+{
+    LOG_METHOD();
+    compute_queue(queue_index).submit(
+        wait_semaphore,
+        wait_stage,
+        command_buffer,
+        signal_semaphore,
+        fence
+    );
+}
+
+void VulkanEngine::compute_submit(
+    VulkanCommandBuffer& command_buffer,
+    VulkanFence* fence,
+    uint32_t queue_index)
+{
+    LOG_METHOD();
+    compute_queue(queue_index).submit(command_buffer, fence);
+}
+
 size_t VulkanEngine::current_frame() const noexcept {
     return m_current_frame;
 }

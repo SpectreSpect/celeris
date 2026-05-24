@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "../instanced_render_object.h"
 #include "../manager_bundle.h"
 #include "../../vulkan_self/logger/logger.h"
@@ -7,7 +9,7 @@
 class VulkanEngine;
 class MeshManager;
 class MaterialInstanceManager;
-class PointInstance;
+struct PointInstance;
 
 class PointCloud : public InstancedRenderObject {
 public:
