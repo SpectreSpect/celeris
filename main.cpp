@@ -1,7 +1,5 @@
 #include "vulkan_self/vulkan_engine.h"
 #include "vulkan_self/vulkan_shader_module.h"
-#include "vulkan_self/pipeline/vulkan_pipeline_layout.h"
-#include "vulkan_self/pipeline/graphics_pipeline.h"
 #include "vulkan_self/vulkan_buffer.h"
 #include "vulkan_self/vulkan_resource_loader.h"
 #include "vulkan_self/descriptor_set/descriptor_set_layout_builder.h"
@@ -9,10 +7,14 @@
 #include "vulkan_self/descriptor_set/descriptor_pool_builder.h"
 #include "vulkan_self/descriptor_set/descriptor_pool.h"
 #include "vulkan_self/descriptor_set/descriptor_set.h"
+#include "vulkan_self/pipeline/vulkan_pipeline_layout.h"
+#include "vulkan_self/pipeline/graphics_pipeline/graphics_pipeline.h"
+#include "vulkan_self/pipeline/compute_pipeline/compute_pipeline.h"
+#include "vulkan_self/pipeline/pipeline_pass_builder.h"
+#include "vulkan_self/compute/compute_pass.h"
 #include "vulkan_self/image/vulkan_image.h"
 #include "vulkan_self/image/cpu_image.h"
 #include "vulkan_self/image/vulkan_texture_2d.h"
-#include "vulkan_self/pipeline/compute_pipeline.h"
 #include "path_utils.h"
 #include "vulkan_self/material/material_system.h"
 #include "vulkan_self/material/material_instance.h"
@@ -30,6 +32,9 @@
 #include "vulkan_self/material/material_instance.h"
 #include "renderer/shader_manager.h"
 #include "renderer/material_manager.h"
+#include "vulkan_self/compute/compute_pass_builder.h"
+#include "renderer/compute_pass_manager.h"
+#include "renderer/compute_pass_instance.h"
 #include "vulkan_self/material/material_buffer.h"
 #include "renderer/instanced_render_object.h"
 #include "renderer/instance_batch.h"
@@ -43,6 +48,15 @@
 #include "renderer/scene.h"
 
 #include <vector>
+
+struct SimpleUniform {
+    glm::vec4 color;
+};
+
+struct SimpleStorage {
+    glm::vec4 color1;
+    glm::vec4 color2;
+};
 
 int main() {
     GlfwContext glfw_context;
@@ -65,9 +79,33 @@ int main() {
     ShaderManager shader_manager(engine.device());
     TextureManager texture_manager(engine, resource_loader);
     MaterialManager material_manager(engine, shader_manager, frame_resources);
+    ComputePassManager compute_pass_manager(engine.device(), shader_manager);
+
     MaterialInstanceManager material_instance_manager(engine, material_manager, texture_manager);
     MeshManager mesh_manager(engine, resource_loader);
     ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
+
+    // Compute pass
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    VulkanBuffer test_uniform = VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(SimpleUniform));
+    VulkanBuffer test_ssbo = VulkanBuffer::create_storage_buffer(engine, sizeof(SimpleStorage));
+
+    ComputePassInstance test_instance(compute_pass_manager.descriptor_pool(), compute_pass_manager.test_compute_pass);
+    test_instance.set_uniform_buffer(0, test_uniform);
+    test_instance.set_storage_buffer(1, test_ssbo);
+
+    VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
+    VulkanFence compute_fence(engine.device());
+    {
+        auto compute_scope = compute_command_buffer.begin_scope();
+        
+        test_instance.bind(compute_command_buffer);
+        compute_command_buffer.dispatch(1, 1, 1);
+    }
+
+    engine.compute_submit(compute_command_buffer, &compute_fence);
+    compute_fence.wait();
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     Renderer renderer(engine, frame_resources);
 

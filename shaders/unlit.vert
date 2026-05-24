@@ -15,7 +15,7 @@ layout(set = 1, binding = 0) uniform CameraUniform {
 
 layout(push_constant) uniform PushConstants {
     mat4 model;
-    mat4 material_data_id;
+    uint material_data_id;
 } pc;
 
 void main() {

@@ -1,26 +1,17 @@
 #pragma once
 
 #include <string>
-#include <string_view>
-#include <optional>
-#include <cstdint>
+#include <vector>
 
-#include <glm/glm.hpp>
+#include <vulkan/vulkan.h>
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include "../../logger/logger_header.h"
 
-#include "../logger/logger_header.h"
-#include "../vertex_layout_builder.h"
-#include "pipeline.h"
-
-class VulkanShaderModule;
+class VulkanDevice;
 class VulkanPipelineLayout;
 class VulkanRenderPass;
-class VulkanDevice;
-class VulkanCommandBuffer;
-class DescriptorSetLayout;
-class VulkanEngine;
+class VulkanShaderModule;
+class VertexLayoutBuilder;
 
 struct GraphicsPipelineBuliderDesc {
     VkDevice device;
@@ -53,6 +44,8 @@ struct GraphicsPipelineBuliderDesc {
     VkColorComponentFlags color_write_mask;
     bool blend_enable;
 };
+
+
 
 class GraphicsPipelineBuilder {
 private:
@@ -106,83 +99,11 @@ public:
         VkSampleCountFlagBits rasterization_samples = default_desc.rasterization_samples // Предполагаю должно быть больше для нормальной работы? #TODO
     ) noexcept;
 
-    // Опять же, пока что всё по простому, чтобы не тратить просто так время. Кода пригодится - сделаю полноценно.
+    // Опять же, пока что всё по простому, чтобы не тратить просто так время. Кода пригодится - сделаю полноценно. #TODO
     GraphicsPipelineBuilder& set_color_blending(
         VkColorComponentFlags color_write_mask = default_desc.color_write_mask,
         bool blend_enable = default_desc.blend_enable
     ) noexcept;
 
     const GraphicsPipelineBuliderDesc& desc() const noexcept;
-};
-
-class GraphicsPipeline : public Pipeline {
-public:
-    _XCHILD_NAME(GraphicsPipeline);
-
-    explicit GraphicsPipeline(const GraphicsPipelineBuilder& builder);
-
-    VkPipelineBindPoint get_bind_point() const noexcept override;
-
-    static GraphicsPipelineBuilder create_builder() noexcept; // Микро функция для удобства
-
-    static void set_y_down_viewport(
-        VulkanCommandBuffer& command_buffer, 
-        glm::vec2 size,
-        glm::vec2 origin = glm::vec2{0.0f, 0.0f},
-        float min_depth = 0.0f,
-        float max_depth = 1.0f
-    );
-
-    static void set_y_down_viewport(
-        VulkanCommandBuffer& command_buffer, 
-        VkExtent2D size,
-        VkOffset2D origin = VkOffset2D{0, 0},
-        float min_depth = 0.0f,
-        float max_depth = 1.0f
-    );
-
-    static void set_y_up_viewport(
-        VulkanCommandBuffer& command_buffer, 
-        glm::vec2 size,
-        glm::vec2 origin = glm::vec2{0.0f, 0.0f},
-        float min_depth = 0.0f,
-        float max_depth = 1.0f
-    );
-
-    static void set_y_up_viewport(
-        VulkanCommandBuffer& command_buffer, 
-        VkExtent2D size,
-        VkOffset2D origin = VkOffset2D{0, 0},
-        float min_depth = 0.0f,
-        float max_depth = 1.0f
-    );
-
-    static void set_scissor(
-        VulkanCommandBuffer& command_buffer,
-        VkExtent2D extent,
-        VkOffset2D offset = VkOffset2D{0, 0}
-    );
-
-    static void set_y_down_viewport(
-        VulkanCommandBuffer& command_buffer,
-        VulkanEngine& engine,
-        VkOffset2D origin = VkOffset2D{0, 0},
-        float min_depth = 0.0f,
-        float max_depth = 1.0f
-    );
-
-    static void set_y_up_viewport(
-        VulkanCommandBuffer& command_buffer,
-        VulkanEngine& engine,
-        VkOffset2D origin = VkOffset2D{0, 0},
-        float min_depth = 0.0f,
-        float max_depth = 1.0f
-    );
-
-    static void set_scissor(
-        VulkanCommandBuffer& command_buffer,
-        VulkanEngine& engine,
-        VkOffset2D offset = VkOffset2D{0, 0}
-    );
-
 };

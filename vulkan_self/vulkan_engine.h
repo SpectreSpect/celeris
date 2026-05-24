@@ -88,6 +88,33 @@ public:
     VulkanCommandPool& compute_command_pool() noexcept;
     const VulkanCommandPool& compute_command_pool() const noexcept;
 
+    const VulkanQueue& graphics_queue(uint32_t index = 0) const;
+    VulkanQueue& graphics_queue(uint32_t index = 0);
+
+    const VulkanQueue& present_queue(uint32_t index = 0) const;
+    VulkanQueue& present_queue(uint32_t index = 0);
+    
+    const VulkanQueue& compute_queue(uint32_t index = 0) const;
+    VulkanQueue& compute_queue(uint32_t index = 0);
+    
+    const VulkanQueue& transfer_queue(uint32_t index = 0) const;
+    VulkanQueue& transfer_queue(uint32_t index = 0);
+
+    void compute_submit(
+        VulkanSemaphore* wait_semaphore,
+        VkPipelineStageFlags wait_stage,
+        VulkanCommandBuffer& command_buffer,
+        VulkanSemaphore* signal_semaphore,
+        VulkanFence* fence,
+        uint32_t queue_index = 0
+    );
+
+    void compute_submit(
+        VulkanCommandBuffer& command_buffer,
+        VulkanFence* fence = nullptr,
+        uint32_t queue_index = 0
+    );
+
     size_t current_frame() const noexcept;
     uint32_t num_frames_in_flight() const noexcept;
 

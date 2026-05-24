@@ -49,6 +49,11 @@ public:
         VulkanFence* fence
     );
 
+    void submit(
+        VulkanCommandBuffer& command_buffer,
+        VulkanFence* fence = nullptr
+    );
+
     VkResult present(
         std::span<const VulkanSemaphore> wait_semaphores,
         std::span<const VulkanSwapchain> swapchains,
