@@ -85,6 +85,7 @@ add_executable(app
   renderer/compute_pass_instance.cpp
   renderer/instanced_render_object.cpp
   renderer/instance_batch.cpp
+  renderer/instance_buffer_view.cpp
   renderer/texture_manager.cpp
   renderer/material_instance_manager.cpp
   renderer/renderer.cpp
@@ -97,7 +98,9 @@ add_executable(app
   renderer/point_cloud/lidar/lidar_video.cpp
   renderer/point_cloud/gicp/gicp_pass.cpp
   renderer/point_cloud/gicp/voxel_point_map.cpp
-  renderer/point_cloud/gicp/voxel_map_poin_inserter.cpp
+  renderer/point_cloud/gicp/voxel_map_point_inserter.cpp
+  renderer/point_cloud/gicp/voxel_map_point_reseter.cpp
+  renderer/point_cloud/gicp/gicp_reductor.cpp
 )
 
 

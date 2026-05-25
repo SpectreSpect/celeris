@@ -1,5 +1,7 @@
-#include "voxel_map_poin_inserter.h"
+#include "voxel_map_point_inserter.h"
 
+#include "../../../vulkan_self/vulkan_engine.h"
+#include "../../compute_pass_manager.h"
 #include "../point_cloud.h"
 #include "voxel_point_map.h"
 
@@ -13,12 +15,15 @@ VoxelMapPointInserter::VoxelMapPointInserter(VulkanEngine& engine, ComputePassMa
 }
 
 void VoxelMapPointInserter::insert(VoxelPointMap& voxel_point_map, PointCloud& source_point_cloud, VulkanBuffer& source_normal_buffer) {
+    LOG_METHOD();
     // if (!this->engine)
-    //     throw std::runtime_error("engine was null");
-        
+    //     throw std::runtime_error("engine was null")
+
+    logger.check(source_point_cloud.instance_buffer_view_valid(), "Source point cloud instance view was invalid");
+    
     InserterUniform uniform_data{};
     uniform_data.max_map_point_count = voxel_point_map.m_max_map_point_count;
-    uniform_data.source_point_count = source_point_cloud.instance_data.instance_count();
+    uniform_data.source_point_count = source_point_cloud.instance_count();
     uniform_data.num_hash_table_slots = voxel_point_map.m_num_hash_table_slots;
     uniform_data.source_model = source_point_cloud.transform.get_model_matrix();
     // uniform_data.color = source_point_cloud.color;
@@ -26,7 +31,7 @@ void VoxelMapPointInserter::insert(VoxelPointMap& voxel_point_map, PointCloud& s
     uniform_buffer.upload(&uniform_data, sizeof(InserterUniform));
 
     insert_pass.set_uniform_buffer(0, uniform_buffer);
-    insert_pass.set_storage_buffer(1, source_point_cloud.instance_data.buffer());
+    insert_pass.set_storage_buffer(1, *source_point_cloud.instance_buffer());
     insert_pass.set_storage_buffer(2, source_normal_buffer);
     insert_pass.set_storage_buffer(3, voxel_point_map.map_point_count_buffer);
     insert_pass.set_storage_buffer(4, voxel_point_map.map_point_buffer);
@@ -43,7 +48,7 @@ void VoxelMapPointInserter::insert(VoxelPointMap& voxel_point_map, PointCloud& s
     
     // descriptor_set_bundle.bind_image_storage(1, brdf_lut_texture);
 
-    uint32_t x_groups = div_up_u32(source_point_cloud.instance_data.instance_count(), 256);
+    uint32_t x_groups = div_up_u32(source_point_cloud.instance_count(), 256);
 
     {
         auto compute_scope = compute_command_buffer.begin_scope();
@@ -53,14 +58,11 @@ void VoxelMapPointInserter::insert(VoxelPointMap& voxel_point_map, PointCloud& s
         compute_command_buffer.dispatch(x_groups, 1, 1);
     }
 
+    compute_fence.reset();
     engine.compute_submit(compute_command_buffer, &compute_fence);
     compute_fence.wait();
 
-
-    uint32_t count = 0;
-    voxel_point_map.map_point_count_buffer.read(&count, sizeof(count), 0);
-
-    std::cout << count << std::endl;
+    voxel_point_map.map_point_count_buffer.read(&voxel_point_map.m_map_point_count, sizeof(uint32_t), 0);
     
     // command_buffer.begin();
 

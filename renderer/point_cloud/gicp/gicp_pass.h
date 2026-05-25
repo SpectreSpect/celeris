@@ -1,28 +1,28 @@
 #pragma once
 
-#include "../../compute_pass_instance.h"
-#include "../../../vulkan_self/vulkan_buffer.h"
-
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+#include "../../compute_pass_instance.h"
+#include "../../../vulkan_self/vulkan_buffer.h"
+#include "../../../vulkan_self/vulkan_fence.h"
+#include "../../../vulkan_self/vulkan_command_buffer.h"
+#include "gicp_reductor.h"
+
+#include "../../../vulkan_self/logger/logger.h"
 
 class ComputePassManager;
 class VulkanEngine;
+class VoxelPointMap;
+class PointCloud;
+class VulkanBuffer;
+class GICPReductor;
+
 
 class GICPPass {
 public:
-    struct GICPReductorUniform {
-        uint32_t input_count;
-    };
-
-    struct GICPPartial {
-        double H[6][6];
-        double g[6];
-        double total_weighted_sq_error;
-        uint32_t valid_count;
-    };
+    _XCLASS_NAME(GICPPass);
 
     struct GICPPassUniform {
         glm::vec4 position;
@@ -44,16 +44,24 @@ public:
 
     GICPPass(VulkanEngine& engine, ComputePassManager& compute_pass_manager);
 
+    double step(VoxelPointMap& voxel_point_map, PointCloud& source_point_cloud, VulkanBuffer& source_normal_buffer);
+
     // double step()();
 
 
     // ComputePassInstance test_instance(compute_pass_manager.descriptor_pool(), compute_pass_manager.test_compute_pass);
 private:
+    uint32_t max_partial_count = 1000000;
+
+    VulkanEngine& engine;
+
     ComputePassInstance gicp_step_pass;
+    VulkanCommandBuffer compute_command_buffer;
+    VulkanFence compute_fence;
 
     // VulkanBuffer output_buffer;
 
-    // GICPReductor reductor;
+    GICPReductor reductor;
 
     VulkanBuffer uniform_buffer;
     VulkanBuffer output_buffer;
@@ -61,7 +69,12 @@ private:
     VulkanBuffer partial_src;
     VulkanBuffer partial_dst;
 
-    // VulkanBuffer rejection_buffer;
+    VulkanBuffer rejection_buffer;
 
-    uint32_t max_partial_count = 1000000;
+    static glm::quat omega_to_quat(const glm::vec3& omega);
+    static glm::mat3 euler_xyz_to_mat3(const glm::vec3& euler);
+    static glm::mat3 skew_matrix(const glm::vec3& v);
+    static bool solve_6x6(const double H_in[6][6], const double g_in[6], double delta_out[6]);
+    static glm::mat3 omega_to_mat3(const glm::vec3& omega);
+    static glm::vec3 mat3_to_euler_xyz(const glm::mat3& R);
 };

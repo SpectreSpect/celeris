@@ -50,7 +50,8 @@
 #include "renderer/point_cloud/lidar/lidar_video.h"
 #include "renderer/point_cloud/gicp/gicp_pass.h"
 #include "renderer/point_cloud/gicp/voxel_point_map.h"
-#include "renderer/point_cloud/gicp/voxel_map_poin_inserter.h"
+#include "renderer/point_cloud/gicp/voxel_map_point_inserter.h"
+#include "renderer/point_cloud/gicp/voxel_map_point_reseter.h"
 
 #include <vector>
 
@@ -114,29 +115,30 @@ int main() {
 
     GICPPass gicp_pass(engine, compute_pass_manager);
     VoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);
+    VoxelMapPointReseter voxel_map_reseter(engine, compute_pass_manager);
 
     
 
     // Compute pass
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    VulkanBuffer test_uniform = VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(SimpleUniform));
-    VulkanBuffer test_ssbo = VulkanBuffer::create_storage_buffer(engine, sizeof(SimpleStorage));
+    // VulkanBuffer test_uniform = VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(SimpleUniform));
+    // VulkanBuffer test_ssbo = VulkanBuffer::create_storage_buffer(engine, sizeof(SimpleStorage));
 
-    ComputePassInstance test_instance(compute_pass_manager.descriptor_pool(), compute_pass_manager.test_compute_pass);
-    test_instance.set_uniform_buffer(0, test_uniform);
-    test_instance.set_storage_buffer(1, test_ssbo);
+    // ComputePassInstance test_instance(compute_pass_manager.descriptor_pool(), compute_pass_manager.test_compute_pass);
+    // test_instance.set_uniform_buffer(0, test_uniform);
+    // test_instance.set_storage_buffer(1, test_ssbo);
 
-    VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
-    VulkanFence compute_fence(engine.device());
-    {
-        auto compute_scope = compute_command_buffer.begin_scope();
+    // VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
+    // VulkanFence compute_fence(engine.device());
+    // {
+    //     auto compute_scope = compute_command_buffer.begin_scope();
         
-        test_instance.bind(compute_command_buffer);
-        compute_command_buffer.dispatch(1, 1, 1);
-    }
+    //     test_instance.bind(compute_command_buffer);
+    //     compute_command_buffer.dispatch(1, 1, 1);
+    // }
 
-    engine.compute_submit(compute_command_buffer, &compute_fence);
-    compute_fence.wait();
+    // engine.compute_submit(compute_command_buffer, &compute_fence);
+    // compute_fence.wait();
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     Renderer renderer(engine, frame_resources);
@@ -159,20 +161,43 @@ int main() {
             points.push_back(point);
         }
     
+    std::vector<PointInstance> source_points;
+    std::vector<glm::vec4> source_normals;
+
+    std::vector<PointInstance> target_points;
+    std::vector<glm::vec4> target_normals;
+
+    for (int x = 0; x < 100; x++)
+        for (int z = 0; z < 100; z++) {
+            static PointInstance point;
+
+            point.pos.x = x;
+            point.pos.z = z;
+            point.color = glm::vec4(0, 0, 1, 1);
+
+            points.push_back(point);
+        }
+    
     PointCloud point_cloud(manager_bundle, points);
-    PointCloud voxel_map_point_cloud(manager_bundle, 57000);
     // LidarScan lidar_scan(manager_bundle, path_utils::executable_dir() / "assets" / "lidar_scans" / "frame_000000.bin");
-    LidarVideo lidar_video(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 50);
+    LidarVideo lidar_video(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 5);
 
-    PointCloud& source_point_cloud = lidar_video.get_scan(0).point_cloud();
+    PointCloud& target_point_cloud = lidar_video.get_scan(0).point_cloud();
+    PointCloud& source_point_cloud = lidar_video.get_scan(4).point_cloud();
 
-    VulkanBuffer normal_buffer(VulkanBuffer::create_storage_buffer(engine, sizeof(GICPPass::GICPPartial) * source_point_cloud.instance_data.instance_count()));
+    VulkanBuffer target_normal_buffer(VulkanBuffer::create_storage_buffer(engine, sizeof(GICPReductor::GICPPartial) * target_point_cloud.instance_count()));
+    VulkanBuffer source_normal_buffer(VulkanBuffer::create_storage_buffer(engine, sizeof(GICPReductor::GICPPartial) * source_point_cloud.instance_count()));
 
     VoxelPointMap voxel_point_map(engine, 1500000, 1500000);
 
-    voxel_map_inserter.insert(voxel_point_map, source_point_cloud, normal_buffer);
+    voxel_map_reseter.reset(voxel_point_map);
+    voxel_map_inserter.insert(voxel_point_map, target_point_cloud, target_normal_buffer);
 
-    voxel_map_point_cloud.instance_data.external_buffer = &voxel_point_map.map_point_buffer;
+    
+
+    PointCloud voxel_map_point_cloud(manager_bundle, voxel_point_map.map_point_buffer, voxel_point_map.m_map_point_count);
+
+    // voxel_map_point_cloud.instance_data.external_buffer = &voxel_point_map.map_point_buffer;
     // voxel_map_point_cloud.instance_data.external_buffer = &source_point_cloud.instance_data.buffer();
 
 
@@ -200,9 +225,12 @@ int main() {
     // scene.add(unlit_cube);
     // scene.add(lidar_video);
     scene.add(voxel_map_point_cloud);
+    scene.add(source_point_cloud);
     
     // lidar_video.set_looped(true);
     // scene.add(lidar_scan);
+
+    bool g_pressed = false;
     
     float last_frame_time = 0.0f;
     float start_time = (float)glfwGetTime();
@@ -221,6 +249,21 @@ int main() {
 
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), camera);
+
+        if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
+            g_pressed = true;
+
+            gicp_pass.step(voxel_point_map, source_point_cloud, source_normal_buffer);
+
+
+            // std::cout << "g pressed" << std::endl;
+        }
+
+        if (g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_RELEASE) {
+            g_pressed = false;
+
+            // std::cout << "g released" << std::endl;
+        }
 
         // unlit_cube.transform.position.x = sin(timer) * 5 ;
 

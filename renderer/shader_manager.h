@@ -21,4 +21,6 @@ public:
 
     VulkanShaderModule gicp_step_cs;
     VulkanShaderModule insert_points_into_voxel_map_cs;
+    VulkanShaderModule reset_point_voxel_map_cs;
+    VulkanShaderModule gicp_reduce_cs;
 };

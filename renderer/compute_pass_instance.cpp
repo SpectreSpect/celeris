@@ -20,6 +20,7 @@ void ComputePassInstance::set_storage_buffer(uint32_t binding, VulkanBuffer& sto
     m_descriptor_set.write_storage_buffer(binding, storage_buffer);
 }
 
+
 void ComputePassInstance::set_texture(uint32_t binding, VulkanTexture2D& texture_2d) {
     LOG_METHOD();
     m_descriptor_set.write_texture(binding, texture_2d);

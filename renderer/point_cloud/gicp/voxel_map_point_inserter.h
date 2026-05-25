@@ -5,9 +5,11 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
-#include "../../compute_pass_manager.h"
 #include "../../compute_pass_instance.h"
 #include "../../../vulkan_self/vulkan_fence.h"
+#include "../../../vulkan_self/vulkan_command_buffer.h"
+
+#include "../../../vulkan_self/logger/logger.h"
 
 class ComputePassManager;
 class VulkanEngine;
@@ -16,6 +18,8 @@ class PointCloud;
 
 class VoxelMapPointInserter {
 public:
+    _XCLASS_NAME(VoxelMapPointInserter);
+
     struct InserterUniform {
         uint32_t source_point_count;
         uint32_t max_map_point_count;
