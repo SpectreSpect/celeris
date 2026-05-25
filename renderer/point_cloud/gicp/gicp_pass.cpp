@@ -75,10 +75,10 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
     engine.compute_submit(compute_command_buffer, &compute_fence);
     compute_fence.wait();
     
-    uint32_t partial_count = x_groups;
+    uint32_t partial_count = math_utils::div_up_u32(source_point_cloud.instance_count(), 32);;
     GICPReductor::GICPPartial result = reductor.reduce(partial_src, partial_dst, partial_count);
 
-        const float max_rot = glm::radians(5.0f);
+    const float max_rot = glm::radians(5.0f);
     const float max_trans = 5.0f;
 
 

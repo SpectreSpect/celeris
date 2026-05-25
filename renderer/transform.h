@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 #include <iostream>
 #include <string>
@@ -20,7 +21,7 @@ public:
     glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
     Transform() = default;
-    Transform(glm::vec3 position, glm::vec3 scale, glm::vec3 rotation);
+    Transform(glm::vec3 position, glm::vec3 scale, glm::quat rotation);
 
     Transform& operator*(Transform& other);
 

@@ -133,6 +133,8 @@ void LidarVideo::load_from_file(ManagerBundle& manager_bundle, const std::filesy
 
     m_timer = 0.0f;
 
+    make_poses_relative_like_old_version();
+
     if (!m_scans.empty())
         set_frame(0);
 }
@@ -235,6 +237,45 @@ glm::vec3 LidarVideo::ros_rpy_to_engine_rpy(const glm::vec3& rpy_ros) {
     glm::mat3 R_eng = M * R_ros * glm::transpose(M); // change of basis
 
     return mat3_to_rpy_zyx(R_eng);
+}
+
+void LidarVideo::make_poses_relative_like_old_version() {
+    if (m_scans.empty())
+        return;
+
+    for (int i = static_cast<int>(m_scans.size()) - 1; i >= 1; --i) {
+        auto& curr = m_scans[i].point_cloud().transform;
+        auto& prev = m_scans[i - 1].point_cloud().transform;
+
+        glm::vec3 p_prev = prev.position;
+        glm::vec3 p_curr = curr.position;
+
+        glm::quat q_prev = glm::normalize(prev.rotation);
+        glm::quat q_curr = glm::normalize(curr.rotation);
+
+        if (glm::dot(q_prev, q_curr) < 0.0f) {
+            q_curr = -q_curr;
+        }
+
+        curr.position = p_curr - p_prev;
+        curr.rotation = glm::normalize(q_curr * glm::inverse(q_prev));
+    }
+
+    m_scans[0].point_cloud().transform.position = glm::vec3(0.0f);
+    m_scans[0].point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+}
+
+void LidarVideo::compose_current_pose_from_previous() {
+    uint32_t id = m_current_frame_id;
+
+    if (id == 0 || id >= m_scans.size())
+        return;
+
+    auto& curr = m_scans[id].point_cloud().transform;
+    const auto& prev = m_scans[id - 1].point_cloud().transform;
+
+    curr.position = prev.position + curr.position;
+    curr.rotation = glm::normalize(curr.rotation * prev.rotation);
 }
 
 uint32_t LidarVideo::current_frame_id() const {

@@ -63,21 +63,4 @@ void VoxelMapPointInserter::insert(VoxelPointMap& voxel_point_map, PointCloud& s
     compute_fence.wait();
 
     voxel_point_map.map_point_count_buffer.read(&voxel_point_map.m_map_point_count, sizeof(uint32_t), 0);
-    
-    // command_buffer.begin();
-
-    // command_buffer.bind_pipeline(pipeline);
-    // command_buffer.dispatch(x_groups, 1, 1);
-
-    // command_buffer.memory_barrier(temp_storage_buffer);
-    // command_buffer.end();
-
-    // command_buffer.submit_and_wait(compute_queue, fence);
-
-    // voxel_point_map.map_point_count_buffer.read_subdata(0, &voxel_point_map.map_point_count, sizeof(voxel_point_map.map_point_count));
-    // OutputBuffer output_data{};
-    // output_buffer.read_subdata(0, &output_data, sizeof(output_data));
-
-    // source_point_cloud.position = output_data.position;
-    // source_point_cloud.rotation = output_data.rotation;
 }

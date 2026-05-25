@@ -281,6 +281,25 @@ int main() {
             if (current_frame_id > 0) {
                 LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
 
+
+
+                // auto& pc = current_scan.point_cloud();
+
+                // std::cout << "LidarVideo transform pos: "
+                //         << lidar_video.transform.position.x << ", "
+                //         << lidar_video.transform.position.y << ", "
+                //         << lidar_video.transform.position.z << std::endl;
+
+                // std::cout << "LidarScan transform pos: "
+                //         << current_scan.transform.position.x << ", "
+                //         << current_scan.transform.position.y << ", "
+                //         << current_scan.transform.position.z << std::endl;
+
+                // std::cout << "PointCloud transform pos: "
+                //         << pc.transform.position.x << ", "
+                //         << pc.transform.position.y << ", "
+                //         << pc.transform.position.z << std::endl;
+
                 gicp_pass.step(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
             }
         }
@@ -305,6 +324,8 @@ int main() {
             }
             
             lidar_video.next_frame();
+
+            lidar_video.compose_current_pose_from_previous();
         }
 
         if (n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_RELEASE) {
