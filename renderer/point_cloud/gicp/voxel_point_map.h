@@ -7,6 +7,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+class InstanceBufferView;
+
 class VoxelPointMap {
 public:
     struct VoxelPointMapUniform {
@@ -32,6 +34,8 @@ public:
     static_assert(sizeof(VoxelHashSlotGpu) == 48);
 
     VoxelPointMap(VulkanEngine& engine, uint32_t num_hash_table_slots, uint32_t max_map_point_count);
+
+    InstanceBufferView get_map_instance_view();
 
     // VoxelPointMap() = default;
     // void create(VulkanBuffer& engine, uint32_t num_hash_table_slots, uint32_t max_map_point_count);

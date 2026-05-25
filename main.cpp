@@ -199,7 +199,7 @@ int main() {
     
     PointCloud point_cloud(manager_bundle, points);
     // LidarScan lidar_scan(manager_bundle, path_utils::executable_dir() / "assets" / "lidar_scans" / "frame_000000.bin");
-    LidarVideo lidar_video(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 5);
+    LidarVideo lidar_video(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 20);
 
     // PointCloud& target_point_cloud = lidar_video.get_scan(0).point_cloud();
     // PointCloud& source_point_cloud = lidar_video.get_scan(4).point_cloud();
@@ -239,12 +239,13 @@ int main() {
 
     Scene scene;
 
-    lidar_video.get_scan(2).point_cloud().transform.position.y += 4;
+    // lidar_video.get_scan(2).point_cloud().transform.position.y += 4;
 
     // scene.add(unlit_cube);
     // scene.add(lidar_video);
     scene.add(voxel_map_point_cloud);
-    scene.add(lidar_video.get_scan(2).point_cloud());
+    scene.add(lidar_video);
+    // scene.add(lidar_video.get_scan(2).point_cloud());
     // scene.add(source_point_cloud);
     // scene.add(target_point_cloud);
     
@@ -252,6 +253,7 @@ int main() {
     // scene.add(lidar_scan);
 
     bool g_pressed = false;
+    bool n_pressed = false;
     
     float last_frame_time = 0.0f;
     float start_time = (float)glfwGetTime();
@@ -274,17 +276,40 @@ int main() {
         if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
             g_pressed = true;
 
-            gicp_pass.step(voxel_point_map, lidar_video.get_scan(2).point_cloud(), lidar_video.get_scan(2).normal_buffer());
-            
+            uint32_t current_frame_id = lidar_video.current_frame_id();
 
+            if (current_frame_id > 0) {
+                LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
 
-            // std::cout << "g pressed" << std::endl;
+                gicp_pass.step(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
+            }
         }
 
         if (g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_RELEASE) {
             g_pressed = false;
+        }
 
-            // std::cout << "g released" << std::endl;
+        if (!n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_PRESS) {
+            n_pressed = true;
+            
+            uint32_t current_frame_id = lidar_video.current_frame_id();
+
+            if (current_frame_id > 0) {
+                LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
+                LidarScan& previous_scan = lidar_video.get_scan(current_frame_id - 1);
+
+                // gicp_pass.fit(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer(), 10);
+
+                voxel_map_inserter.insert(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
+                voxel_map_point_cloud.set_instance_view(voxel_point_map.get_map_instance_view());
+            }
+            
+            lidar_video.next_frame();
+        }
+
+        if (n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_RELEASE) {
+            n_pressed = false;
+
         }
 
         // unlit_cube.transform.position.x = sin(timer) * 5 ;

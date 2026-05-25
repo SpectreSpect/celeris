@@ -136,6 +136,19 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
     return rmse;
 }
 
+double GICPPass::fit(VoxelPointMap& voxel_point_map, PointCloud& source_point_cloud, VulkanBuffer& source_normal_buffer, uint32_t max_steps) {
+    double rmse = 0;
+    for (int i = 0; i < max_steps; i++) {
+        rmse = step(voxel_point_map, source_point_cloud, source_normal_buffer);
+        if (rmse < 0.5) {
+            break;
+        }
+            
+    }
+
+    return rmse;
+}
+
 glm::quat GICPPass::omega_to_quat(const glm::vec3& omega) {
     float theta = glm::length(omega);
 
