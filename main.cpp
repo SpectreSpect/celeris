@@ -171,35 +171,51 @@ int main() {
         for (int z = 0; z < 100; z++) {
             static PointInstance point;
 
+            glm::vec4 normal = glm::vec4(0, 1, 0, 1);
+
             point.pos.x = x;
             point.pos.z = z;
             point.color = glm::vec4(0, 0, 1, 1);
 
-            points.push_back(point);
+            target_points.push_back(point);
+            target_normals.push_back(normal);
+
+            point.color = glm::vec4(1, 0, 0, 1);
+
+            source_points.push_back(point);
+            source_normals.push_back(normal);
         }
+    
+    VulkanBuffer source_normal_buffer(VulkanBuffer::create_host_visible_storage_buffer(engine, source_normals.size() * sizeof(glm::vec4)));
+    VulkanBuffer target_normal_buffer(VulkanBuffer::create_host_visible_storage_buffer(engine, target_normals.size() * sizeof(glm::vec4)));
+
+    source_normal_buffer.upload(source_normals);
+    target_normal_buffer.upload(target_normals);
+
+    PointCloud target_point_cloud(manager_bundle, target_points);
+    PointCloud source_point_cloud(manager_bundle, source_points);
+
+    source_point_cloud.transform.position = glm::vec4(1, 1, 1, 1);
     
     PointCloud point_cloud(manager_bundle, points);
     // LidarScan lidar_scan(manager_bundle, path_utils::executable_dir() / "assets" / "lidar_scans" / "frame_000000.bin");
     LidarVideo lidar_video(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 5);
 
-    PointCloud& target_point_cloud = lidar_video.get_scan(0).point_cloud();
-    PointCloud& source_point_cloud = lidar_video.get_scan(4).point_cloud();
+    // PointCloud& target_point_cloud = lidar_video.get_scan(0).point_cloud();
+    // PointCloud& source_point_cloud = lidar_video.get_scan(4).point_cloud();
 
-    VulkanBuffer target_normal_buffer(VulkanBuffer::create_storage_buffer(engine, sizeof(GICPReductor::GICPPartial) * target_point_cloud.instance_count()));
-    VulkanBuffer source_normal_buffer(VulkanBuffer::create_storage_buffer(engine, sizeof(GICPReductor::GICPPartial) * source_point_cloud.instance_count()));
+    // VulkanBuffer target_normal_buffer(VulkanBuffer::create_storage_buffer(engine, sizeof(GICPReductor::GICPPartial) * target_point_cloud.instance_count()));
+    // VulkanBuffer source_normal_buffer(VulkanBuffer::create_storage_buffer(engine, sizeof(GICPReductor::GICPPartial) * source_point_cloud.instance_count()));
 
     VoxelPointMap voxel_point_map(engine, 1500000, 1500000);
-
     voxel_map_reseter.reset(voxel_point_map);
-    voxel_map_inserter.insert(voxel_point_map, target_point_cloud, target_normal_buffer);
 
-    
+    voxel_map_inserter.insert(voxel_point_map, target_point_cloud, target_normal_buffer);
 
     PointCloud voxel_map_point_cloud(manager_bundle, voxel_point_map.map_point_buffer, voxel_point_map.m_map_point_count);
 
     // voxel_map_point_cloud.instance_data.external_buffer = &voxel_point_map.map_point_buffer;
     // voxel_map_point_cloud.instance_data.external_buffer = &source_point_cloud.instance_data.buffer();
-
 
     unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
@@ -226,6 +242,7 @@ int main() {
     // scene.add(lidar_video);
     scene.add(voxel_map_point_cloud);
     scene.add(source_point_cloud);
+    // scene.add(target_point_cloud);
     
     // lidar_video.set_looped(true);
     // scene.add(lidar_scan);
