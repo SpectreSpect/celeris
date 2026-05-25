@@ -210,7 +210,8 @@ int main() {
     VoxelPointMap voxel_point_map(engine, 1500000, 1500000);
     voxel_map_reseter.reset(voxel_point_map);
 
-    voxel_map_inserter.insert(voxel_point_map, target_point_cloud, target_normal_buffer);
+    // voxel_map_inserter.insert(voxel_point_map, target_point_cloud, target_normal_buffer);
+    voxel_map_inserter.insert(voxel_point_map, lidar_video.get_scan(0).point_cloud(), lidar_video.get_scan(0).normal_buffer());
 
     PointCloud voxel_map_point_cloud(manager_bundle, voxel_point_map.map_point_buffer, voxel_point_map.m_map_point_count);
 
@@ -238,10 +239,13 @@ int main() {
 
     Scene scene;
 
+    lidar_video.get_scan(2).point_cloud().transform.position.y += 4;
+
     // scene.add(unlit_cube);
     // scene.add(lidar_video);
     scene.add(voxel_map_point_cloud);
-    scene.add(source_point_cloud);
+    scene.add(lidar_video.get_scan(2).point_cloud());
+    // scene.add(source_point_cloud);
     // scene.add(target_point_cloud);
     
     // lidar_video.set_looped(true);
@@ -270,7 +274,8 @@ int main() {
         if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
             g_pressed = true;
 
-            gicp_pass.step(voxel_point_map, source_point_cloud, source_normal_buffer);
+            gicp_pass.step(voxel_point_map, lidar_video.get_scan(2).point_cloud(), lidar_video.get_scan(2).normal_buffer());
+            
 
 
             // std::cout << "g pressed" << std::endl;
