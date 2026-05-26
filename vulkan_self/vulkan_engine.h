@@ -100,6 +100,9 @@ public:
     const VulkanQueue& transfer_queue(uint32_t index = 0) const;
     VulkanQueue& transfer_queue(uint32_t index = 0);
 
+    const VulkanInstance& instance() const;
+    VulkanInstance& instance();
+
     void compute_submit(
         VulkanSemaphore* wait_semaphore,
         VkPipelineStageFlags wait_stage,

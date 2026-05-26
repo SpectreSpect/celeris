@@ -168,6 +168,14 @@ VulkanQueue& VulkanEngine::transfer_queue(uint32_t index) {
     return device().transfer_queue();
 }
 
+const VulkanInstance& VulkanEngine::instance() const {
+    return m_instance;
+}
+
+VulkanInstance& VulkanEngine::instance() {
+    return m_instance;
+}
+
 void VulkanEngine::compute_submit(
     VulkanSemaphore* wait_semaphore,
     VkPipelineStageFlags wait_stage,

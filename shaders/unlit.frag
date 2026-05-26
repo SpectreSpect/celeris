@@ -24,6 +24,18 @@ layout(push_constant) uniform PushConstants {
     uint material_data_id;
 } pc;
 
+vec4 linear_to_srgb(vec4 color)
+{
+    vec3 rgb = max(color.rgb, vec3(0.0));
+
+    vec3 low  = rgb * 12.92;
+    vec3 high = 1.055 * pow(rgb, vec3(1.0 / 2.4)) - 0.055;
+
+    vec3 srgb = mix(low, high, lessThanEqual(rgb, vec3(0.0031308)));
+
+    return vec4(srgb, color.a);
+}
+
 void main() {
-    out_color = material_buffer.materials[pc.material_data_id].color;
+    out_color = linear_to_srgb(material_buffer.materials[pc.material_data_id].color);
 }

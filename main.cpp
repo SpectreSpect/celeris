@@ -52,6 +52,7 @@
 #include "renderer/point_cloud/gicp/voxel_point_map.h"
 #include "renderer/point_cloud/gicp/voxel_map_point_inserter.h"
 #include "renderer/point_cloud/gicp/voxel_map_point_reseter.h"
+#include "imgui_layer.h"
 
 #include <vector>
 
@@ -74,7 +75,7 @@ VkClearValue make_clear_color_srgb(glm::vec4 color) {
     return clear_color;
 }
 
-VkClearValue clear_color = make_clear_color_srgb({0.05f, 0.05f, 0.05f, 1.0f});
+VkClearValue clear_color = {0.05f, 0.05f, 0.05f, 1.0f};
 
 struct SimpleUniform {
     glm::vec4 color;
@@ -90,11 +91,13 @@ int main() {
     Window window(glfw_context, 1280, 720, "Vulkan engine");
 
     QueueRequest queue_request;
-    queue_request.graphics_count = 1;
+    queue_request.graphics_count = 2;
     queue_request.present_count = 1;
     queue_request.compute_count = 1;
 
     VulkanEngine engine(glfw_context, window, queue_request);
+
+    UI ui(window, engine);
 
     Camera camera;
     FPSCameraController camera_controller(camera);
@@ -262,6 +265,20 @@ int main() {
                 // engine.swapchain_resources().swapchain, {{0.05f, 0.05f, 0.05f, 1.0f}});
                 engine.swapchain_resources().swapchain, clear_color);
                 // rgba(37, 150, 190)
+
+                ui.begin_frame();
+                ui.update_mouse_mode(window);
+
+                ImGui::Begin("Debug");
+
+                if (ImGui::Button("Previous frame")) {
+                    
+                }
+
+                ImGui::End();
+                
+                ui.end_frame(command_buffer);
+
 
                 renderer.render(command_buffer, scene);
             }
