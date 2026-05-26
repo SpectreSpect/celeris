@@ -12,6 +12,8 @@
 #include "../../camera/camera.h"
 
 
+
+
 class FrameResources {
 public:
     _XCLASS_NAME(FrameResources);    
@@ -21,6 +23,18 @@ public:
         glm::mat4 proj;
         glm::vec4 view_pos;
         glm::vec2 viewport;
+    };
+
+    struct FrameData {
+        DescriptorSet descriptor_set;
+    
+        VulkanBuffer camera_uniform;
+
+        VulkanBuffer light_source_ssbo;
+        VulkanBuffer lights_in_clusters_ssbo;
+        VulkanBuffer num_lights_in_clusters_ssbo;
+        VulkanBuffer cluster_aabbs_ssbo;
+        VulkanBuffer lighting_system_uniform;
     };
 
     FrameResources(VulkanPhysicalDevice& physical_device, VulkanDevice& device, uint32_t num_frames_in_flight);

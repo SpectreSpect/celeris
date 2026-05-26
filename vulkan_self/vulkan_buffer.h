@@ -33,6 +33,9 @@ public:
     
     ~VulkanBuffer() noexcept;
 
+    void fill(VulkanCommandBuffer& command_buffer, uint32_t data);
+    void fill(VulkanCommandBuffer& command_buffer, uint32_t data, VkDeviceSize size_bytes, VkDeviceSize offset = 0);
+
 private:
     void destroy() noexcept;
 
@@ -111,6 +114,18 @@ public:
     ) const;
 
     void transfer_write_to_vertex_read_barrier(
+        VulkanCommandBuffer& command_buffer,
+        VkDeviceSize offset_bytes = 0,
+        VkDeviceSize size_bytes = VK_WHOLE_SIZE
+    ) const;
+
+    void transfer_write_to_compute_read_write_barrier(
+        VulkanCommandBuffer& command_buffer,
+        VkDeviceSize offset_bytes = 0,
+        VkDeviceSize size_bytes = VK_WHOLE_SIZE
+    ) const;
+
+    void compute_write_to_fragment_read_barrier(
         VulkanCommandBuffer& command_buffer,
         VkDeviceSize offset_bytes = 0,
         VkDeviceSize size_bytes = VK_WHOLE_SIZE
@@ -199,6 +214,17 @@ public:
     );
 
     static VulkanBuffer create_host_visible_storage_buffer(
+        const VulkanEngine& engine,
+        VkDeviceSize size_bytes
+    );
+
+    static VulkanBuffer create_host_visible_transfer_dst_storage_buffer(
+        const VulkanPhysicalDevice& physical_device,
+        const VulkanDevice& device,
+        VkDeviceSize size_bytes
+    );
+
+    static VulkanBuffer create_host_visible_transfer_dst_storage_buffer(
         const VulkanEngine& engine,
         VkDeviceSize size_bytes
     );
