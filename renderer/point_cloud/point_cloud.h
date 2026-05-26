@@ -42,8 +42,6 @@ public:
     // const VulkanBuffer& owned_instance_buffer() const;
     // VulkanBuffer& owned_instance_buffer();
 
-    void set_instance_count(uint32_t instance_count);
-
 private:
     std::unique_ptr<InstanceBatch> m_instance_batch;
 };

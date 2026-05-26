@@ -86,6 +86,250 @@ struct SimpleStorage {
     glm::vec4 color2;
 };
 
+
+std::string to_string(glm::vec3 v) {
+    return std::string("(" + std::to_string(v.x) + ", " + std::to_string(v.y) + ", " + std::to_string(v.z) + ")");
+}
+
+std::string to_string(glm::vec4 v) {
+    return std::string("(" + std::to_string(v.x) + ", " + std::to_string(v.y) + ", " + std::to_string(v.z) + ", " + std::to_string(v.w) + ")");
+}
+
+std::string to_string(glm::quat q)
+{
+    std::ostringstream ss;
+    ss << "quat("
+       << "w: " << q.w << ", "
+       << "x: " << q.x << ", "
+       << "y: " << q.y << ", "
+       << "z: " << q.z
+       << ")";
+
+    return ss.str();
+}
+
+void print_point_cloud(PointCloud& point_cloud, int step = -1) {
+    if (step < 0)
+        std::cout << "=== Initial values ===" << std::endl;
+    else
+        std::cout << "=== Step " << step << " ===" << std::endl;
+    
+    std::cout << "source_point_cloud position: (" << to_string(point_cloud.transform.position) << std::endl;
+    std::cout << "source_point_cloud rotation: (" << to_string(point_cloud.transform.rotation) << std::endl;
+    std::cout << std::endl;
+}
+
+
+void generate(
+    std::vector<PointInstance>& source_points,
+    std::vector<PointInstance>& target_points,
+    std::vector<glm::vec4>& source_normals,
+    std::vector<glm::vec4>& target_normals
+)
+{
+    source_points.clear();
+    target_points.clear();
+    source_normals.clear();
+    target_normals.clear();
+
+    const glm::vec4 source_color = glm::vec4(1, 0, 0, 1);
+    const glm::vec4 target_color = glm::vec4(0, 0, 1, 1);
+
+    auto add_point =
+        [](
+            std::vector<PointInstance>& points,
+            std::vector<glm::vec4>& normals,
+            const glm::vec3& local_pos,
+            const glm::vec3& local_normal,
+            const glm::vec4& color,
+            const glm::mat4& transform
+        )
+    {
+        PointInstance point;
+
+        point.pos = transform * glm::vec4(local_pos, 1.0f);
+        point.color = color;
+
+        glm::vec3 world_normal = glm::normalize(glm::mat3(transform) * local_normal);
+
+        points.push_back(point);
+        normals.push_back(glm::vec4(world_normal, 0.0f));
+    };
+
+    auto add_grid_face =
+        [&](
+            std::vector<PointInstance>& points,
+            std::vector<glm::vec4>& normals,
+            const glm::vec3& origin,
+            const glm::vec3& u_axis,
+            const glm::vec3& v_axis,
+            const glm::vec3& normal,
+            int u_steps,
+            int v_steps,
+            const glm::vec4& color,
+            const glm::mat4& transform
+        )
+    {
+        for (int u_i = 0; u_i < u_steps; u_i++)
+        {
+            float u = float(u_i) / float(u_steps - 1);
+
+            for (int v_i = 0; v_i < v_steps; v_i++)
+            {
+                float v = float(v_i) / float(v_steps - 1);
+
+                glm::vec3 pos = origin + u_axis * u + v_axis * v;
+                add_point(points, normals, pos, normal, color, transform);
+            }
+        }
+    };
+
+    auto steps_for_length = [](float length)
+    {
+        const float points_per_unit = 12.0f;
+        return std::max(2, int(std::round(length * points_per_unit)) + 1);
+    };
+
+    auto add_cube =
+        [&](
+            std::vector<PointInstance>& points,
+            std::vector<glm::vec4>& normals,
+            const glm::vec3& bottom_center,
+            float size,
+            const glm::vec4& color,
+            const glm::mat4& transform
+        )
+    {
+        glm::vec3 min_corner = bottom_center + glm::vec3(-size * 0.5f, 0.0f, -size * 0.5f);
+        glm::vec3 max_corner = bottom_center + glm::vec3( size * 0.5f, size,  size * 0.5f);
+
+        int steps = steps_for_length(size);
+
+        // +X face
+        add_grid_face(
+            points, normals,
+            glm::vec3(max_corner.x, min_corner.y, min_corner.z),
+            glm::vec3(0, size, 0),
+            glm::vec3(0, 0, size),
+            glm::vec3(1, 0, 0),
+            steps, steps,
+            color, transform
+        );
+
+        // -X face
+        add_grid_face(
+            points, normals,
+            glm::vec3(min_corner.x, min_corner.y, min_corner.z),
+            glm::vec3(0, size, 0),
+            glm::vec3(0, 0, size),
+            glm::vec3(-1, 0, 0),
+            steps, steps,
+            color, transform
+        );
+
+        // +Z face
+        add_grid_face(
+            points, normals,
+            glm::vec3(min_corner.x, min_corner.y, max_corner.z),
+            glm::vec3(size, 0, 0),
+            glm::vec3(0, size, 0),
+            glm::vec3(0, 0, 1),
+            steps, steps,
+            color, transform
+        );
+
+        // -Z face
+        add_grid_face(
+            points, normals,
+            glm::vec3(min_corner.x, min_corner.y, min_corner.z),
+            glm::vec3(size, 0, 0),
+            glm::vec3(0, size, 0),
+            glm::vec3(0, 0, -1),
+            steps, steps,
+            color, transform
+        );
+
+        // Top face
+        add_grid_face(
+            points, normals,
+            glm::vec3(min_corner.x, max_corner.y, min_corner.z),
+            glm::vec3(size, 0, 0),
+            glm::vec3(0, 0, size),
+            glm::vec3(0, 1, 0),
+            steps, steps,
+            color, transform
+        );
+
+        // Bottom face skipped because the cube sits on the plane.
+    };
+
+    auto add_scene =
+        [&](
+            std::vector<PointInstance>& points,
+            std::vector<glm::vec4>& normals,
+            const glm::vec4& color,
+            const glm::mat4& transform
+        )
+    {
+        const float plane_length = 24.0f;
+        const float plane_width = 5.0f;
+
+        const int plane_length_steps = 240;
+        const int plane_width_steps = 50;
+
+        // Long flat plane
+        add_grid_face(
+            points, normals,
+            glm::vec3(-plane_length * 0.5f, 0.0f, -plane_width * 0.5f),
+            glm::vec3(plane_length, 0.0f, 0.0f),
+            glm::vec3(0.0f, 0.0f, plane_width),
+            glm::vec3(0.0f, 1.0f, 0.0f),
+            plane_length_steps,
+            plane_width_steps,
+            color,
+            transform
+        );
+
+        struct CubeSpec
+        {
+            glm::vec3 bottom_center;
+            float size;
+        };
+
+        const std::array<CubeSpec, 6> cubes =
+        {{
+            { glm::vec3(-8.0f, 0.0f, -1.4f), 1.0f },
+            { glm::vec3(-4.5f, 0.0f,  1.2f), 1.3f },
+            { glm::vec3(-1.0f, 0.0f, -0.8f), 0.9f },
+            { glm::vec3( 3.0f, 0.0f,  1.4f), 1.1f },
+            { glm::vec3( 6.5f, 0.0f, -1.1f), 1.5f },
+            { glm::vec3( 9.0f, 0.0f,  0.7f), 0.8f },
+        }};
+
+        for (const CubeSpec& cube : cubes)
+        {
+            add_cube(
+                points,
+                normals,
+                cube.bottom_center,
+                cube.size,
+                color,
+                transform
+            );
+        }
+    };
+
+    glm::mat4 source_transform = glm::mat4(1.0f);
+
+    glm::mat4 target_transform = glm::mat4(1.0f);
+    target_transform = glm::translate(target_transform, glm::vec3(1.5f, 0.25f, -0.8f));
+    target_transform = glm::rotate(target_transform, glm::radians(8.0f), glm::vec3(0, 1, 0));
+
+    add_scene(source_points, source_normals, source_color, source_transform);
+    add_scene(target_points, target_normals, target_color, target_transform);
+}
+
+
 int main() {
     GlfwContext glfw_context;
     Window window(glfw_context, 1280, 720, "Vulkan engine");
@@ -147,19 +391,6 @@ int main() {
     RenderObject unlit_cube2(mesh_manager.cube, material_instance_manager.dirt_blinn_phong);
     RenderObject unlit_cube3(mesh_manager.cube, material_instance_manager.rock_blinn_phong);
     RenderObject unlit_cube4(mesh_manager.cube, material_instance_manager.unlit);
-
-    std::vector<PointInstance> points;
-
-    for (int x = 0; x < 100; x++)
-        for (int z = 0; z < 100; z++) {
-            static PointInstance point;
-
-            point.pos.x = x * 0.01;
-            point.pos.z = z * 0.01;
-            point.color = glm::vec4(x / 100.0f, 0, z / 100.0f, 1);
-
-            points.push_back(point);
-        }
     
     std::vector<PointInstance> source_points;
     std::vector<glm::vec4> source_normals;
@@ -167,24 +398,56 @@ int main() {
     std::vector<PointInstance> target_points;
     std::vector<glm::vec4> target_normals;
 
-    for (int x = 0; x < 100; x++)
-        for (int z = 0; z < 100; z++) {
-            static PointInstance point;
+    generate(source_points, target_points, source_normals, target_normals);
 
-            glm::vec4 normal = glm::vec4(0, 1, 0, 1);
+    // const int lat_steps = 100;
+    // const int lon_steps = 100;
 
-            point.pos.x = x;
-            point.pos.z = z;
-            point.color = glm::vec4(0, 0, 1, 1);
+    // const float radius = 3.0f;
 
-            target_points.push_back(point);
-            target_normals.push_back(normal);
+    // glm::vec3 source_center = glm::vec3(0.0f, 0.0f, 0.0f);
+    // glm::vec3 target_center = glm::vec3(0.0f, 0.0f, 0.0f);
 
-            point.color = glm::vec4(1, 0, 0, 1);
+    // for (int lat = 0; lat < lat_steps; lat++)
+    // {
+    //     float theta = glm::pi<float>() * float(lat) / float(lat_steps - 1);
+    //     // theta: 0 -> pi
 
-            source_points.push_back(point);
-            source_normals.push_back(normal);
-        }
+    //     for (int lon = 0; lon < lon_steps; lon++)
+    //     {
+    //         float phi = glm::two_pi<float>() * float(lon) / float(lon_steps);
+    //         // phi: 0 -> 2pi
+
+    //         glm::vec3 unit_pos;
+    //         unit_pos.x = std::sin(theta) * std::cos(phi);
+    //         unit_pos.y = std::cos(theta);
+    //         unit_pos.z = std::sin(theta) * std::sin(phi);
+
+    //         glm::vec4 normal = glm::vec4(unit_pos, 0.0f);
+
+    //         {
+    //             PointInstance point;
+    //             glm::vec3 pos = target_center + unit_pos * radius;
+
+    //             point.pos = glm::vec4(pos, 1.0f);
+    //             point.color = glm::vec4(0, 0, 1, 1);
+
+    //             target_points.push_back(point);
+    //             target_normals.push_back(normal);
+    //         }
+
+    //         {
+    //             PointInstance point;
+    //             glm::vec3 pos = source_center + unit_pos * radius;
+
+    //             point.pos = glm::vec4(pos, 1.0f);
+    //             point.color = glm::vec4(1, 0, 0, 1);
+
+    //             source_points.push_back(point);
+    //             source_normals.push_back(normal);
+    //         }
+    //     }
+    // }
     
     VulkanBuffer source_normal_buffer(VulkanBuffer::create_host_visible_storage_buffer(engine, source_normals.size() * sizeof(glm::vec4)));
     VulkanBuffer target_normal_buffer(VulkanBuffer::create_host_visible_storage_buffer(engine, target_normals.size() * sizeof(glm::vec4)));
@@ -196,10 +459,54 @@ int main() {
     PointCloud source_point_cloud(manager_bundle, source_points);
 
     source_point_cloud.transform.position = glm::vec4(1, 1, 1, 1);
+
+    print_point_cloud(source_point_cloud, -1);
     
-    PointCloud point_cloud(manager_bundle, points);
+    // PointCloud point_cloud(manager_bundle, points);
     // LidarScan lidar_scan(manager_bundle, path_utils::executable_dir() / "assets" / "lidar_scans" / "frame_000000.bin");
-    LidarVideo lidar_video(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 20);
+    LidarVideo lidar_video(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, -1);
+
+
+    uint32_t test_frame = 0;
+    size_t current_frame_id = 0;
+    size_t last_inserted_frame_id = current_frame_id;
+
+
+    // Important: save original first frame pose before overwriting it.
+    glm::vec3 first_position = lidar_video.get_scan(0).point_cloud().transform.position;
+    glm::quat first_rotation = glm::normalize(lidar_video.get_scan(0).point_cloud().transform.rotation);
+
+    for (int i = static_cast<int>(lidar_video.get_scan_count()) - 1; i >= 1; --i) {
+        glm::vec3 p_prev = lidar_video.get_scan(i - 1).point_cloud().transform.position;
+        glm::vec3 p_curr = lidar_video.get_scan(i).point_cloud().transform.position;
+
+        glm::quat q_prev = glm::normalize(lidar_video.get_scan(i - 1).point_cloud().transform.rotation);
+        glm::quat q_curr = glm::normalize(lidar_video.get_scan(i).point_cloud().transform.rotation);
+
+        // Optional: avoid quaternion sign discontinuity.
+        // q and -q represent the same rotation.
+        if (glm::dot(q_prev, q_curr) < 0.0f) {
+            q_curr = -q_curr;
+        }
+
+        glm::vec3 delta_position = p_curr - p_prev;
+
+        // Since your update convention is:
+        // q_new = dq * q_old
+        glm::quat delta_rotation = glm::normalize(q_curr * glm::inverse(q_prev));
+
+        lidar_video.get_scan(i).point_cloud().transform.position = delta_position;
+        lidar_video.get_scan(i).point_cloud().transform.rotation = delta_rotation;
+    }
+
+    lidar_video.get_scan(0).point_cloud().transform.position = glm::vec3(0.0f);
+    lidar_video.get_scan(0).point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+
+
+
+
+
+
 
     // PointCloud& target_point_cloud = lidar_video.get_scan(0).point_cloud();
     // PointCloud& source_point_cloud = lidar_video.get_scan(4).point_cloud();
@@ -235,7 +542,7 @@ int main() {
     unlit_cube.add_child(unlit_cube2);
     unlit_cube2.add_child(unlit_cube3);
     unlit_cube3.add_child(unlit_cube4);
-    unlit_cube4.add_child(point_cloud);
+    // unlit_cube4.add_child(point_cloud);
 
     Scene scene;
 
@@ -244,7 +551,9 @@ int main() {
     // scene.add(unlit_cube);
     // scene.add(lidar_video);
     scene.add(voxel_map_point_cloud);
-    scene.add(lidar_video);
+    // scene.add(source_point_cloud);
+    
+    // scene.add(lidar_video);
     // scene.add(lidar_video.get_scan(2).point_cloud());
     // scene.add(source_point_cloud);
     // scene.add(target_point_cloud);
@@ -254,6 +563,8 @@ int main() {
 
     bool g_pressed = false;
     bool n_pressed = false;
+
+    int step = 0;
     
     float last_frame_time = 0.0f;
     float start_time = (float)glfwGetTime();
@@ -302,6 +613,11 @@ int main() {
 
                 gicp_pass.step(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
             }
+
+            // gicp_pass.step(voxel_point_map, source_point_cloud, source_normal_buffer);
+
+            // print_point_cloud(source_point_cloud, step);
+            step++;
         }
 
         if (g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_RELEASE) {
@@ -313,11 +629,28 @@ int main() {
             
             uint32_t current_frame_id = lidar_video.current_frame_id();
 
+
+            // if (current_frame_id > 0) {
+            //     auto& curr = point_cloud_video.frames[current_frame_id].point_cloud;
+            //     const auto& prev = point_cloud_video.frames[current_frame_id - 1].point_cloud;
+
+            //     curr.position = prev.position + curr.position;
+
+            //     curr.rotation = glm::normalize(curr.rotation * prev.rotation);
+            // }
+
             if (current_frame_id > 0) {
                 LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
                 LidarScan& previous_scan = lidar_video.get_scan(current_frame_id - 1);
 
-                // gicp_pass.fit(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer(), 10);
+                PointCloud& current_point_cloud = current_scan.point_cloud();
+                PointCloud& previous_point_cloud = previous_scan.point_cloud();
+
+                current_point_cloud.transform.position = previous_point_cloud.transform.position + current_point_cloud.transform.position;
+
+                current_point_cloud.transform.rotation = glm::normalize(current_point_cloud.transform.rotation * previous_point_cloud.transform.rotation);
+
+                gicp_pass.fit(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer(), 10);
 
                 voxel_map_inserter.insert(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
                 voxel_map_point_cloud.set_instance_view(voxel_point_map.get_map_instance_view());
@@ -325,7 +658,7 @@ int main() {
             
             lidar_video.next_frame();
 
-            lidar_video.compose_current_pose_from_previous();
+            // lidar_video.compose_current_pose_from_previous();
         }
 
         if (n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_RELEASE) {

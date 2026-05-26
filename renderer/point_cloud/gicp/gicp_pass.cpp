@@ -45,7 +45,7 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
     
     uniform_data.rotation = glm::vec4(q.x, q.y, q.z, q.w);
     uniform_data.num_source_points = source_point_cloud.instance_count();
-    uniform_data.num_target_points = voxel_point_map.m_map_point_count;
+    uniform_data.num_target_points = voxel_point_map.m_map_point_count; // 1824 2067 2186 2090
     uniform_data.num_hash_table_slots = voxel_point_map.m_num_hash_table_slots;
 
     uniform_buffer.upload(&uniform_data, sizeof(GICPPassUniform));
@@ -74,8 +74,29 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
     compute_fence.reset();
     engine.compute_submit(compute_command_buffer, &compute_fence);
     compute_fence.wait();
+
+
+    // std::vector<GICPReductor::GICPPartial> test_parcial_src;
+    // test_parcial_src.resize(100);
+    // for (int i = 0; i < test_parcial_src.size(); i++) {
+    //     GICPReductor::GICPPartial parital{};
+
+    //     for (int x = 0; x < 6; x++) {
+    //         parital.g[x] = x + i;
+    //         for (int y = 0; y < 6; y++) {
+    //             parital.H[x][y] = x + y + i;
+    //         }
+    //     }
+    //     parital.total_weighted_sq_error = i;
+    //     parital.valid_count = 1;
+
+    //     test_parcial_src[i] = parital;
+    // }
+    // // partial_src.upload(test_parcial_src.data(), test_parcial_src.size() * sizeof(GICPReductor::GICPPartial), 0);
+    // partial_src.upload(test_parcial_src, 0);
     
-    uint32_t partial_count = math_utils::div_up_u32(source_point_cloud.instance_count(), 32);;
+    uint32_t partial_count = math_utils::div_up_u32(source_point_cloud.instance_count(), 32);
+    // uint32_t partial_count =  math_utils::div_up_u32(test_parcial_src.size(), 32);
     GICPReductor::GICPPartial result = reductor.reduce(partial_src, partial_dst, partial_count);
 
     const float max_rot = glm::radians(5.0f);

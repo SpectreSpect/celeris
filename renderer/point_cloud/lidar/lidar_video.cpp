@@ -133,7 +133,7 @@ void LidarVideo::load_from_file(ManagerBundle& manager_bundle, const std::filesy
 
     m_timer = 0.0f;
 
-    make_poses_relative_like_old_version();
+    // make_poses_relative_like_old_version();
 
     if (!m_scans.empty())
         set_frame(0);
@@ -323,6 +323,10 @@ LidarScan& LidarVideo::get_scan(uint32_t scan_id) {
     logger.check(scan_id >= 0 && scan_id < m_scans.size(), "Lidar video frame index was out of bounds");
 
     return m_scans[scan_id];
+}
+
+uint32_t LidarVideo::get_scan_count() {
+    return m_scans.size();
 }
 
 void LidarVideo::sync() {
