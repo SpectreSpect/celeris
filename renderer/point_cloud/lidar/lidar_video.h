@@ -42,8 +42,8 @@ public:
     static inline glm::mat3 basis_M_ros_to_engine();
     static glm::vec3 ros_rpy_to_engine_rpy(const glm::vec3& rpy_ros);
 
-    void make_poses_relative_like_old_version();
-    void compose_current_pose_from_previous();
+    // void make_poses_relative_like_old_version();
+    // void compose_current_pose_from_previous();
 
     uint32_t current_frame_id() const;
     void next_frame();
