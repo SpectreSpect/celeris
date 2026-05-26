@@ -1,5 +1,7 @@
 #include "fps_camera_controller.h"
 
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
 
 FPSCameraController::FPSCameraController(Camera& camera) : m_camera(camera) {}
 
@@ -68,13 +70,13 @@ void FPSCameraController::update_mouse(Window& window, float delta_time) {
 }
 
 void FPSCameraController::update(Window& window, float delta_time) {
-    // ImGuiIO& io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
 
-    // bool ui_wants_mouse = io.WantCaptureMouse;
-    // bool ui_wants_keys  = io.WantCaptureKeyboard;
+    bool ui_wants_mouse = io.WantCaptureMouse;
+    bool ui_wants_keys  = io.WantCaptureKeyboard;
 
-    // if (!ui_wants_mouse && !ui_wants_keys) {
-    update_keyboard(window, delta_time);
-    update_mouse(window, delta_time);
-    // }
+    if (!ui_wants_mouse && !ui_wants_keys) {
+        update_keyboard(window, delta_time);
+        update_mouse(window, delta_time);
+    }
 }

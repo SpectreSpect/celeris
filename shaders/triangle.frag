@@ -38,6 +38,19 @@ layout(push_constant) uniform PushConstants {
     uint material_data_id;
 } pc;
 
+vec4 linear_to_srgb(vec4 color)
+{
+    vec3 rgb = max(color.rgb, vec3(0.0));
+
+    vec3 low  = rgb * 12.92;
+    vec3 high = 1.055 * pow(rgb, vec3(1.0 / 2.4)) - 0.055;
+
+    vec3 srgb = mix(low, high, lessThanEqual(rgb, vec3(0.0031308)));
+
+    return vec4(srgb, color.a);
+}
+
+
 void main() {
     // vec3 base_color = ubo.color.rgb;
     MaterialData material_data = material_buffer.materials[pc.material_data_id];
@@ -73,6 +86,6 @@ void main() {
 
     vec3 final_color = ambient + diffuse_c + specular_c;
 
-    out_color = vec4(final_color, 1);
+    out_color = linear_to_srgb(vec4(final_color, 1));
     // out_color = ;
 }
