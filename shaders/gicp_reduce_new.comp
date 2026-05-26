@@ -1,0 +1,115 @@
+#version 460
+layout(local_size_x = 64) in;
+
+struct GICPPartial {
+    double H[6][6];
+    double g[6];
+    double total_weighted_sq_error;
+    uint valid_count;
+};
+
+layout(set = 0, binding = 0) uniform UniformBufferObject {
+    uint input_count;
+} ubo;
+
+layout(std430, set = 0, binding = 1) readonly buffer SourcePartialBuffer {
+    GICPPartial partials[];
+} source_partial_buffer;
+
+layout(std430, set = 0, binding = 2) writeonly buffer OutputPartialBuffer {
+    GICPPartial partials[];
+} output_partial_buffer;
+
+shared GICPPartial scratch[64];
+
+void zero_scratch(uint scratch_index) {
+    for (int r = 0; r < 6; ++r) {
+        scratch[scratch_index].g[r] = 0.0;
+
+        for (int c = 0; c < 6; ++c) {
+            scratch[scratch_index].H[r][c] = 0.0;
+        }
+    }
+
+    scratch[scratch_index].total_weighted_sq_error = 0.0;
+    scratch[scratch_index].valid_count = 0u;
+}
+
+void load_source_to_scratch(uint scratch_index, uint source_index) {
+    for (int r = 0; r < 6; ++r) {
+        scratch[scratch_index].g[r] =
+            source_partial_buffer.partials[source_index].g[r];
+
+        for (int c = 0; c < 6; ++c) {
+            scratch[scratch_index].H[r][c] =
+                source_partial_buffer.partials[source_index].H[r][c];
+        }
+    }
+
+    scratch[scratch_index].total_weighted_sq_error =
+        source_partial_buffer.partials[source_index].total_weighted_sq_error;
+
+    scratch[scratch_index].valid_count =
+        source_partial_buffer.partials[source_index].valid_count;
+}
+
+void store_scratch_to_output(uint output_index, uint scratch_index) {
+    for (int r = 0; r < 6; ++r) {
+        output_partial_buffer.partials[output_index].g[r] =
+            scratch[scratch_index].g[r];
+
+        for (int c = 0; c < 6; ++c) {
+            output_partial_buffer.partials[output_index].H[r][c] =
+                scratch[scratch_index].H[r][c];
+        }
+    }
+
+    output_partial_buffer.partials[output_index].total_weighted_sq_error =
+        scratch[scratch_index].total_weighted_sq_error;
+
+    output_partial_buffer.partials[output_index].valid_count =
+        scratch[scratch_index].valid_count;
+}
+
+void add_to_first(uint a_index, uint b_index) {
+    for (int r = 0; r < 6; ++r) {
+        scratch[a_index].g[r] += scratch[b_index].g[r];
+
+        for (int c = 0; c < 6; ++c) {
+            scratch[a_index].H[r][c] += scratch[b_index].H[r][c];
+        }
+    }
+
+    scratch[a_index].total_weighted_sq_error +=
+        scratch[b_index].total_weighted_sq_error;
+
+    scratch[a_index].valid_count +=
+        scratch[b_index].valid_count;
+}
+
+void main() {
+    uint lid  = gl_LocalInvocationID.x;
+    uint gid  = gl_WorkGroupID.x;
+    uint base = gid * gl_WorkGroupSize.x;
+    uint idx  = base + lid;
+
+    if (idx < ubo.input_count) {
+        load_source_to_scratch(lid, idx);
+    } else {
+        zero_scratch(lid);
+    }
+
+    barrier();
+
+    for (uint stride = gl_WorkGroupSize.x >> 1; stride > 0; stride >>= 1) {
+        if (lid < stride) {
+            add_to_first(lid, lid + stride);
+        }
+
+        barrier();
+    }
+
+    if (lid == 0) {
+        store_scratch_to_output(gid, 0);
+    }
+}

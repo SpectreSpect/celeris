@@ -42,10 +42,16 @@ public:
     static inline glm::mat3 basis_M_ros_to_engine();
     static glm::vec3 ros_rpy_to_engine_rpy(const glm::vec3& rpy_ros);
 
+    // void make_poses_relative_like_old_version();
+    // void compose_current_pose_from_previous();
+
     uint32_t current_frame_id() const;
     void next_frame();
     void previous_frame();
     void set_frame(uint32_t id);
+
+    LidarScan& get_scan(uint32_t scan_id);
+    uint32_t get_scan_count();
 
     size_t get_frame_id(float time, size_t search_start_id = 0) const;
 

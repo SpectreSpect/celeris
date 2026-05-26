@@ -1,0 +1,45 @@
+#version 460
+layout(local_size_x = 256) in;
+
+// #define VOXEL_HASH_TABLE_SIZE 1024u
+#define VOXEL_SLOT_EMPTY 0xFFFFFFFFu
+#define VOXEL_INVALID_ID 0xFFFFFFFFu
+
+struct PointInstance {
+    vec4 position;
+    vec4 color;
+};
+
+struct VoxelHashSlot {
+    uint  state;
+    ivec4 key;
+    uint  value;
+};
+
+layout(set = 0, binding = 0) uniform ParamsBuffer {
+    uint num_hash_table_slots;
+} params;
+
+
+layout(std430, set = 0, binding = 2) buffer MapPointCountBuffer {
+    uint count;
+} map_point_count_buffer;
+
+layout(std430, set = 0, binding = 4) buffer VoxelHashTableBuffer {
+    VoxelHashSlot slots[];
+} voxel_table;
+
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+
+    if (id < params.num_hash_table_slots) {
+        voxel_table.slots[id].state = VOXEL_SLOT_EMPTY;
+        voxel_table.slots[id].key   = ivec4(0);
+        voxel_table.slots[id].value = VOXEL_INVALID_ID;
+    }
+
+    if (id == 0u) {
+        map_point_count_buffer.count = 0u;
+    }
+}

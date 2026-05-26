@@ -18,6 +18,10 @@ private:
 
 public:
     ComputePass test_compute_pass;
+    ComputePass gicp_cp;
+    ComputePass point_voxel_map_insert_cp;
+    ComputePass reset_voxel_point_map_cp;
+    ComputePass gicp_reduce_cp;
 
     ComputePassManager(VulkanDevice& device, ShaderManager& shader_manager);
 
@@ -26,9 +30,12 @@ public:
     ComputePass create_pass(VulkanDevice& device, ComputePassBuilder& builder);
 
     ComputePass create_test_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_gicp_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_point_voxel_map_insert_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_reset_voxel_point_map_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_gicp_reduce_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
 private:
-    
     DescriptorPool m_pool;
     static constexpr uint32_t m_max_compute_pass_instances = 256;
 };

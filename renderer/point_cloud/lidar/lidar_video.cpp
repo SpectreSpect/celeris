@@ -111,8 +111,8 @@ void LidarVideo::load_from_file(ManagerBundle& manager_bundle, const std::filesy
         glm::vec3 lidar_pos_eng, lidar_rpy_eng;
         mat4_to_pose(T_world_lidar, lidar_pos_eng, lidar_rpy_eng);
 
-        m_scans.back().transform.position = lidar_pos_eng;
-        m_scans.back().transform.rotation = lidar_rpy_eng;
+        m_scans.back().point_cloud().transform.position = lidar_pos_eng;
+        m_scans.back().point_cloud().transform.rotation = lidar_rpy_eng;
 
         // frames.back().point_cloud.color = glm::vec4(1, 0, 0, 1);
 
@@ -274,6 +274,18 @@ void LidarVideo::set_frame(uint32_t id) {
     m_current_frame_id = id;
 
     sync();
+}
+
+LidarScan& LidarVideo::get_scan(uint32_t scan_id) {
+    LOG_METHOD();
+
+    logger.check(scan_id >= 0 && scan_id < m_scans.size(), "Lidar video frame index was out of bounds");
+
+    return m_scans[scan_id];
+}
+
+uint32_t LidarVideo::get_scan_count() {
+    return m_scans.size();
 }
 
 void LidarVideo::sync() {
