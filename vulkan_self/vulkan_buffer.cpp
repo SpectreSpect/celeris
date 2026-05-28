@@ -86,6 +86,21 @@ void VulkanBuffer::destroy() noexcept {
     m_memory.reset();
 }
 
+void VulkanBuffer::fill(VulkanCommandBuffer& command_buffer, uint32_t data) {
+    LOG_METHOD();
+
+    vkCmdFillBuffer(command_buffer.handle(), m_buffer, 0, m_size, data);
+}
+
+void VulkanBuffer::fill(VulkanCommandBuffer& command_buffer, uint32_t data, VkDeviceSize size_bytes, VkDeviceSize offset) {
+    LOG_METHOD();
+
+    logger.check(size_bytes > 0, "Size bytes should be greater than 0");
+    logger.check(offset > size_bytes, "Offset was out of bounds");
+
+    vkCmdFillBuffer(command_buffer.handle(), m_buffer, offset, size_bytes, data);
+}
+
 VulkanBuffer::VulkanBuffer(VulkanBuffer&& other) noexcept
     :   m_device(std::exchange(other.m_device, VK_NULL_HANDLE)),
         m_buffer(std::exchange(other.m_buffer, VK_NULL_HANDLE)),
@@ -217,6 +232,57 @@ void VulkanBuffer::transfer_write_to_vertex_read_barrier(
         VK_ACCESS_TRANSFER_WRITE_BIT,
         VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
         VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
+        offset_bytes,
+        size_bytes
+    );
+}
+
+void VulkanBuffer::transfer_write_to_compute_read_write_barrier(
+    VulkanCommandBuffer& command_buffer,
+    VkDeviceSize offset_bytes,
+    VkDeviceSize size_bytes
+) const {
+    LOG_METHOD();
+
+    logger.check(
+        has_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT),
+        "Buffer was not created with VK_BUFFER_USAGE_TRANSFER_DST_BIT"
+    );
+
+    logger.check(
+        has_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT),
+        "Buffer was not created with VK_BUFFER_USAGE_STORAGE_BUFFER_BIT"
+    );
+
+    memory_barrier(
+        command_buffer,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_ACCESS_TRANSFER_WRITE_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+        offset_bytes,
+        size_bytes
+    );
+}
+
+void VulkanBuffer::compute_write_to_fragment_read_barrier(
+    VulkanCommandBuffer& command_buffer,
+    VkDeviceSize offset_bytes,
+    VkDeviceSize size_bytes
+) const {
+    LOG_METHOD();
+
+    logger.check(
+        has_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT),
+        "Buffer was not created with VK_BUFFER_USAGE_STORAGE_BUFFER_BIT"
+    );
+
+    memory_barrier(
+        command_buffer,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT,
         offset_bytes,
         size_bytes
     );
@@ -489,6 +555,51 @@ VulkanBuffer VulkanBuffer::create_host_visible_storage_buffer(
         size_bytes
     );
 }
+
+VulkanBuffer VulkanBuffer::create_host_visible_transfer_dst_storage_buffer(
+    const VulkanPhysicalDevice& physical_device,
+    const VulkanDevice& device,
+    VkDeviceSize size_bytes
+) {
+    LOG_NAMED("VulkanBuffer");
+
+    logger.check(
+        physical_device.handle() != VK_NULL_HANDLE,
+        "Physical device is not initialized"
+    );
+
+    logger.check(
+        device.handle() != VK_NULL_HANDLE,
+        "Device is not initialized"
+    );
+
+    logger.check(
+        size_bytes != 0,
+        "Attempt to create buffer with zero size"
+    );
+
+    return VulkanBuffer(
+        physical_device,
+        device,
+        size_bytes,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    );
+}
+
+VulkanBuffer VulkanBuffer::create_host_visible_transfer_dst_storage_buffer(
+    const VulkanEngine& engine,
+    VkDeviceSize size_bytes
+) {
+    return create_host_visible_transfer_dst_storage_buffer(
+        engine.physical_device(),
+        engine.device(),
+        size_bytes
+    );
+}
+
 
 VulkanBuffer VulkanBuffer::create_host_visible_vertex_buffer(
     const VulkanPhysicalDevice& physical_device,

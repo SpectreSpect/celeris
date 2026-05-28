@@ -53,6 +53,7 @@
 #include "renderer/point_cloud/gicp/voxel_map_point_inserter.h"
 #include "renderer/point_cloud/gicp/voxel_map_point_reseter.h"
 #include "imgui_layer.h"
+#include "renderer/lighting_system/lighting_system.h"
 
 #include <vector>
 
@@ -103,14 +104,18 @@ int main() {
     FPSCameraController camera_controller(camera);
     camera_controller.speed = 20;
 
-    FrameResources frame_resources(engine.physical_device(), engine.device(), engine.num_frames_in_flight());
-    
     VulkanResourceLoader resource_loader(engine, 1024 * 1024 * 100); // 1 Мб
 
     ShaderManager shader_manager(engine.device());
     TextureManager texture_manager(engine, resource_loader);
-    MaterialManager material_manager(engine, shader_manager, frame_resources);
     ComputePassManager compute_pass_manager(engine.device(), shader_manager);
+
+    LightingSystem lighting_system(engine, compute_pass_manager);
+    FrameResources frame_resources(engine, lighting_system, engine.num_frames_in_flight());
+
+    lighting_system.set_frame_resources(frame_resources);
+
+    MaterialManager material_manager(engine, shader_manager, frame_resources);
     MaterialInstanceManager material_instance_manager(engine, material_manager, texture_manager);
     MeshManager mesh_manager(engine, resource_loader);
     ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
@@ -125,6 +130,19 @@ int main() {
     RenderObject unlit_cube2(mesh_manager.cube, material_instance_manager.dirt_blinn_phong);
     RenderObject unlit_cube3(mesh_manager.cube, material_instance_manager.rock_blinn_phong);
     RenderObject unlit_cube4(mesh_manager.cube, material_instance_manager.unlit);
+
+    // LightSource light_source{};
+    // light_source.color = glm::vec4(1, 1, 1, 1);
+    // light_source.position = glm::vec4(1, 1, 1, 5);
+
+    LightSource light_source0 = {glm::vec4(1, 1, 1, 5), glm::vec4(0, 1, 0, 1)};
+    LightSource light_source1 = {glm::vec4(2, 1, 0, 5), glm::vec4(1, 0, 0, 1)};
+    
+
+    // lighting_system.set_light_source(0, {glm::vec4(1, 1, 1, 5), glm::vec4(0, 1, 0, 1)});
+    // lighting_system.set_light_source(1, {glm::vec4(2, 1, 0, 5), glm::vec4(1, 0, 0, 1)});
+    // lighting_system.set_light_source(2, {glm::vec4(0, 1, 2, 5), glm::vec4(0, 1, 0, 1)});
+    // lighting_system.set_light_source(3, {glm::vec4(-2, 1, 0, 5), glm::vec4(0, 0, 1, 1)});
     
     LidarVideo lidar_video(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 10);
 
@@ -175,19 +193,25 @@ int main() {
     material_instance_manager.rock_blinn_phong.material_buffer.sync();
     material_instance_manager.dirt_blinn_phong.material_buffer.sync();
 
-    unlit_cube.transform.position.x = 0;
+    unlit_cube.transform.position = glm::vec4(0, 0, 0, 1);
+
+    unlit_cube.transform.scale = glm::vec3(50, 1, 50);
+
+    // unlit_cube.transform.position.x = 0;
     unlit_cube2.transform.position.x = 2;
     unlit_cube3.transform.position.x = 4;
     unlit_cube4.transform.position.x = 6;
 
-    unlit_cube.add_child(unlit_cube2);
-    unlit_cube2.add_child(unlit_cube3);
-    unlit_cube3.add_child(unlit_cube4);
+    // unlit_cube.add_child(unlit_cube2);
+    // unlit_cube2.add_child(unlit_cube3);
+    // unlit_cube3.add_child(unlit_cube4);
     // unlit_cube4.add_child(point_cloud);
 
     Scene scene;
 
-    scene.add(voxel_map_point_cloud);
+    // scene.add(voxel_map_point_cloud);
+
+    scene.add(unlit_cube);
 
     bool g_pressed = false;
     bool n_pressed = false;
@@ -209,8 +233,15 @@ int main() {
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
 
+        light_source0.position.x = cos(timer) * 10;
+        light_source1.position.x = sin(timer) * 10;
+
+        lighting_system.set_light_source(0, light_source0);
+        lighting_system.set_light_source(1, light_source1);
+
         camera_controller.update(window, delta_time);
-        frame_resources.update_camera(engine.current_frame(), camera);
+        frame_resources.update_camera(engine.current_frame(), window, camera);
+        lighting_system.update(engine.current_frame(), window, camera);
 
         if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
             g_pressed = true;

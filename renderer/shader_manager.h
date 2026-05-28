@@ -23,4 +23,6 @@ public:
     VulkanShaderModule insert_points_into_voxel_map_cs;
     VulkanShaderModule reset_point_voxel_map_cs;
     VulkanShaderModule gicp_reduce_cs;
+    
+    VulkanShaderModule build_cluster_light_lists_cs;
 };

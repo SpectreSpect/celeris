@@ -21,12 +21,6 @@ struct Plane {
     }
 };
 
-struct AABB {
-    glm::vec4 min;
-    glm::vec4 max;   
-};
-
-
 class Camera{
 public:
     glm::vec3 position;
