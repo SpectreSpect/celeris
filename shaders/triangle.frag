@@ -1,6 +1,6 @@
 #version 450
 
-#define USE_CLUSTERED_LIGHTS 0
+#define USE_CLUSTERED_LIGHTS 1
 
 layout(location = 0) in vec3 frag_world_pos;
 layout(location = 1) in vec3 frag_normal;
@@ -24,39 +24,34 @@ layout(std430, set = 0, binding = 0) readonly buffer MaterialBuffer {
 
 layout(set = 0, binding = 1) uniform sampler2D texSampler;
 
-#if USE_CLUSTERED_LIGHTS
-layout(std430, set = 1, binding = 4) readonly buffer LightSourcesBuffer {
-    LightSource light_sources[];
-};
-
-layout(std430, set = 1, binding = 5) readonly buffer NumLightsInClustersBuffer {
-    uint num_lights_in_clusters[];
-};
-
-layout(std430, set = 1, binding = 6) readonly buffer LightsInClustersBuffer {
-    uint lights_in_clusters[];
-};
-#endif
-
 layout(set = 1, binding = 0) uniform CameraUniform {
     mat4 view;
     mat4 proj;
     vec4 viewPos;
 } camera_uniform;
 
-layout(set = 1, binding = 3) uniform ClusteredLightingUniform {
-    // x = x tiles
-    // y = y tiles
-    // z = z slices
-    // w = max lights per cluster
-    uvec4 cluster_grid;
 
-    // x = screen width
-    // y = screen height
-    // z = near plane
-    // w = far plane
+#if USE_CLUSTERED_LIGHTS
+layout(set = 1, binding = 3) uniform ClusteredLightingUniform {
+    uvec4 cluster_grid;
     vec4 screen_params;
 } lighting_uniform;
+
+layout(std430, set = 1, binding = 5) readonly buffer LightSourcesBuffer {
+    LightSource light_sources[];
+};
+
+layout(std430, set = 1, binding = 6) readonly buffer NumLightsInClustersBuffer {
+    uint num_lights_in_clusters[];
+};
+
+layout(std430, set = 1, binding = 7) readonly buffer LightsInClustersBuffer {
+    uint lights_in_clusters[];
+};
+#endif
+
+
+
 
 layout(push_constant) uniform PushConstants {
     mat4 model;
@@ -84,6 +79,9 @@ uint compute_cluster_id()
     float fx = clamp(gl_FragCoord.x, 0.0, screen_width - 1.0);
     float fy = clamp(gl_FragCoord.y, 0.0, screen_height - 1.0);
 
+    // Important: match CPU cluster generation where y=0 is bottom.
+    fy = screen_height - 1.0 - fy;
+
     uint tile_x = uint(fx * float(x_tiles) / screen_width);
     uint tile_y = uint(fy * float(y_tiles) / screen_height);
 
@@ -93,9 +91,7 @@ uint compute_cluster_id()
     vec3 frag_view_pos = vec3(camera_uniform.view * vec4(frag_world_pos, 1.0));
 
     float view_z = -frag_view_pos.z;
-    if (view_z <= 0.0) {
-        view_z = near_plane;
-    }
+    view_z = max(view_z, near_plane);
 
     float ln_z = log(max(view_z, 1e-6));
     float ln_near = log(max(near_plane, 1e-6));
@@ -217,4 +213,6 @@ void main()
 #endif
 
     out_color = linear_to_srgb(vec4(final_color, 1.0));
+
+    // out_color = vec4(count, count, count, 1);
 }

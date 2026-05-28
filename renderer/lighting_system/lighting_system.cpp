@@ -17,11 +17,11 @@ LightingSystem::LightingSystem(VulkanEngine& engine, ComputePassManager& compute
     
         m_light_sources(m_max_num_light_sources, {glm::vec4(0.0f), glm::vec4(0.0f)}),
         m_lights_in_clusters(m_total_clusters_count),
-        m_light_source_ssbo(VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(LightSource) * m_max_num_light_sources)),
-        m_lights_in_clusters_ssbo(VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(unsigned int) * m_lights_in_clusters_size)),
-        m_num_lights_in_clusters_ssbo(VulkanBuffer::create_host_visible_transfer_dst_storage_buffer(engine, sizeof(unsigned int) * m_total_clusters_count)),
-        m_cluster_aabbs_ssbo(VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(AABB) * m_total_clusters_count)),
-        m_uniform_buffer(VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(LightingSystemUniform))),
+        // m_light_source_ssbo(VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(LightSource) * m_max_num_light_sources)),
+        // m_lights_in_clusters_ssbo(VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(unsigned int) * m_lights_in_clusters_size)),
+        // m_num_lights_in_clusters_ssbo(VulkanBuffer::create_host_visible_transfer_dst_storage_buffer(engine, sizeof(unsigned int) * m_total_clusters_count)),
+        // m_cluster_aabbs_ssbo(VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(AABB) * m_total_clusters_count)),
+        // m_uniform_buffer(VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(LightingSystemUniform))),
         m_compute_command_buffer(engine.device(), engine.compute_command_pool()),
         m_compute_fence(engine.device()) {
     LOG_METHOD();
@@ -34,6 +34,11 @@ void LightingSystem::set_light_source(uint32_t slot_id, LightSource light_source
     LOG_METHOD();
 
     logger.check(slot_id < m_light_sources.size(), "Light source slot index was out of bounds");
+
+    m_active_light_count = std::max<size_t>(
+        m_active_light_count,
+        size_t(slot_id) + 1
+    );
     
     m_light_sources[slot_id] = light_source;
     m_dirty_lights.insert(slot_id);
@@ -42,10 +47,12 @@ void LightingSystem::set_light_source(uint32_t slot_id, LightSource light_source
 void LightingSystem::update_light_sources(uint32_t frame_id) {
     LOG_METHOD();
     
-    if (m_dirty_lights.empty())
-        return;
-
-    m_light_source_ssbo.upload(m_light_sources);
+    // if (m_dirty_lights.empty())
+    //     return;
+    
+    FrameData& frame_data = get_frame_data(frame_id);
+    
+    frame_data.light_source_ssbo.upload(m_light_sources);
 
     // m_frame_resources.m_frame_data[0].light_source_ssbo
 
@@ -79,35 +86,48 @@ void LightingSystem::update_light_indices_for_clusters(uint32_t frame_id, const 
     LOG_METHOD();
 
     uint32_t x_count = math_utils::div_up_u32(m_total_clusters_count, 256u);
-    uint32_t y_count = m_light_sources.size();
+    // uint32_t y_count = m_light_sources.size();
+    uint32_t y_count = uint32_t(m_active_light_count);
 
-    LightingSystemUniform uniform_data{};
+    if (y_count == 0) {
+        return;
+    }
+
+
+    FrameData& frame_data = get_frame_data(frame_id);
+
+    LightingBuildUniform uniform_data{};
+
     uniform_data.num_clusters = m_total_clusters_count;
-    uniform_data.max_lights_per_cluster = m_max_lights_per_cluster;
+    uniform_data.max_lights_per_cluster = uint32_t(m_max_lights_per_cluster);
+    uniform_data.num_light_sources = uint32_t(m_active_light_count);
     uniform_data.view_matrix = camera.get_view_matrix();
 
-    // FrameResources::FrameData& frame_data = m_frame_resources.frame_data(frame_id);
+    frame_data.lighting_build_uniform.upload(
+        &uniform_data,
+        sizeof(LightingBuildUniform)
+    );
 
-    m_uniform_buffer.upload(&uniform_data, sizeof(LightingSystemUniform));
+    
 
-    m_build_cluster_light_lists_pass.set_uniform_buffer(0, m_uniform_buffer);
-    m_build_cluster_light_lists_pass.set_storage_buffer(4, m_cluster_aabbs_ssbo);
-    m_build_cluster_light_lists_pass.set_storage_buffer(5, m_light_source_ssbo);
-    m_build_cluster_light_lists_pass.set_storage_buffer(6, m_num_lights_in_clusters_ssbo);
-    m_build_cluster_light_lists_pass.set_storage_buffer(7, m_lights_in_clusters_ssbo);
+    m_build_cluster_light_lists_pass.set_uniform_buffer(0, frame_data.lighting_build_uniform);
+    m_build_cluster_light_lists_pass.set_storage_buffer(4, frame_data.cluster_aabbs_ssbo);
+    m_build_cluster_light_lists_pass.set_storage_buffer(5, frame_data.light_source_ssbo);
+    m_build_cluster_light_lists_pass.set_storage_buffer(6, frame_data.num_lights_in_clusters_ssbo);
+    m_build_cluster_light_lists_pass.set_storage_buffer(7, frame_data.lights_in_clusters_ssbo);
 
     {
         auto compute_scope = m_compute_command_buffer.begin_scope();
 
-        m_num_lights_in_clusters_ssbo.fill(m_compute_command_buffer, 0);
-        m_num_lights_in_clusters_ssbo.transfer_write_to_compute_read_write_barrier(m_compute_command_buffer);
+        frame_data.num_lights_in_clusters_ssbo.fill(m_compute_command_buffer, 0);
+        frame_data.num_lights_in_clusters_ssbo.transfer_write_to_compute_read_write_barrier(m_compute_command_buffer);
         
         m_build_cluster_light_lists_pass.bind(m_compute_command_buffer);
 
         m_compute_command_buffer.dispatch(x_count, y_count, 1);
 
-        m_num_lights_in_clusters_ssbo.compute_write_to_fragment_read_barrier(m_compute_command_buffer);
-        m_lights_in_clusters_ssbo.compute_write_to_fragment_read_barrier(m_compute_command_buffer);
+        frame_data.num_lights_in_clusters_ssbo.compute_write_to_fragment_read_barrier(m_compute_command_buffer);
+        frame_data.lights_in_clusters_ssbo.compute_write_to_fragment_read_barrier(m_compute_command_buffer);
     }
 
     m_compute_fence.reset();
@@ -115,8 +135,8 @@ void LightingSystem::update_light_indices_for_clusters(uint32_t frame_id, const 
     m_compute_fence.wait();
 }
 
-void LightingSystem::set_cluster_aabbs(std::vector<AABB>& aabbs) {
-    m_cluster_aabbs_ssbo.upload(aabbs);
+void LightingSystem::set_cluster_aabbs(uint32_t frame_id, std::vector<AABB>& aabbs) {
+    get_frame_data(frame_id).cluster_aabbs_ssbo.upload(aabbs);
 }
 
 bool LightingSystem::sphere_intersects_aabb_view_space(const glm::vec3 &center_vs, float radius, const AABB &aabb) const noexcept {
@@ -267,39 +287,72 @@ void LightingSystem::create_clusters(std::vector<AABB>& out_cluster_cells, glm::
     create_clusters_full(out_cluster_cells, tiles, fov_y_radians, aspect, sliceDistances);
 }
 
-void LightingSystem::update_cluster_structure(const Window& window, const Camera& camera) {
+void LightingSystem::update_cluster_structure(uint32_t frame_id, const Window& window, const Camera& camera) {
+    FrameData& frame_data = get_frame_data(frame_id);
+    
     bool need_recreate_clusters = false;
 
-    if (m_cluster_fov != glm::radians(camera.fov)) {
-        m_cluster_fov = glm::radians(camera.fov);
+    if (frame_data.cluster_fov != glm::radians(camera.fov)) {
+        frame_data.cluster_fov = glm::radians(camera.fov);
         need_recreate_clusters = true;
     }
     // float aspect = window.get_fbuffer_aspect_ratio();
 
     float aspect = float(window.width()) / float(window.height());
-    if (m_cluster_aspect != aspect) {
-        m_cluster_aspect = aspect;
+    if (frame_data.cluster_aspect != aspect) {
+        frame_data.cluster_aspect = aspect;
         need_recreate_clusters = true;
     }
-    if (m_cluster_near != camera.near_plane) {
-        m_cluster_near = camera.near_plane;
+    if (frame_data.cluster_near != camera.near_plane) {
+        frame_data.cluster_near = camera.near_plane;
         need_recreate_clusters = true;
     }
-    if (m_cluster_far != camera.far_plane) {
-        m_cluster_far = camera.far_plane;
+    if (frame_data.cluster_far != camera.far_plane) {
+        frame_data.cluster_far = camera.far_plane;
         need_recreate_clusters = true;
     }
     
     if (need_recreate_clusters) {
-        create_clusters(m_clusters, m_num_clusters, m_cluster_fov, m_cluster_aspect, m_cluster_near, m_cluster_far);
-        set_cluster_aabbs(m_clusters);
+        create_clusters(m_clusters, m_num_clusters, frame_data.cluster_fov, frame_data.cluster_aspect, frame_data.cluster_near, frame_data.cluster_far);
+        set_cluster_aabbs(frame_id, m_clusters);
     }
 }
 
-void LightingSystem::update(const Window& window, const Camera& camera) {
-    update_cluster_structure(window, camera);
-    update_light_sources(0);
-    update_light_indices_for_clusters(0, camera);
+void LightingSystem::update_clustered_lighting_uniform(
+    uint32_t frame_id,
+    const Window& window,
+    const Camera& camera
+) {
+    FrameData& frame_data = get_frame_data(frame_id);
+
+    ClusteredLightingUniform uniform_data{};
+
+    uniform_data.cluster_grid = glm::uvec4(
+        uint32_t(m_num_clusters.x),
+        uint32_t(m_num_clusters.y),
+        uint32_t(m_num_clusters.z),
+        uint32_t(m_max_lights_per_cluster)
+    );
+
+    uniform_data.screen_params = glm::vec4(
+        float(window.width()),
+        float(window.height()),
+        camera.near_plane,
+        camera.far_plane
+    );
+
+    frame_data.clustered_lighting_uniform.upload(&uniform_data, sizeof(ClusteredLightingUniform));
+}
+
+void LightingSystem::update(uint32_t frame_id, const Window& window, const Camera& camera) {
+    update_cluster_structure(frame_id, window, camera);
+    update_clustered_lighting_uniform(frame_id, window, camera);
+    update_light_sources(frame_id);
+    update_light_indices_for_clusters(frame_id, camera);
+}
+
+void LightingSystem::set_frame_resources(FrameResources& frame_resources) noexcept {
+    m_frame_resources = &frame_resources;
 }
 
 uint32_t LightingSystem::max_num_light_sources() const noexcept {
@@ -312,4 +365,12 @@ uint32_t LightingSystem::lights_in_clusters_size() const noexcept {
 
 uint32_t LightingSystem::total_clusters_count() const noexcept {
     return m_total_clusters_count;
+}
+
+FrameData& LightingSystem::get_frame_data(uint32_t frame_id) {
+    LOG_METHOD();
+
+    logger.check(m_frame_resources != nullptr, "Frame resources aren't set");
+
+    return m_frame_resources->frame_data(frame_id);
 }

@@ -16,10 +16,12 @@ void Renderer::render(VulkanCommandBuffer& command_buffer, RenderObject& render_
     pc.model = transform;
     pc.material_data_id = render_object.material_data_id;
 
-    render_object.m_material->bind(command_buffer);
     MaterialPass& pass = render_object.m_material->m_pass;
 
+    render_object.m_material->bind(command_buffer);
     m_frame_resources->bind(m_engine->current_frame(), command_buffer, pass.pipeline(), 1);
+
+    // Нужно ли нам возможность прикреплять любые дискриптор сеты?
 
     pass.pipeline().set_y_up_viewport(command_buffer, *m_engine);
     pass.pipeline().set_scissor(command_buffer, *m_engine);
