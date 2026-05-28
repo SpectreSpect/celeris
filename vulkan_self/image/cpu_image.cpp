@@ -41,7 +41,7 @@ const std::vector<uint8_t>& CpuImage::image_data() const {
     return m_image_data;
 }
 
-CpuImage CpuImage::load_rgba8_image(const std::filesystem::path& path) {
+CpuImage CpuImage::load_rgba8_image(const std::filesystem::path& path, VkFormat format) {
     LOG_NAMED("CpuImage");
 
     std::vector<std::uint8_t> file_data = Utils::read_binary_file(path);
@@ -83,6 +83,6 @@ CpuImage CpuImage::load_rgba8_image(const std::filesystem::path& path) {
             static_cast<uint32_t>(height), 
             1
         }, 
-        VK_FORMAT_R8G8B8A8_SRGB
+        format
     );
 }

@@ -1,4 +1,4 @@
-#include "vulkan_texture_2d.h"
+#include "cubemap.h"
 
 #include <algorithm>
 #include <utility>
@@ -6,7 +6,7 @@
 #include "../vulkan_physical_device.h"
 #include "../vulkan_device.h"
 
-VulkanTexture2D::VulkanTexture2D(
+Cubemap::Cubemap(
     VulkanImage&& image,
     VulkanImageView&& view,
     VulkanSampler&& sampler,
@@ -16,12 +16,12 @@ VulkanTexture2D::VulkanTexture2D(
         m_sampler(std::move(sampler)),
         m_layout(layout) {}
 
-VulkanTexture2D::VulkanTexture2D(
+Cubemap::Cubemap(
     const VulkanPhysicalDevice& physical_device,
     const VulkanDevice& device,
     VkExtent2D extent2d,
     uint32_t mip_levels)
-    :   VulkanTexture2D(
+    :   Cubemap(
             physical_device,
             device,
             extent2d,
@@ -29,7 +29,7 @@ VulkanTexture2D::VulkanTexture2D(
             mip_levels
         ) {}
 
-VulkanTexture2D::VulkanTexture2D(
+Cubemap::Cubemap(
     const VulkanPhysicalDevice& physical_device,
     const VulkanDevice& device,
     VkExtent2D extent2d,
@@ -51,69 +51,73 @@ VulkanTexture2D::VulkanTexture2D(
             0,
             m_image.mip_levels(),
             0,
-            1,
-            VK_IMAGE_VIEW_TYPE_2D
+            face_count,
+            VK_IMAGE_VIEW_TYPE_CUBE
         ),
         m_sampler(
             device,
             create_sampler_desc(
                 m_image.mip_levels(),
                 VK_FILTER_LINEAR,
-                VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                 VK_SAMPLER_MIPMAP_MODE_LINEAR
             )
         ),
         m_layout(VK_IMAGE_LAYOUT_UNDEFINED) {}
 
-VulkanImage& VulkanTexture2D::image() noexcept {
+VulkanImage& Cubemap::image() noexcept {
     return m_image;
 }
 
-const VulkanImage& VulkanTexture2D::image() const noexcept {
+const VulkanImage& Cubemap::image() const noexcept {
     return m_image;
 }
 
-VulkanImageView& VulkanTexture2D::view() noexcept {
+VulkanImageView& Cubemap::view() noexcept {
     return m_view;
 }
 
-const VulkanImageView& VulkanTexture2D::view() const noexcept {
+const VulkanImageView& Cubemap::view() const noexcept {
     return m_view;
 }
 
-VulkanSampler& VulkanTexture2D::sampler() noexcept {
+VulkanSampler& Cubemap::sampler() noexcept {
     return m_sampler;
 }
 
-const VulkanSampler& VulkanTexture2D::sampler() const noexcept {
+const VulkanSampler& Cubemap::sampler() const noexcept {
     return m_sampler;
 }
 
-VkExtent3D VulkanTexture2D::extent() const noexcept {
+VkExtent3D Cubemap::extent() const noexcept {
     return m_image.extent();
 }
 
-VkExtent2D VulkanTexture2D::extent2d() const noexcept {
+VkExtent2D Cubemap::extent2d() const noexcept {
     return m_image.extent2d();
 }
 
-VkFormat VulkanTexture2D::format() const noexcept {
+VkFormat Cubemap::format() const noexcept {
     return m_image.format();
 }
 
-uint32_t VulkanTexture2D::mip_levels() const noexcept {
+uint32_t Cubemap::mip_levels() const noexcept {
     return m_image.mip_levels();
 }
 
-VkImageLayout VulkanTexture2D::layout() const noexcept {
+uint32_t Cubemap::array_layers() const noexcept {
+    return m_image.array_layers();
+}
+
+VkImageLayout Cubemap::layout() const noexcept {
     return m_layout;
 }
 
-VkImageLayout VulkanTexture2D::texture_layout() const noexcept {
+VkImageLayout Cubemap::texture_layout() const noexcept {
     return m_layout;
 }
 
-VkDescriptorImageInfo VulkanTexture2D::descriptor_image_info() const noexcept {
+VkDescriptorImageInfo Cubemap::descriptor_image_info() const noexcept {
     VkDescriptorImageInfo info{};
     info.sampler = m_sampler.handle();
     info.imageView = m_view.handle();
@@ -121,15 +125,16 @@ VkDescriptorImageInfo VulkanTexture2D::descriptor_image_info() const noexcept {
     return info;
 }
 
-void VulkanTexture2D::set_layout(VkImageLayout layout) noexcept {
+void Cubemap::set_layout(VkImageLayout layout) noexcept {
     m_layout = layout;
 }
 
-uint32_t VulkanTexture2D::calculate_mip_levels(VkExtent2D extent2d) {
-    LOG_NAMED("VulkanTexture2D");
+uint32_t Cubemap::calculate_mip_levels(VkExtent2D extent2d) {
+    LOG_NAMED("Cubemap");
 
-    logger.check(extent2d.width != 0, "Texture width is zero");
-    logger.check(extent2d.height != 0, "Texture height is zero");
+    logger.check(extent2d.width != 0, "Cubemap width is zero");
+    logger.check(extent2d.height != 0, "Cubemap height is zero");
+    logger.check(extent2d.width == extent2d.height, "Cubemap faces must be square");
 
     uint32_t max_dimension = std::max(extent2d.width, extent2d.height);
 
@@ -142,32 +147,82 @@ uint32_t VulkanTexture2D::calculate_mip_levels(VkExtent2D extent2d) {
     return levels;
 }
 
-VulkanImage VulkanTexture2D::create_image(
+void Cubemap::transition_layout(
+    VulkanCommandBuffer& command_buffer,
+    VkImageLayout new_layout,
+    VkPipelineStageFlags src_stage,
+    VkPipelineStageFlags dst_stage,
+    VkAccessFlags src_access,
+    VkAccessFlags dst_access,
+    uint32_t base_mip_level,
+    uint32_t level_count,
+    uint32_t base_array_layer,
+    uint32_t layer_count)
+{
+    LOG_METHOD();
+
+    logger.check(m_image.handle() != VK_NULL_HANDLE, "Cubemap image is not initialized");
+    logger.check(new_layout != VK_IMAGE_LAYOUT_UNDEFINED, "New cubemap layout must not be UNDEFINED");
+    logger.check(src_stage != 0, "Source stage must not be zero");
+    logger.check(dst_stage != 0, "Destination stage must not be zero");
+
+    if (level_count == 0) {
+        level_count = m_image.mip_levels() - base_mip_level;
+    }
+
+    logger.check(base_mip_level < m_image.mip_levels(), "Base mip level is out of range");
+    logger.check(level_count <= m_image.mip_levels() - base_mip_level, "Mip level range is out of bounds");
+
+    logger.check(base_array_layer < m_image.array_layers(), "Base array layer is out of range");
+    logger.check(layer_count <= m_image.array_layers() - base_array_layer, "Array layer range is out of bounds");
+
+    m_image.memory_barrier(
+        command_buffer,
+        src_stage,
+        src_access,
+        dst_stage,
+        dst_access,
+        m_layout,
+        new_layout,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        base_mip_level,
+        level_count,
+        base_array_layer,
+        layer_count
+    );
+
+    m_layout = new_layout;
+}
+
+VulkanImage Cubemap::create_image(
     const VulkanPhysicalDevice& physical_device,
     const VulkanDevice& device,
     VkExtent2D extent2d,
     VkFormat format,
     uint32_t mip_levels)
 {
-    LOG_NAMED("VulkanTexture2D");
+    LOG_NAMED("Cubemap");
 
     logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
     logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
 
-    logger.check(extent2d.width != 0, "Texture width is zero");
-    logger.check(extent2d.height != 0, "Texture height is zero");
+    logger.check(extent2d.width != 0, "Cubemap width is zero");
+    logger.check(extent2d.height != 0, "Cubemap height is zero");
+    logger.check(extent2d.width == extent2d.height, "Cubemap faces must be square");
 
-    logger.check(format != VK_FORMAT_UNDEFINED, "Texture format is undefined");
+    logger.check(format != VK_FORMAT_UNDEFINED, "Cubemap format is undefined");
 
     if (mip_levels == 0) {
         mip_levels = calculate_mip_levels(extent2d);
     }
 
-    logger.check(mip_levels != 0, "Texture mip levels count is zero");
+    logger.check(mip_levels != 0, "Cubemap mip levels count is zero");
 
     VkImageUsageFlags usage =
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-        VK_IMAGE_USAGE_SAMPLED_BIT;
+        VK_IMAGE_USAGE_SAMPLED_BIT |
+        VK_IMAGE_USAGE_STORAGE_BIT;
 
     if (mip_levels > 1) {
         usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -183,20 +238,20 @@ VulkanImage VulkanTexture2D::create_image(
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_TYPE_2D,
         mip_levels,
-        1,
+        face_count,
         VK_SAMPLE_COUNT_1_BIT,
         VK_IMAGE_LAYOUT_UNDEFINED,
-        0
+        VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT
     );
 }
 
-VkSamplerCreateInfo VulkanTexture2D::create_sampler_desc(
+VkSamplerCreateInfo Cubemap::create_sampler_desc(
     uint32_t mip_levels,
     VkFilter filter,
     VkSamplerAddressMode address_mode,
     VkSamplerMipmapMode mipmap_mode)
 {
-    LOG_NAMED("VulkanTexture2D");
+    LOG_NAMED("Cubemap");
 
     logger.check(mip_levels != 0, "Sampler mip levels count is zero");
 

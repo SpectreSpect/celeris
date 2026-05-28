@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <vector>
 #include <cstddef>
 
@@ -11,6 +12,9 @@
 #include "vulkan_command_buffer.h"
 #include "vulkan_fence.h"
 
+#include "image/cpu_image.h"
+#include "image/cubemap.h"
+
 class VulkanPhysicalDevice;
 class VulkanDevice;
 class VulkanQueue;
@@ -18,7 +22,6 @@ class VulkanCommandPool;
 class VulkanEngine;
 class VulkanImage;
 class VulkanTexture2D;
-class CpuImage;
 
 class VulkanResourceLoader {
 public:
@@ -75,7 +78,16 @@ public:
 
     void upload_sampled_texture_2d(
         const CpuImage& cpu_image,
-        VulkanTexture2D& texture
+        VulkanTexture2D& texture,
+        VkPipelineStageFlags shader_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        bool generate_mipmaps = true
+    );
+
+    void upload_sampled_cubemap(
+        const std::array<CpuImage, Cubemap::face_count>& face_images,
+        Cubemap& cubemap,
+        VkPipelineStageFlags shader_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        bool generate_mipmaps = true
     );
 
     void upload_vertex_buffer(
@@ -143,8 +155,29 @@ private:
         VkAccessFlags dst_finish_access = 0;
     };
 
+    struct MipmapGenerationRequest {
+        VulkanImage* image = nullptr;
+
+        VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
+        uint32_t base_array_layer = 0;
+        uint32_t layer_count = 1;
+
+        VkImageLayout old_layout_for_dst_mips = VK_IMAGE_LAYOUT_UNDEFINED;
+        VkPipelineStageFlags old_stage_for_dst_mips = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        VkAccessFlags old_access_for_dst_mips = 0;
+
+        VkImageLayout final_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        VkPipelineStageFlags final_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        VkAccessFlags final_access = VK_ACCESS_SHADER_READ_BIT;
+    };
+
     struct TextureLayoutUpdate {
         VulkanTexture2D* texture = nullptr;
+        VkImageLayout final_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    };
+
+    struct CubemapLayoutUpdate {
+        Cubemap* cubemap = nullptr;
         VkImageLayout final_layout = VK_IMAGE_LAYOUT_UNDEFINED;
     };
 
@@ -157,5 +190,25 @@ private:
 
     std::vector<BufferUploadRequest> m_buffer_upload_requests;
     std::vector<ImageUploadRequest> m_image_upload_requests;
-    std::vector<TextureLayoutUpdate> m_texture_upload_requests;
+    std::vector<MipmapGenerationRequest> m_mipmap_generation_requests;
+    std::vector<TextureLayoutUpdate> m_texture_layout_updates;
+    std::vector<CubemapLayoutUpdate> m_cubemap_layout_updates;
+
+private:
+    static VkPipelineStageFlags old_stage_for_sampled_layout(VkImageLayout layout, VkPipelineStageFlags shader_stage);
+    static VkAccessFlags old_access_for_sampled_layout(VkImageLayout layout);
+
+    static void record_generate_mipmaps(
+        VulkanCommandBuffer& command_buffer,
+        VulkanImage& image,
+        VkImageAspectFlags aspect_mask,
+        uint32_t base_array_layer,
+        uint32_t layer_count,
+        VkImageLayout old_layout_for_dst_mips,
+        VkPipelineStageFlags old_stage_for_dst_mips,
+        VkAccessFlags old_access_for_dst_mips,
+        VkImageLayout final_layout,
+        VkPipelineStageFlags final_stage,
+        VkAccessFlags final_access
+    );
 };

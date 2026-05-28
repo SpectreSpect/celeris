@@ -8,6 +8,7 @@ TextureManager::TextureManager(VulkanEngine& engine, VulkanResourceLoader& resou
         m_resource_loader(resource_loader),
         dirt_texture(load_rbga8(path_utils::executable_dir() / "assets" / "textures" / "minecraft_dirt" / "texture.png")),
         rock_texture(load_rbga8(path_utils::executable_dir() / "assets" / "textures" / "rock" / "albedo.jpg")){
+        // st_peters_square_night_4k_hdr(load_rbga8(path_utils::executable_dir() / "assets" / "textures" / "hdr" / "st_peters_square_night_4k.hdr")){
     resource_loader.submit();
 }
 

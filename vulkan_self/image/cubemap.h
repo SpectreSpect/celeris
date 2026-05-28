@@ -12,26 +12,28 @@
 class VulkanPhysicalDevice;
 class VulkanDevice;
 
-class VulkanTexture2D {
+class Cubemap {
 public:
-    _XCLASS_NAME(VulkanTexture2D);
+    _XCLASS_NAME(Cubemap);
+
+    static constexpr uint32_t face_count = 6;
 
     // Так как копировать эти объекты нельзя, поэтому &&
-    explicit VulkanTexture2D(
+    explicit Cubemap(
         VulkanImage&& image,
         VulkanImageView&& view,
         VulkanSampler&& sampler,
         VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     );
 
-    explicit VulkanTexture2D(
+    explicit Cubemap(
         const VulkanPhysicalDevice& physical_device,
         const VulkanDevice& device,
         VkExtent2D extent2d,
         uint32_t mip_levels = 0
     );
 
-    explicit VulkanTexture2D(
+    explicit Cubemap(
         const VulkanPhysicalDevice& physical_device,
         const VulkanDevice& device,
         VkExtent2D extent2d,
@@ -39,13 +41,13 @@ public:
         uint32_t mip_levels = 0
     );
 
-    ~VulkanTexture2D() noexcept = default;
+    ~Cubemap() noexcept = default;
 
-    VulkanTexture2D(const VulkanTexture2D&) = delete;
-    VulkanTexture2D& operator=(const VulkanTexture2D&) = delete;
+    Cubemap(const Cubemap&) = delete;
+    Cubemap& operator=(const Cubemap&) = delete;
 
-    VulkanTexture2D(VulkanTexture2D&&) noexcept = default;
-    VulkanTexture2D& operator=(VulkanTexture2D&&) noexcept = default;
+    Cubemap(Cubemap&&) noexcept = default;
+    Cubemap& operator=(Cubemap&&) noexcept = default;
 
     VulkanImage& image() noexcept;
     const VulkanImage& image() const noexcept;
@@ -58,6 +60,7 @@ public:
     VkExtent2D extent2d() const noexcept;
     VkFormat format() const noexcept;
     uint32_t mip_levels() const noexcept;
+    uint32_t array_layers() const noexcept;
 
     VkImageLayout layout() const noexcept;
     VkImageLayout texture_layout() const noexcept;
@@ -66,6 +69,19 @@ public:
     void set_layout(VkImageLayout layout) noexcept;
 
     static uint32_t calculate_mip_levels(VkExtent2D extent2d);
+
+    void transition_layout(
+        VulkanCommandBuffer& command_buffer,
+        VkImageLayout new_layout,
+        VkPipelineStageFlags src_stage,
+        VkPipelineStageFlags dst_stage,
+        VkAccessFlags src_access,
+        VkAccessFlags dst_access,
+        uint32_t base_mip_level = 0,
+        uint32_t level_count = 0,
+        uint32_t base_array_layer = 0,
+        uint32_t layer_count = face_count
+    );
 
 private:
     VulkanImage m_image;
@@ -85,7 +101,7 @@ private:
     static VkSamplerCreateInfo create_sampler_desc(
         uint32_t mip_levels,
         VkFilter filter = VK_FILTER_LINEAR,
-        VkSamplerAddressMode address_mode = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        VkSamplerAddressMode address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
         VkSamplerMipmapMode mipmap_mode = VK_SAMPLER_MIPMAP_MODE_LINEAR
     );
 };

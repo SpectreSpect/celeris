@@ -25,4 +25,6 @@ public:
     VulkanShaderModule gicp_reduce_cs;
     
     VulkanShaderModule build_cluster_light_lists_cs;
+
+    VulkanShaderModule equirect_to_cubemap_cs;
 };

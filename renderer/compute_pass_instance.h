@@ -20,6 +20,7 @@ public:
     void set_uniform_buffer(uint32_t binding, VulkanBuffer& uniform_buffer);
     void set_storage_buffer(uint32_t binding, VulkanBuffer& storage_buffer);
     void set_texture(uint32_t binding, VulkanTexture2D& texture_2d);
+    void set_storage_cubemap(uint32_t binding, Cubemap& cubemap);
 
     void bind(VulkanCommandBuffer& command_buffer);
 

@@ -54,6 +54,7 @@
 #include "renderer/point_cloud/gicp/voxel_map_point_reseter.h"
 #include "imgui_layer.h"
 #include "renderer/lighting_system/lighting_system.h"
+#include "renderer/pbr/equirect_to_cubemap_pass.h"
 
 #include <vector>
 
@@ -119,6 +120,10 @@ int main() {
     MaterialInstanceManager material_instance_manager(engine, material_manager, texture_manager);
     MeshManager mesh_manager(engine, resource_loader);
     ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
+
+    EquirectToCubemapPass equirect_to_cubemap_pass(engine, compute_pass_manager);
+
+    Cubemap dirt_cubemap = equirect_to_cubemap_pass.generate(texture_manager.dirt_texture, 100);
 
     GICPPass gicp_pass(engine, compute_pass_manager);
     VoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);
@@ -308,13 +313,14 @@ int main() {
 
                 ImGui::End();
                 
-                ui.end_frame(command_buffer);
-
-
                 renderer.render(command_buffer, scene);
+
+
+                ui.end_frame(command_buffer);
             }
         }
 
+        
         engine.submit_graphic_commands(image_index);
         engine.present(image_index);
     }

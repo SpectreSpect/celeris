@@ -14,6 +14,7 @@ private:
 public:
     VulkanTexture2D dirt_texture;
     VulkanTexture2D rock_texture;
+    // VulkanTexture2D st_peters_square_night_4k_hdr;
 
     TextureManager(VulkanEngine& engine, VulkanResourceLoader& resource_loader);
 

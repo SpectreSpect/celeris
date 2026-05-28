@@ -24,6 +24,8 @@ public:
     ComputePass gicp_reduce_cp;
     ComputePass build_cluster_light_lists_cp;
 
+    ComputePass equirect_to_cubemap_cp;
+
     ComputePassManager(VulkanDevice& device, ShaderManager& shader_manager);
 
     DescriptorPool& descriptor_pool() noexcept;
@@ -36,6 +38,7 @@ public:
     ComputePass create_reset_voxel_point_map_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_gicp_reduce_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_build_cluster_light_lists_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_equirect_to_cubemap_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
 private:
     DescriptorPool m_pool;
