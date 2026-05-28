@@ -25,15 +25,15 @@ layout(std430, set = 0, binding = 0) readonly buffer MaterialBuffer {
 layout(set = 0, binding = 1) uniform sampler2D texSampler;
 
 #if USE_CLUSTERED_LIGHTS
-layout(std430, set = 0, binding = 4) readonly buffer LightSourcesBuffer {
+layout(std430, set = 1, binding = 4) readonly buffer LightSourcesBuffer {
     LightSource light_sources[];
 };
 
-layout(std430, set = 0, binding = 5) readonly buffer NumLightsInClustersBuffer {
+layout(std430, set = 1, binding = 5) readonly buffer NumLightsInClustersBuffer {
     uint num_lights_in_clusters[];
 };
 
-layout(std430, set = 0, binding = 6) readonly buffer LightsInClustersBuffer {
+layout(std430, set = 1, binding = 6) readonly buffer LightsInClustersBuffer {
     uint lights_in_clusters[];
 };
 #endif
@@ -44,7 +44,7 @@ layout(set = 1, binding = 0) uniform CameraUniform {
     vec4 viewPos;
 } camera_uniform;
 
-layout(set = 1, binding = 1) uniform ClusteredLightingUniform {
+layout(set = 1, binding = 3) uniform ClusteredLightingUniform {
     // x = x tiles
     // y = y tiles
     // z = z slices

@@ -104,19 +104,21 @@ int main() {
     FPSCameraController camera_controller(camera);
     camera_controller.speed = 20;
 
-    FrameResources frame_resources(engine.physical_device(), engine.device(), engine.num_frames_in_flight());
-    
     VulkanResourceLoader resource_loader(engine, 1024 * 1024 * 100); // 1 Мб
 
     ShaderManager shader_manager(engine.device());
     TextureManager texture_manager(engine, resource_loader);
-    MaterialManager material_manager(engine, shader_manager, frame_resources);
     ComputePassManager compute_pass_manager(engine.device(), shader_manager);
+
+    LightingSystem lighting_system(engine, compute_pass_manager);
+    FrameResources frame_resources(engine, lighting_system, engine.num_frames_in_flight());
+
+    MaterialManager material_manager(engine, shader_manager, frame_resources);
     MaterialInstanceManager material_instance_manager(engine, material_manager, texture_manager);
     MeshManager mesh_manager(engine, resource_loader);
     ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
 
-    LightingSystem lighting_system(engine, compute_pass_manager);
+    
 
     GICPPass gicp_pass(engine, compute_pass_manager);
     VoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);
@@ -216,7 +218,7 @@ int main() {
 
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), camera);
-        lighting_system.update(window, camera);
+        // lighting_system.update(window, camera);
 
         if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
             g_pressed = true;

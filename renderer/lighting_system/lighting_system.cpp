@@ -8,12 +8,14 @@
 #include "../../vulkan_self/window.h"
 #include "../../vulkan_self/vulkan_command_buffer.h"
 #include "../../math_utils.h"
+#include "../resources/frame_resources.h"
 
 LightingSystem::LightingSystem(VulkanEngine& engine, ComputePassManager& compute_pass_manager)
     :   m_engine(engine),
+        // m_frame_resources(m_frame_resources),
         m_build_cluster_light_lists_pass(compute_pass_manager.descriptor_pool(), compute_pass_manager.build_cluster_light_lists_cp),
     
-    m_light_sources(m_max_num_light_sources, {glm::vec4(0.0f), glm::vec4(0.0f)}),
+        m_light_sources(m_max_num_light_sources, {glm::vec4(0.0f), glm::vec4(0.0f)}),
         m_lights_in_clusters(m_total_clusters_count),
         m_light_source_ssbo(VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(LightSource) * m_max_num_light_sources)),
         m_lights_in_clusters_ssbo(VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(unsigned int) * m_lights_in_clusters_size)),
@@ -37,13 +39,17 @@ void LightingSystem::set_light_source(uint32_t slot_id, LightSource light_source
     m_dirty_lights.insert(slot_id);
 }
 
-void LightingSystem::update_light_sources() {
+void LightingSystem::update_light_sources(uint32_t frame_id) {
     LOG_METHOD();
     
     if (m_dirty_lights.empty())
         return;
 
-    m_light_source_ssbo.upload(m_light_sources); // I'm not sure this is optimal
+    m_light_source_ssbo.upload(m_light_sources);
+
+    // m_frame_resources.m_frame_data[0].light_source_ssbo
+
+    // m_frame_resources.frame_data(frame_id).light_source_ssbo.upload(m_light_sources);
 
     m_dirty_lights.clear();
 }
@@ -69,7 +75,7 @@ void LightingSystem::update_clusters(const std::vector<AABB> &clusters, const gl
     }
 }
 
-void LightingSystem::update_light_indices_for_clusters(const Camera& camera) {
+void LightingSystem::update_light_indices_for_clusters(uint32_t frame_id, const Camera& camera) {
     LOG_METHOD();
 
     uint32_t x_count = math_utils::div_up_u32(m_total_clusters_count, 256u);
@@ -79,6 +85,8 @@ void LightingSystem::update_light_indices_for_clusters(const Camera& camera) {
     uniform_data.num_clusters = m_total_clusters_count;
     uniform_data.max_lights_per_cluster = m_max_lights_per_cluster;
     uniform_data.view_matrix = camera.get_view_matrix();
+
+    // FrameResources::FrameData& frame_data = m_frame_resources.frame_data(frame_id);
 
     m_uniform_buffer.upload(&uniform_data, sizeof(LightingSystemUniform));
 
@@ -290,6 +298,18 @@ void LightingSystem::update_cluster_structure(const Window& window, const Camera
 
 void LightingSystem::update(const Window& window, const Camera& camera) {
     update_cluster_structure(window, camera);
-    update_light_sources();
-    update_light_indices_for_clusters(camera);
+    update_light_sources(0);
+    update_light_indices_for_clusters(0, camera);
+}
+
+uint32_t LightingSystem::max_num_light_sources() const noexcept {
+    return m_max_num_light_sources;
+}
+
+uint32_t LightingSystem::lights_in_clusters_size() const noexcept {
+    return m_lights_in_clusters_size;
+}
+
+uint32_t LightingSystem::total_clusters_count() const noexcept {
+    return m_total_clusters_count;
 }

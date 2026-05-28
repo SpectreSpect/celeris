@@ -21,6 +21,7 @@ class ComputePassManager;
 class Camera;
 class VulkanCommandBuffer;
 class Window;
+class FrameResources;
 
 class LightingSystem {
 public:
@@ -37,9 +38,9 @@ public:
     explicit LightingSystem(VulkanEngine& engine, ComputePassManager& compute_pass_manager);
 
     void set_light_source(uint32_t slot_id, LightSource light_source);
-    void update_light_sources();
+    void update_light_sources(uint32_t frame_id);
     void update_clusters(const std::vector<AABB> &clusters, const glm::mat4& view_matrix);
-    void update_light_indices_for_clusters(const Camera& camera);
+    void update_light_indices_for_clusters(uint32_t frame_id, const Camera& camera);
     void set_cluster_aabbs(std::vector<AABB>& aabbs);
     bool sphere_intersects_aabb_view_space(const glm::vec3 &center_vs, float radius, const AABB &aabb) const noexcept;
     void compute_slice_distances_linear(float near_plane, float far_plane, unsigned z_slices, std::vector<float>& out);
@@ -54,6 +55,10 @@ public:
     void update_cluster_structure(const Window& window, const Camera& camera);
     void update(const Window& window, const Camera& camera);
 
+    uint32_t max_num_light_sources() const noexcept;
+    uint32_t lights_in_clusters_size() const noexcept;
+    uint32_t total_clusters_count() const noexcept;
+
 private:
     size_t m_max_num_light_sources = 10000;
     size_t m_max_lights_per_cluster = 1500;
@@ -65,6 +70,8 @@ private:
     float m_cluster_aspect = 0.0f;
     float m_cluster_near = 0.0f;
     float m_cluster_far = 0.0f;
+
+    // FrameResources& m_frame_resources;
 
     VulkanEngine& m_engine;
     ComputePassInstance m_build_cluster_light_lists_pass;
