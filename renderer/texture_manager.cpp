@@ -3,13 +3,19 @@
 #include "../vulkan_self/image/cpu_image.h"
 #include "../vulkan_self/vulkan_resource_loader.h"
 
-TextureManager::TextureManager(VulkanEngine& engine, VulkanResourceLoader& resource_loader)
+TextureManager::TextureManager(VulkanEngine& engine, VulkanResourceLoader& resource_loader, ComputePassManager& compute_pass_manager)
     :   m_engine(engine),
+        equirect_to_cubemap_pass(engine, compute_pass_manager),
         m_resource_loader(resource_loader),
         dirt_texture(load_rbga8(path_utils::executable_dir() / "assets" / "textures" / "minecraft_dirt" / "texture.png")),
-        rock_texture(load_rbga8(path_utils::executable_dir() / "assets" / "textures" / "rock" / "albedo.jpg")){
+        rock_texture(load_rbga8(path_utils::executable_dir() / "assets" / "textures" / "rock" / "albedo.jpg")),
+        st_peters_square_night_4k_hdr(load_rbga8(path_utils::executable_dir() / "assets" / "hdr" / "st_peters_square_night_4k.hdr"))
+        {
         // st_peters_square_night_4k_hdr(load_rbga8(path_utils::executable_dir() / "assets" / "textures" / "hdr" / "st_peters_square_night_4k.hdr")){
     resource_loader.submit();
+
+    dirt_env_map.emplace(equirect_to_cubemap_pass.generate(dirt_texture, 100));
+    st_peters_square_night_4k_hdr_env_map.emplace(equirect_to_cubemap_pass.generate(st_peters_square_night_4k_hdr, 2048));
 }
 
 VulkanTexture2D TextureManager::load_rbga8(const std::filesystem::path& path) {

@@ -78,4 +78,45 @@ namespace StaticMeshData{
         0, 1, 2,
         2, 1, 3
     };
+
+    
+    std::vector<float> skybox_cube_vertices = {
+        // position.x, position.y, position.z, position.w
+
+        -1.0f, -1.0f, -1.0f, 1.0f, // 0
+        1.0f, -1.0f, -1.0f, 1.0f, // 1
+        1.0f,  1.0f, -1.0f, 1.0f, // 2
+        -1.0f,  1.0f, -1.0f, 1.0f, // 3
+
+        -1.0f, -1.0f,  1.0f, 1.0f, // 4
+        1.0f, -1.0f,  1.0f, 1.0f, // 5
+        1.0f,  1.0f,  1.0f, 1.0f, // 6
+        -1.0f,  1.0f,  1.0f, 1.0f  // 7
+    };
+
+    std::vector<uint32_t> skybox_cube_indices = {
+        // Back face, -Z
+        0, 2, 1,
+        2, 0, 3,
+
+        // Front face, +Z
+        4, 5, 6,
+        6, 7, 4,
+
+        // Left face, -X
+        0, 4, 7,
+        7, 3, 0,
+
+        // Right face, +X
+        1, 2, 6,
+        6, 5, 1,
+
+        // Top face, +Y
+        3, 7, 6,
+        6, 2, 3,
+
+        // Bottom face, -Y
+        0, 1, 5,
+        5, 4, 0
+    };
 }

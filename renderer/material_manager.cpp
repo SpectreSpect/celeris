@@ -15,6 +15,7 @@ MaterialManager::MaterialManager(VulkanEngine& engine, ShaderManager& shader_man
 :   blin_phong_mp(create_blin_phong_pass(engine, frame_resources, shader_manager.blinn_phong_vs, shader_manager.blinn_phong_fs)),
     unlit_mp(create_unlit_pass(engine, frame_resources, shader_manager.unlit_vs, shader_manager.unlit_fs)),
     point_mp(create_point_pass(engine, frame_resources, shader_manager.point_vs, shader_manager.point_fs)),
+    skybox_mp(create_skybox_pass(engine, frame_resources, shader_manager.skybox_vs, shader_manager.skybox_fs)),
     m_pool(engine.device(), m_pool_builder) {}
 
 MaterialPass MaterialManager::create_pass(VulkanEngine& engine, MaterialPassBuilder& builder, 
@@ -121,10 +122,40 @@ MaterialPass MaterialManager::create_point_pass(VulkanEngine& engine, FrameResou
     return create_pass(engine, builder, vs, fs);
 }
 
+MaterialPass MaterialManager::create_skybox_pass(VulkanEngine& engine, FrameResources& frame_resources, 
+                                                const VulkanShaderModule& vs, const VulkanShaderModule& fs) {
+    LOG_METHOD();
+
+    struct SkyboxVertex {
+        glm::vec4 position;
+    };
+
+    MaterialPassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::fragment);
+    builder.add_combined_image_sampler(1, ShaderStages::fragment);
+
+    builder.add_push_constants(sizeof(TransformPushConstants), 0);
+    builder.add_descriptor_set_layout(frame_resources.descriptor_layout());
+
+    builder.add_vertex_binding(0, sizeof(SkyboxVertex));
+    builder.add_vertex_attribute(0, 0, Formats::vec4, offsetof(SkyboxVertex, position));
+
+    return create_pass(engine, builder, vs, fs);
+}
+
 MaterialInstance MaterialManager::create_blinn_phong_material(VulkanEngine& engine, VulkanTexture2D& albedo){
     MaterialInstance material(engine, m_pool, blin_phong_mp, sizeof(BlinPhongMaterialData));
     
     material.descriptor_set.write_texture(1, albedo);
+
+    return material;
+}
+
+MaterialInstance MaterialManager::create_skybox_material(VulkanEngine& engine, Cubemap& skybox_cubemap) {
+    MaterialInstance material(engine, m_pool, skybox_mp, sizeof(SkyboxMaterialData));
+    
+    material.descriptor_set.write_cubemap(1, skybox_cubemap);
 
     return material;
 }

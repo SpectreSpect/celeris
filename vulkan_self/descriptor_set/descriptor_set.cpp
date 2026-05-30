@@ -77,6 +77,47 @@ void DescriptorSet::write_texture(
     );
 }
 
+void DescriptorSet::write_cubemap(
+    uint32_t binding,
+    const Cubemap& cubemap)
+{
+    LOG_METHOD();
+
+    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(m_descriptor_set != VK_NULL_HANDLE, "Descriptor set is not initialized");
+
+    logger.check(cubemap.view().handle() != VK_NULL_HANDLE, "Cubemap image view is not initialized");
+    logger.check(cubemap.sampler().handle() != VK_NULL_HANDLE, "Cubemap sampler is not initialized");
+
+    // Use this check if your Cubemap class tracks its current layout.
+    logger.check(
+        cubemap.layout() == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        "Cubemap image layout must be VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL"
+    );
+
+    VkDescriptorImageInfo image_info{};
+    image_info.sampler = cubemap.sampler().handle();
+    image_info.imageView = cubemap.view().handle();
+    image_info.imageLayout = cubemap.layout();
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = m_descriptor_set;
+    write.dstBinding = binding;
+    write.dstArrayElement = 0;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    write.descriptorCount = 1;
+    write.pImageInfo = &image_info;
+
+    vkUpdateDescriptorSets(
+        m_device,
+        1,
+        &write,
+        0,
+        nullptr
+    );
+}
+
 void DescriptorSet::write_storage_cubemap(
     uint32_t binding,
     const Cubemap& cubemap)

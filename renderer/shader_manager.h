@@ -18,6 +18,9 @@ public:
 
     VulkanShaderModule point_vs;
     VulkanShaderModule point_fs;
+    
+    VulkanShaderModule skybox_vs;
+    VulkanShaderModule skybox_fs;
 
     VulkanShaderModule gicp_step_cs;
     VulkanShaderModule insert_points_into_voxel_map_cs;

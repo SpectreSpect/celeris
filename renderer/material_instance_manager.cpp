@@ -11,6 +11,7 @@ MaterialInstanceManager::MaterialInstanceManager(VulkanEngine& engine, MaterialM
         rock_blinn_phong(material_manager.create_blinn_phong_material(engine, texture_manager.rock_texture)),
         dirt_blinn_phong(material_manager.create_blinn_phong_material(engine, texture_manager.dirt_texture)),
         point_cloud(create_mi(material_manager.point_mp, sizeof(UnlitMaterialData))),
+        st_peters_square_night_4k_hdr(material_manager.create_skybox_material(engine, *texture_manager.st_peters_square_night_4k_hdr_env_map)),
 
         point_cloud_ubo(VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(PointUniform))){
 

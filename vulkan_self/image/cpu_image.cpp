@@ -46,6 +46,8 @@ CpuImage CpuImage::load_rgba8_image(const std::filesystem::path& path, VkFormat 
 
     std::vector<std::uint8_t> file_data = Utils::read_binary_file(path);
 
+    stbi_set_flip_vertically_on_load(true);
+
     int width, height, channels;
     stbi_uc* raw_pixels = stbi_load_from_memory(
         file_data.data(),

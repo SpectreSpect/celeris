@@ -14,6 +14,7 @@ class MaterialPassBuilder;
 class VulkanShaderModule;
 class MaterialInstance;
 class VulkanTexture2D;
+class Cubemap;
 
 class MaterialManager {
 public:
@@ -26,6 +27,7 @@ public:
     MaterialPass blin_phong_mp;
     MaterialPass unlit_mp;
     MaterialPass point_mp;
+    MaterialPass skybox_mp;
 
     MaterialManager(VulkanEngine& engine, ShaderManager& shader_manager, FrameResources& frame_resources);
 
@@ -46,8 +48,12 @@ public:
                                    const VulkanShaderModule& vs, const VulkanShaderModule& fs);
     MaterialPass create_point_pass(VulkanEngine& engine, FrameResources& frame_resources, 
                                    const VulkanShaderModule& vs, const VulkanShaderModule& fs);
+    MaterialPass create_skybox_pass(VulkanEngine& engine, FrameResources& frame_resources, 
+                                   const VulkanShaderModule& vs, const VulkanShaderModule& fs);
         
     MaterialInstance create_blinn_phong_material(VulkanEngine& engine, VulkanTexture2D& albedo);
+    MaterialInstance create_skybox_material(VulkanEngine& engine, Cubemap& skybox_cubemap);
+    
 
 private:
     DescriptorPool m_pool;

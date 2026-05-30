@@ -13,6 +13,11 @@ struct BlinPhongMaterialData {
     glm::vec4 color;
 };
 
+struct SkyboxMaterialData {
+    float exposure;
+};
+
+
 struct PointUniform {
     float point_size_px;
     float point_size_world;
