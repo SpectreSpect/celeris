@@ -5,6 +5,7 @@
 #include "../vulkan_self/vulkan_command_buffer.h"
 #include "../vulkan_self/vulkan_buffer.h"
 #include "../vulkan_self/image/vulkan_texture_2d.h"
+#include "../vulkan_self/image/vulkan_image_view.h"
 
 ComputePassInstance::ComputePassInstance(DescriptorPool& pool, ComputePass& pass) 
     :   m_compute_pass(&pass),
@@ -20,10 +21,30 @@ void ComputePassInstance::set_storage_buffer(uint32_t binding, VulkanBuffer& sto
     m_descriptor_set.write_storage_buffer(binding, storage_buffer);
 }
 
-
 void ComputePassInstance::set_texture(uint32_t binding, VulkanTexture2D& texture_2d) {
     LOG_METHOD();
     m_descriptor_set.write_texture(binding, texture_2d);
+}
+
+void ComputePassInstance::set_storage_texture(uint32_t binding, VulkanTexture2D& texture_2d) {
+    LOG_METHOD();
+    m_descriptor_set.write_storage_texture(binding, texture_2d);
+}
+
+void ComputePassInstance::set_cubemap(uint32_t binding, Cubemap& cubemap) {
+    LOG_METHOD();
+    m_descriptor_set.write_cubemap(binding, cubemap);
+}
+
+
+void ComputePassInstance::set_storage_cubemap(uint32_t binding, Cubemap& cubemap) {
+    LOG_METHOD();
+    m_descriptor_set.write_storage_cubemap(binding, cubemap);
+}
+
+void ComputePassInstance::set_storage_image_view(uint32_t binding, const VulkanImageView& image_view) {
+    LOG_METHOD();
+    m_descriptor_set.write_storage_image_view(binding, image_view);
 }
 
 void ComputePassInstance::bind(VulkanCommandBuffer& command_buffer) {

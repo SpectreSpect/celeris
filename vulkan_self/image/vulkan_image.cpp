@@ -19,7 +19,8 @@ VulkanImage::VulkanImage(
     uint32_t mip_levels,
     uint32_t array_layers,
     VkSampleCountFlagBits samples,
-    VkImageLayout initial_layout) 
+    VkImageLayout initial_layout,
+    VkImageCreateFlags image_flags) 
         :   m_device(device.handle()),
             m_extent(extent),
             m_format(format),
@@ -28,7 +29,8 @@ VulkanImage::VulkanImage(
             m_image_type(image_type),
             m_mip_levels(mip_levels),
             m_array_layers(array_layers),
-            m_samples(samples)
+            m_samples(samples),
+            m_image_flags(image_flags)
 {
     LOG_METHOD();
 
@@ -59,6 +61,7 @@ VulkanImage::VulkanImage(
     image_info.queueFamilyIndexCount = 0;
     image_info.pQueueFamilyIndices = nullptr;
     image_info.initialLayout = initial_layout;
+    image_info.flags = image_flags;
 
     VkResult result = vkCreateImage(
         m_device,
@@ -260,7 +263,11 @@ void VulkanImage::memory_barrier(
 
 void VulkanImage::barrier_undefined_to_transfer_dst(
     VulkanCommandBuffer& command_buffer,
-    VkImageAspectFlags aspect_mask) const
+    VkImageAspectFlags aspect_mask,
+    uint32_t base_mip_level,
+    uint32_t level_count,
+    uint32_t base_array_layer,
+    uint32_t layer_count) const
 {
     LOG_METHOD();
 
@@ -277,14 +284,22 @@ void VulkanImage::barrier_undefined_to_transfer_dst(
         VK_ACCESS_TRANSFER_WRITE_BIT,
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        aspect_mask
+        aspect_mask,
+        base_mip_level,
+        level_count,
+        base_array_layer,
+        layer_count
     );
 }
 
 void VulkanImage::barrier_transfer_write_to_shader_read(
     VulkanCommandBuffer& command_buffer,
     VkPipelineStageFlags shader_stage,
-    VkImageAspectFlags aspect_mask) const
+    VkImageAspectFlags aspect_mask,
+    uint32_t base_mip_level,
+    uint32_t level_count,
+    uint32_t base_array_layer,
+    uint32_t layer_count) const
 {
     LOG_METHOD();
 
@@ -303,7 +318,11 @@ void VulkanImage::barrier_transfer_write_to_shader_read(
         VK_ACCESS_SHADER_READ_BIT,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        aspect_mask
+        aspect_mask,
+        base_mip_level,
+        level_count,
+        base_array_layer,
+        layer_count
     );
 }
 

@@ -55,6 +55,7 @@ add_executable(app
   vulkan_self/image/vulkan_image.cpp
   vulkan_self/image/vulkan_sampler.cpp
   vulkan_self/image/vulkan_texture_2d.cpp
+  vulkan_self/image/cubemap.cpp
   vulkan_self/pipeline/vulkan_pipeline_layout.cpp
   vulkan_self/pipeline/pipeline.cpp
   vulkan_self/pipeline/pipeline_pass.cpp
@@ -103,6 +104,12 @@ add_executable(app
   renderer/point_cloud/gicp/gicp_reductor.cpp
   imgui_layer.cpp
   renderer/lighting_system/lighting_system.cpp
+  renderer/pbr/equirect_to_cubemap_pass.cpp
+  renderer/pbr/brdf_lut_pass.cpp
+  renderer/pbr/prefilter_map_pass.cpp
+  renderer/pbr/irradiance_map_pass.cpp
+  renderer/pbr/pbr_maps.cpp
+  renderer/pbr/pbr_map_generator.cpp
 )
 
 

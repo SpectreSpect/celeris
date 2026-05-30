@@ -54,6 +54,10 @@
 #include "renderer/point_cloud/gicp/voxel_map_point_reseter.h"
 #include "imgui_layer.h"
 #include "renderer/lighting_system/lighting_system.h"
+#include "renderer/pbr/equirect_to_cubemap_pass.h"
+#include "renderer/pbr/brdf_lut_pass.h"
+#include "renderer/pbr/prefilter_map_pass.h"
+#include "renderer/pbr/irradiance_map_pass.h"
 
 #include <vector>
 
@@ -107,9 +111,9 @@ int main() {
     VulkanResourceLoader resource_loader(engine, 1024 * 1024 * 100); // 1 Мб
 
     ShaderManager shader_manager(engine.device());
-    TextureManager texture_manager(engine, resource_loader);
     ComputePassManager compute_pass_manager(engine.device(), shader_manager);
-
+    TextureManager texture_manager(engine, resource_loader, compute_pass_manager);
+    
     LightingSystem lighting_system(engine, compute_pass_manager);
     FrameResources frame_resources(engine, lighting_system, engine.num_frames_in_flight());
 
@@ -120,16 +124,37 @@ int main() {
     MeshManager mesh_manager(engine, resource_loader);
     ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
 
+    // EquirectToCubemapPass equirect_to_cubemap_pass(engine, compute_pass_manager);
+
+    // BrdfLutPass brdf_lut_generator(engine, compute_pass_manager);
+    // VulkanTexture2D brdf_lut_texture = brdf_lut_generator.generate(256, 256);
+
+    // PrefilterPass prefilter_pass(engine, compute_pass_manager);
+    // Cubemap prefilter_map = prefilter_pass.generate(*texture_manager.st_peters_square_night_4k_hdr_env_map, 32);
+
+    // Cubemap dirt_cubemap = equirect_to_cubemap_pass.generate(texture_manager.dirt_texture, 100);
+
+    IrradiancePass irradiance_pass(engine, compute_pass_manager);
+    Cubemap irradiance_map = irradiance_pass.generate(*texture_manager.st_peters_square_night_4k_hdr_env_map, 32);
+
+    // Cubemap dirt_cubemap = equirect_to_cubemap_pass.generate(texture_manager.dirt_texture, 100);
+
     GICPPass gicp_pass(engine, compute_pass_manager);
     VoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);
     VoxelMapPointReseter voxel_map_reseter(engine, compute_pass_manager);
+    
 
     Renderer renderer(engine, frame_resources);
 
-    RenderObject unlit_cube(mesh_manager.cube, material_instance_manager.dirt_blinn_phong);
+    RenderObject sphere(mesh_manager.sphere, material_instance_manager.studio_kominka_02_4k_pbr);
+
+    RenderObject unlit_cube(mesh_manager.cube, material_instance_manager.studio_kominka_02_4k_pbr);
     RenderObject unlit_cube2(mesh_manager.cube, material_instance_manager.dirt_blinn_phong);
     RenderObject unlit_cube3(mesh_manager.cube, material_instance_manager.rock_blinn_phong);
     RenderObject unlit_cube4(mesh_manager.cube, material_instance_manager.unlit);
+
+    RenderObject skybox(mesh_manager.skybox_cube, material_instance_manager.st_peters_square_night_4k_hdr);
+    skybox.set_material_data<SkyboxMaterialData>(SkyboxMaterialData{.exposure = 1.8});
 
     // LightSource light_source{};
     // light_source.color = glm::vec4(1, 1, 1, 1);
@@ -184,7 +209,12 @@ int main() {
 
     // PointCloud voxel_map_point_cloud(manager_bundle, voxel_point_map.map_point_buffer, voxel_point_map.m_map_point_count);
 
-    unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
+    // unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
+    unlit_cube.set_material_data<PBRMaterialData>(PBRMaterialData{.material = glm::vec4(1, 0.01, 1, 0.2f),
+                                                                  .color = glm::vec4(1, 1, 1, 1)});
+    sphere.set_material_data(PBRMaterialData{.material = glm::vec4(0, 0.5, 1, 0.2f),
+                                             .color = glm::vec4(0, 0, 0, 1)});
+
     unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube3.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube4.set_material_data<UnlitMaterialData>({glm::vec4(0, 1, 1, 1)});
@@ -196,6 +226,7 @@ int main() {
     unlit_cube.transform.position = glm::vec4(0, 0, 0, 1);
 
     unlit_cube.transform.scale = glm::vec3(50, 1, 50);
+    sphere.transform.position = glm::vec4(0, 2, 0, 1);
 
     // unlit_cube.transform.position.x = 0;
     unlit_cube2.transform.position.x = 2;
@@ -211,7 +242,9 @@ int main() {
 
     // scene.add(voxel_map_point_cloud);
 
-    scene.add(unlit_cube);
+    // scene.add(unlit_cube);
+    scene.add(sphere);
+    scene.add(skybox);
 
     bool g_pressed = false;
     bool n_pressed = false;

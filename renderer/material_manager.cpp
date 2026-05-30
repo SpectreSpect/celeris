@@ -10,11 +10,14 @@
 #include "../vulkan_self/material/material_instance.h"
 #include "../vulkan_self/image/vulkan_texture_2d.h"
 #include "material_data_types.h"
+#include "pbr/pbr_maps.h"
 
 MaterialManager::MaterialManager(VulkanEngine& engine, ShaderManager& shader_manager, FrameResources& frame_resources)
 :   blin_phong_mp(create_blin_phong_pass(engine, frame_resources, shader_manager.blinn_phong_vs, shader_manager.blinn_phong_fs)),
     unlit_mp(create_unlit_pass(engine, frame_resources, shader_manager.unlit_vs, shader_manager.unlit_fs)),
     point_mp(create_point_pass(engine, frame_resources, shader_manager.point_vs, shader_manager.point_fs)),
+    skybox_mp(create_skybox_pass(engine, frame_resources, shader_manager.skybox_vs, shader_manager.skybox_fs)),
+    pbr_mp(create_pbr_pass(engine, frame_resources, shader_manager.pbr_vs, shader_manager.pbr_fs)),
     m_pool(engine.device(), m_pool_builder) {}
 
 MaterialPass MaterialManager::create_pass(VulkanEngine& engine, MaterialPassBuilder& builder, 
@@ -39,6 +42,7 @@ MaterialPass MaterialManager::create_blin_phong_pass(VulkanEngine& engine, Frame
         glm::vec4 position;
         glm::vec4 normal;
         glm::vec2 uv;
+        glm::vec4 tangent;
     };
 
     MaterialPassBuilder builder;
@@ -56,6 +60,7 @@ MaterialPass MaterialManager::create_blin_phong_pass(VulkanEngine& engine, Frame
     builder.add_vertex_attribute(0, 0, Formats::vec4, offsetof(BlinPhongVertex, position));
     builder.add_vertex_attribute(1, 0, Formats::vec4, offsetof(BlinPhongVertex, normal));
     builder.add_vertex_attribute(2, 0, Formats::vec2, offsetof(BlinPhongVertex, uv));
+    builder.add_vertex_attribute(3, 0, Formats::vec4, offsetof(BlinPhongVertex, tangent));
 
     return create_pass(engine, builder, vs, fs);
 }
@@ -69,6 +74,7 @@ MaterialPass MaterialManager::create_unlit_pass(VulkanEngine& engine, FrameResou
         glm::vec4 position;
         glm::vec4 normal;
         glm::vec2 uv;
+        glm::vec4 tangent;
     };
 
     MaterialPassBuilder builder;
@@ -84,6 +90,7 @@ MaterialPass MaterialManager::create_unlit_pass(VulkanEngine& engine, FrameResou
     builder.add_vertex_attribute(0, 0, Formats::vec4, offsetof(UnlitVertex, position));
     builder.add_vertex_attribute(1, 0, Formats::vec4, offsetof(UnlitVertex, normal));
     builder.add_vertex_attribute(2, 0, Formats::vec2, offsetof(UnlitVertex, uv));
+    builder.add_vertex_attribute(3, 0, Formats::vec4, offsetof(UnlitVertex, tangent));
 
     return create_pass(engine, builder, vs, fs);
 }
@@ -121,10 +128,90 @@ MaterialPass MaterialManager::create_point_pass(VulkanEngine& engine, FrameResou
     return create_pass(engine, builder, vs, fs);
 }
 
+MaterialPass MaterialManager::create_skybox_pass(VulkanEngine& engine, FrameResources& frame_resources, 
+                                                const VulkanShaderModule& vs, const VulkanShaderModule& fs) {
+    LOG_METHOD();
+
+    struct SkyboxVertex {
+        glm::vec4 position;
+    };
+
+    MaterialPassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::fragment);
+    builder.add_combined_image_sampler(1, ShaderStages::fragment);
+
+    builder.add_push_constants(sizeof(TransformPushConstants), 0);
+    builder.add_descriptor_set_layout(frame_resources.descriptor_layout());
+
+    builder.add_vertex_binding(0, sizeof(SkyboxVertex));
+    builder.add_vertex_attribute(0, 0, Formats::vec4, offsetof(SkyboxVertex, position));
+
+    return create_pass(engine, builder, vs, fs);
+}
+
+MaterialPass MaterialManager::create_pbr_pass(VulkanEngine& engine, FrameResources& frame_resources, 
+                                                const VulkanShaderModule& vs, const VulkanShaderModule& fs) {
+    LOG_METHOD();
+
+    struct PBRVertex {
+        glm::vec4 position;
+        glm::vec4 normal;
+        glm::vec2 uv;
+        glm::vec4 tangent;
+    };
+
+    MaterialPassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::fragment);
+    builder.add_combined_image_sampler(1, ShaderStages::fragment); // irradianceMap
+    builder.add_combined_image_sampler(2, ShaderStages::fragment); // prefilterMap
+    builder.add_combined_image_sampler(3, ShaderStages::fragment); // brdfLUT
+
+    builder.add_push_constants(sizeof(TransformPushConstants), 0);
+    builder.add_descriptor_set_layout(frame_resources.descriptor_layout());
+
+    builder.add_vertex_binding(0, sizeof(PBRVertex));
+    builder.add_vertex_attribute(0, 0, Formats::vec4, offsetof(PBRVertex, position));
+    builder.add_vertex_attribute(1, 0, Formats::vec4, offsetof(PBRVertex, normal));
+    builder.add_vertex_attribute(2, 0, Formats::vec2, offsetof(PBRVertex, uv));
+    builder.add_vertex_attribute(3, 0, Formats::vec4, offsetof(PBRVertex, tangent));
+
+    return create_pass(engine, builder, vs, fs);
+}
+
 MaterialInstance MaterialManager::create_blinn_phong_material(VulkanEngine& engine, VulkanTexture2D& albedo){
     MaterialInstance material(engine, m_pool, blin_phong_mp, sizeof(BlinPhongMaterialData));
     
     material.descriptor_set.write_texture(1, albedo);
+
+    return material;
+}
+
+MaterialInstance MaterialManager::create_skybox_material(VulkanEngine& engine, Cubemap& skybox_cubemap) {
+    MaterialInstance material(engine, m_pool, skybox_mp, sizeof(SkyboxMaterialData));
+    
+    material.descriptor_set.write_cubemap(1, skybox_cubemap);
+
+    return material;
+}
+
+MaterialInstance MaterialManager::create_pbr_material(VulkanEngine& engine, Cubemap& irradiance_map, Cubemap& prefilter_map, VulkanTexture2D& brdf_lut) {
+    MaterialInstance material(engine, m_pool, pbr_mp, sizeof(PBRMaterialData));
+    
+    material.descriptor_set.write_cubemap(1, irradiance_map);
+    material.descriptor_set.write_cubemap(2, prefilter_map);
+    material.descriptor_set.write_texture(3, brdf_lut);
+
+    return material;
+}
+
+MaterialInstance MaterialManager::create_pbr_material(VulkanEngine& engine, PBRMaps& pbr_maps) {
+    MaterialInstance material(engine, m_pool, pbr_mp, sizeof(PBRMaterialData));
+    
+    material.descriptor_set.write_cubemap(1, pbr_maps.irradiance_map());
+    material.descriptor_set.write_cubemap(2, pbr_maps.prefilter_map());
+    material.descriptor_set.write_texture(3, pbr_maps.brdf_lut());
 
     return material;
 }

@@ -16,6 +16,10 @@ void PipelinePassBuilder::add_combined_image_sampler(uint32_t binding, VkShaderS
     m_material_dsl_builder.add_combined_image_sampler(binding, shader_stage_flags);
 }
 
+void PipelinePassBuilder::add_storage_image(uint32_t binding, VkShaderStageFlags shader_stage_flags) {
+    m_material_dsl_builder.add_storage_image(binding, shader_stage_flags);
+}
+
 void PipelinePassBuilder::add_push_constants(uint32_t size_bytes, uint32_t offset, VkShaderStageFlags stage_flags) {
     m_pipeline_layout_builder.add_push_constants(size_bytes, offset, stage_flags);
 }

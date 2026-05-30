@@ -4,21 +4,28 @@ layout(location = 0) in vec4 inDir;
 
 layout(location = 0) out vec4 outFragColor;
 
-layout(set = 0, binding = 0) uniform UniformBufferObject {
-    mat4 proj;
-    mat4 view;
+struct MaterialData {
     float exposure;
-} ubo;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer MaterialBuffer {
+    MaterialData materials[];
+} material_buffer;
 
 layout(set = 0, binding = 1) uniform samplerCube envMap;
 
-layout(set = 0, binding = 1) uniform samplerCube textures[];
+layout(push_constant) uniform PushConstants {
+    mat4 model;
+    uint material_data_id;
+} pc;
 
 void main() { 
+    MaterialData material_data = material_buffer.materials[pc.material_data_id];
+
     vec3 dir = normalize(inDir.xyz);
     vec3 hdr_color = texture(envMap, dir).rgb;
 
-    vec3 mapped = vec3(1.0) - exp(-hdr_color * ubo.exposure);
+    vec3 mapped = vec3(1.0) - exp(-hdr_color * material_data.exposure);
 
     // outFragColor = texture(albedoTex, outUV.xy);
 
@@ -28,6 +35,7 @@ void main() {
     // mapped = pow(mapped, vec3(1.0 / 2.2));
 
     outFragColor = vec4(mapped, 1.0);
+    // outFragColor = vec4(1, 0, 0, 1.0);
     // outFragColor = vec4(hdr_color, 1.0);
 }
 

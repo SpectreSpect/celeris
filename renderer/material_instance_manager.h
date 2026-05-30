@@ -18,6 +18,11 @@ public:
     MaterialInstance rock_blinn_phong;
     MaterialInstance dirt_blinn_phong;
     MaterialInstance point_cloud;
+    MaterialInstance st_peters_square_night_4k_hdr;
+    MaterialInstance dirt_pbr;
+    MaterialInstance studio_kominka_02_4k_pbr;
+
+    
 
     VulkanBuffer point_cloud_ubo;
 
