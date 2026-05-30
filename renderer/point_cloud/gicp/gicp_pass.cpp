@@ -6,8 +6,6 @@
 #include "voxel_point_map.h"
 #include "../../../math_utils.h"
 
-#include <glm/gtx/euler_angles.hpp>
-
 
 GICPPass::GICPPass(VulkanEngine& engine, ComputePassManager& compute_pass_manager)
     :   engine(engine),
@@ -181,10 +179,6 @@ glm::quat GICPPass::omega_to_quat(const glm::vec3& omega) {
     return glm::normalize(glm::angleAxis(theta, axis));
 }
 
-glm::mat3 GICPPass::euler_xyz_to_mat3(const glm::vec3& euler) {
-    return glm::mat3(glm::eulerAngleXYZ(euler.x, euler.y, euler.z));
-}
-
 glm::mat3 GICPPass::skew_matrix(const glm::vec3& v) {
     glm::mat3 K(0.0f);
     K[0] = glm::vec3( 0.0f,  v.z, -v.y);
@@ -321,10 +315,4 @@ glm::mat3 GICPPass::omega_to_mat3(const glm::vec3& omega) {
     glm::vec3 axis = omega / theta;
     glm::mat4 R4 = glm::rotate(glm::mat4(1.0f), theta, axis);
     return glm::mat3(R4);
-}
-
-glm::vec3 GICPPass::mat3_to_euler_xyz(const glm::mat3& R) {
-    float x, y, z;
-    glm::extractEulerAngleXYZ(glm::mat4(R), x, y, z);
-    return glm::vec3(x, y, z);
 }

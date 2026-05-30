@@ -14,7 +14,12 @@ class DescriptorPool {
 public:
     _XCLASS_NAME(DescriptorPool);
 
-    explicit DescriptorPool(const VulkanDevice& device, std::span<const VkDescriptorPoolSize> pool_sizes, uint32_t max_sets);
+    explicit DescriptorPool(
+        const VulkanDevice& device,
+        std::span<const VkDescriptorPoolSize> pool_sizes,
+        uint32_t max_sets,
+        VkDescriptorPoolCreateFlags flags = 0
+    );
     explicit DescriptorPool(const VulkanDevice& device, const DescriptorPoolBuilder& builder);
 
     DescriptorPool(const DescriptorPool&) = delete;

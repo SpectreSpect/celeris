@@ -62,6 +62,7 @@ DescriptorPool UI::create_descriptor_pool(VulkanEngine& engine) const {
     DescriptorPoolBuilder descriptor_pool_builder;
     descriptor_pool_builder.add_descriptors(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 64);
     descriptor_pool_builder.set_max_sets(64);
+    descriptor_pool_builder.set_flags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT);
 
     return DescriptorPool(engine.device(), descriptor_pool_builder);
 }
