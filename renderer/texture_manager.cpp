@@ -9,6 +9,7 @@ TextureManager::TextureManager(VulkanEngine& engine, VulkanResourceLoader& resou
         brdf_lut_pass(engine, compute_pass_manager),
         prefilter_pass(engine, compute_pass_manager),
         irradiance_pass(engine, compute_pass_manager),
+        pbr_map_generator(engine, compute_pass_manager),
         brdf_lut(brdf_lut_pass.generate(512, 512)),
         m_resource_loader(resource_loader),
         dirt_texture(load_rbga8(path_utils::executable_dir() / "assets" / "textures" / "minecraft_dirt" / "texture.png")),
@@ -22,6 +23,8 @@ TextureManager::TextureManager(VulkanEngine& engine, VulkanResourceLoader& resou
     st_peters_square_night_4k_hdr_env_map.emplace(equirect_to_cubemap_pass.generate(st_peters_square_night_4k_hdr, 2048));
     st_peters_square_night_4k_hdr_prefilter_map.emplace(prefilter_pass.generate(*st_peters_square_night_4k_hdr_env_map, 512));
     st_peters_square_night_4k_hdr_irradiance_map.emplace(irradiance_pass.generate(*st_peters_square_night_4k_hdr_env_map, 32));
+
+    studio_kominka_02_4k_pbr_maps.emplace(pbr_map_generator.generate_maps(st_peters_square_night_4k_hdr));
 }
 
 VulkanTexture2D TextureManager::load_rbga8(const std::filesystem::path& path) {

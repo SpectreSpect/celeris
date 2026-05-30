@@ -108,6 +108,8 @@ add_executable(app
   renderer/pbr/brdf_lut_pass.cpp
   renderer/pbr/prefilter_map_pass.cpp
   renderer/pbr/irradiance_map_pass.cpp
+  renderer/pbr/pbr_maps.cpp
+  renderer/pbr/pbr_map_generator.cpp
 )
 
 

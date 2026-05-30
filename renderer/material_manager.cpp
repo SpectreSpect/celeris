@@ -10,6 +10,7 @@
 #include "../vulkan_self/material/material_instance.h"
 #include "../vulkan_self/image/vulkan_texture_2d.h"
 #include "material_data_types.h"
+#include "pbr/pbr_maps.h"
 
 MaterialManager::MaterialManager(VulkanEngine& engine, ShaderManager& shader_manager, FrameResources& frame_resources)
 :   blin_phong_mp(create_blin_phong_pass(engine, frame_resources, shader_manager.blinn_phong_vs, shader_manager.blinn_phong_fs)),
@@ -201,6 +202,16 @@ MaterialInstance MaterialManager::create_pbr_material(VulkanEngine& engine, Cube
     material.descriptor_set.write_cubemap(1, irradiance_map);
     material.descriptor_set.write_cubemap(2, prefilter_map);
     material.descriptor_set.write_texture(3, brdf_lut);
+
+    return material;
+}
+
+MaterialInstance MaterialManager::create_pbr_material(VulkanEngine& engine, PBRMaps& pbr_maps) {
+    MaterialInstance material(engine, m_pool, pbr_mp, sizeof(PBRMaterialData));
+    
+    material.descriptor_set.write_cubemap(1, pbr_maps.irradiance_map());
+    material.descriptor_set.write_cubemap(2, pbr_maps.prefilter_map());
+    material.descriptor_set.write_texture(3, pbr_maps.brdf_lut());
 
     return material;
 }

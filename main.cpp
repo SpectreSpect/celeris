@@ -146,9 +146,9 @@ int main() {
 
     Renderer renderer(engine, frame_resources);
 
-    RenderObject sphere(mesh_manager.sphere, material_instance_manager.dirt_pbr);
+    RenderObject sphere(mesh_manager.sphere, material_instance_manager.studio_kominka_02_4k_pbr);
 
-    RenderObject unlit_cube(mesh_manager.cube, material_instance_manager.dirt_pbr);
+    RenderObject unlit_cube(mesh_manager.cube, material_instance_manager.studio_kominka_02_4k_pbr);
     RenderObject unlit_cube2(mesh_manager.cube, material_instance_manager.dirt_blinn_phong);
     RenderObject unlit_cube3(mesh_manager.cube, material_instance_manager.rock_blinn_phong);
     RenderObject unlit_cube4(mesh_manager.cube, material_instance_manager.unlit);
@@ -210,10 +210,10 @@ int main() {
     PointCloud voxel_map_point_cloud(manager_bundle, voxel_point_map.map_point_buffer, voxel_point_map.m_map_point_count);
 
     // unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
-    unlit_cube.set_material_data<PBRMaterialData>(PBRMaterialData{.material = glm::vec4(1, 0.01, 1, 1),
+    unlit_cube.set_material_data<PBRMaterialData>(PBRMaterialData{.material = glm::vec4(1, 0.01, 1, 0.2f),
                                                                   .color = glm::vec4(1, 1, 1, 1)});
-    sphere.set_material_data<PBRMaterialData>(PBRMaterialData{.material = glm::vec4(0, 0.5, 1, 0.2),
-                                                                  .color = glm::vec4(0, 0, 0, 1)});
+    sphere.set_material_data(PBRMaterialData{.material = glm::vec4(0, 0.5, 1, 0.2f),
+                                             .color = glm::vec4(0, 0, 0, 1)});
 
     unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube3.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
@@ -348,7 +348,6 @@ int main() {
             }
         }
 
-        
         engine.submit_graphic_commands(image_index);
         engine.present(image_index);
     }

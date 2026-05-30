@@ -8,6 +8,8 @@
 #include "pbr/brdf_lut_pass.h"
 #include "pbr/prefilter_map_pass.h"
 #include "pbr/irradiance_map_pass.h"
+#include "pbr/pbr_map_generator.h"
+#include "pbr/pbr_maps.h"
 #include "../path_utils.h"
 
 class VulkanEngine;
@@ -25,6 +27,8 @@ public:
     PrefilterPass prefilter_pass;
     IrradiancePass irradiance_pass;
 
+    PBRMapGenerator pbr_map_generator;
+
     VulkanTexture2D brdf_lut;
 
     VulkanTexture2D dirt_texture;
@@ -35,6 +39,7 @@ public:
     std::optional<Cubemap> st_peters_square_night_4k_hdr_env_map = std::nullopt;
     std::optional<Cubemap> st_peters_square_night_4k_hdr_prefilter_map = std::nullopt;
     std::optional<Cubemap> st_peters_square_night_4k_hdr_irradiance_map = std::nullopt;
+    std::optional<PBRMaps> studio_kominka_02_4k_pbr_maps = std::nullopt;
 
     TextureManager(VulkanEngine& engine, VulkanResourceLoader& resource_loader, ComputePassManager& compute_pass_manager);
 
