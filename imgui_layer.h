@@ -50,6 +50,7 @@ public:
 private:
     DescriptorPool m_descriptor_pool;
 
+private:
     void destory() noexcept;
     DescriptorPool create_descriptor_pool(VulkanEngine& engine) const;
     VulkanInitInfo get_default_vulkan_init_info(VulkanEngine& engine, DescriptorPool& descriptor_pool);    

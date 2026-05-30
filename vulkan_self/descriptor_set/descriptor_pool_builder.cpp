@@ -41,6 +41,16 @@ DescriptorPoolBuilder& DescriptorPoolBuilder::add_layout(const DescriptorSetLayo
     return *this;
 }
 
+DescriptorPoolBuilder& DescriptorPoolBuilder::set_max_sets(uint32_t max_sets) noexcept {
+    m_max_sets = max_sets;
+    return *this;
+}
+
+DescriptorPoolBuilder& DescriptorPoolBuilder::set_flags(VkDescriptorPoolCreateFlags flags) noexcept {
+    m_create_flags = flags;
+    return *this;
+}
+
 std::span<const VkDescriptorPoolSize> DescriptorPoolBuilder::pool_sizes() const noexcept {
     return m_pool_sizes;
 }
@@ -51,7 +61,6 @@ uint32_t DescriptorPoolBuilder::max_sets() const noexcept {
     return m_max_sets;
 }
 
-void DescriptorPoolBuilder::set_max_sets(uint32_t max_sets) noexcept {
-    m_max_sets = max_sets;
+VkDescriptorPoolCreateFlags DescriptorPoolBuilder::flags() const noexcept {
+    return m_create_flags;
 }
-

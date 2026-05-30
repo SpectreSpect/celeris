@@ -7,8 +7,11 @@
 #include "descriptor_set_layout.h"
 #include "descriptor_set.h"
 
-DescriptorPool::DescriptorPool(const VulkanDevice& device, std::span<const VkDescriptorPoolSize> pool_sizes, uint32_t max_sets
-) : m_device(device.handle()) {
+DescriptorPool::DescriptorPool(
+    const VulkanDevice& device, 
+    std::span<const VkDescriptorPoolSize> pool_sizes, 
+    uint32_t max_sets,
+    VkDescriptorPoolCreateFlags flags) : m_device(device.handle()) {
     LOG_METHOD();
 
     logger.check(!pool_sizes.empty(), "pool_sizes was empty");
@@ -17,6 +20,7 @@ DescriptorPool::DescriptorPool(const VulkanDevice& device, std::span<const VkDes
 
     VkDescriptorPoolCreateInfo pool_info{};
     pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.flags = flags;
     pool_info.poolSizeCount =  static_cast<uint32_t>(pool_sizes.size());
     pool_info.pPoolSizes = pool_sizes.data();
     pool_info.maxSets = max_sets;
@@ -26,9 +30,8 @@ DescriptorPool::DescriptorPool(const VulkanDevice& device, std::span<const VkDes
     logger.check(result == VK_SUCCESS) << "Failed to create descriptor pool: " << clr(string_VkResult(result), LoggerPalette::blue) << "\n";
 }
 
-DescriptorPool::DescriptorPool(const VulkanDevice& device, const DescriptorPoolBuilder& builder
-) : DescriptorPool(device, builder.pool_sizes(), builder.max_sets()) {
-}
+DescriptorPool::DescriptorPool(const VulkanDevice& device, const DescriptorPoolBuilder& builder) 
+    :   DescriptorPool(device, builder.pool_sizes(), builder.max_sets(), builder.flags()) {}
 
 DescriptorPool::DescriptorPool(DescriptorPool&& other) noexcept 
     :   m_pool(std::exchange(other.m_pool, VK_NULL_HANDLE)),

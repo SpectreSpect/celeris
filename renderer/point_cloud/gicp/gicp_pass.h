@@ -69,9 +69,7 @@ private:
     VulkanBuffer rejection_buffer;
 
     static glm::quat omega_to_quat(const glm::vec3& omega);
-    static glm::mat3 euler_xyz_to_mat3(const glm::vec3& euler);
     static glm::mat3 skew_matrix(const glm::vec3& v);
     static bool solve_6x6(const double H_in[6][6], const double g_in[6], double delta_out[6]);
     static glm::mat3 omega_to_mat3(const glm::vec3& omega);
-    static glm::vec3 mat3_to_euler_xyz(const glm::mat3& R);
 };
