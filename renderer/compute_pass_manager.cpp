@@ -13,6 +13,9 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         gicp_reduce_cp(create_gicp_reduce_compute_pass(device, shader_manager.gicp_reduce_cs)),
         build_cluster_light_lists_cp(create_build_cluster_light_lists_compute_pass(device, shader_manager.build_cluster_light_lists_cs)),
         equirect_to_cubemap_cp(create_equirect_to_cubemap_compute_pass(device, shader_manager.equirect_to_cubemap_cs)),
+        brdf_lut_cp(create_brdf_lut_pass(device, shader_manager.brdf_lut_cs)),
+        prefilter_map_cp(create_prefilter_map_pass(device, shader_manager.generate_prefilter_map_cs)),
+        irradiance_map_cp(create_irradiance_map_pass(device, shader_manager.generate_irradiance_map_cs)),
         m_pool(device, m_pool_builder) {}
 
 DescriptorPool& ComputePassManager::descriptor_pool() noexcept {
@@ -128,6 +131,47 @@ ComputePass ComputePassManager::create_equirect_to_cubemap_compute_pass(VulkanDe
     builder.add_uniform_buffer(0, ShaderStages::compute); // UniformBufferObject
     builder.add_combined_image_sampler(1, ShaderStages::compute); // UniformBufferObject
     builder.add_storage_image(2, ShaderStages::compute); // outEnvMap
+    
+    builder.set_compute_shader(compute_shader_module);
+
+    return create_pass(device, builder);
+}
+
+ComputePass ComputePassManager::create_brdf_lut_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_uniform_buffer(0, ShaderStages::compute);
+    builder.add_storage_image(1, ShaderStages::compute);
+    
+    builder.set_compute_shader(compute_shader_module);
+
+    return create_pass(device, builder);
+}
+
+ComputePass ComputePassManager::create_prefilter_map_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_uniform_buffer(0, ShaderStages::compute); // UniformBufferObject
+    builder.add_combined_image_sampler(1, ShaderStages::compute); // uEnvironmentMap
+    builder.add_storage_image(2, ShaderStages::compute); // outPrefilterMap
+    
+    builder.set_compute_shader(compute_shader_module);
+
+    return create_pass(device, builder);
+}
+
+ComputePass ComputePassManager::create_irradiance_map_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_uniform_buffer(0, ShaderStages::compute); // UniformBufferObject
+    builder.add_combined_image_sampler(1, ShaderStages::compute); // uEnvironmentMap
+    builder.add_storage_image(2, ShaderStages::compute); // outIrradianceMap
     
     builder.set_compute_shader(compute_shader_module);
 

@@ -5,6 +5,7 @@
 
 #include "../vulkan_physical_device.h"
 #include "../vulkan_device.h"
+#include "../vulkan_command_buffer.h"
 
 Cubemap::Cubemap(
     VulkanImage&& image,
@@ -192,6 +193,199 @@ void Cubemap::transition_layout(
     );
 
     m_layout = new_layout;
+}
+
+void Cubemap::generate_mipmaps(VulkanCommandBuffer& command_buffer)
+{
+    LOG_METHOD();
+
+    logger.check(image().handle() != VK_NULL_HANDLE, "Cubemap image is not initialized");
+    logger.check(mip_levels() != 0, "Cubemap mip levels count is zero");
+    logger.check(array_layers() == Cubemap::face_count, "Cubemap must have 6 faces");
+
+    logger.check(
+        image().has_usage(VK_IMAGE_USAGE_TRANSFER_SRC_BIT),
+        "Cubemap image must have VK_IMAGE_USAGE_TRANSFER_SRC_BIT for mip generation"
+    );
+
+    logger.check(
+        image().has_usage(VK_IMAGE_USAGE_TRANSFER_DST_BIT),
+        "Cubemap image must have VK_IMAGE_USAGE_TRANSFER_DST_BIT for mip generation"
+    );
+
+    if (mip_levels() == 1) {
+        image().memory_barrier(
+            command_buffer,
+
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT,
+
+            VK_IMAGE_LAYOUT_GENERAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+
+            VK_IMAGE_ASPECT_COLOR_BIT,
+
+            0,
+            1,
+
+            0,
+            Cubemap::face_count
+        );
+
+        set_layout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        return;
+    }
+
+    int32_t mip_width = static_cast<int32_t>(extent().width);
+    int32_t mip_height = static_cast<int32_t>(extent().height);
+
+    for (uint32_t mip = 1; mip < mip_levels(); mip++) {
+        VkImageLayout previous_mip_old_layout =
+            mip == 1
+                ? VK_IMAGE_LAYOUT_GENERAL
+                : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
+        VkPipelineStageFlags previous_mip_old_stage =
+            mip == 1
+                ? VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+                : VK_PIPELINE_STAGE_TRANSFER_BIT;
+
+        VkAccessFlags previous_mip_old_access =
+            mip == 1
+                ? VK_ACCESS_SHADER_WRITE_BIT
+                : VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        // Previous mip becomes the blit source.
+        image().memory_barrier(
+            command_buffer,
+
+            previous_mip_old_stage,
+            previous_mip_old_access,
+
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_ACCESS_TRANSFER_READ_BIT,
+
+            previous_mip_old_layout,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+
+            VK_IMAGE_ASPECT_COLOR_BIT,
+
+            mip - 1,
+            1,
+
+            0,
+            Cubemap::face_count
+        );
+
+        // Current mip becomes the blit destination.
+        image().memory_barrier(
+            command_buffer,
+
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+            0,
+
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_ACCESS_TRANSFER_WRITE_BIT,
+
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+
+            VK_IMAGE_ASPECT_COLOR_BIT,
+
+            mip,
+            1,
+
+            0,
+            Cubemap::face_count
+        );
+
+        int32_t next_mip_width = std::max(mip_width / 2, 1);
+        int32_t next_mip_height = std::max(mip_height / 2, 1);
+
+        VkImageBlit blit{};
+        blit.srcOffsets[0] = VkOffset3D{0, 0, 0};
+        blit.srcOffsets[1] = VkOffset3D{mip_width, mip_height, 1};
+
+        blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        blit.srcSubresource.mipLevel = mip - 1;
+        blit.srcSubresource.baseArrayLayer = 0;
+        blit.srcSubresource.layerCount = Cubemap::face_count;
+
+        blit.dstOffsets[0] = VkOffset3D{0, 0, 0};
+        blit.dstOffsets[1] = VkOffset3D{next_mip_width, next_mip_height, 1};
+
+        blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        blit.dstSubresource.mipLevel = mip;
+        blit.dstSubresource.baseArrayLayer = 0;
+        blit.dstSubresource.layerCount = Cubemap::face_count;
+
+        vkCmdBlitImage(
+            command_buffer.handle(),
+
+            image().handle(),
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+
+            image().handle(),
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+
+            1,
+            &blit,
+
+            VK_FILTER_LINEAR
+        );
+
+        // Previous mip is finished. Make it shader-readable.
+        image().memory_barrier(
+            command_buffer,
+
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_ACCESS_TRANSFER_READ_BIT,
+
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT,
+
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+
+            VK_IMAGE_ASPECT_COLOR_BIT,
+
+            mip - 1,
+            1,
+
+            0,
+            Cubemap::face_count
+        );
+
+        mip_width = next_mip_width;
+        mip_height = next_mip_height;
+    }
+
+    // Last mip was only used as TRANSFER_DST, so transition it too.
+    image().memory_barrier(
+        command_buffer,
+
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_ACCESS_TRANSFER_WRITE_BIT,
+
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT,
+
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+
+        VK_IMAGE_ASPECT_COLOR_BIT,
+
+        mip_levels() - 1,
+        1,
+
+        0,
+        Cubemap::face_count
+    );
+
+    set_layout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 VulkanImage Cubemap::create_image(

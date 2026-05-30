@@ -5,7 +5,9 @@
 #include "static_mesh_data.h"
 
 MeshManager::MeshManager(VulkanEngine& engine, VulkanResourceLoader& resource_loader)
-    :   cube(engine, resource_loader, StaticMeshData::cube_vertices.data(), Utils::size_bytes(StaticMeshData::cube_vertices), 
+    :   sphere(engine, resource_loader, StaticMeshData::sphere_vertices.data(), Utils::size_bytes(StaticMeshData::sphere_vertices), 
+                                        StaticMeshData::sphere_indices.data(), Utils::size_bytes(StaticMeshData::sphere_indices)),
+        cube(engine, resource_loader, StaticMeshData::cube_vertices.data(), Utils::size_bytes(StaticMeshData::cube_vertices), 
                                        StaticMeshData::cube_indices.data(), Utils::size_bytes(StaticMeshData::cube_indices)),
         point_cloud_quad(engine, resource_loader, StaticMeshData::point_cloud_quad_corners.data(), Utils::size_bytes(StaticMeshData::point_cloud_quad_corners), 
                                        StaticMeshData::point_cloud_quad_indices.data(), Utils::size_bytes(StaticMeshData::point_cloud_quad_indices)),

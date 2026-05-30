@@ -17,6 +17,10 @@ struct SkyboxMaterialData {
     float exposure;
 };
 
+struct PBRMaterialData {
+    glm::vec4 material;
+    glm::vec4 color;
+};
 
 struct PointUniform {
     float point_size_px;

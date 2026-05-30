@@ -23,7 +23,7 @@ Cubemap EquirectToCubemapPass::generate(VulkanTexture2D& equirectangular_map, ui
 
     Cubemap cubemap(m_engine.physical_device(), m_engine.device(), {face_size, face_size}, VK_FORMAT_R8G8B8A8_UNORM, mip_levels);
 
-    EquirectToCubemapUniform uniform_data{};
+    static EquirectToCubemapUniform uniform_data{};
     uniform_data.image_width = face_size;
     uniform_data.image_height = face_size;
     uniform_data.num_layers = 6;
@@ -53,7 +53,7 @@ Cubemap EquirectToCubemapPass::generate(VulkanTexture2D& equirectangular_map, ui
 
         m_compute_command_buffer.dispatch(x_groups, y_groups, z_groups);
 
-        generate_cubemap_mipmaps(m_compute_command_buffer, cubemap);
+        cubemap.generate_mipmaps(m_compute_command_buffer);
     }
 
     m_compute_fence.reset();

@@ -19,6 +19,7 @@ public:
     MaterialInstance dirt_blinn_phong;
     MaterialInstance point_cloud;
     MaterialInstance st_peters_square_night_4k_hdr;
+    MaterialInstance dirt_pbr;
 
     VulkanBuffer point_cloud_ubo;
 

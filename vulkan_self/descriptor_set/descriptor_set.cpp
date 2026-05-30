@@ -5,6 +5,7 @@
 #include "../pipeline/pipeline.h"
 #include "../image/vulkan_texture_2d.h"
 #include "../image/cubemap.h"
+#include "../image/vulkan_image_view.h"
 
 void DescriptorSet::write_buffer(uint32_t binding, VulkanBuffer& buffer, VkDescriptorType descriptor_type) {
     LOG_METHOD();
@@ -137,6 +138,81 @@ void DescriptorSet::write_storage_cubemap(
     VkDescriptorImageInfo image_info{};
     image_info.sampler = VK_NULL_HANDLE;
     image_info.imageView = cubemap.view().handle();
+    image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = m_descriptor_set;
+    write.dstBinding = binding;
+    write.dstArrayElement = 0;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    write.descriptorCount = 1;
+    write.pImageInfo = &image_info;
+
+    vkUpdateDescriptorSets(
+        m_device,
+        1,
+        &write,
+        0,
+        nullptr
+    );
+}
+
+void DescriptorSet::write_storage_texture(uint32_t binding, const VulkanTexture2D& texture) {
+    LOG_METHOD();
+
+    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(m_descriptor_set != VK_NULL_HANDLE, "Descriptor set is not initialized");
+
+    logger.check(texture.view().handle() != VK_NULL_HANDLE, "Texture image view is not initialized");
+
+    // Use this if your VulkanTexture2D tracks its current layout.
+    // For storage images, the image must be in VK_IMAGE_LAYOUT_GENERAL.
+    logger.check(
+        texture.texture_layout() == VK_IMAGE_LAYOUT_GENERAL,
+        "Texture image layout must be VK_IMAGE_LAYOUT_GENERAL for storage image"
+    );
+
+    VkDescriptorImageInfo image_info{};
+    image_info.sampler = VK_NULL_HANDLE;
+    image_info.imageView = texture.view().handle();
+    image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = m_descriptor_set;
+    write.dstBinding = binding;
+    write.dstArrayElement = 0;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    write.descriptorCount = 1;
+    write.pImageInfo = &image_info;
+
+    vkUpdateDescriptorSets(
+        m_device,
+        1,
+        &write,
+        0,
+        nullptr
+    );
+}
+
+void DescriptorSet::write_storage_image_view(
+    uint32_t binding,
+    const VulkanImageView& image_view)
+{
+    LOG_METHOD();
+
+    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(m_descriptor_set != VK_NULL_HANDLE, "Descriptor set is not initialized");
+
+    logger.check(
+        image_view.handle() != VK_NULL_HANDLE,
+        "Storage image view is not initialized"
+    );
+
+    VkDescriptorImageInfo image_info{};
+    image_info.sampler = VK_NULL_HANDLE;
+    image_info.imageView = image_view.handle();
     image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
     VkWriteDescriptorSet write{};

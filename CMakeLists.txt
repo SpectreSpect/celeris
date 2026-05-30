@@ -105,6 +105,9 @@ add_executable(app
   imgui_layer.cpp
   renderer/lighting_system/lighting_system.cpp
   renderer/pbr/equirect_to_cubemap_pass.cpp
+  renderer/pbr/brdf_lut_pass.cpp
+  renderer/pbr/prefilter_map_pass.cpp
+  renderer/pbr/irradiance_map_pass.cpp
 )
 
 

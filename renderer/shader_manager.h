@@ -22,6 +22,9 @@ public:
     VulkanShaderModule skybox_vs;
     VulkanShaderModule skybox_fs;
 
+    VulkanShaderModule pbr_vs;
+    VulkanShaderModule pbr_fs;
+
     VulkanShaderModule gicp_step_cs;
     VulkanShaderModule insert_points_into_voxel_map_cs;
     VulkanShaderModule reset_point_voxel_map_cs;
@@ -30,4 +33,7 @@ public:
     VulkanShaderModule build_cluster_light_lists_cs;
 
     VulkanShaderModule equirect_to_cubemap_cs;
+    VulkanShaderModule brdf_lut_cs;
+    VulkanShaderModule generate_prefilter_map_cs;
+    VulkanShaderModule generate_irradiance_map_cs;
 };

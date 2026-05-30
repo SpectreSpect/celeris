@@ -83,6 +83,8 @@ public:
         uint32_t layer_count = face_count
     );
 
+    void generate_mipmaps(VulkanCommandBuffer& command_buffer);
+
 private:
     VulkanImage m_image;
     VulkanImageView m_view;
