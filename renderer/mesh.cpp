@@ -40,5 +40,5 @@ void Mesh::bind_vertex_buffer(VulkanCommandBuffer& command_buffer, uint32_t buff
 }
 
 void Mesh::bind_index_buffer(VulkanCommandBuffer& command_buffer, uint32_t buffer_binding, VkDeviceSize offset) {
-    m_index_buffer.bind_as_index_buffer(command_buffer, buffer_binding, offset);
+    m_index_buffer.bind_as_index_buffer(command_buffer, offset);
 }

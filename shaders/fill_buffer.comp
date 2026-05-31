@@ -1,0 +1,140 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+
+layout(std430, set = 0, binding = 0) readonly buffer PrefabBuffer {
+    uint data[];
+} prefabBuffer;
+
+layout(std430, set = 0, binding = 1) buffer ClearableBuffer {
+    uint data[];
+} clearableBuffer;
+
+layout(push_constant) uniform PushConstants {
+    uint prefab_data_bytes;
+    uint clearable_data_bytes;
+
+    uint clearable_data_offset_bytes;
+
+    uint count_invocations_x;
+    uint count_invocations_y;
+    uint count_invocations_z;
+
+    uint invocation_stride_bytes;
+} pc;
+
+#define BYTE_MASK 0xFFu
+
+uint read_prefab_byte(uint byte_offset) {
+    uint src_byte_offset = byte_offset % pc.prefab_data_bytes;
+    uint src_uint_index  = src_byte_offset >> 2u;
+    uint src_byte_index  = src_byte_offset & 3u;
+    uint src_shift       = src_byte_index * 8u;
+
+    return (prefabBuffer.data[src_uint_index] >> src_shift) & BYTE_MASK;
+}
+
+uint build_prefab_uint(uint byte_offset) {
+    uint b0 = read_prefab_byte(byte_offset + 0u);
+    uint b1 = read_prefab_byte(byte_offset + 1u);
+    uint b2 = read_prefab_byte(byte_offset + 2u);
+    uint b3 = read_prefab_byte(byte_offset + 3u);
+
+    return (b0 << 0u) |
+           (b1 << 8u) |
+           (b2 << 16u) |
+           (b3 << 24u);
+}
+
+void write_dst_byte_atomic(uint dst_byte_offset, uint byte_value) {
+    uint dst_uint_index = dst_byte_offset >> 2u;
+    uint dst_byte_index = dst_byte_offset & 3u;
+    uint dst_shift      = dst_byte_index * 8u;
+
+    uint clear_mask  = ~(BYTE_MASK << dst_shift);
+    uint insert_bits = (byte_value & BYTE_MASK) << dst_shift;
+
+    for (;;) {
+        uint oldv = atomicAdd(clearableBuffer.data[dst_uint_index], 0u);
+        uint newv = (oldv & clear_mask) | insert_bits;
+
+        if (atomicCompSwap(clearableBuffer.data[dst_uint_index], oldv, newv) == oldv) {
+            break;
+        }
+    }
+}
+
+void main() {
+    if (pc.prefab_data_bytes == 0u ||
+        pc.invocation_stride_bytes == 0u ||
+        pc.clearable_data_bytes == 0u) {
+        return;
+    }
+
+    uvec3 gid = gl_GlobalInvocationID.xyz;
+
+    if (gid.x >= pc.count_invocations_x ||
+        gid.y >= pc.count_invocations_y ||
+        gid.z >= pc.count_invocations_z) {
+        return;
+    }
+
+    uint invocation_idx =
+          gid.x
+        + gid.y * pc.count_invocations_x
+        + gid.z * (pc.count_invocations_x * pc.count_invocations_y);
+
+    uint rel_start = invocation_idx * pc.invocation_stride_bytes;
+
+    if (rel_start >= pc.clearable_data_bytes) {
+        return;
+    }
+
+    uint remaining = pc.clearable_data_bytes - rel_start;
+    uint rel_len   = min(pc.invocation_stride_bytes, remaining);
+    uint rel_end   = rel_start + rel_len;
+
+    uint abs_start = pc.clearable_data_offset_bytes + rel_start;
+    uint abs_end   = pc.clearable_data_offset_bytes + rel_end;
+
+    uint aligned_begin = (abs_start + 3u) & ~3u;
+    uint aligned_end   = abs_end & ~3u;
+
+    if (aligned_begin > abs_end) {
+        aligned_begin = abs_end;
+    }
+
+    if (aligned_end < aligned_begin) {
+        aligned_end = aligned_begin;
+    }
+
+    bool can_fast_middle =
+        ((pc.prefab_data_bytes & 3u) == 0u) &&
+        ((pc.clearable_data_offset_bytes & 3u) == 0u);
+
+    for (uint abs_byte_off = abs_start; abs_byte_off < aligned_begin; ++abs_byte_off) {
+        uint rel_byte_off = abs_byte_off - pc.clearable_data_offset_bytes;
+        uint v = read_prefab_byte(rel_byte_off);
+        write_dst_byte_atomic(abs_byte_off, v);
+    }
+
+    for (uint abs_byte_off = aligned_begin; abs_byte_off < aligned_end; abs_byte_off += 4u) {
+        uint dst_uint_index = abs_byte_off >> 2u;
+        uint rel_byte_off   = abs_byte_off - pc.clearable_data_offset_bytes;
+
+        if (can_fast_middle) {
+            uint src_byte_offset = rel_byte_off % pc.prefab_data_bytes;
+            uint src_uint_index  = src_byte_offset >> 2u;
+
+            clearableBuffer.data[dst_uint_index] = prefabBuffer.data[src_uint_index];
+        } else {
+            clearableBuffer.data[dst_uint_index] = build_prefab_uint(rel_byte_off);
+        }
+    }
+
+    for (uint abs_byte_off = aligned_end; abs_byte_off < abs_end; ++abs_byte_off) {
+        uint rel_byte_off = abs_byte_off - pc.clearable_data_offset_bytes;
+        uint v = read_prefab_byte(rel_byte_off);
+        write_dst_byte_atomic(abs_byte_off, v);
+    }
+}

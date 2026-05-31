@@ -24,6 +24,7 @@ public:
         uint32_t memory_type_index,
         VkDeviceSize size_bytes
     );
+    
     explicit VulkanMemory(
         const VulkanPhysicalDevice& physical_device,
         const VulkanDevice& device,
@@ -31,10 +32,8 @@ public:
         VkMemoryPropertyFlags required_properties,
         VkDeviceSize size_bytes
     );
+    
     ~VulkanMemory() noexcept;
-
-private:
-    void destroy() noexcept;
 
 public:
     VulkanMemory(const VulkanMemory&) = delete;
@@ -130,6 +129,8 @@ private:
     VkDeviceSize m_non_coherent_atom_size = 1;
 
 private:
+    void destroy() noexcept;
+
     void allocate(
         const VulkanPhysicalDevice& physical_device,
         const VulkanDevice& device,

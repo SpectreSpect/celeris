@@ -14,15 +14,22 @@ public:
     VulkanShaderModule unlit_vs;
     VulkanShaderModule unlit_fs;
 
-    VulkanShaderModule test_cs;
-
     VulkanShaderModule point_vs;
     VulkanShaderModule point_fs;
 
+    // Compute shaders
+    // General
+    VulkanShaderModule fill_buffer_cs;
+
+    // GICP
     VulkanShaderModule gicp_step_cs;
     VulkanShaderModule insert_points_into_voxel_map_cs;
     VulkanShaderModule reset_point_voxel_map_cs;
     VulkanShaderModule gicp_reduce_cs;
     
+    // Lights
     VulkanShaderModule build_cluster_light_lists_cs;
+
+    // Voxel grid
+    // ...
 };

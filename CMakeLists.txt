@@ -103,6 +103,8 @@ add_executable(app
   renderer/point_cloud/gicp/gicp_reductor.cpp
   imgui_layer.cpp
   renderer/lighting_system/lighting_system.cpp
+  voxel_grid_vulkan/voxel_grid.cpp
+  vulkan_self/buffer_filler.cpp
 )
 
 
