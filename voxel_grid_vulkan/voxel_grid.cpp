@@ -35,16 +35,9 @@ VoxelGrid::VoxelGrid(
     // dispatch_args = BufferObject::from_fill(sizeof(uint32_t) * 3u, GL_DYNAMIC_DRAW, 1u, *shader_manager);
     // dispatch_args_additional = BufferObject::from_fill(sizeof(uint32_t) * 3u, GL_DYNAMIC_DRAW, 1u, *shader_manager);
     
-    // chunk_meta_ = BufferObject(sizeof(ChunkMetaGPU) * (size_t)count_active_chunks, GL_DYNAMIC_DRAW);
-
-
-    // indirect_cmds_ = BufferObject(sizeof(uint32_t) + sizeof(DrawElementsIndirectCommand) * (size_t)count_active_chunks, GL_DYNAMIC_DRAW);
-
     
 
-    // enqueued_ = BufferObject(sizeof(uint32_t) * (size_t)count_active_chunks, GL_DYNAMIC_DRAW);
-    dirty_list_ = BufferObject::from_fill(sizeof(uint32_t) * (size_t)(1 + count_active_chunks), GL_DYNAMIC_DRAW, 0u, *shader_manager);
-    // failed_dirty_list_ = BufferObject(sizeof(uint32_t) * (size_t)(1 + count_active_chunks), GL_DYNAMIC_DRAW);
+
 
     // dirty_quad_count_ = BufferObject(sizeof(uint32_t) * (size_t)count_active_chunks, GL_DYNAMIC_DRAW);
     // emit_counters_     = BufferObject(sizeof(uint32_t) * (size_t)count_active_chunks, GL_DYNAMIC_DRAW);
@@ -59,7 +52,7 @@ VoxelGrid::VoxelGrid(
     // verify_debug_stack_.update_subdata_fill(0, 0u, sizeof(uint32_t) * 2, *shader_manager);
 
     // evicted_chunks_list_ = BufferObject::from_fill(sizeof(uint32_t) * (count_active_chunks + 1), GL_DYNAMIC_DRAW, 0u, *shader_manager);
-    // voxel_write_list_ = BufferObject::from_fill(sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * desc.max_write_count, GL_DYNAMIC_DRAW, 0u, *shader_manager);
+    
     // local_voxel_write_list_ = BufferObject::from_fill(sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * desc.max_write_count, GL_DYNAMIC_DRAW, 0u, *shader_manager);
 
 
@@ -113,6 +106,7 @@ VoxelGrid::VoxelGridParams VoxelGrid::create_params(const VoxelGridDesc& desc) c
     params.voxel_size = desc.voxel_size;
     params.count_active_chunks = desc.count_active_chunks;
     params.count_evict_buckets = desc.count_evict_buckets;
+    params.max_write_count = desc.max_write_count;
     params.min_free_chunks = desc.min_free_chunks;
     params.tomb_fraction_to_rebuild = desc.tomb_fraction_to_rebuild;
     params.eviction_bucket_shell_thickness = desc.eviction_bucket_shell_thickness;
@@ -167,37 +161,38 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(ComputePassMa
 VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     const VulkanPhysicalDevice& physical_device,
     const VulkanDevice& device,
-    VulkanCommandBuffer& command_buffer) const 
+    VulkanCommandBuffer& command_buffer) 
 {
     LOG_METHOD();
     
     VkDeviceSize free_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
     VkDeviceSize chunk_hash_table_size = sizeof(HashTableCounters) + sizeof(ChunkHashTableSlot) * m_params.chunk_hash_table_size;
     VkDeviceSize mesh_buffers_status_size = sizeof(uint32_t) * 2;
+    VkDeviceSize chunk_meta_size = sizeof(ChunkMetaGPU) * (size_t)m_params.count_active_chunks;
+    VkDeviceSize enqueued_size = sizeof(uint32_t) * (size_t)m_params.count_active_chunks;
+    VkDeviceSize dirty_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
+    VkDeviceSize voxel_write_list_size = sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * m_params.max_write_count;
+    VkDeviceSize indirect_cmds_size = sizeof(uint32_t) + sizeof(DrawElementsIndirectCommand) * (size_t)m_params.count_active_chunks;
+    VkDeviceSize failed_dirty_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
+    
 
-    // mesh_buffers_status_ = BufferObject::from_fill(sizeof(uint32_t) * 2, GL_DYNAMIC_DRAW, 0u, *shader_manager);
-
-    // VulkanBuffer mesh_buffer = VulkanBuffer::from_fill(
-    //     physical_device, 
-    //     device, 
-    //     command_buffer, 
-    //     fill_pass_instance, 
-    //     prefab_buffer, 
-    //     0u, 
-    //     mesh_buffers_status_size,
-    //     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-    //     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-    // );
-
-    m_buffer_filler.fill_buffer(command_buffer, 0u, VulkanBuffer::create_storage_buffer(physical_device, device, mesh_buffers_status_size));
-
-    // return VoxelGridBuffers {
-    //     .chunk_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_hash_table_size),
-    //     .free_list = VulkanBuffer::create_storage_buffer(physical_device, device, free_list_size),
-        
-        
-    //     .mesh_buffers_status = 
-    // }
+    return VoxelGridBuffers {
+        .chunk_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_hash_table_size),
+        .free_list = VulkanBuffer::create_storage_buffer(physical_device, device, free_list_size),
+        .chunk_meta = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_meta_size),
+        .enqueued = VulkanBuffer::create_storage_buffer(physical_device, device, enqueued_size),
+        .indirect_cmds = VulkanBuffer::create_storage_buffer(physical_device, device, indirect_cmds_size),
+        .failed_dirty_list = VulkanBuffer::create_storage_buffer(physical_device, device, failed_dirty_list_size),
+        .mesh_buffers_status = m_buffer_filler.fill_buffer(
+            command_buffer, 0u, VulkanBuffer::create_storage_buffer(physical_device, device, mesh_buffers_status_size)
+        ),
+        .dirty_list = m_buffer_filler.fill_buffer(
+            command_buffer, 0u, VulkanBuffer::create_storage_buffer(physical_device, device, dirty_list_size)
+        ),
+        .voxel_write_list = m_buffer_filler.fill_buffer(
+            command_buffer, 0u, VulkanBuffer::create_storage_buffer(physical_device, device, voxel_write_list_size)
+        )
+    };
 }
 
 void VoxelGrid::world_init_gpu() {

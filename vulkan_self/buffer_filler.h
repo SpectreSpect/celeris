@@ -43,14 +43,14 @@ public:
     template <class T>
     VulkanBuffer& fill_buffer(
         VulkanCommandBuffer& command_buffer,
-        T fill_value,
+        const T& fill_value,
         VulkanBuffer& dst_buffer,
         uint32_t offset_in_dst = 0u,
         uint32_t invocation_stride = 0u)
     {
         LOG_METHOD();
 
-        static_assert(std::is_trivially_copyable<T>, "T must be trivially copyable");
+        static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable");
 
         fill_buffer(
             command_buffer,
@@ -62,6 +62,25 @@ public:
         );
 
         return dst_buffer;
+    }
+
+    template <class T>
+    VulkanBuffer fill_buffer(
+        VulkanCommandBuffer& command_buffer,
+        const T& fill_value,
+        VulkanBuffer&& dst_buffer,
+        uint32_t offset_in_dst = 0u,
+        uint32_t invocation_stride = 0u)
+    {
+        fill_buffer(
+            command_buffer,
+            fill_value,
+            dst_buffer,
+            offset_in_dst,
+            invocation_stride
+        );
+
+        return std::move(dst_buffer);
     }
 
 private:

@@ -333,5 +333,7 @@ private:
     VkBufferUsageFlags m_usage = 0;
 
 private:
+    void destroy_buffer() noexcept;
+    void set_to_default_fields(bool except_memory = false) noexcept;
     void destroy() noexcept;
 };

@@ -29,22 +29,31 @@ VulkanBuffer::~VulkanBuffer() noexcept {
     destroy();
 }
 
-void VulkanBuffer::destroy() noexcept {
-    if (m_device != VK_NULL_HANDLE && m_buffer != VK_NULL_HANDLE) {
-        vkDestroyBuffer(
-            m_device,
-            m_buffer,
-            nullptr
-        );
-    }
+void VulkanBuffer::destroy_buffer() noexcept {
+    vkDestroyBuffer(
+        m_device,
+        m_buffer,
+        nullptr
+    );
+}
 
+void VulkanBuffer::set_to_default_fields(bool except_memory) noexcept {
     m_physical_device = VK_NULL_HANDLE;
     m_device = VK_NULL_HANDLE;
     m_buffer = VK_NULL_HANDLE;
     m_size = 0;
     m_usage = 0;
 
-    m_memory.reset();
+    if (!except_memory)
+        m_memory.reset();
+}
+
+void VulkanBuffer::destroy() noexcept {
+    if (m_device != VK_NULL_HANDLE && m_buffer != VK_NULL_HANDLE) {
+        destroy_buffer();
+    }
+
+    set_to_default_fields();    
 }
 
 VulkanBuffer::VulkanBuffer(VulkanBuffer&& other) noexcept
@@ -132,11 +141,8 @@ void VulkanBuffer::realloc(
 
         m_memory->bind_to_buffer(*this);
     } catch (...) {
-        vkDestroyBuffer(m_device, m_buffer, nullptr);
-        m_buffer = VK_NULL_HANDLE;
-        m_device = VK_NULL_HANDLE;
-        m_size = 0;
-        m_usage = 0;
+        destroy_buffer();
+        set_to_default_fields(true);
         throw;
     }
 }

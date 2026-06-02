@@ -56,15 +56,15 @@ public:
 
 public:
     struct VoxelGridBuffers {
-        VulkanBuffer chunk_hash_table; //+
-        VulkanBuffer free_list;
-        VulkanBuffer mesh_buffers_status;
+        VulkanBuffer chunk_hash_table;
+        VulkanBuffer free_list;        
         VulkanBuffer chunk_meta;
         VulkanBuffer enqueued;
-        VulkanBuffer dirty_list;
-        VulkanBuffer voxel_write_list;
         VulkanBuffer indirect_cmds;
         VulkanBuffer failed_dirty_list;
+        VulkanBuffer mesh_buffers_status;
+        VulkanBuffer dirty_list;
+        VulkanBuffer voxel_write_list;
     };
 
     struct VoxelGridPassInstances {
@@ -76,6 +76,7 @@ public:
         glm::uvec3 voxel_size = {0u, 0u, 0u};
         uint32_t count_active_chunks = 0u;
         uint32_t count_evict_buckets = 0u;
+        uint32_t max_write_count = 0u;
         uint32_t min_free_chunks = 0u;
         uint32_t chunk_hash_table_size = 0u;
         float tomb_fraction_to_rebuild = 0.0f;
@@ -117,7 +118,7 @@ private:
         const VulkanPhysicalDevice& physical_device,
         const VulkanDevice& device,
         VulkanCommandBuffer& command_buffer
-    ) const;
+    );
 
     void world_init_gpu();
 };
