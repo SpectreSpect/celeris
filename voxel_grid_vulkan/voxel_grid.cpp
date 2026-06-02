@@ -1,6 +1,7 @@
 #include "voxel_grid.h"
 
 #include <string>
+#include <algorithm>
 
 #include "../math_utils.h"
 #include "../renderer/compute_pass_manager.h"
@@ -9,6 +10,7 @@
 #include "../vulkan_self/vulkan_device.h"
 #include "../vulkan_self/descriptor_set/descriptor_pool.h"
 #include "../vulkan_self/vulkan_queue.h"
+#include "../push_constants_structures.h"
 
 VoxelGrid::VoxelGrid(
     const VulkanPhysicalDevice& physical_device,
@@ -153,8 +155,11 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(ComputePassMa
     
     DescriptorPool& dp = compute_pass_manager.descriptor_pool();
 
+    
+
     return VoxelGridPassInstances {
-        .fill_buffer_pi = ComputePassInstance(dp, compute_pass_manager.fill_buffer_cp)
+        .fill_buffer_pi = ComputePassInstance(dp, compute_pass_manager.fill_buffer_cp),
+        .world_init_pi = ComputePassInstance(dp, compute_pass_manager.world_init_cp)
     };
 }
 
@@ -175,7 +180,6 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize indirect_cmds_size = sizeof(uint32_t) + sizeof(DrawElementsIndirectCommand) * (size_t)m_params.count_active_chunks;
     VkDeviceSize failed_dirty_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
     
-
     return VoxelGridBuffers {
         .chunk_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_hash_table_size),
         .free_list = VulkanBuffer::create_storage_buffer(physical_device, device, free_list_size),
@@ -198,23 +202,32 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
 void VoxelGrid::world_init_gpu() {
     LOG_METHOD();
 
-    // chunk_hash_table_.bind_base_as_ssbo(0);
-    // free_list_.bind_base_as_ssbo(1);
-    // mesh_buffers_status_.bind_base_as_ssbo(2);
-    // chunk_meta_.bind_base_as_ssbo(3);
-    // enqueued_.bind_base_as_ssbo(4);
-    // dirty_list_.bind_base_as_ssbo(5);
-    // voxel_write_list_.bind_base_as_ssbo(6);
-    // indirect_cmds_.bind_base_as_ssbo(7);
-    // failed_dirty_list_.bind_base_as_ssbo(8);
+    m_pass_instances.world_init_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+    m_pass_instances.world_init_pi.set_storage_buffer(1, m_buffers.free_list);
+    m_pass_instances.world_init_pi.set_storage_buffer(2, m_buffers.mesh_buffers_status);
+    m_pass_instances.world_init_pi.set_storage_buffer(3, m_buffers.chunk_meta);
+    m_pass_instances.world_init_pi.set_storage_buffer(4, m_buffers.enqueued);
+    m_pass_instances.world_init_pi.set_storage_buffer(5, m_buffers.dirty_list);
+    m_pass_instances.world_init_pi.set_storage_buffer(6, m_buffers.voxel_write_list);
+    m_pass_instances.world_init_pi.set_storage_buffer(7, m_buffers.indirect_cmds);
+    m_pass_instances.world_init_pi.set_storage_buffer(8, m_buffers.failed_dirty_list);
 
-    // prog_world_init_.use();
-    // glUniform1ui(glGetUniformLocation(prog_world_init_.id, "u_chunk_hash_table_size"), chunk_hash_table_size);
-    // glUniform1ui(glGetUniformLocation(prog_world_init_.id, "u_max_chunks"), count_active_chunks);
+    m_pass_instances.world_init_pi.bind(m_command_buffer);
 
-    // uint32_t maxItems = std::max(chunk_hash_table_size, count_active_chunks);
-    // uint32_t groups_x = math_utils::div_up_u32(maxItems, 256u);
+    m_pass_instances.world_init_pi.push_constants(m_command_buffer, WorldInitPushConstants{
+        .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
+        .u_max_chunks = m_params.count_active_chunks
+    });
+
+    uint32_t max_items = std::max(m_params.chunk_hash_table_size, m_params.count_active_chunks);
+    uint32_t groups_x = math_utils::div_up_u32(max_items, 256u);
 
     // prog_world_init_.dispatch_compute(groups_x, 1, 1);
     // glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+    
+
+    
+    m_command_buffer.dispatch(groups_x, 1, 1);
+    MEMORY_BARRIER
 }

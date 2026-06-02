@@ -34,3 +34,20 @@ void ComputePassInstance::bind(VulkanCommandBuffer& command_buffer) {
     m_compute_pass->pipeline().bind(command_buffer);
     m_descriptor_set.bind(command_buffer, m_compute_pass->pipeline(), 0);
 }
+
+std::vector<ComputePassInstance> ComputePassInstance::create_compute_pass_instances(DescriptorPool& pool, ComputePass& pass, uint32_t count) {
+    LOG_NAMED("ComputePassInstance");
+
+    logger.check(count > 0, "Attempt to create zero instances");
+    logger.check(pool.handle() != VK_NULL_HANDLE, "Descriptor pool is not initialized");
+    logger.check(pass.pipeline().handle() != VK_NULL_HANDLE, "Compute pass pipeline is not initialized");
+
+    std::vector<ComputePassInstance> instances;
+    instances.reserve(count);
+
+    for (uint32_t i = 0; i < count; i++) {
+        instances.emplace_back(pool, pass);
+    }
+
+    return instances;
+}

@@ -31,5 +31,5 @@ public:
     VulkanShaderModule build_cluster_light_lists_cs;
 
     // Voxel grid
-    // ...
+    VulkanShaderModule world_init_cs;
 };

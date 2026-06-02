@@ -31,7 +31,7 @@ public:
     ComputePass build_cluster_light_lists_cp;
 
     // Voxel grid
-    // ...
+    ComputePass world_init_cp;
 
     ComputePassManager(VulkanDevice& device, ShaderManager& shader_manager);
 
@@ -52,7 +52,7 @@ public:
     ComputePass create_build_cluster_light_lists_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
     // Voxel grid
-    // ...
+    ComputePass create_world_init_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
 private:
     DescriptorPool m_pool;

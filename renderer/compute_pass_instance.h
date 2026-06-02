@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <utility>
+#include <vector>
 
 #include "../vulkan_self/logger/logger_header.h"
 #include "../vulkan_self/descriptor_set/descriptor_set.h"
@@ -32,6 +33,8 @@ public:
     }
 
     void bind(VulkanCommandBuffer& command_buffer);
+
+    static std::vector<ComputePassInstance> create_compute_pass_instances(DescriptorPool& pool, ComputePass& pass, uint32_t count);
 
 private:
     ComputePass* m_compute_pass = nullptr;

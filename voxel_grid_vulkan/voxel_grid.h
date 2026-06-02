@@ -69,6 +69,7 @@ public:
 
     struct VoxelGridPassInstances {
         ComputePassInstance fill_buffer_pi;
+        ComputePassInstance world_init_pi;
     };
 
     struct VoxelGridParams {

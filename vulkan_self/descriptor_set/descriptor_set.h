@@ -24,7 +24,6 @@ public:
     void write_buffer(uint32_t binding, VulkanBuffer& buffer, VkDescriptorType descriptor_type);
     void write_uniform_buffer(uint32_t binding, VulkanBuffer& buffer);
     void write_storage_buffer(uint32_t binding, VulkanBuffer& buffer);
-
     void write_texture(uint32_t binding, const VulkanTexture2D& texture);
 
     void bind(VulkanCommandBuffer& command_buffer, VkPipelineLayout pipeline_layout, VkPipelineBindPoint bind_point, uint32_t set_binding);

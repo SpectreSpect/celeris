@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "../pipeline/pipeline_pass.h"
 #include "../pipeline/compute_pipeline/compute_pipeline.h"
 

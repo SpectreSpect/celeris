@@ -1,0 +1,120 @@
+#ifndef BUFFER_STRUCTURES_VULKAN_GLSL
+#define BUFFER_STRUCTURES_VULKAN_GLSL
+
+// Vulkan GLSL include file. Do not put #version here.
+// Include it from a real shader after:
+//   #version 450
+//   #extension GL_GOOGLE_include_directive : require
+//
+// This file is meant to be included, not compiled directly.
+
+// For the converted standalone version, include the Vulkan-compatible hash table
+// declaration file generated for the current include set.
+#include "hash_table/hash_table_decl.comp"
+
+#ifndef DIRTY_FLAG_BIT
+#define DIRTY_FLAG_BIT 1u
+#endif
+
+#ifndef NEED_GENERATION_FLAG_BIT
+#define NEED_GENERATION_FLAG_BIT 2u
+#endif
+
+#ifndef HAS_WRITTEN_VOXELS_BIT
+#define HAS_WRITTEN_VOXELS_BIT 4u
+#endif
+
+struct ChunkMeta {
+    uint used;
+    uint key_lo;
+    uint key_hi;
+    uint dirty_flags;
+};
+
+struct ChunkMeshAlloc {
+    uint v_startPage;
+    uint v_order;
+    uint needV;
+    uint i_startPage;
+    uint i_order;
+    uint needI;
+
+    // Do not use bool in SSBO/shared GPU-visible structures.
+    // Use 0u / 1u instead.
+    uint is_valid;
+};
+
+struct Node {
+    uint page;
+    uint next;
+};
+
+#ifndef VOXEL_TYPE_BITS
+#define VOXEL_TYPE_BITS 16u
+#endif
+
+#ifndef VOXEL_TYPE_MASK
+#define VOXEL_TYPE_MASK ((1u << VOXEL_TYPE_BITS) - 1u)
+#endif
+
+#ifndef VOXEL_VISABILITY_FLAG_BIT
+#define VOXEL_VISABILITY_FLAG_BIT 1u // Определяет, видим ли воксель
+#endif
+
+#ifndef VOXEL_EASY_OVERWRITE_FLAG_BIT
+#define VOXEL_EASY_OVERWRITE_FLAG_BIT 2u // Можно заменять как "воздух"/"вода"
+#endif
+
+uint read_voxel_type(uint type_flags) {
+    return type_flags & VOXEL_TYPE_MASK;
+}
+
+uint read_voxel_flags(uint type_flags) {
+    return type_flags >> VOXEL_TYPE_BITS;
+}
+
+uint pack_voxel_type_flags(uint type, uint flags) {
+    return (flags << VOXEL_TYPE_BITS) | (type & VOXEL_TYPE_MASK);
+}
+
+struct VoxelData {
+    uint type_flags; // high bits: flags, low VOXEL_TYPE_BITS bits: type
+    uint color;      // 0xRRGGBBAAu
+};
+
+#ifndef OVERWRITE_BIT
+#define OVERWRITE_BIT 1u
+#endif
+
+// std430-friendly: 16 + 8 + 4 + 4 = 32 bytes.
+struct VoxelWrite {
+    ivec4 world_voxel; // xyz used, w unused
+    VoxelData voxel_data;
+    uint set_flags;
+    uint _pad1;
+};
+
+// std430-friendly: 16 + 16 = 32 bytes.
+struct Vertex {
+    vec4 pos;
+    uint color;
+    uint face;
+    uint pad0;
+    uint pad1;
+};
+
+// Same layout as VkDrawIndexedIndirectCommand / VkDrawElementsIndirectCommand style data.
+struct DrawElementsIndirectCommand {
+    uint count;
+    uint instanceCount;
+    uint firstIndex;
+    int  baseVertex;
+    uint baseInstance;
+};
+
+struct BucketHead {
+    uint id;
+    uint count;
+};
+
+#endif // BUFFER_STRUCTURES_VULKAN_GLSL

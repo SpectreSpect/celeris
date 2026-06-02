@@ -23,8 +23,7 @@ DescriptorSetLayout::DescriptorSetLayout(const VulkanDevice& device, std::span<c
 }
 
 DescriptorSetLayout::DescriptorSetLayout(const VulkanDevice& device, const DescriptorSetLayoutBuilder& builder
-) : DescriptorSetLayout(device, builder.get_bindings()) {
-}
+) : DescriptorSetLayout(device, builder.get_bindings()) {}
 
 DescriptorSetLayout::DescriptorSetLayout(DescriptorSetLayout&& other) noexcept
     :   m_layout(std::exchange(other.m_layout, VK_NULL_HANDLE)),

@@ -50,6 +50,7 @@ add_executable(app
   vulkan_self/descriptor_set/descriptor_pool_builder.cpp
   vulkan_self/descriptor_set/descriptor_pool.cpp
   vulkan_self/descriptor_set/descriptor_set.cpp
+  vulkan_self/descriptor_set/descripter_set_writer.cpp
   vulkan_self/image/cpu_image.cpp
   vulkan_self/image/vulkan_image_view.cpp
   vulkan_self/image/vulkan_image.cpp

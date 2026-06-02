@@ -1,0 +1,13 @@
+#ifndef CHUNK_HASH_TABLE_GET_OR_CREATE_GLSL
+#define CHUNK_HASH_TABLE_GET_OR_CREATE_GLSL
+
+#include "common.comp"
+#include "config_functions/chunk_key_comp.comp"
+#include "config_functions/init_chunk_meta.comp"
+#include "config_functions/pop_free_chunk_id.comp"
+
+#include "config_begin.comp"
+#include "../../common/hash_table/hash_table_get_or_create_impl.comp"
+#include "config_end.comp"
+
+#endif // CHUNK_HASH_TABLE_GET_OR_CREATE_GLSL

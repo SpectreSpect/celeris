@@ -22,8 +22,7 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         gicp_reduce_cs(device, path_utils::executable_dir() / "shaders" / "gicp_reduce.comp.spv"),
 
         // Lights
-        build_cluster_light_lists_cs(device, path_utils::executable_dir() / "shaders" / "build_cluster_light_lists.comp.spv") 
+        build_cluster_light_lists_cs(device, path_utils::executable_dir() / "shaders" / "build_cluster_light_lists.comp.spv"),
         
         // Voxel grid
-        // ...
-        {}
+        world_init_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "world_init.comp.spv") {}

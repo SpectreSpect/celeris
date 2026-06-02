@@ -22,7 +22,7 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         build_cluster_light_lists_cp(create_build_cluster_light_lists_compute_pass(device, shader_manager.build_cluster_light_lists_cs)),
 
         // Voxel grid
-        // ...
+        world_init_cp(create_world_init_compute_pass(device, shader_manager.world_init_cs)),
 
         m_pool(device, m_pool_builder) {}
 
@@ -119,6 +119,25 @@ ComputePass ComputePassManager::create_build_cluster_light_lists_compute_pass(Vu
     builder.add_storage_buffer(5, ShaderStages::compute); // light_source_ssbo
     builder.add_storage_buffer(6, ShaderStages::compute); // num_lights_in_clusters_ssbo
     builder.add_storage_buffer(7, ShaderStages::compute); // lights_in_clusters_ssbo
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_world_init_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // ChunkHashTable
+    builder.add_storage_buffer(1, ShaderStages::compute); // FreeList
+    builder.add_storage_buffer(2, ShaderStages::compute); // MeshBuffersStatusBuf
+    builder.add_storage_buffer(3, ShaderStages::compute); // ChunkMetaBuf
+    builder.add_storage_buffer(4, ShaderStages::compute); // EnqueuedBuf
+    builder.add_storage_buffer(5, ShaderStages::compute); // DirtyListBuf
+    builder.add_storage_buffer(6, ShaderStages::compute); // VoxelWriteList
+    builder.add_storage_buffer(7, ShaderStages::compute); // IndirectCmdBuf
+    builder.add_storage_buffer(8, ShaderStages::compute); // FailedDirtyListBuf
+    builder.add_push_constantsf(sizeof(WorldInitPushConstants), ShaderStages::compute); // WorldInitPushConstants
 
     return create_pass(device, compute_shader_module, builder);
 }
