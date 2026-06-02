@@ -6,7 +6,7 @@
 //   COUNT_TABLE_COUNTERS
 
 #ifndef COUNTER_TYPE_NAME
-#error "COUNTER_TYPE_NAME must be defined before including hash_table_counters_impl.comp"
+#error "COUNTER_TYPE_NAME must be defined before including hash_table_counters_impl.inc"
 #endif
 
 void HASH_TABLE_PREFIX(HT_CAT3(add_, COUNTER_TYPE_NAME, _counter))(uint slot_id, uint add_value) {

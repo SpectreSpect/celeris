@@ -10,7 +10,7 @@
 #include "../vulkan_self/vulkan_device.h"
 #include "../vulkan_self/descriptor_set/descriptor_pool.h"
 #include "../vulkan_self/vulkan_queue.h"
-#include "../push_constants_structures.h"
+#include "../vulkan_self/push_constants_structures.h"
 
 VoxelGrid::VoxelGrid(
     const VulkanPhysicalDevice& physical_device,
@@ -21,7 +21,7 @@ VoxelGrid::VoxelGrid(
     :   m_command_pool(device, queue),
         m_command_buffer(device, m_command_pool),
         m_compute_pass_manager(&compute_pass_manager),
-        m_buffer_filler(physical_device, device, compute_pass_manager, 1024),
+        // m_buffer_filler(physical_device, device, compute_pass_manager, 1024),
         m_params(create_params(desc)),
         m_pass_instances(create_pass_instances(compute_pass_manager)),
         m_buffers(create_buffers(physical_device, device, m_command_buffer))
@@ -187,15 +187,19 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         .enqueued = VulkanBuffer::create_storage_buffer(physical_device, device, enqueued_size),
         .indirect_cmds = VulkanBuffer::create_storage_buffer(physical_device, device, indirect_cmds_size),
         .failed_dirty_list = VulkanBuffer::create_storage_buffer(physical_device, device, failed_dirty_list_size),
-        .mesh_buffers_status = m_buffer_filler.fill_buffer(
-            command_buffer, 0u, VulkanBuffer::create_storage_buffer(physical_device, device, mesh_buffers_status_size)
-        ),
-        .dirty_list = m_buffer_filler.fill_buffer(
-            command_buffer, 0u, VulkanBuffer::create_storage_buffer(physical_device, device, dirty_list_size)
-        ),
-        .voxel_write_list = m_buffer_filler.fill_buffer(
-            command_buffer, 0u, VulkanBuffer::create_storage_buffer(physical_device, device, voxel_write_list_size)
-        )
+
+        .mesh_buffers_status = VulkanBuffer::create_storage_buffer(physical_device, device, mesh_buffers_status_size),
+        .dirty_list = VulkanBuffer::create_storage_buffer(physical_device, device, dirty_list_size),
+        .voxel_write_list = VulkanBuffer::create_storage_buffer(physical_device, device, voxel_write_list_size)
+        // .mesh_buffers_status = m_buffer_filler.fill_buffer(
+        //     command_buffer, 0u, VulkanBuffer::create_storage_buffer(physical_device, device, mesh_buffers_status_size)
+        // ),
+        // .dirty_list = m_buffer_filler.fill_buffer(
+        //     command_buffer, 0u, VulkanBuffer::create_storage_buffer(physical_device, device, dirty_list_size)
+        // ),
+        // .voxel_write_list = m_buffer_filler.fill_buffer(
+        //     command_buffer, 0u, VulkanBuffer::create_storage_buffer(physical_device, device, voxel_write_list_size)
+        // )
     };
 }
 
@@ -229,5 +233,5 @@ void VoxelGrid::world_init_gpu() {
 
     
     m_command_buffer.dispatch(groups_x, 1, 1);
-    MEMORY_BARRIER
+    // MEMORY_BARRIER
 }

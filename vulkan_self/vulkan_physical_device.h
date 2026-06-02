@@ -16,8 +16,9 @@ class VulkanPhysicalDevice {
 public:
     _XCLASS_NAME(VulkanPhysicalDevice);
 
-    static constexpr std::array<const char*, 1> device_extensions = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    static constexpr std::array<const char*, 2> device_extensions = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME
     };
 
     explicit VulkanPhysicalDevice(

@@ -5,14 +5,14 @@
 // Optional before include:
 //   #define TOMB_CHECK_LIST_SIZE 32u  // must be a power of two because mask wrapping is used
 
-#include "hash_table_decl.comp"
+#include "hash_table_decl.inc"
 
 #ifndef HT_PREFIX
-#error "HT_PREFIX must be defined before including hash_table_common_impl.comp"
+#error "HT_PREFIX must be defined before including hash_table_common_impl.inc"
 #endif
 
 #ifndef TABLE_COUNTERS
-#error "TABLE_COUNTERS must be defined before including hash_table_common_impl.comp"
+#error "TABLE_COUNTERS must be defined before including hash_table_common_impl.inc"
 #endif
 
 #ifdef HASH_TABLE_PREFIX
@@ -33,13 +33,13 @@ uint HASH_TABLE_PREFIX(tomb_list_tail_id) = INVALID_ID;
 uint HASH_TABLE_PREFIX(tomb_list_count_elements) = 0u;
 
 #define COUNTER_TYPE_NAME empty
-#include "hash_table_counters_impl.comp"
+#include "hash_table_counters_impl.inc"
 
 #define COUNTER_TYPE_NAME occupied
-#include "hash_table_counters_impl.comp"
+#include "hash_table_counters_impl.inc"
 
 #define COUNTER_TYPE_NAME tomb
-#include "hash_table_counters_impl.comp"
+#include "hash_table_counters_impl.inc"
 
 void HASH_TABLE_PREFIX(reset_all_counters_as_empty)() {
     uint floored_empty_count = HASH_TABLE_SIZE / COUNT_TABLE_COUNTERS;

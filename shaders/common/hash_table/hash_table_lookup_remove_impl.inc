@@ -1,6 +1,6 @@
 // Template-like Vulkan GLSL include file.
 // Expected before include:
-//   hash_table_common_impl.comp has already been included for this HT_PREFIX
+//   hash_table_common_impl.inc has already been included for this HT_PREFIX
 //   SLOT_KEY_TYPE
 //   SLOT_VALUE_TYPE
 //   KEY_HASH_FUNC(key) -> uint
@@ -9,10 +9,10 @@
 // Optional before include:
 //   KEY_COMP_FUNC(a, b) -> bool
 
-#include "hash_table_decl.comp"
+#include "hash_table_decl.inc"
 
 #ifndef HT_PREFIX
-#error "HT_PREFIX must be defined before including hash_table_lookup_remove_impl.comp"
+#error "HT_PREFIX must be defined before including hash_table_lookup_remove_impl.inc"
 #endif
 
 #ifndef HASH_TABLE_PREFIX

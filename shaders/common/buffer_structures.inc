@@ -10,7 +10,7 @@
 
 // For the converted standalone version, include the Vulkan-compatible hash table
 // declaration file generated for the current include set.
-#include "hash_table/hash_table_decl.comp"
+#include "hash_table/hash_table_decl.inc"
 
 #ifndef DIRTY_FLAG_BIT
 #define DIRTY_FLAG_BIT 1u

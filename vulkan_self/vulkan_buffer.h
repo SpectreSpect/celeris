@@ -94,7 +94,7 @@ public:
         uint32_t offset = 0u,
         uint32_t invocation_stride = 4u)
     {
-        static_assert(std::is_trivially_copyable<T>, "T must be trivially copyable");
+        static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
         
         fill(
             command_buffer,
@@ -313,7 +313,7 @@ public:
     {
         LOG_NAMED("VulkanBuffer");
 
-        static_assert(std::is_trivially_copyable<T>, "T must be trivially copyable");
+        static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
         
         logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
         logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");

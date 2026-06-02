@@ -5,7 +5,7 @@
 #include "../vulkan_self/vulkan_shader_module.h"
 #include "shader_manager.h"
 
-#include "../push_constants_structures.h"
+#include "../vulkan_self/push_constants_structures.h"
 
 ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shader_manager)
     :   

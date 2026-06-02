@@ -1,9 +1,12 @@
 #include "descripter_set_writer.h"
 
+#include "../vulkan_device.h"
 #include "../vulkan_buffer.h"
 #include "../image/vulkan_texture_2d.h"
 #include "../pipeline/pipeline.h"
 #include "../vulkan_command_buffer.h"
+
+DescriptorSetWriter::DescriptorSetWriter(VulkanDevice& device) : m_device(device) {}
 
 DescriptorSetWriter& DescriptorSetWriter::write_buffer(uint32_t binding, const VulkanBuffer& buffer, VkDescriptorType descriptor_type) {
     LOG_METHOD();
@@ -104,14 +107,22 @@ void DescriptorSetWriter::push_descriptor_set(VulkanCommandBuffer& command_buffe
         writes.push_back(write);
     }
 
-    vkCmdPushDescriptorSetKHR(
+    m_device.cmd_push_descriptor_set_khr()(
         command_buffer.handle(),
         pipeline.get_bind_point(),
         pipeline.layout(),
         set_index,
         static_cast<uint32_t>(writes.size()),
-        writes.data()
-    );
+        writes.data());
+
+    // vkCmdPushDescriptorSetKHR(
+    //     command_buffer.handle(),
+    //     pipeline.get_bind_point(),
+    //     pipeline.layout(),
+    //     set_index,
+    //     static_cast<uint32_t>(writes.size()),
+    //     writes.data()
+    // );
 }
 
 void DescriptorSetWriter::push_descriptor_set_and_clear(VulkanCommandBuffer& command_buffer, const Pipeline& pipeline, uint32_t set_index) {

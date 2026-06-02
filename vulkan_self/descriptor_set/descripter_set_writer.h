@@ -10,12 +10,13 @@ class VulkanBuffer;
 class VulkanTexture2D;
 class VulkanCommandBuffer;
 class Pipeline;
+class VulkanDevice;
 
 class DescriptorSetWriter {
 public:
     _XCLASS_NAME(DescriptorSetWriter);
 
-    DescriptorSetWriter() = default;
+    DescriptorSetWriter(VulkanDevice& device);
     ~DescriptorSetWriter() noexcept = default;
 
     DescriptorSetWriter(const DescriptorSetWriter&) = delete;
@@ -43,6 +44,8 @@ private:
     };
 
 private:
+    VulkanDevice& m_device;
+
     std::vector<VkDescriptorBufferInfo> m_buffer_infos;
     std::vector<VkDescriptorImageInfo> m_image_infos;
     std::vector<PendingWrite> m_pending_writes;

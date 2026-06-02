@@ -3,10 +3,8 @@
 
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
-// ----- includes -----
-#include "../common/buffer_structures.comp"
-#include "chunk_hash_table/common.comp"
-// --------------------
+#include "../common/buffer_structures.inc"
+#include "chunk_hash_table/decl.inc"
 
 layout(std430, set = 0, binding = 0) buffer ChunkHashTable {
     HashTableCounters chunk_hash_table_counters;
@@ -55,6 +53,11 @@ layout(push_constant) uniform WorldInitPushConstants {
     uint u_chunk_hash_table_size;
     uint u_max_chunks;
 };
+
+// Function implementation includes.
+// These must come after buffers and push constants, because the template uses:
+// chunk_hash_table_counters, chunk_hash_table_slots, u_chunk_hash_table_size.
+#include "chunk_hash_table/common.inc"
 
 void main() {
     uint i = gl_GlobalInvocationID.x;

@@ -104,7 +104,7 @@ private:
 
     ComputePassManager* m_compute_pass_manager = nullptr;
 
-    BufferFiller m_buffer_filler;
+    // BufferFiller m_buffer_filler;
 
     VoxelGridParams m_params;
     VoxelGridPassInstances m_pass_instances;

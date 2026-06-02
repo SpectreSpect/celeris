@@ -97,7 +97,6 @@ int main() {
     queue_request.compute_count = 1;
 
     VulkanEngine engine(glfw_context, window, queue_request);
-
     
     UI ui(window, engine);
     Camera camera;

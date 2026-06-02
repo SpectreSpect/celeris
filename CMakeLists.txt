@@ -108,7 +108,6 @@ add_executable(app
   vulkan_self/buffer_filler.cpp
 )
 
-
 target_compile_features(app PRIVATE cxx_std_20)
 
 # ---------------- ImGui (FetchContent, no submodule) ----------------
@@ -123,6 +122,7 @@ FetchContent_Declare(
 )
 
 FetchContent_GetProperties(imgui)
+
 if(NOT imgui_POPULATED)
   FetchContent_MakeAvailable(imgui)
 endif()
@@ -183,39 +183,48 @@ message(STATUS "Vulkan shader compiler kind: ${VULKAN_SHADER_COMPILER_KIND}")
 set(SHADERS_SRC_DIR "${CMAKE_SOURCE_DIR}/shaders")
 set(SHADERS_BUILD_DIR "${CMAKE_BINARY_DIR}/shaders")
 
-file(GLOB SHADER_SOURCES CONFIGURE_DEPENDS
+file(GLOB_RECURSE SHADER_SOURCES CONFIGURE_DEPENDS
   "${SHADERS_SRC_DIR}/*.vert"
   "${SHADERS_SRC_DIR}/*.frag"
   "${SHADERS_SRC_DIR}/*.comp"
 )
 
+file(GLOB_RECURSE SHADER_INCLUDE_FILES CONFIGURE_DEPENDS
+  "${SHADERS_SRC_DIR}/*.inc"
+)
+
 set(SPIRV_OUTPUTS)
 
 foreach(SHADER ${SHADER_SOURCES})
-  get_filename_component(SHADER_NAME "${SHADER}" NAME)
-  set(SPIRV_OUTPUT "${SHADERS_BUILD_DIR}/${SHADER_NAME}.spv")
+  file(RELATIVE_PATH SHADER_REL_PATH "${SHADERS_SRC_DIR}" "${SHADER}")
+
+  set(SPIRV_OUTPUT "${SHADERS_BUILD_DIR}/${SHADER_REL_PATH}.spv")
+
+  get_filename_component(SPIRV_OUTPUT_DIR "${SPIRV_OUTPUT}" DIRECTORY)
 
   if(VULKAN_SHADER_COMPILER_KIND STREQUAL "glslc")
     add_custom_command(
       OUTPUT "${SPIRV_OUTPUT}"
-      COMMAND ${CMAKE_COMMAND} -E make_directory "${SHADERS_BUILD_DIR}"
+      COMMAND ${CMAKE_COMMAND} -E make_directory "${SPIRV_OUTPUT_DIR}"
       COMMAND "${VULKAN_SHADER_COMPILER}"
+              "-I${SHADERS_SRC_DIR}"
               "${SHADER}"
               -o "${SPIRV_OUTPUT}"
-      DEPENDS "${SHADER}"
-      COMMENT "Compiling shader ${SHADER_NAME}"
+      DEPENDS "${SHADER}" ${SHADER_INCLUDE_FILES}
+      COMMENT "Compiling shader ${SHADER_REL_PATH}"
       VERBATIM
     )
   else()
     add_custom_command(
       OUTPUT "${SPIRV_OUTPUT}"
-      COMMAND ${CMAKE_COMMAND} -E make_directory "${SHADERS_BUILD_DIR}"
+      COMMAND ${CMAKE_COMMAND} -E make_directory "${SPIRV_OUTPUT_DIR}"
       COMMAND "${VULKAN_SHADER_COMPILER}"
               -V
+              "-I${SHADERS_SRC_DIR}"
               "${SHADER}"
               -o "${SPIRV_OUTPUT}"
-      DEPENDS "${SHADER}"
-      COMMENT "Compiling shader ${SHADER_NAME}"
+      DEPENDS "${SHADER}" ${SHADER_INCLUDE_FILES}
+      COMMENT "Compiling shader ${SHADER_REL_PATH}"
       VERBATIM
     )
   endif()

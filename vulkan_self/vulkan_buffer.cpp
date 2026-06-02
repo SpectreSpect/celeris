@@ -7,7 +7,7 @@
 #include "../renderer/compute_pass_instance.h"
 #include "utils.h"
 #include "../math_utils.h"
-#include "../push_constants_structures.h"
+#include "push_constants_structures.h"
 
 VulkanBuffer::VulkanBuffer(
     const VulkanPhysicalDevice& physical_device,
@@ -278,7 +278,7 @@ void VulkanBuffer::fill(
     const uint32_t groups_y = math_utils::div_up_u32(count_invocations_y, FILL_LOCAL_SIZE_Y);
     const uint32_t groups_z = math_utils::div_up_u32(count_invocations_z, FILL_LOCAL_SIZE_Z);
 
-    BufferFillPushConstants pc{};
+    FillBufferPushConstants pc{};
     pc.prefab_data_bytes = data_size_bytes;
     pc.clearable_data_bytes = size_bytes;
 
