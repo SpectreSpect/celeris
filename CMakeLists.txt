@@ -56,6 +56,7 @@ add_executable(app
   vulkan_self/image/vulkan_sampler.cpp
   vulkan_self/image/vulkan_texture_2d.cpp
   vulkan_self/image/cubemap.cpp
+  vulkan_self/image/cubemap_array.cpp
   vulkan_self/pipeline/vulkan_pipeline_layout.cpp
   vulkan_self/pipeline/pipeline.cpp
   vulkan_self/pipeline/pipeline_pass.cpp
@@ -95,6 +96,7 @@ add_executable(app
   renderer/point_cloud/point_cloud.cpp
   renderer/scene.cpp
   renderer/scene_object.cpp
+  renderer/skybox.cpp
   renderer/point_cloud/lidar/lidar_scan.cpp
   renderer/point_cloud/lidar/lidar_video.cpp
   renderer/point_cloud/gicp/gicp_pass.cpp

@@ -46,6 +46,7 @@
 #include "renderer/manager_bundle.h"
 #include "renderer/point_cloud/point_cloud.h"
 #include "renderer/scene.h"
+#include "renderer/skybox.h"
 #include "renderer/point_cloud/lidar/lidar_scan.h"
 #include "renderer/point_cloud/lidar/lidar_video.h"
 #include "renderer/point_cloud/gicp/gicp_pass.h"
@@ -58,6 +59,7 @@
 #include "renderer/pbr/brdf_lut_pass.h"
 #include "renderer/pbr/prefilter_map_pass.h"
 #include "renderer/pbr/irradiance_map_pass.h"
+#include "vulkan_self/image/cubemap_array.h"
 
 #include <vector>
 
@@ -102,7 +104,6 @@ int main() {
 
     VulkanEngine engine(glfw_context, window, queue_request);
 
-    
     UI ui(window, engine);
     Camera camera;
     FPSCameraController camera_controller(camera);
@@ -124,6 +125,8 @@ int main() {
     MeshManager mesh_manager(engine, resource_loader);
     ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
 
+    CubemapArray cubemaps(engine.physical_device(), engine.device(), VkExtent2D{512, 512}, VK_FORMAT_R8G8B8A8_UNORM, 16, CubemapArray::StorageImageUsage::Enabled);
+
     // EquirectToCubemapPass equirect_to_cubemap_pass(engine, compute_pass_manager);
 
     // BrdfLutPass brdf_lut_generator(engine, compute_pass_manager);
@@ -134,15 +137,14 @@ int main() {
 
     // Cubemap dirt_cubemap = equirect_to_cubemap_pass.generate(texture_manager.dirt_texture, 100);
 
-    IrradiancePass irradiance_pass(engine, compute_pass_manager);
-    Cubemap irradiance_map = irradiance_pass.generate(*texture_manager.st_peters_square_night_4k_hdr_env_map, 32);
+    // IrradiancePass irradiance_pass(engine, compute_pass_manager);
+    // Cubemap irradiance_map = irradiance_pass.generate(*texture_manager.st_peters_square_night_4k_hdr_env_map, 32);
 
     // Cubemap dirt_cubemap = equirect_to_cubemap_pass.generate(texture_manager.dirt_texture, 100);
 
     GICPPass gicp_pass(engine, compute_pass_manager);
     VoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);
     VoxelMapPointReseter voxel_map_reseter(engine, compute_pass_manager);
-    
 
     Renderer renderer(engine, frame_resources);
 
@@ -153,8 +155,16 @@ int main() {
     RenderObject unlit_cube3(mesh_manager.cube, material_instance_manager.rock_blinn_phong);
     RenderObject unlit_cube4(mesh_manager.cube, material_instance_manager.unlit);
 
-    RenderObject skybox(mesh_manager.skybox_cube, material_instance_manager.st_peters_square_night_4k_hdr);
-    skybox.set_material_data<SkyboxMaterialData>(SkyboxMaterialData{.exposure = 1.8});
+    const float skybox_exposure = 1.8f;
+
+    Skybox skybox(
+        mesh_manager.skybox_cube,
+        material_instance_manager.st_peters_square_night_4k_hdr,
+        texture_manager,
+        material_manager.pbr_mp,
+        TextureManager::st_peters_square_night_4k_pbr_map_id,
+        skybox_exposure
+    );
 
     // LightSource light_source{};
     // light_source.color = glm::vec4(1, 1, 1, 1);
@@ -210,10 +220,8 @@ int main() {
     // PointCloud voxel_map_point_cloud(manager_bundle, voxel_point_map.map_point_buffer, voxel_point_map.m_map_point_count);
 
     // unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
-    unlit_cube.set_material_data<PBRMaterialData>(PBRMaterialData{.material = glm::vec4(1, 0.01, 1, 0.2f),
-                                                                  .color = glm::vec4(1, 1, 1, 1)});
-    sphere.set_material_data(PBRMaterialData{.material = glm::vec4(0, 0.5, 1, 0.2f),
-                                             .color = glm::vec4(0, 0, 0, 1)});
+    unlit_cube.set_material_data<PBRMaterialData>(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
+    sphere.set_material_data(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
 
     unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube3.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
@@ -246,6 +254,8 @@ int main() {
     scene.add(sphere);
     scene.add(skybox);
 
+    skybox.update(scene);
+
     bool g_pressed = false;
     bool n_pressed = false;
 
@@ -254,8 +264,18 @@ int main() {
     float last_frame_time = 0.0f;
     float start_time = (float)glfwGetTime();
     float timer = 0;
+    uint32_t pending_skybox_environment_map_id = skybox.environment_map_id();
+    bool skybox_environment_update_pending = false;
+
     while (!engine.window().should_close()) {
         engine.window().poll_events();
+
+        if (skybox_environment_update_pending) {
+            engine.device().wait_idle();
+            skybox.set_environment_map_id(pending_skybox_environment_map_id);
+            skybox.update(scene);
+            skybox_environment_update_pending = false;
+        }
 
         float current_frame_time = (float)glfwGetTime() - start_time;
         float delta_time = current_frame_time - last_frame_time;
@@ -337,7 +357,8 @@ int main() {
                 ImGui::Begin("Debug");
 
                 if (ImGui::Button("Previous frame")) {
-                    
+                    pending_skybox_environment_map_id = TextureManager::studio_kominka_02_4k_pbr_map_id;
+                    skybox_environment_update_pending = true;
                 }
 
                 ImGui::End();

@@ -15,7 +15,7 @@ class VulkanShaderModule;
 class MaterialInstance;
 class VulkanTexture2D;
 class Cubemap;
-class PBRMaps;
+class CubemapArray;
 
 class MaterialManager {
 public:
@@ -57,8 +57,7 @@ public:
         
     MaterialInstance create_blinn_phong_material(VulkanEngine& engine, VulkanTexture2D& albedo);
     MaterialInstance create_skybox_material(VulkanEngine& engine, Cubemap& skybox_cubemap);
-    MaterialInstance create_pbr_material(VulkanEngine& engine, Cubemap& irradiance_map, Cubemap& prefilter_map, VulkanTexture2D& brdf_lut);
-    MaterialInstance create_pbr_material(VulkanEngine& engine, PBRMaps& pbr_maps);
+    MaterialInstance create_pbr_material(VulkanEngine& engine, CubemapArray& irradiance_maps, CubemapArray& prefilter_maps, VulkanTexture2D& brdf_lut);
     
 private:
     DescriptorPool m_pool;

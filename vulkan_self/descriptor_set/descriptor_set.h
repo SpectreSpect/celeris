@@ -14,6 +14,7 @@ class VulkanPipelineLayout;
 class Pipeline;
 class VulkanTexture2D;
 class Cubemap;
+class CubemapArray;
 class VulkanImageView;
 
 class DescriptorSet {
@@ -29,6 +30,7 @@ public:
 
     void write_texture(uint32_t binding, const VulkanTexture2D& texture);
     void write_cubemap(uint32_t binding, const Cubemap& cubemap);
+    void write_cubemap_array(uint32_t binding, const CubemapArray& cubemap_array);
     void write_storage_cubemap(uint32_t binding, const Cubemap& cubemap);
     void write_storage_texture(uint32_t binding, const VulkanTexture2D& texture);
     void write_storage_image_view(uint32_t binding, const VulkanImageView& image_view);
