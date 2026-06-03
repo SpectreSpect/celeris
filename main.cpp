@@ -46,6 +46,7 @@
 #include "renderer/manager_bundle.h"
 #include "renderer/point_cloud/point_cloud.h"
 #include "renderer/scene.h"
+#include "renderer/skybox_environment.h"
 #include "renderer/point_cloud/lidar/lidar_scan.h"
 #include "renderer/point_cloud/lidar/lidar_video.h"
 #include "renderer/point_cloud/gicp/gicp_pass.h"
@@ -255,6 +256,20 @@ int main() {
     scene.add(sphere);
     scene.add(skybox);
 
+    SkyboxEnvironment skybox_environment(
+        skybox,
+        material_manager.pbr_mp,
+        TextureManager::st_peters_square_night_4k_pbr_map_id
+    );
+    skybox_environment.update(scene);
+
+    SkyboxEnvironment kaminka_skybox_environment(
+        skybox,
+        material_manager.pbr_mp,
+        TextureManager::studio_kominka_02_4k_pbr_map_id
+    );
+    // skybox_environment.update(scene);
+
     bool g_pressed = false;
     bool n_pressed = false;
 
@@ -346,7 +361,7 @@ int main() {
                 ImGui::Begin("Debug");
 
                 if (ImGui::Button("Previous frame")) {
-                    
+                    kaminka_skybox_environment.update(scene);
                 }
 
                 ImGui::End();

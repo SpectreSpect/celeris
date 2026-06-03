@@ -96,6 +96,7 @@ add_executable(app
   renderer/point_cloud/point_cloud.cpp
   renderer/scene.cpp
   renderer/scene_object.cpp
+  renderer/skybox_environment.cpp
   renderer/point_cloud/lidar/lidar_scan.cpp
   renderer/point_cloud/lidar/lidar_video.cpp
   renderer/point_cloud/gicp/gicp_pass.cpp
