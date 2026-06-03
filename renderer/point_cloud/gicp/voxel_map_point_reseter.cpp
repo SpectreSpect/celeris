@@ -1,6 +1,6 @@
 #include "voxel_map_point_reseter.h"
 
-#include "../../compute_pass_manager.h"
+#include "../../../managers/compute_pass_manager.h"
 #include "../../../vulkan_self/vulkan_engine.h"
 #include "voxel_point_map.h"
 #include "../../../math_utils.h"

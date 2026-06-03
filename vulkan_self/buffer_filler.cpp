@@ -2,7 +2,7 @@
 
 #include "vulkan_physical_device.h"
 #include "vulkan_device.h"
-#include "../renderer/compute_pass_manager.h"
+#include "../managers/compute_pass_manager.h"
 #include "vulkan_command_buffer.h"
 #include "vulkan_command_pool.h"
 #include "vulkan_queue.h"

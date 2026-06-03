@@ -2,7 +2,7 @@
 
 
 #include "light_source.h"
-#include "../compute_pass_manager.h"
+#include "../../managers/compute_pass_manager.h"
 #include "../../vulkan_self/vulkan_engine.h"
 #include "../../camera/camera.h"
 #include "../../vulkan_self/window.h"

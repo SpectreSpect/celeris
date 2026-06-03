@@ -9,7 +9,7 @@
 
 #include "logger/logger_header.h"
 #include "vulkan_buffer.h"
-#include "../renderer/pass_instance.h"
+#include "pass/instance/pass_instance.h"
 #include "vulkan_fence.h"
 
 class ComputePassManager;

@@ -9,19 +9,14 @@
 #include "mesh.h"
 
 #include "../vulkan_self/logger/logger_header.h"
-#include "../vulkan_self/material/material_instance.h"
 
+class PassInstance;
 
 class RenderObject : public SceneObject {
 public:
-    _XCLASS_NAME(RenderObject);
+    _XCHILD_NAME(RenderObject);
 
-    RenderObject(Mesh& mesh, MaterialInstance& material)
-        : m_mesh(mesh),
-          m_material(&material),
-          material_data_id(material.material_buffer.allocate_slot())
-    {}
-
+    RenderObject(Mesh& mesh, PassInstance& material);
     ~RenderObject();
 
     RenderObject(const RenderObject&) = delete;
@@ -51,7 +46,7 @@ public:
     }
 
     template<class SlotType>
-    void set_material(MaterialInstance& new_material, const SlotType& data) {
+    void set_material(PassInstance& new_material, const SlotType& data) {
         if (m_material) {
             m_material->material_buffer.free_slot(material_data_id);
         }
@@ -61,16 +56,11 @@ public:
     }
 
     void sync_material();
-
-    // RenderObject& add_child(RenderObject& child);
     
     virtual void render(Renderer& renderer, VulkanCommandBuffer& command_buffer, const glm::mat4& world_transform);
-    
 
+private:
     Mesh& m_mesh;
-    MaterialInstance* m_material = nullptr;
-    uint32_t material_data_id = UINT32_MAX;
-
-    // RenderObject* parent = nullptr;
-    // std::vector<RenderObject*> children;
+    PassInstance* m_material = nullptr;
+    uint32_t m_material_data_id = UINT32_MAX;
 };

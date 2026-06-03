@@ -1,10 +1,15 @@
 #include "render_object.h"
-#include "../vulkan_self/material/material_instance.h"
+#include "../vulkan_self/pass/instance/pass_instance.h"
 #include "renderer.h"
 
+RenderObject::RenderObject(Mesh& mesh, PassInstance& material)
+    :   m_mesh(mesh),
+        m_material(&material),
+        m_material_data_id(material.material_buffer.allocate_slot()) {}
+
 RenderObject::~RenderObject() {
-    if (m_material && material_data_id != UINT32_MAX) {
-        m_material->material_buffer.free_slot(material_data_id);
+    if (m_material && m_material_data_id != UINT32_MAX) {
+        m_material->material_buffer.free_slot(m_material_data_id);
     }
 }
 
@@ -12,10 +17,10 @@ RenderObject::RenderObject(RenderObject&& other) noexcept
     : SceneObject(std::move(other)),
       m_mesh(other.m_mesh),
       m_material(other.m_material),
-      material_data_id(other.material_data_id)
+      m_material_data_id(other.m_material_data_id)
 {
     other.m_material = nullptr;
-    other.material_data_id = UINT32_MAX;
+    other.m_material_data_id = UINT32_MAX;
 }
 
 RenderObject& RenderObject::operator=(RenderObject&& other) noexcept {
@@ -23,16 +28,16 @@ RenderObject& RenderObject::operator=(RenderObject&& other) noexcept {
         return *this;
     }
 
-    if (m_material && material_data_id != UINT32_MAX) {
-        m_material->material_buffer.free_slot(material_data_id);
+    if (m_material && m_material_data_id != UINT32_MAX) {
+        m_material->material_buffer.free_slot(m_material_data_id);
     }
 
     transform = std::move(other.transform);
     m_material = other.m_material;
-    material_data_id = other.material_data_id;
+    m_material_data_id = other.m_material_data_id;
 
     other.m_material = nullptr;
-    other.material_data_id = UINT32_MAX;
+    other.m_material_data_id = UINT32_MAX;
 
     return *this;
 }

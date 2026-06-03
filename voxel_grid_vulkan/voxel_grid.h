@@ -6,7 +6,7 @@
 
 #include "../vulkan_self/logger/logger_header.h"
 #include "../vulkan_self/vulkan_buffer.h"
-#include "../renderer/pass_instance.h"
+#include "../vulkan_self/pass/instance/pass_instance.h"
 #include "../vulkan_self/buffer_filler.h"
 #include "../vulkan_self/vulkan_command_buffer.h"
 #include "../vulkan_self/vulkan_command_pool.h"

@@ -4,7 +4,7 @@
 #include <algorithm>
 
 #include "../math_utils.h"
-#include "../renderer/compute_pass_manager.h"
+#include "../managers/compute_pass_manager.h"
 #include "voxel_grid_structures.h"
 #include "../vulkan_self/vulkan_physical_device.h"
 #include "../vulkan_self/vulkan_device.h"

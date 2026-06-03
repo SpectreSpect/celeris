@@ -4,7 +4,7 @@
 
 #include "vulkan_command_buffer.h"
 #include "vulkan_engine.h"
-#include "../renderer/pass_instance.h"
+#include "../vulkan_self/pass/instance/pass_instance.h"
 #include "utils.h"
 #include "../math_utils.h"
 #include "push_constants_structures.h"

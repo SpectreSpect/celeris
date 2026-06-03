@@ -56,20 +56,11 @@ add_executable(app
   vulkan_self/image/vulkan_image.cpp
   vulkan_self/image/vulkan_sampler.cpp
   vulkan_self/image/vulkan_texture_2d.cpp
-  vulkan_self/pipeline/vulkan_pipeline_layout.cpp
   vulkan_self/pipeline/pipeline.cpp
-  vulkan_self/pipeline/pipeline_pass.cpp
-  vulkan_self/pipeline/pipeline_pass_builder.cpp
+  vulkan_self/pipeline/vulkan_pipeline_layout.cpp
   vulkan_self/pipeline/graphics_pipeline/graphics_pipeline_builder.cpp
   vulkan_self/pipeline/graphics_pipeline/graphics_pipeline.cpp
   vulkan_self/pipeline/compute_pipeline/compute_pipeline.cpp
-  vulkan_self/material/material_system.cpp
-  vulkan_self/material/blin_phong_material_layout.cpp
-  vulkan_self/material/material_layout.cpp
-  vulkan_self/material/material_pass.cpp
-  vulkan_self/material/material_pass_builder.cpp
-  vulkan_self/compute/compute_pass.cpp
-  vulkan_self/compute/compute_pass_builder.cpp
   renderer/resources/frame_resources.cpp
   camera/camera.cpp
   camera/controllers/fps_camera_controller.cpp
@@ -77,20 +68,30 @@ add_executable(app
   renderer/transform.cpp
   renderer/mesh.cpp
   renderer/render_object.cpp
-  renderer/shader_manager.cpp
-  renderer/material_manager.cpp
-  renderer/compute_pass_manager.cpp
-  renderer/pass_object.cpp
-  renderer/pass_instance.cpp
-  renderer/pass_writer.cpp
+  managers/compute_pass_manager.cpp
+  managers/manager_bundle.cpp
+  managers/material_instance_manager.cpp
+  managers/material_manager.cpp
+  managers/mesh_manager.cpp
+  managers/shader_manager.cpp
+  managers/texture_manager.cpp
+  
+  vulkan_self/pass/compute_pass/compute_pass.cpp
+  vulkan_self/pass/compute_pass/compute_pass_builder.cpp
+  vulkan_self/pass/instance/pass_object.cpp
+  vulkan_self/pass/instance/pass_instance.cpp
+  vulkan_self/pass/instance/pass_writer.cpp
+  vulkan_self/pass/material_pass/material_pass.cpp
+  vulkan_self/pass/material_pass/material_pass_builder.cpp
+  vulkan_self/pass/pipeline_pass.cpp
+  vulkan_self/pass/pipeline_pass_builder.cpp
+  vulkan_self/pass/instance/slot_pass_object.cpp
+  vulkan_self/pass/instance/slot_pass_instance.cpp
+
   renderer/instanced_render_object.cpp
   renderer/instance_batch.cpp
   renderer/instance_buffer_view.cpp
-  renderer/texture_manager.cpp
-  renderer/material_instance_manager.cpp
   renderer/renderer.cpp
-  renderer/mesh_manager.cpp
-  renderer/manager_bundle.cpp
   renderer/point_cloud/point_cloud.cpp
   renderer/scene.cpp
   renderer/scene_object.cpp

@@ -4,7 +4,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-#include "../../pass_instance.h"
+#include "../../../vulkan_self/pass/instance/pass_instance.h"
 #include "../../../vulkan_self/vulkan_buffer.h"
 #include "../../../vulkan_self/vulkan_fence.h"
 #include "../../../vulkan_self/vulkan_command_buffer.h"

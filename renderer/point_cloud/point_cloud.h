@@ -3,7 +3,7 @@
 #include <vector>
 
 #include "../instanced_render_object.h"
-#include "../manager_bundle.h"
+#include "../../managers/manager_bundle.h"
 #include "../../vulkan_self/logger/logger.h"
 
 class VulkanEngine;
