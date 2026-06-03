@@ -16,9 +16,9 @@ MaterialInstanceManager::MaterialInstanceManager(VulkanEngine& engine, MaterialM
 
     PointUniform point_uniform{2, 0.005, 1, 0};
     point_cloud_ubo.upload(&point_uniform, sizeof(point_uniform));
-    point_cloud.descriptor_set.write_uniform_buffer(1, point_cloud_ubo);
+    point_cloud.set_uniform_buffer(1, point_cloud_ubo);
 }
 
-MaterialInstance MaterialInstanceManager::create_mi(MaterialPass& material_pass, uint32_t material_data_size) {
-    return MaterialInstance(m_engine, m_material_manager.descriptor_pool(), material_pass, material_data_size);
+SlotPassInstance MaterialInstanceManager::create_mi(MaterialPass& material_pass, uint32_t material_data_size) {
+    return SlotPassInstance(m_engine, m_material_manager.descriptor_pool(), material_pass, material_data_size);
 }

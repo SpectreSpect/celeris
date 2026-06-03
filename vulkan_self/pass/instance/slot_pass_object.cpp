@@ -6,8 +6,9 @@ SlotPassObject::SlotPassObject(
     VulkanEngine& engine,
     PipelinePass& pass,
     uint32_t slot_size,
-    uint32_t num_slot)
-    :   PassObject(pass)
+    uint32_t num_slots)
+    :   PassObject(pass),
+        m_slot_buffer(engine, num_slots, slot_size)
 {
     LOG_NAMED("SlotPassObject");
 

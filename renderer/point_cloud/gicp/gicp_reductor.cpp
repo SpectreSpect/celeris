@@ -1,5 +1,5 @@
 #include "gicp_reductor.h"
-#include "../../compute_pass_manager.h"
+#include "../../../managers/compute_pass_manager.h"
 #include "../../../vulkan_self/vulkan_engine.h"
 #include "../../../math_utils.h"
 

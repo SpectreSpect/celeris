@@ -1,15 +1,14 @@
 #include "render_object.h"
-#include "../vulkan_self/pass/instance/pass_instance.h"
 #include "renderer.h"
 
-RenderObject::RenderObject(Mesh& mesh, PassInstance& material)
+RenderObject::RenderObject(Mesh& mesh, SlotPassInstance& material)
     :   m_mesh(mesh),
         m_material(&material),
-        m_material_data_id(material.material_buffer.allocate_slot()) {}
+        m_material_data_id(material.slot_buffer().allocate_slot()) {}
 
 RenderObject::~RenderObject() {
     if (m_material && m_material_data_id != UINT32_MAX) {
-        m_material->material_buffer.free_slot(m_material_data_id);
+        m_material->slot_buffer().free_slot(m_material_data_id);
     }
 }
 
@@ -29,7 +28,7 @@ RenderObject& RenderObject::operator=(RenderObject&& other) noexcept {
     }
 
     if (m_material && m_material_data_id != UINT32_MAX) {
-        m_material->material_buffer.free_slot(m_material_data_id);
+        m_material->slot_buffer().free_slot(m_material_data_id);
     }
 
     transform = std::move(other.transform);
@@ -43,7 +42,19 @@ RenderObject& RenderObject::operator=(RenderObject&& other) noexcept {
 }
 
 void RenderObject::sync_material() {
-    m_material->material_buffer.sync();
+    m_material->sync();
+}
+
+Mesh& RenderObject::mesh() noexcept {
+    return m_mesh;
+}
+
+SlotPassInstance& RenderObject::material() noexcept {
+    return *m_material;
+}
+
+uint32_t RenderObject::material_data_id() const noexcept {
+    return m_material_data_id;
 }
 
 void RenderObject::render(Renderer& renderer, VulkanCommandBuffer& command_buffer, const glm::mat4& world_transform) {

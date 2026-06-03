@@ -6,13 +6,13 @@
 #include "../vulkan_self/descriptor_set/descriptor_pool_builder.h"
 #include "../vulkan_self/descriptor_set/descriptor_pool.h"
 #include "../vulkan_self/pass/material_pass/material_pass.h"
+#include "../vulkan_self/pass/instance/slot_pass_instance.h"
 
 class VulkanEngine;
 class ShaderManager;
 class FrameResources;
 class MaterialPassBuilder;
 class VulkanShaderModule;
-class MaterialInstance;
 class VulkanTexture2D;
 
 class MaterialManager {
@@ -47,7 +47,7 @@ public:
     MaterialPass create_point_pass(VulkanEngine& engine, FrameResources& frame_resources, 
                                    const VulkanShaderModule& vs, const VulkanShaderModule& fs);
         
-    MaterialInstance create_blinn_phong_material(VulkanEngine& engine, VulkanTexture2D& albedo);
+    SlotPassInstance create_blinn_phong_material(VulkanEngine& engine, VulkanTexture2D& albedo);
 
 private:
     DescriptorPool m_pool;

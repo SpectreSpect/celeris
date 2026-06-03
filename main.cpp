@@ -27,7 +27,6 @@
 #include "managers/material_manager.h"
 #include "vulkan_self/pass/compute_pass/compute_pass_builder.h"
 #include "managers/compute_pass_manager.h"
-#include "vulkan_self/material/material_buffer.h"
 #include "renderer/instanced_render_object.h"
 #include "renderer/instance_batch.h"
 #include "managers/texture_manager.h"
@@ -180,9 +179,9 @@ int main() {
     unlit_cube3.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube4.set_material_data<UnlitMaterialData>({glm::vec4(0, 1, 1, 1)});
 
-    material_instance_manager.unlit.material_buffer.sync();
-    material_instance_manager.rock_blinn_phong.material_buffer.sync();
-    material_instance_manager.dirt_blinn_phong.material_buffer.sync();
+    material_instance_manager.unlit.sync();
+    material_instance_manager.rock_blinn_phong.sync();
+    material_instance_manager.dirt_blinn_phong.sync();
 
     unlit_cube.transform.position = glm::vec4(0, 0, 0, 1);
 

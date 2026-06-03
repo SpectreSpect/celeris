@@ -120,10 +120,10 @@ MaterialPass MaterialManager::create_point_pass(VulkanEngine& engine, FrameResou
     return create_pass(engine, builder, vs, fs);
 }
 
-MaterialInstance MaterialManager::create_blinn_phong_material(VulkanEngine& engine, VulkanTexture2D& albedo){
-    MaterialInstance material(engine, m_pool, blin_phong_mp, sizeof(BlinPhongMaterialData));
+SlotPassInstance MaterialManager::create_blinn_phong_material(VulkanEngine& engine, VulkanTexture2D& albedo){
+    SlotPassInstance material(engine, m_pool, blin_phong_mp, sizeof(BlinPhongMaterialData));
     
-    material.descriptor_set.write_texture(1, albedo);
+    material.set_texture(1, albedo);
 
     return material;
 }

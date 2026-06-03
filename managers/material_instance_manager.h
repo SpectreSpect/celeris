@@ -1,10 +1,13 @@
 #pragma once
 
 #include "../renderer/material_data_types.h"
+#include "../vulkan_self/pass/instance/slot_pass_instance.h"
+#include "../vulkan_self/vulkan_buffer.h"
 
 class VulkanEngine;
 class MaterialManager;
 class TextureManager;
+class MaterialPass;
 
 class MaterialInstanceManager {
 private:
@@ -13,10 +16,10 @@ private:
     TextureManager& m_texture_manager;
 
 public:
-    MaterialInstance unlit;
-    MaterialInstance rock_blinn_phong;
-    MaterialInstance dirt_blinn_phong;
-    MaterialInstance point_cloud;
+    SlotPassInstance unlit;
+    SlotPassInstance rock_blinn_phong;
+    SlotPassInstance dirt_blinn_phong;
+    SlotPassInstance point_cloud;
 
     VulkanBuffer point_cloud_ubo;
 
@@ -25,6 +28,5 @@ public:
 
 private:
 
-    MaterialInstance create_mi(MaterialPass& material_pass, uint32_t material_data_size);
+    SlotPassInstance create_mi(MaterialPass& material_pass, uint32_t material_data_size);
 };
-
