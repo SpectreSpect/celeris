@@ -46,7 +46,7 @@
 #include "renderer/manager_bundle.h"
 #include "renderer/point_cloud/point_cloud.h"
 #include "renderer/scene.h"
-#include "renderer/skybox_environment.h"
+#include "renderer/skybox.h"
 #include "renderer/point_cloud/lidar/lidar_scan.h"
 #include "renderer/point_cloud/lidar/lidar_video.h"
 #include "renderer/point_cloud/gicp/gicp_pass.h"
@@ -155,8 +155,16 @@ int main() {
     RenderObject unlit_cube3(mesh_manager.cube, material_instance_manager.rock_blinn_phong);
     RenderObject unlit_cube4(mesh_manager.cube, material_instance_manager.unlit);
 
-    RenderObject skybox(mesh_manager.skybox_cube, material_instance_manager.st_peters_square_night_4k_hdr);
-    skybox.set_material_data<SkyboxMaterialData>(SkyboxMaterialData{.exposure = 1.8});
+    const float skybox_exposure = 1.8f;
+
+    Skybox skybox(
+        mesh_manager.skybox_cube,
+        material_instance_manager.st_peters_square_night_4k_hdr,
+        texture_manager,
+        material_manager.pbr_mp,
+        TextureManager::st_peters_square_night_4k_pbr_map_id,
+        skybox_exposure
+    );
 
     // LightSource light_source{};
     // light_source.color = glm::vec4(1, 1, 1, 1);
@@ -212,18 +220,8 @@ int main() {
     // PointCloud voxel_map_point_cloud(manager_bundle, voxel_point_map.map_point_buffer, voxel_point_map.m_map_point_count);
 
     // unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
-    unlit_cube.set_material_data<PBRMaterialData>(PBRMaterialData{.material = glm::vec4(1, 0.01, 1, 0.2f),
-                                                                  .color = glm::vec4(1, 1, 1, 1),
-                                                                  .pbr_map_ids = glm::uvec4(TextureManager::studio_kominka_02_4k_pbr_map_id,
-                                                                                            TextureManager::studio_kominka_02_4k_pbr_map_id,
-                                                                                            0,
-                                                                                            0)});
-    sphere.set_material_data(PBRMaterialData{.material = glm::vec4(1, 0.01f, 1, 0.2f),
-                                             .color = glm::vec4(1, 1, 1, 1),
-                                             .pbr_map_ids = glm::uvec4(TextureManager::ferndale_studio_06_4k_pbr_map_id,
-                                                                       TextureManager::ferndale_studio_06_4k_pbr_map_id,
-                                                                       0,
-                                                                       0)});
+    unlit_cube.set_material_data<PBRMaterialData>(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
+    sphere.set_material_data(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
 
     unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube3.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
@@ -256,19 +254,7 @@ int main() {
     scene.add(sphere);
     scene.add(skybox);
 
-    SkyboxEnvironment skybox_environment(
-        skybox,
-        material_manager.pbr_mp,
-        TextureManager::st_peters_square_night_4k_pbr_map_id
-    );
-    skybox_environment.update(scene);
-
-    SkyboxEnvironment kaminka_skybox_environment(
-        skybox,
-        material_manager.pbr_mp,
-        TextureManager::studio_kominka_02_4k_pbr_map_id
-    );
-    // skybox_environment.update(scene);
+    skybox.update(scene);
 
     bool g_pressed = false;
     bool n_pressed = false;
@@ -278,8 +264,18 @@ int main() {
     float last_frame_time = 0.0f;
     float start_time = (float)glfwGetTime();
     float timer = 0;
+    uint32_t pending_skybox_environment_map_id = skybox.environment_map_id();
+    bool skybox_environment_update_pending = false;
+
     while (!engine.window().should_close()) {
         engine.window().poll_events();
+
+        if (skybox_environment_update_pending) {
+            engine.device().wait_idle();
+            skybox.set_environment_map_id(pending_skybox_environment_map_id);
+            skybox.update(scene);
+            skybox_environment_update_pending = false;
+        }
 
         float current_frame_time = (float)glfwGetTime() - start_time;
         float delta_time = current_frame_time - last_frame_time;
@@ -361,7 +357,8 @@ int main() {
                 ImGui::Begin("Debug");
 
                 if (ImGui::Button("Previous frame")) {
-                    kaminka_skybox_environment.update(scene);
+                    pending_skybox_environment_map_id = TextureManager::studio_kominka_02_4k_pbr_map_id;
+                    skybox_environment_update_pending = true;
                 }
 
                 ImGui::End();
