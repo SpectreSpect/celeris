@@ -38,6 +38,7 @@ public:
 
     // Voxel grid
     VulkanShaderModule world_init_cs;
+    VulkanShaderModule apply_writes_to_world_cs;
 
     // PBR
     VulkanShaderModule equirect_to_cubemap_cs;

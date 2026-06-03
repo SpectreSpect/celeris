@@ -36,6 +36,9 @@ layout(std430, set = 0, binding = 5) buffer DirtyListBuf {
 
 layout(std430, set = 0, binding = 6) buffer VoxelWriteList {
     uint write_count;
+    uint write_pad0;
+    uint write_pad1;
+    uint write_pad2;
     VoxelWrite writes[];
 };
 

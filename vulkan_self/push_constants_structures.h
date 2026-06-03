@@ -19,3 +19,13 @@ struct WorldInitPushConstants {
     uint32_t u_chunk_hash_table_size;
     uint32_t u_max_chunks;
 };
+
+struct ApplyVoxelWritesPushConstants {
+    uint32_t u_chunk_hash_table_size;
+    uint32_t u_chunk_dim_x;
+    uint32_t u_chunk_dim_y;
+    uint32_t u_chunk_dim_z;
+    uint32_t u_voxels_per_chunk;
+    uint32_t u_pack_bits;
+    int32_t u_pack_offset;
+};

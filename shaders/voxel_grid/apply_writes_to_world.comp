@@ -1,0 +1,97 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+#include "../common/buffer_structures.inc"
+#include "chunk_hash_table/decl.inc"
+#include "utils.inc"
+
+layout(std430, set = 0, binding = 0) buffer ChunkHashTable {
+    HashTableCounters chunk_hash_table_counters;
+    ChunkHashTableSlot chunk_hash_table_slots[];
+};
+
+layout(std430, set = 0, binding = 1) readonly buffer VoxelWriteList {
+    uint write_count;
+    uint write_pad0;
+    uint write_pad1;
+    uint write_pad2;
+    VoxelWrite writes[];
+};
+
+layout(std430, set = 0, binding = 2) buffer ChunkVoxels {
+    VoxelData voxels[];
+};
+
+layout(std430, set = 0, binding = 3) buffer FreeList {
+    uint free_count;
+    uint free_list[];
+};
+
+layout(std430, set = 0, binding = 4) buffer ChunkMetaBuf {
+    ChunkMeta meta[];
+};
+
+layout(std430, set = 0, binding = 5) buffer EnqueuedBuf {
+    uint enqueued[];
+};
+
+layout(std430, set = 0, binding = 6) buffer DirtyListBuf {
+    uint dirty_count;
+    uint dirty_list[];
+};
+
+layout(push_constant) uniform ApplyVoxelWritesPushConstants {
+    uint u_chunk_hash_table_size;
+    uint u_chunk_dim_x;
+    uint u_chunk_dim_y;
+    uint u_chunk_dim_z;
+    uint u_voxels_per_chunk;
+    uint u_pack_bits;
+    int u_pack_offset;
+};
+
+#include "chunk_pool/voxel_index.inc"
+#include "chunk_pool/mark_dirty.inc"
+#include "chunk_hash_table/get_or_create.inc"
+
+void main() {
+    uint write_id = gl_GlobalInvocationID.x;
+    if (write_id >= write_count) {
+        return;
+    }
+
+    VoxelWrite write = writes[write_id];
+    if (read_voxel_type(write.voxel_data.type_flags) == 0u) {
+        return;
+    }
+
+    ivec3 world_voxel = write.world_voxel.xyz;
+
+    ivec3 chunk_coord = ivec3(
+        floor_div(world_voxel.x, u_chunk_dim_x),
+        floor_div(world_voxel.y, u_chunk_dim_y),
+        floor_div(world_voxel.z, u_chunk_dim_z)
+    );
+
+    uvec3 local_voxel = uvec3(
+        uint(floor_mod(world_voxel.x, u_chunk_dim_x)),
+        uint(floor_mod(world_voxel.y, u_chunk_dim_y)),
+        uint(floor_mod(world_voxel.z, u_chunk_dim_z))
+    );
+
+    uint slot_id;
+    bool created;
+    uvec2 key = pack_key_uvec2(chunk_coord, u_pack_offset, u_pack_bits);
+
+    if (!chunk_hash_table_get_or_create_slot(key, slot_id, created)) {
+        return;
+    }
+
+    uint chunk_id = chunk_hash_table_slots[slot_id].value;
+    uint voxel_id = voxel_index(local_voxel);
+
+    voxels[chunk_id * u_voxels_per_chunk + voxel_id] = write.voxel_data;
+    mark_dirty_around(chunk_id, chunk_coord);
+}

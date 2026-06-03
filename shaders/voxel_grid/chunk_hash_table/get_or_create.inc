@@ -2,7 +2,7 @@
 #define CHUNK_HASH_TABLE_GET_OR_CREATE_GLSL
 
 #include "common.inc"
-#include "config_functions/chunk_key_inc.inc"
+#include "config_functions/chunk_key_comp.inc"
 #include "config_functions/init_chunk_meta.inc"
 #include "config_functions/pop_free_chunk_id.inc"
 

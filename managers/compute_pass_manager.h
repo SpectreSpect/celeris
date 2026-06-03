@@ -33,6 +33,7 @@ public:
 
     // Voxel grid
     ComputePass world_init_cp;
+    ComputePass apply_writes_to_world_cp;
 
     // PBR
     ComputePass equirect_to_cubemap_cp;
@@ -66,6 +67,7 @@ public:
 
     // Voxel grid
     ComputePass create_world_init_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_apply_writes_to_world_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
 private:
     DescriptorPool m_pool;

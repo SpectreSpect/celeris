@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <vector>
 #include <glm/glm.hpp>
 
 #include "../vulkan_self/logger/logger_header.h"
@@ -10,6 +11,8 @@
 #include "../vulkan_self/buffer_filler.h"
 #include "../vulkan_self/vulkan_command_buffer.h"
 #include "../vulkan_self/vulkan_command_pool.h"
+#include "../vulkan_self/vulkan_fence.h"
+#include "voxel_grid_structures.h"
 
 class VulkanPhysicalDevice;
 class VulkanDevice;
@@ -54,6 +57,12 @@ public:
     VoxelGrid(VoxelGrid&&) noexcept = default;
     VoxelGrid& operator=(VoxelGrid&&) noexcept = default;
 
+    void apply_writes_to_world_gpu(uint32_t write_count);
+    void apply_writes_to_world_from_cpu(
+        const std::vector<glm::ivec3>& positions,
+        const std::vector<VoxelDataGPU>& voxels
+    );
+
 public:
     struct VoxelGridBuffers {
         VulkanBuffer chunk_hash_table;
@@ -65,11 +74,13 @@ public:
         VulkanBuffer mesh_buffers_status;
         VulkanBuffer dirty_list;
         VulkanBuffer voxel_write_list;
+        VulkanBuffer voxels;
     };
 
     struct VoxelGridPassInstances {
         PassInstance fill_buffer_pi;
         PassInstance world_init_pi;
+        PassInstance apply_writes_to_world_pi;
     };
 
     struct VoxelGridParams {
@@ -101,7 +112,9 @@ public:
 private:
     VulkanCommandPool m_command_pool;
     VulkanCommandBuffer m_command_buffer;
+    VulkanFence m_fence;
 
+    VulkanQueue* m_queue = nullptr;
     ComputePassManager* m_compute_pass_manager = nullptr;
 
     // BufferFiller m_buffer_filler;
@@ -122,4 +135,5 @@ private:
     );
 
     void world_init_gpu();
+    void submit_compute_commands();
 };

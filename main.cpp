@@ -116,7 +116,7 @@ int main() {
     MeshManager mesh_manager(engine, resource_loader);
     ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
 
-    CubemapArray cubemaps(engine.physical_device(), engine.device(), VkExtent2D{512, 512}, VK_FORMAT_R8G8B8A8_UNORM, 16, CubemapArray::StorageImageUsage::Enabled);
+    // CubemapArray cubemaps(engine.physical_device(), engine.device(), VkExtent2D{512, 512}, VK_FORMAT_R8G8B8A8_UNORM, 16, CubemapArray::StorageImageUsage::Enabled);
 
     // EquirectToCubemapPass equirect_to_cubemap_pass(engine, compute_pass_manager);
 

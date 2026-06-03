@@ -20,6 +20,8 @@ VoxelGrid::VoxelGrid(
     const VoxelGridDesc& desc) 
     :   m_command_pool(device, queue),
         m_command_buffer(device, m_command_pool),
+        m_fence(device),
+        m_queue(&queue),
         m_compute_pass_manager(&compute_pass_manager),
         // m_buffer_filler(physical_device, device, compute_pass_manager, 1024),
         m_params(create_params(desc)),
@@ -80,7 +82,6 @@ VoxelGrid::VoxelGrid(
 
     // load_list_ = BufferObject(sizeof(uint32_t) * (size_t)(1 + count_active_chunks), GL_DYNAMIC_DRAW);
 
-    VoxelDataGPU voxel_prifab(0u, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3(255));
     // voxels_ = BufferObject::from_fill(sizeof(VoxelDataGPU) * vox_per_chunk() * count_active_chunks, GL_DYNAMIC_DRAW, voxel_prifab, *shader_manager);
 
     // alignof(ChunkHashTableSlot) == 8!!!
@@ -100,7 +101,7 @@ uint64_t VoxelGrid::vox_per_chunk() const noexcept {
 VoxelGrid::VoxelGridParams VoxelGrid::create_params(const VoxelGridDesc& desc) const {
     LOG_METHOD();
 
-    logger.check(desc.chunk_hash_table_size_factor < 1.0f, "chunk_hash_table_size_factor must be >= 1.0");
+    logger.check(desc.chunk_hash_table_size_factor >= 1.0f, "chunk_hash_table_size_factor must be >= 1.0");
 
     VoxelGridParams params;
 
@@ -119,7 +120,7 @@ VoxelGrid::VoxelGridParams VoxelGrid::create_params(const VoxelGridDesc& desc) c
     uint32_t base = (raw > UINT32_MAX) ? UINT32_MAX : (uint32_t)raw;
     params.chunk_hash_table_size = math_utils::next_pow2_u32(base);
 
-    logger.check((params.chunk_hash_table_size & (params.chunk_hash_table_size - 1)) != 0, "chunk_hash_table_size must be 2^n");
+    logger.check((params.chunk_hash_table_size & (params.chunk_hash_table_size - 1)) == 0, "chunk_hash_table_size must be 2^n");
 
     params.vb_page_size = 1 << desc.vb_page_size_order_of_two;
     params.count_vb_pages = math_utils::next_pow2_u32(math_utils::div_up_u32((desc.max_quads * 4u), params.vb_page_size));
@@ -157,7 +158,8 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(ComputePassMa
 
     return VoxelGridPassInstances {
         .fill_buffer_pi = PassInstance(compute_pass_manager.fill_buffer_cp, dp),
-        .world_init_pi = PassInstance(compute_pass_manager.world_init_cp, dp)
+        .world_init_pi = PassInstance(compute_pass_manager.world_init_cp, dp),
+        .apply_writes_to_world_pi = PassInstance(compute_pass_manager.apply_writes_to_world_cp, dp)
     };
 }
 
@@ -175,6 +177,7 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize enqueued_size = sizeof(uint32_t) * (size_t)m_params.count_active_chunks;
     VkDeviceSize dirty_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
     VkDeviceSize voxel_write_list_size = sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * m_params.max_write_count;
+    VkDeviceSize voxels_size = sizeof(VoxelDataGPU) * vox_per_chunk() * (size_t)m_params.count_active_chunks;
     VkDeviceSize indirect_cmds_size = sizeof(uint32_t) + sizeof(DrawElementsIndirectCommand) * (size_t)m_params.count_active_chunks;
     VkDeviceSize failed_dirty_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
     
@@ -188,7 +191,14 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
 
         .mesh_buffers_status = VulkanBuffer::create_storage_buffer(physical_device, device, mesh_buffers_status_size),
         .dirty_list = VulkanBuffer::create_storage_buffer(physical_device, device, dirty_list_size),
-        .voxel_write_list = VulkanBuffer::create_storage_buffer(physical_device, device, voxel_write_list_size)
+        .voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, voxel_write_list_size),
+        .voxels = VulkanBuffer(
+            physical_device,
+            device,
+            voxels_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        )
         // .mesh_buffers_status = m_buffer_filler.fill_buffer(
         //     command_buffer, 0u, VulkanBuffer::create_storage_buffer(physical_device, device, mesh_buffers_status_size)
         // ),
@@ -204,32 +214,148 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
 void VoxelGrid::world_init_gpu() {
     LOG_METHOD();
 
-    m_pass_instances.world_init_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
-    m_pass_instances.world_init_pi.set_storage_buffer(1, m_buffers.free_list);
-    m_pass_instances.world_init_pi.set_storage_buffer(2, m_buffers.mesh_buffers_status);
-    m_pass_instances.world_init_pi.set_storage_buffer(3, m_buffers.chunk_meta);
-    m_pass_instances.world_init_pi.set_storage_buffer(4, m_buffers.enqueued);
-    m_pass_instances.world_init_pi.set_storage_buffer(5, m_buffers.dirty_list);
-    m_pass_instances.world_init_pi.set_storage_buffer(6, m_buffers.voxel_write_list);
-    m_pass_instances.world_init_pi.set_storage_buffer(7, m_buffers.indirect_cmds);
-    m_pass_instances.world_init_pi.set_storage_buffer(8, m_buffers.failed_dirty_list);
+    {
+        auto scope = m_command_buffer.begin_scope();
 
-    m_pass_instances.world_init_pi.bind(m_command_buffer);
+        m_buffers.voxels.fill(m_command_buffer, 0u);
+        m_buffers.voxels.transfer_write_to_compute_read_write_barrier(m_command_buffer);
 
-    m_pass_instances.world_init_pi.push_constants(m_command_buffer, WorldInitPushConstants{
-        .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
-        .u_max_chunks = m_params.count_active_chunks
-    });
+        m_pass_instances.world_init_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+        m_pass_instances.world_init_pi.set_storage_buffer(1, m_buffers.free_list);
+        m_pass_instances.world_init_pi.set_storage_buffer(2, m_buffers.mesh_buffers_status);
+        m_pass_instances.world_init_pi.set_storage_buffer(3, m_buffers.chunk_meta);
+        m_pass_instances.world_init_pi.set_storage_buffer(4, m_buffers.enqueued);
+        m_pass_instances.world_init_pi.set_storage_buffer(5, m_buffers.dirty_list);
+        m_pass_instances.world_init_pi.set_storage_buffer(6, m_buffers.voxel_write_list);
+        m_pass_instances.world_init_pi.set_storage_buffer(7, m_buffers.indirect_cmds);
+        m_pass_instances.world_init_pi.set_storage_buffer(8, m_buffers.failed_dirty_list);
 
-    uint32_t max_items = std::max(m_params.chunk_hash_table_size, m_params.count_active_chunks);
-    uint32_t groups_x = math_utils::div_up_u32(max_items, 256u);
+        m_pass_instances.world_init_pi.bind(m_command_buffer);
 
-    // prog_world_init_.dispatch_compute(groups_x, 1, 1);
-    // glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        m_pass_instances.world_init_pi.push_constants(m_command_buffer, WorldInitPushConstants{
+            .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
+            .u_max_chunks = m_params.count_active_chunks
+        });
 
-    
+        uint32_t max_items = std::max(m_params.chunk_hash_table_size, m_params.count_active_chunks);
+        uint32_t groups_x = math_utils::div_up_u32(max_items, 256u);
+        m_command_buffer.dispatch(groups_x, 1, 1);
 
-    
-    m_command_buffer.dispatch(groups_x, 1, 1);
-    // MEMORY_BARRIER
+        m_buffers.chunk_hash_table.memory_barrier(
+            m_command_buffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+        );
+        m_buffers.free_list.memory_barrier(
+            m_command_buffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+        );
+    }
+
+    submit_compute_commands();
+}
+
+void VoxelGrid::apply_writes_to_world_gpu(uint32_t write_count) {
+    LOG_METHOD();
+
+    if (write_count == 0u) {
+        return;
+    }
+
+    logger.check(write_count <= m_params.max_write_count, "write_count exceeded max_write_count");
+
+    {
+        auto scope = m_command_buffer.begin_scope();
+
+        m_buffers.voxel_write_list.memory_barrier(
+            m_command_buffer,
+            VK_PIPELINE_STAGE_HOST_BIT,
+            VK_ACCESS_HOST_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT
+        );
+
+        m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+        m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(1, m_buffers.voxel_write_list);
+        m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(2, m_buffers.voxels);
+        m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(3, m_buffers.free_list);
+        m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(4, m_buffers.chunk_meta);
+        m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(5, m_buffers.enqueued);
+        m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(6, m_buffers.dirty_list);
+
+        m_pass_instances.apply_writes_to_world_pi.bind(m_command_buffer);
+
+        m_pass_instances.apply_writes_to_world_pi.push_constants(m_command_buffer, ApplyVoxelWritesPushConstants{
+            .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
+            .u_chunk_dim_x = m_params.chunk_size.x,
+            .u_chunk_dim_y = m_params.chunk_size.y,
+            .u_chunk_dim_z = m_params.chunk_size.z,
+            .u_voxels_per_chunk = static_cast<uint32_t>(vox_per_chunk()),
+            .u_pack_bits = math_utils::BITS,
+            .u_pack_offset = static_cast<int32_t>(math_utils::OFFSET)
+        });
+
+        m_command_buffer.dispatch(math_utils::div_up_u32(write_count, 256u), 1, 1);
+
+        m_buffers.voxels.memory_barrier(
+            m_command_buffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+        );
+        m_buffers.dirty_list.memory_barrier(
+            m_command_buffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+        );
+    }
+
+    submit_compute_commands();
+}
+
+void VoxelGrid::apply_writes_to_world_from_cpu(
+    const std::vector<glm::ivec3>& positions,
+    const std::vector<VoxelDataGPU>& voxels)
+{
+    LOG_METHOD();
+
+    logger.check(positions.size() == voxels.size(), "positions and voxels must have the same size");
+    logger.check(positions.size() <= m_params.max_write_count, "CPU voxel write batch exceeded max_write_count");
+
+    uint32_t write_count = static_cast<uint32_t>(positions.size());
+    m_buffers.voxel_write_list.upload(&write_count, sizeof(write_count), 0);
+
+    if (write_count == 0u) {
+        return;
+    }
+
+    std::vector<VoxelWriteGPU> writes(write_count);
+    for (uint32_t i = 0; i < write_count; ++i) {
+        writes[i].world_voxel = glm::ivec4(positions[i], 0);
+        writes[i].voxel_data = voxels[i];
+        writes[i].set_flags = OVERWRITE_BIT;
+        writes[i].pad1 = 0u;
+    }
+
+    m_buffers.voxel_write_list.upload(writes, sizeof(uint32_t) * 4);
+    apply_writes_to_world_gpu(write_count);
+}
+
+void VoxelGrid::submit_compute_commands() {
+    LOG_METHOD();
+
+    logger.check(m_queue != nullptr, "VoxelGrid queue was not initialized");
+
+    m_fence.reset();
+    m_queue->submit(m_command_buffer, &m_fence);
+    m_fence.wait();
+    m_command_buffer.reset();
 }
