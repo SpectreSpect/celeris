@@ -43,9 +43,19 @@ VulkanDevice::VulkanDevice(const VulkanPhysicalDevice& physical_device) {
 
         queue_create_infos.push_back(queue_create_info);
     }
+    
+    VkPhysicalDeviceFeatures supported_features{};
+    vkGetPhysicalDeviceFeatures(physical_device.handle(), &supported_features);
+
+    logger.check(
+        supported_features.imageCubeArray == VK_TRUE,
+        "Physical device does not support imageCubeArray"
+    );
+
 
     VkPhysicalDeviceFeatures device_features{};
     device_features.shaderFloat64 = VK_TRUE;
+    device_features.imageCubeArray = VK_TRUE;
 
     VkDeviceCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

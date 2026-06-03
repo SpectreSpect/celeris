@@ -5,6 +5,7 @@
 #include "../pipeline/pipeline.h"
 #include "../image/vulkan_texture_2d.h"
 #include "../image/cubemap.h"
+#include "../image/cubemap_array.h"
 #include "../image/vulkan_image_view.h"
 
 void DescriptorSet::write_buffer(uint32_t binding, VulkanBuffer& buffer, VkDescriptorType descriptor_type) {
@@ -100,6 +101,45 @@ void DescriptorSet::write_cubemap(
     image_info.sampler = cubemap.sampler().handle();
     image_info.imageView = cubemap.view().handle();
     image_info.imageLayout = cubemap.layout();
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = m_descriptor_set;
+    write.dstBinding = binding;
+    write.dstArrayElement = 0;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    write.descriptorCount = 1;
+    write.pImageInfo = &image_info;
+
+    vkUpdateDescriptorSets(
+        m_device,
+        1,
+        &write,
+        0,
+        nullptr
+    );
+}
+
+void DescriptorSet::write_cubemap_array(
+    uint32_t binding,
+    const CubemapArray& cubemap_array)
+{
+    LOG_METHOD();
+
+    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(m_descriptor_set != VK_NULL_HANDLE, "Descriptor set is not initialized");
+
+    logger.check(cubemap_array.view().handle() != VK_NULL_HANDLE, "Cubemap array image view is not initialized");
+    logger.check(cubemap_array.sampler().handle() != VK_NULL_HANDLE, "Cubemap array sampler is not initialized");
+    logger.check(
+        cubemap_array.layout() == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        "Cubemap array image layout must be VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL"
+    );
+
+    VkDescriptorImageInfo image_info{};
+    image_info.sampler = cubemap_array.sampler().handle();
+    image_info.imageView = cubemap_array.view().handle();
+    image_info.imageLayout = cubemap_array.layout();
 
     VkWriteDescriptorSet write{};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

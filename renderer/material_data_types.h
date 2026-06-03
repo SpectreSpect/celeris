@@ -20,6 +20,7 @@ struct SkyboxMaterialData {
 struct PBRMaterialData {
     glm::vec4 material = glm::vec4(1.0f, 0.01f, 1.0f, 0.2f);
     glm::vec4 color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    glm::uvec4 pbr_map_ids = glm::uvec4(0u, 0u, 0u, 0u);
 };
 
 struct PointUniform {

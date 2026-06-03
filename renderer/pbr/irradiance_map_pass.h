@@ -10,6 +10,7 @@
 class VulkanEngine;
 class ComputePassManager;
 class Cubemap;
+class CubemapArray;
 
 class IrradiancePass {
 public:
@@ -24,6 +25,7 @@ public:
     IrradiancePass(VulkanEngine& engine, ComputePassManager& compute_pass_manager);
 
     Cubemap generate(Cubemap& environment_map, uint32_t face_size);
+    void generate_into(Cubemap& environment_map, CubemapArray& irradiance_maps, uint32_t cubemap_id);
 
 private:
     VulkanEngine& m_engine;

@@ -58,6 +58,7 @@
 #include "renderer/pbr/brdf_lut_pass.h"
 #include "renderer/pbr/prefilter_map_pass.h"
 #include "renderer/pbr/irradiance_map_pass.h"
+#include "vulkan_self/image/cubemap_array.h"
 
 #include <vector>
 
@@ -102,7 +103,6 @@ int main() {
 
     VulkanEngine engine(glfw_context, window, queue_request);
 
-    
     UI ui(window, engine);
     Camera camera;
     FPSCameraController camera_controller(camera);
@@ -124,6 +124,8 @@ int main() {
     MeshManager mesh_manager(engine, resource_loader);
     ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
 
+    CubemapArray cubemaps(engine.physical_device(), engine.device(), VkExtent2D{512, 512}, VK_FORMAT_R8G8B8A8_UNORM, 16, CubemapArray::StorageImageUsage::Enabled);
+
     // EquirectToCubemapPass equirect_to_cubemap_pass(engine, compute_pass_manager);
 
     // BrdfLutPass brdf_lut_generator(engine, compute_pass_manager);
@@ -134,15 +136,14 @@ int main() {
 
     // Cubemap dirt_cubemap = equirect_to_cubemap_pass.generate(texture_manager.dirt_texture, 100);
 
-    IrradiancePass irradiance_pass(engine, compute_pass_manager);
-    Cubemap irradiance_map = irradiance_pass.generate(*texture_manager.st_peters_square_night_4k_hdr_env_map, 32);
+    // IrradiancePass irradiance_pass(engine, compute_pass_manager);
+    // Cubemap irradiance_map = irradiance_pass.generate(*texture_manager.st_peters_square_night_4k_hdr_env_map, 32);
 
     // Cubemap dirt_cubemap = equirect_to_cubemap_pass.generate(texture_manager.dirt_texture, 100);
 
     GICPPass gicp_pass(engine, compute_pass_manager);
     VoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);
     VoxelMapPointReseter voxel_map_reseter(engine, compute_pass_manager);
-    
 
     Renderer renderer(engine, frame_resources);
 
@@ -211,9 +212,17 @@ int main() {
 
     // unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube.set_material_data<PBRMaterialData>(PBRMaterialData{.material = glm::vec4(1, 0.01, 1, 0.2f),
-                                                                  .color = glm::vec4(1, 1, 1, 1)});
-    sphere.set_material_data(PBRMaterialData{.material = glm::vec4(0, 0.5, 1, 0.2f),
-                                             .color = glm::vec4(0, 0, 0, 1)});
+                                                                  .color = glm::vec4(1, 1, 1, 1),
+                                                                  .pbr_map_ids = glm::uvec4(TextureManager::studio_kominka_02_4k_pbr_map_id,
+                                                                                            TextureManager::studio_kominka_02_4k_pbr_map_id,
+                                                                                            0,
+                                                                                            0)});
+    sphere.set_material_data(PBRMaterialData{.material = glm::vec4(1, 0.01f, 1, 0.2f),
+                                             .color = glm::vec4(1, 1, 1, 1),
+                                             .pbr_map_ids = glm::uvec4(TextureManager::ferndale_studio_06_4k_pbr_map_id,
+                                                                       TextureManager::ferndale_studio_06_4k_pbr_map_id,
+                                                                       0,
+                                                                       0)});
 
     unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube3.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});

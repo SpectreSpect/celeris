@@ -17,6 +17,9 @@ struct MaterialData {
 
     // rgb = albedo/base color, a = environment multiplier
     vec4 color;
+
+    // x = irradiance cubemap id, y = prefilter cubemap id
+    uvec4 pbr_map_ids;
 };
 
 struct LightSource {
@@ -28,8 +31,8 @@ layout(std430, set = 0, binding = 0) readonly buffer MaterialBuffer {
     MaterialData materials[];
 } material_buffer;
 
-layout(set = 0, binding = 1) uniform samplerCube irradianceMap;
-layout(set = 0, binding = 2) uniform samplerCube prefilterMap;
+layout(set = 0, binding = 1) uniform samplerCubeArray irradianceMaps;
+layout(set = 0, binding = 2) uniform samplerCubeArray prefilterMaps;
 layout(set = 0, binding = 3) uniform sampler2D brdfLUT;
 
 layout(set = 1, binding = 0) uniform CameraUniform {
@@ -191,6 +194,8 @@ void accumulate_pbr_light(
 void main()
 {
     MaterialData material_data = material_buffer.materials[pc.material_data_id];
+    float irradiance_map_id = float(material_data.pbr_map_ids.x);
+    float prefilter_map_id = float(material_data.pbr_map_ids.y);
 
     vec3 albedo = clamp(material_data.color.rgb, 0.0, 1.0);
     float environment_multiplier = material_data.color.a > 0.0
@@ -293,16 +298,16 @@ void main()
     vec3 kS = F;
     vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
 
-    vec3 irradiance = texture(irradianceMap, N).rgb * environment_multiplier;
+    vec3 irradiance = texture(irradianceMaps, vec4(N, irradiance_map_id)).rgb * environment_multiplier;
     vec3 diffuse_ibl = irradiance * albedo;
 
-    int prefilter_levels = textureQueryLevels(prefilterMap);
+    int prefilter_levels = textureQueryLevels(prefilterMaps);
     float prefilter_max_mip = max(float(prefilter_levels - 1), 0.0);
     float lod = roughness * prefilter_max_mip;
 
     vec3 prefiltered_color = textureLod(
-        prefilterMap,
-        normalize(R),
+        prefilterMaps,
+        vec4(normalize(R), prefilter_map_id),
         lod
     ).rgb * environment_multiplier;
 

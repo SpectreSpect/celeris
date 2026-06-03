@@ -56,6 +56,7 @@ add_executable(app
   vulkan_self/image/vulkan_sampler.cpp
   vulkan_self/image/vulkan_texture_2d.cpp
   vulkan_self/image/cubemap.cpp
+  vulkan_self/image/cubemap_array.cpp
   vulkan_self/pipeline/vulkan_pipeline_layout.cpp
   vulkan_self/pipeline/pipeline.cpp
   vulkan_self/pipeline/pipeline_pass.cpp
