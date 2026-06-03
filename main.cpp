@@ -51,6 +51,7 @@
 #include "renderer/pbr/prefilter_map_pass.h"
 #include "renderer/pbr/irradiance_map_pass.h"
 #include "vulkan_self/image/cubemap_array.h"
+#include "voxel_grid_vulkan/voxel_grid.h"
 
 #include <vector>
 
@@ -132,6 +133,47 @@ int main() {
     // Cubemap irradiance_map = irradiance_pass.generate(*texture_manager.st_peters_square_night_4k_hdr_env_map, 32);
 
     // Cubemap dirt_cubemap = equirect_to_cubemap_pass.generate(texture_manager.dirt_texture, 100);
+
+
+        // float voxel_size = 1.0f;
+        // uint32_t chunk_size = 16u;
+        // glm::ivec3(chunk_size), // chunk_size
+        // glm::vec3(voxel_size), // voxel_size
+        // 10'000, // count_active_chunks
+        // 1'000'000, // max_quads
+        // 4, // chunk_hash_table_size_factor
+        // 4096, // count_evict_buckets
+        // 5'000, // min_free_chunks
+        // 0.2f, // tomb_fraction_to_rebuild
+        // chunk_size * voxel_size * 1, // eviction_bucket_shell_thickness
+        // 10, // vb_page_size_order_of_two
+        // 10, // ib_page_size_order_of_two
+        // 1.0, // buddy_allocator_nodes_factor
+
+    glm::vec3 voxel_size(1.0f);
+    glm::ivec3 chunk_size(16);
+    VoxelGrid::VoxelGridDesc voxel_grid_desc {
+        .chunk_size = chunk_size,
+        .voxel_size = voxel_size,
+        .count_active_chunks = 10'000,
+        .max_quads = 3'000'000,
+        .chunk_hash_table_size_factor = 1.0f,
+        .count_evict_buckets = 32,
+        .min_free_chunks = 4'500,
+        .tomb_fraction_to_rebuild = 0.2f,
+        .eviction_bucket_shell_thickness = chunk_size.x * voxel_size.x * 1,
+        .vb_page_size_order_of_two = 10,
+        .ib_page_size_order_of_two = 10,
+        .buddy_allocator_nodes_factor = 1.0,
+        .render_distance = chunk_size.x * voxel_size.x * 30,
+        .generation_distance = 10,
+        .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000)
+    };
+
+    VoxelGrid voxel_grid(engine.physical_device(), 
+                         engine.device(), engine.compute_queue(), 
+                         compute_pass_manager, voxel_grid_desc);
+
 
     GICPPass gicp_pass(engine, compute_pass_manager);
     VoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);
