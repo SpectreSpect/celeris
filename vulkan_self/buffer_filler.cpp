@@ -85,7 +85,7 @@ std::vector<BufferFiller::FillResource> BufferFiller::create_fill_resources(
     for (size_t i = 0; i < count_fill_recources; i++) {
         fill_resources.emplace_back(
             VulkanCommandBuffer(device, command_pool), 
-            ComputePassInstance(compute_pass_manager.descriptor_pool(), compute_pass_manager.fill_buffer_cp),
+            PassInstance(compute_pass_manager.fill_buffer_cp, compute_pass_manager.descriptor_pool()),
             VulkanFence(device)
         );
     }

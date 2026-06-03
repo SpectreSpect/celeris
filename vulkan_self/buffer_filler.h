@@ -9,7 +9,7 @@
 
 #include "logger/logger_header.h"
 #include "vulkan_buffer.h"
-#include "../renderer/compute_pass_instance.h"
+#include "../renderer/pass_instance.h"
 #include "vulkan_fence.h"
 
 class ComputePassManager;
@@ -96,12 +96,12 @@ public:
 private:
     struct FillResource {
         VulkanCommandBuffer m_command_buffer; 
-        ComputePassInstance m_fill_pass_instance;
+        PassInstance m_fill_pass_instance;
         VulkanFence m_fence;
 
         FillResource(
             VulkanCommandBuffer&& command_buffer, 
-            ComputePassInstance&& fill_pass_instance,
+            PassInstance&& fill_pass_instance,
             VulkanFence&& fence)
             :   m_command_buffer(std::move(command_buffer)),
                 m_fill_pass_instance(std::move(fill_pass_instance)),

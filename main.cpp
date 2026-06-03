@@ -34,7 +34,6 @@
 #include "renderer/material_manager.h"
 #include "vulkan_self/compute/compute_pass_builder.h"
 #include "renderer/compute_pass_manager.h"
-#include "renderer/compute_pass_instance.h"
 #include "vulkan_self/material/material_buffer.h"
 #include "renderer/instanced_render_object.h"
 #include "renderer/instance_batch.h"

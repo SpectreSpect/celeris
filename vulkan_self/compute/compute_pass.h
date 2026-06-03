@@ -9,6 +9,8 @@ class DescriptorSetLayout;
 class VulkanPipelineLayout;
 class ComputePassBuilder;
 class VulkanDevice;
+class VulkanCommandBuffer;
+class Pipeline;
 
 class ComputePass : public PipelinePass {
 public:
@@ -30,10 +32,12 @@ public:
     ComputePass(ComputePass&&) noexcept = default;
     ComputePass& operator=(ComputePass&&) noexcept = default;
 
-    ComputePipeline& pipeline() noexcept;
-    const ComputePipeline& pipeline() const noexcept;
+    ComputePipeline& compute_pipeline() noexcept;
+    const ComputePipeline& compute_pipeline() const noexcept;
 
     virtual VkPipelineBindPoint bind_point() const noexcept override;
+    virtual const Pipeline& pipeline() const override;
+    virtual void bind(VulkanCommandBuffer& command_buffer) const override;
 
 private:
     ComputePipeline m_pipeline;

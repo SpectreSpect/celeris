@@ -6,7 +6,7 @@
 
 #include "../vulkan_self/logger/logger_header.h"
 #include "../vulkan_self/vulkan_buffer.h"
-#include "../renderer/compute_pass_instance.h"
+#include "../renderer/pass_instance.h"
 #include "../vulkan_self/buffer_filler.h"
 #include "../vulkan_self/vulkan_command_buffer.h"
 #include "../vulkan_self/vulkan_command_pool.h"
@@ -68,8 +68,8 @@ public:
     };
 
     struct VoxelGridPassInstances {
-        ComputePassInstance fill_buffer_pi;
-        ComputePassInstance world_init_pi;
+        PassInstance fill_buffer_pi;
+        PassInstance world_init_pi;
     };
 
     struct VoxelGridParams {

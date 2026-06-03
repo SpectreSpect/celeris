@@ -155,11 +155,9 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(ComputePassMa
     
     DescriptorPool& dp = compute_pass_manager.descriptor_pool();
 
-    
-
     return VoxelGridPassInstances {
-        .fill_buffer_pi = ComputePassInstance(dp, compute_pass_manager.fill_buffer_cp),
-        .world_init_pi = ComputePassInstance(dp, compute_pass_manager.world_init_cp)
+        .fill_buffer_pi = PassInstance(compute_pass_manager.fill_buffer_cp, dp),
+        .world_init_pi = PassInstance(compute_pass_manager.world_init_cp, dp)
     };
 }
 

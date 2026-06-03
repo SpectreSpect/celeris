@@ -4,7 +4,7 @@
 
 #include "vulkan_command_buffer.h"
 #include "vulkan_engine.h"
-#include "../renderer/compute_pass_instance.h"
+#include "../renderer/pass_instance.h"
 #include "utils.h"
 #include "../math_utils.h"
 #include "push_constants_structures.h"
@@ -215,7 +215,7 @@ void VulkanBuffer::fill(VulkanCommandBuffer& command_buffer, uint32_t data, VkDe
 
 void VulkanBuffer::fill(
     VulkanCommandBuffer& command_buffer,
-    ComputePassInstance& fill_pass_instance,
+    PassInstance& fill_pass_instance,
     VulkanBuffer& prefab_buffer,
     const void* data,
     uint32_t data_size_bytes,

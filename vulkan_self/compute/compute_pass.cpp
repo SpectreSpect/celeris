@@ -6,6 +6,8 @@
 #include "../pipeline/vulkan_pipeline_layout.h"
 #include "../compute/compute_pass_builder.h"
 #include "../vulkan_device.h"
+#include "../vulkan_command_buffer.h"
+#include "../pipeline/pipeline.h"
 
 ComputePass::ComputePass(
     DescriptorSetLayout&& descriptor_set_layout,
@@ -40,14 +42,30 @@ ComputePass::BuildData ComputePass::build(VulkanDevice& device, ComputePassBuild
     };
 }
 
-ComputePipeline& ComputePass::pipeline() noexcept {
+ComputePipeline& ComputePass::compute_pipeline() noexcept {
     return m_pipeline;
 }
 
-const ComputePipeline& ComputePass::pipeline() const noexcept {
+const ComputePipeline& ComputePass::compute_pipeline() const noexcept {
     return m_pipeline;
 }
 
 VkPipelineBindPoint ComputePass::bind_point() const noexcept {
     return m_pipeline.get_bind_point();
+}
+
+const Pipeline& ComputePass::pipeline() const {
+    LOG_METHOD();
+
+    logger.check(m_pipeline.handle() != VK_NULL_HANDLE, "Pipline is not initialized");
+
+    return m_pipeline;
+}
+
+void ComputePass::bind(VulkanCommandBuffer& command_buffer) const {
+    LOG_METHOD();
+
+    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+
+    m_pipeline.bind(command_buffer);
 }

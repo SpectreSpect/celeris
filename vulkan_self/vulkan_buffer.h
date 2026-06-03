@@ -18,7 +18,7 @@
 
 class VulkanCommandBuffer;
 class VulkanEngine;
-class ComputePassInstance;
+class PassInstance;
 
 constexpr uint32_t FILL_LOCAL_SIZE_X = 8u;
 constexpr uint32_t FILL_LOCAL_SIZE_Y = 8u;
@@ -75,7 +75,7 @@ public:
     void fill(VulkanCommandBuffer& command_buffer, uint32_t data, VkDeviceSize size_bytes, VkDeviceSize offset = 0);
     void fill(
         VulkanCommandBuffer& command_buffer,
-        ComputePassInstance& fill_pass_instance,
+        PassInstance& fill_pass_instance,
         VulkanBuffer& prefab_buffer,
         const void* data,
         uint32_t data_size_bytes,
@@ -87,7 +87,7 @@ public:
     template <class T>
     void fill(
         VulkanCommandBuffer& command_buffer,
-        ComputePassInstance& fill_pass_instance,
+        PassInstance& fill_pass_instance,
         VulkanBuffer& prefab_buffer,
         T fill_value,
         uint32_t size_bytes,
@@ -304,7 +304,7 @@ public:
         const VulkanPhysicalDevice& physical_device,
         const VulkanDevice& device,
         VulkanCommandBuffer& command_buffer,
-        ComputePassInstance& fill_pass_instance,
+        PassInstance& fill_pass_instance,
         VulkanBuffer& prefab_buffer,
         T fill_value,
         VkDeviceSize size_bytes,

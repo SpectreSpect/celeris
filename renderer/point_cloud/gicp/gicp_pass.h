@@ -4,7 +4,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-#include "../../compute_pass_instance.h"
+#include "../../pass_instance.h"
 #include "../../../vulkan_self/vulkan_buffer.h"
 #include "../../../vulkan_self/vulkan_fence.h"
 #include "../../../vulkan_self/vulkan_command_buffer.h"
@@ -52,7 +52,7 @@ private:
 
     VulkanEngine& engine;
 
-    ComputePassInstance gicp_step_pass;
+    PassInstance gicp_step_pass;
     VulkanCommandBuffer compute_command_buffer;
     VulkanFence compute_fence;
 

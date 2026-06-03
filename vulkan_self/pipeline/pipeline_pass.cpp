@@ -21,3 +21,11 @@ const VulkanPipelineLayout& PipelinePass::pipeline_layout() const noexcept {
 uint32_t PipelinePass::descriptor_set_index() const noexcept {
     return m_descriptor_set_index;
 }
+
+Pipeline& PipelinePass::pipeline() {
+    LOG_METHOD();
+
+    return const_cast<Pipeline&>(
+        std::as_const(*this).pipeline()
+    );
+}

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../compute_pass_instance.h"
+#include "../../pass_instance.h"
 #include "../../../vulkan_self/vulkan_buffer.h"
 
 #include <glm/glm.hpp>

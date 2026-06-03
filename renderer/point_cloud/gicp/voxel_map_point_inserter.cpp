@@ -9,7 +9,7 @@
 
 VoxelMapPointInserter::VoxelMapPointInserter(VulkanEngine& engine, ComputePassManager& compute_pass_manager) 
     :   engine(engine),
-        insert_pass(compute_pass_manager.descriptor_pool(), compute_pass_manager.point_voxel_map_insert_cp),
+        insert_pass(compute_pass_manager.point_voxel_map_insert_cp, compute_pass_manager.descriptor_pool()),
         uniform_buffer(VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(InserterUniform))),
         compute_command_buffer(engine.device(), engine.compute_command_pool()),
         compute_fence(engine.device()){

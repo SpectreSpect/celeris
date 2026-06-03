@@ -447,5 +447,5 @@ VkMemoryPropertyFlags VulkanMemory::get_memory_type_properties(
     const VulkanPhysicalDevice& physical_device,
     uint32_t memory_type_index) 
 {
-    get_memory_type_properties(physical_device.handle(), memory_type_index);
+    return get_memory_type_properties(physical_device.handle(), memory_type_index);
 }

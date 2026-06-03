@@ -24,7 +24,7 @@ DescriptorSetWriter& DescriptorSetWriter::write_buffer(uint32_t binding, const V
     PendingWrite write{
         .binding = binding,
         .descriptor_type = descriptor_type,
-        .info_index = m_buffer_infos.size() - 1,
+        .info_index = static_cast<uint32_t>(m_buffer_infos.size() - 1),
         .is_buffer = true
     };
 
@@ -63,7 +63,7 @@ DescriptorSetWriter& DescriptorSetWriter::write_texture(uint32_t binding, const 
     PendingWrite write{
         .binding = binding,
         .descriptor_type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        .info_index = m_image_infos.size() - 1,
+        .info_index = static_cast<uint32_t>(m_image_infos.size() - 1),
         .is_buffer = false
     };
 
@@ -114,15 +114,6 @@ void DescriptorSetWriter::push_descriptor_set(VulkanCommandBuffer& command_buffe
         set_index,
         static_cast<uint32_t>(writes.size()),
         writes.data());
-
-    // vkCmdPushDescriptorSetKHR(
-    //     command_buffer.handle(),
-    //     pipeline.get_bind_point(),
-    //     pipeline.layout(),
-    //     set_index,
-    //     static_cast<uint32_t>(writes.size()),
-    //     writes.data()
-    // );
 }
 
 void DescriptorSetWriter::push_descriptor_set_and_clear(VulkanCommandBuffer& command_buffer, const Pipeline& pipeline, uint32_t set_index) {

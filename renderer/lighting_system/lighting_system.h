@@ -7,7 +7,7 @@
 // #include <glm/gtc/matrix_transform.hpp>
 // #include <glm/gtc/quaternion.hpp>
 
-#include "../compute_pass_instance.h"
+#include "../pass_instance.h"
 #include "../aabb.h"
 #include "../../vulkan_self/vulkan_buffer.h"
 #include "../../vulkan_self/vulkan_fence.h"
@@ -99,7 +99,7 @@ private:
     FrameResources* m_frame_resources = nullptr;
 
     VulkanEngine& m_engine;
-    ComputePassInstance m_build_cluster_light_lists_pass;
+    PassInstance m_build_cluster_light_lists_pass;
     VulkanCommandBuffer m_compute_command_buffer;
     VulkanFence m_compute_fence;
 

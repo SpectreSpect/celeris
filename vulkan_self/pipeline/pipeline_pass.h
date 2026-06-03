@@ -6,9 +6,12 @@
 #include "../descriptor_set/descriptor_set_layout.h"
 #include "vulkan_pipeline_layout.h"
 
+class VulkanCommandBuffer;
+class Pipeline;
+
 class PipelinePass {
 public:
-    _XPARENT_NAME(MaterialPass);
+    _XPARENT_NAME(PipelinePass);
 
     virtual ~PipelinePass() noexcept = default;
 
@@ -23,6 +26,9 @@ public:
     uint32_t descriptor_set_index() const noexcept;
 
     virtual VkPipelineBindPoint bind_point() const noexcept = 0;
+    virtual const Pipeline& pipeline() const = 0;
+    Pipeline& pipeline();
+    virtual void bind(VulkanCommandBuffer& command_buffer) const = 0;
 
 protected:
     PipelinePass(

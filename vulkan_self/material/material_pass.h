@@ -12,6 +12,8 @@ class MaterialPassBuilder;
 class VulkanRenderPass;
 class VulkanEngine;
 class VulkanDevice;
+class VulkanCommandBuffer;
+class Pipeline;
 
 class MaterialPass : public PipelinePass {
 public:
@@ -36,6 +38,8 @@ public:
     GraphicsPipeline& pipeline() noexcept;
 
     virtual VkPipelineBindPoint bind_point() const noexcept override;
+    virtual const Pipeline& pipeline() const override;
+    virtual void bind(VulkanCommandBuffer& command_buffer) const override;
 
 private:
     struct BuildData {

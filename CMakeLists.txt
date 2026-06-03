@@ -83,7 +83,9 @@ add_executable(app
   renderer/shader_manager.cpp
   renderer/material_manager.cpp
   renderer/compute_pass_manager.cpp
-  renderer/compute_pass_instance.cpp
+  renderer/pass_object.cpp
+  renderer/pass_instance.cpp
+  renderer/pass_writer.cpp
   renderer/instanced_render_object.cpp
   renderer/instance_batch.cpp
   renderer/instance_buffer_view.cpp

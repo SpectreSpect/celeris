@@ -5,7 +5,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
-#include "../../compute_pass_instance.h"
+#include "../../pass_instance.h"
 #include "../../../vulkan_self/vulkan_fence.h"
 #include "../../../vulkan_self/vulkan_command_buffer.h"
 
@@ -29,7 +29,7 @@ public:
 // reset_voxel_point_map_cp
 private:
     VulkanEngine& engine;
-    ComputePassInstance reset_pass;
+    PassInstance reset_pass;
     VulkanBuffer uniform_buffer;
 
     VulkanCommandBuffer compute_command_buffer;

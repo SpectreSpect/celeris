@@ -7,7 +7,7 @@
 
 VoxelMapPointReseter::VoxelMapPointReseter(VulkanEngine& engine, ComputePassManager& compute_pass_manager) 
     :   engine(engine),
-        reset_pass(compute_pass_manager.descriptor_pool(), compute_pass_manager.reset_voxel_point_map_cp),
+        reset_pass(compute_pass_manager.reset_voxel_point_map_cp, compute_pass_manager.descriptor_pool()),
         uniform_buffer(VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(ReseterUniform))),
         compute_command_buffer(engine.device(), engine.compute_command_pool()),
         compute_fence(engine.device()) {}
