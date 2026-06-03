@@ -88,6 +88,287 @@ VoxelGrid::VoxelGrid(
 
 
     world_init_gpu();
+
+    // HashTableCounters hash_table_counters;
+    // ChunkHashTableSlot output_slots[10];
+
+    // m_buffers.chunk_hash_table.read(&hash_table_counters, sizeof(HashTableCounters), 0);
+    // m_buffers.chunk_hash_table.read(output_slots, sizeof(ChunkHashTableSlot) * 10, sizeof(HashTableCounters));
+
+    // for (int i = 0; i < 10; i++) {
+    //     std::cout << "id: " << i << "   key: " << output_slots[i].key << "  state: " << output_slots[i].state << "   value: " << output_slots[i].value << std::endl;
+    // }
+
+
+    constexpr uint32_t PRINT_COUNT = 10;
+
+    std::cout << "\n=== WORLD INIT DEBUG ===\n";
+
+    // 0. chunk_hash_table
+    {
+        HashTableCounters counters{};
+        ChunkHashTableSlot slots[PRINT_COUNT]{};
+
+        m_buffers.chunk_hash_table.read(&counters, sizeof(HashTableCounters), 0);
+        m_buffers.chunk_hash_table.read(
+            slots,
+            sizeof(ChunkHashTableSlot) * PRINT_COUNT,
+            sizeof(HashTableCounters)
+        );
+
+        std::cout << "\n--- chunk_hash_table ---\n";
+
+        std::cout << "empty total    = " << counters.reduce_read_count_empty() << "\n";
+        std::cout << "occupied total = " << counters.reduce_read_count_occupied() << "\n";
+        std::cout << "tomb total     = " << counters.reduce_read_count_tomb() << "\n";
+
+        std::cout << "count_empty: ";
+        for (uint32_t i = 0; i < COUNT_TABLE_COUNTERS; i++) {
+            std::cout << counters.count_empty[i] << " ";
+        }
+        std::cout << "\n";
+
+        std::cout << "count_occupied: ";
+        for (uint32_t i = 0; i < COUNT_TABLE_COUNTERS; i++) {
+            std::cout << counters.count_occupied[i] << " ";
+        }
+        std::cout << "\n";
+
+        std::cout << "count_tomb: ";
+        for (uint32_t i = 0; i < COUNT_TABLE_COUNTERS; i++) {
+            std::cout << counters.count_tomb[i] << " ";
+        }
+        std::cout << "\n";
+
+        for (uint32_t i = 0; i < PRINT_COUNT; i++) {
+            std::cout << "slot " << i
+                      << " key=" << slots[i].key
+                      << " value=" << slots[i].value
+                      << " state=" << slots[i].state;
+
+            if (slots[i].state == SLOT_EMPTY) {
+                std::cout << " SLOT_EMPTY";
+            } else if (slots[i].state == SLOT_LOCKED) {
+                std::cout << " SLOT_LOCKED";
+            } else if (slots[i].state == SLOT_TOMB) {
+                std::cout << " SLOT_TOMB";
+            } else if (slots[i].state == SLOT_OCCUPIED) {
+                std::cout << " SLOT_OCCUPIED";
+            }
+
+            std::cout << "\n";
+        }
+    }
+
+    // 1. free_list
+    {
+        uint32_t free_list[PRINT_COUNT + 1]{};
+
+        m_buffers.free_list.read(
+            free_list,
+            sizeof(uint32_t) * (PRINT_COUNT + 1),
+            0
+        );
+
+        std::cout << "\n--- free_list ---\n";
+        std::cout << "free_count = " << free_list[0] << "\n";
+
+        for (uint32_t i = 0; i < PRINT_COUNT; i++) {
+            std::cout << "free_list[" << i << "] = "
+                      << free_list[i + 1] << "\n";
+        }
+    }
+
+    // 2. mesh_buffers_status
+    {
+        uint32_t status[2]{};
+
+        m_buffers.mesh_buffers_status.read(status, sizeof(status), 0);
+
+        std::cout << "\n--- mesh_buffers_status ---\n";
+        std::cout << "is_vb_full = " << status[0] << "\n";
+        std::cout << "is_ib_full = " << status[1] << "\n";
+    }
+
+    // 3. chunk_meta
+    {
+        ChunkMetaGPU meta[PRINT_COUNT]{};
+
+        m_buffers.chunk_meta.read(
+            meta,
+            sizeof(ChunkMetaGPU) * PRINT_COUNT,
+            0
+        );
+
+        std::cout << "\n--- chunk_meta ---\n";
+
+        for (uint32_t i = 0; i < PRINT_COUNT; i++) {
+            uint64_t key =
+                (static_cast<uint64_t>(meta[i].key_hi) << 32u) |
+                static_cast<uint64_t>(meta[i].key_lo);
+
+            std::cout << "chunk " << i
+                      << " used=" << meta[i].used
+                      << " key_lo=" << meta[i].key_lo
+                      << " key_hi=" << meta[i].key_hi
+                      << " key=" << key
+                      << " dirty_flags=" << meta[i].dirty_flags;
+
+            if (meta[i].dirty_flags & DIRTY_FLAG_BIT) {
+                std::cout << " DIRTY";
+            }
+
+            if (meta[i].dirty_flags & NEED_GENERATION_FLAG_BIT) {
+                std::cout << " NEED_GENERATION";
+            }
+
+            std::cout << "\n";
+        }
+    }
+
+    // 4. enqueued
+    {
+        uint32_t enqueued[PRINT_COUNT]{};
+
+        m_buffers.enqueued.read(
+            enqueued,
+            sizeof(uint32_t) * PRINT_COUNT,
+            0
+        );
+
+        std::cout << "\n--- enqueued ---\n";
+
+        for (uint32_t i = 0; i < PRINT_COUNT; i++) {
+            std::cout << "enqueued[" << i << "] = "
+                      << enqueued[i] << "\n";
+        }
+    }
+
+    // 5. dirty_list
+    {
+        uint32_t dirty_list[PRINT_COUNT + 1]{};
+
+        m_buffers.dirty_list.read(
+            dirty_list,
+            sizeof(uint32_t) * (PRINT_COUNT + 1),
+            0
+        );
+
+        std::cout << "\n--- dirty_list ---\n";
+        std::cout << "dirty_count = " << dirty_list[0] << "\n";
+
+        for (uint32_t i = 0; i < PRINT_COUNT; i++) {
+            std::cout << "dirty_list[" << i << "] = "
+                      << dirty_list[i + 1] << "\n";
+        }
+    }
+
+    // 6. voxel_write_list
+    {
+        uint32_t header[4]{};
+
+        m_buffers.voxel_write_list.read(header, sizeof(header), 0);
+
+        std::cout << "\n--- voxel_write_list ---\n";
+        std::cout << "write_count = " << header[0] << "\n";
+        std::cout << "header[1] = " << header[1] << "\n";
+        std::cout << "header[2] = " << header[2] << "\n";
+        std::cout << "header[3] = " << header[3] << "\n";
+
+        VoxelWriteGPU writes[PRINT_COUNT]{};
+
+        m_buffers.voxel_write_list.read(
+            writes,
+            sizeof(VoxelWriteGPU) * PRINT_COUNT,
+            sizeof(uint32_t) * 4
+        );
+
+        for (uint32_t i = 0; i < PRINT_COUNT; i++) {
+            std::cout << "write " << i
+                      << " world_voxel=("
+                      << writes[i].world_voxel.x << ", "
+                      << writes[i].world_voxel.y << ", "
+                      << writes[i].world_voxel.z << ", "
+                      << writes[i].world_voxel.w << ")"
+                      << " type_flags=" << writes[i].voxel_data.type_flags
+                      << " color=" << writes[i].voxel_data.color
+                      << " set_flags=" << writes[i].set_flags
+                      << "\n";
+        }
+    }
+
+    // 7. indirect_cmds
+    {
+        uint32_t cmd_count = 0;
+
+        m_buffers.indirect_cmds.read(&cmd_count, sizeof(uint32_t), 0);
+
+        std::cout << "\n--- indirect_cmds ---\n";
+        std::cout << "cmd_count = " << cmd_count << "\n";
+
+        DrawElementsIndirectCommand cmds[PRINT_COUNT]{};
+
+        m_buffers.indirect_cmds.read(
+            cmds,
+            sizeof(DrawElementsIndirectCommand) * PRINT_COUNT,
+            sizeof(uint32_t)
+        );
+
+        for (uint32_t i = 0; i < PRINT_COUNT; i++) {
+            std::cout << "cmd " << i
+                      << " count=" << cmds[i].count
+                      << " instanceCount=" << cmds[i].instanceCount
+                      << " firstIndex=" << cmds[i].firstIndex
+                      << " baseVertex=" << cmds[i].baseVertex
+                      << " baseInstance=" << cmds[i].baseInstance
+                      << "\n";
+        }
+    }
+
+    // 8. failed_dirty_list
+    {
+        uint32_t failed_dirty_list[PRINT_COUNT + 1]{};
+
+        m_buffers.failed_dirty_list.read(
+            failed_dirty_list,
+            sizeof(uint32_t) * (PRINT_COUNT + 1),
+            0
+        );
+
+        std::cout << "\n--- failed_dirty_list ---\n";
+        std::cout << "failed_dirty_count = " << failed_dirty_list[0] << "\n";
+
+        for (uint32_t i = 0; i < PRINT_COUNT; i++) {
+            std::cout << "failed_dirty_list[" << i << "] = "
+                      << failed_dirty_list[i + 1] << "\n";
+        }
+    }
+
+    std::cout << "\n=== END WORLD INIT DEBUG ===\n";
+
+
+    // m_pass_instances.world_init_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+    // m_pass_instances.world_init_pi.set_storage_buffer(1, m_buffers.free_list);
+    // m_pass_instances.world_init_pi.set_storage_buffer(2, m_buffers.mesh_buffers_status);
+    // m_pass_instances.world_init_pi.set_storage_buffer(3, m_buffers.chunk_meta);
+    // m_pass_instances.world_init_pi.set_storage_buffer(4, m_buffers.enqueued);
+    // m_pass_instances.world_init_pi.set_storage_buffer(5, m_buffers.dirty_list);
+    // m_pass_instances.world_init_pi.set_storage_buffer(6, m_buffers.voxel_write_list);
+    // m_pass_instances.world_init_pi.set_storage_buffer(7, m_buffers.indirect_cmds);
+    // m_pass_instances.world_init_pi.set_storage_buffer(8, m_buffers.failed_dirty_list);
+
+
+    // VkDeviceSize chunk_hash_table_size = sizeof(HashTableCounters) + sizeof(ChunkHashTableSlot) * m_params.chunk_hash_table_size;
+
+
+
+
+
+
+
+
+
+
     // init_draw_buffers();
     // init_mesh_pool();
 }
@@ -182,15 +463,24 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize failed_dirty_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
     
     return VoxelGridBuffers {
-        .chunk_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_hash_table_size),
-        .free_list = VulkanBuffer::create_storage_buffer(physical_device, device, free_list_size),
-        .chunk_meta = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_meta_size),
-        .enqueued = VulkanBuffer::create_storage_buffer(physical_device, device, enqueued_size),
-        .indirect_cmds = VulkanBuffer::create_storage_buffer(physical_device, device, indirect_cmds_size),
-        .failed_dirty_list = VulkanBuffer::create_storage_buffer(physical_device, device, failed_dirty_list_size),
+        // .chunk_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_hash_table_size),
+        // .free_list = VulkanBuffer::create_storage_buffer(physical_device, device, free_list_size),
+        // .chunk_meta = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_meta_size),
+        // .enqueued = VulkanBuffer::create_storage_buffer(physical_device, device, enqueued_size),
+        // .indirect_cmds = VulkanBuffer::create_storage_buffer(physical_device, device, indirect_cmds_size),
+        // .failed_dirty_list = VulkanBuffer::create_storage_buffer(physical_device, device, failed_dirty_list_size),
+        .chunk_hash_table = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, chunk_hash_table_size),
+        .free_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, free_list_size),
+        .chunk_meta = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, chunk_meta_size),
+        .enqueued = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, enqueued_size),
+        .indirect_cmds = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, indirect_cmds_size),
+        .failed_dirty_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, failed_dirty_list_size),
 
-        .mesh_buffers_status = VulkanBuffer::create_storage_buffer(physical_device, device, mesh_buffers_status_size),
-        .dirty_list = VulkanBuffer::create_storage_buffer(physical_device, device, dirty_list_size),
+        // .mesh_buffers_status = VulkanBuffer::create_storage_buffer(physical_device, device, mesh_buffers_status_size),
+        // .dirty_list = VulkanBuffer::create_storage_buffer(physical_device, device, dirty_list_size),
+        .mesh_buffers_status = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, mesh_buffers_status_size),
+        .dirty_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, dirty_list_size),
+
         .voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, voxel_write_list_size),
         .voxels = VulkanBuffer(
             physical_device,
