@@ -23,14 +23,15 @@ VulkanImageView::VulkanImageView(
     uint32_t base_mip_level,
     uint32_t mip_levels_count,
     uint32_t base_array_level,
-    uint32_t array_levels_count) 
+    uint32_t array_levels_count,
+    VkImageViewType view_type) 
 {
     LOG_METHOD();
 
     VkImageViewCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     create_info.image = image.handle();
-    create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    create_info.viewType = view_type;
     create_info.format = image.format();
 
     create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;

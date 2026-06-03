@@ -13,6 +13,9 @@ class VulkanCommandBuffer;
 class VulkanPipelineLayout;
 class Pipeline;
 class VulkanTexture2D;
+class Cubemap;
+class CubemapArray;
+class VulkanImageView;
 
 class DescriptorSet {
 public:
@@ -25,7 +28,12 @@ public:
     void write_uniform_buffer(uint32_t binding, VulkanBuffer& buffer);
     void write_storage_buffer(uint32_t binding, VulkanBuffer& buffer);
     void write_texture(uint32_t binding, const VulkanTexture2D& texture);
-
+    void write_cubemap(uint32_t binding, const Cubemap& cubemap);
+    void write_cubemap_array(uint32_t binding, const CubemapArray& cubemap_array);
+    void write_storage_cubemap(uint32_t binding, const Cubemap& cubemap);
+    void write_storage_texture(uint32_t binding, const VulkanTexture2D& texture);
+    void write_storage_image_view(uint32_t binding, const VulkanImageView& image_view);
+    
     void bind(VulkanCommandBuffer& command_buffer, VkPipelineLayout pipeline_layout, VkPipelineBindPoint bind_point, uint32_t set_binding);
     void bind(VulkanCommandBuffer& command_buffer, VulkanPipelineLayout& pipeline_layout, VkPipelineBindPoint bind_point, uint32_t set_binding);
     void bind(VulkanCommandBuffer& command_buffer, Pipeline& pipeline, uint32_t set_binding);

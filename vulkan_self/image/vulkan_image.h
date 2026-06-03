@@ -30,7 +30,8 @@ public:
         uint32_t mip_levels = 1,
         uint32_t array_layers = 1,
         VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT,
-        VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED
+        VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+        VkImageCreateFlags image_flags = 0
     );
 
     explicit VulkanImage(
@@ -78,13 +79,21 @@ public:
 
     void barrier_undefined_to_transfer_dst(
         VulkanCommandBuffer& command_buffer,
-        VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT
+        VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT,
+        uint32_t base_mip_level = 0,
+        uint32_t level_count = 1,
+        uint32_t base_array_layer = 0,
+        uint32_t layer_count = 1
     ) const;
 
     void barrier_transfer_write_to_shader_read(
         VulkanCommandBuffer& command_buffer,
         VkPipelineStageFlags shader_stage,
-        VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT
+        VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT,
+        uint32_t base_mip_level = 0,
+        uint32_t level_count = 1,
+        uint32_t base_array_layer = 0,
+        uint32_t layer_count = 1
     ) const;
 
     void copy_from_buffer(
@@ -123,6 +132,7 @@ private:
     uint32_t m_mip_levels = 1;
     uint32_t m_array_layers = 1;
     VkSampleCountFlagBits m_samples = VK_SAMPLE_COUNT_1_BIT;
+    VkImageCreateFlags m_image_flags = 0;
 
     std::optional<VulkanMemory> m_memory = std::nullopt;
 

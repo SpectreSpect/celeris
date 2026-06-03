@@ -56,6 +56,8 @@ add_executable(app
   vulkan_self/image/vulkan_image.cpp
   vulkan_self/image/vulkan_sampler.cpp
   vulkan_self/image/vulkan_texture_2d.cpp
+  vulkan_self/image/cubemap.cpp
+  vulkan_self/image/cubemap_array.cpp
   vulkan_self/pipeline/pipeline.cpp
   vulkan_self/pipeline/vulkan_pipeline_layout.cpp
   vulkan_self/pipeline/graphics_pipeline/graphics_pipeline_builder.cpp
@@ -95,6 +97,7 @@ add_executable(app
   renderer/point_cloud/point_cloud.cpp
   renderer/scene.cpp
   renderer/scene_object.cpp
+  renderer/skybox.cpp
   renderer/point_cloud/lidar/lidar_scan.cpp
   renderer/point_cloud/lidar/lidar_video.cpp
   renderer/point_cloud/gicp/gicp_pass.cpp
@@ -106,6 +109,12 @@ add_executable(app
   renderer/lighting_system/lighting_system.cpp
   voxel_grid_vulkan/voxel_grid.cpp
   vulkan_self/buffer_filler.cpp
+  renderer/pbr/equirect_to_cubemap_pass.cpp
+  renderer/pbr/brdf_lut_pass.cpp
+  renderer/pbr/prefilter_map_pass.cpp
+  renderer/pbr/irradiance_map_pass.cpp
+  renderer/pbr/pbr_maps.cpp
+  renderer/pbr/pbr_map_generator.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

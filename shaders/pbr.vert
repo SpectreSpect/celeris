@@ -1,52 +1,40 @@
 #version 450
 
-layout(location = 0) in vec4 inPosition;
-layout(location = 1) in vec4 inNormal;
-layout(location = 2) in vec4 inColor;
-layout(location = 3) in vec2 inUV;
-layout(location = 4) in vec4 inTangent; // xyz=tangent, w=handedness
+layout(location = 0) in vec4 in_position;
+layout(location = 1) in vec4 in_normal;
+layout(location = 2) in vec2 in_uv;
+layout(location = 3) in vec4 in_tangent; // xyz = tangent, w = handedness
 
-layout(location = 0) out vec3 vFragPos;
-layout(location = 1) out vec3 vNormal;
-layout(location = 2) out vec3 vTangent;
-layout(location = 3) out float vTangentSign;
-layout(location = 4) out vec3 vFragPosView;
-layout(location = 5) out vec3 vColor;
-layout(location = 6) out vec2 vUV;
+layout(location = 0) out vec3 frag_world_pos;
+layout(location = 1) out vec3 frag_normal;
+layout(location = 2) out vec2 frag_uv;
+layout(location = 3) out vec3 frag_tangent;
+layout(location = 4) out float frag_tangent_sign;
+layout(location = 5) out vec3 frag_view_pos;
 
-layout(std140, set = 0, binding = 0) uniform PBRUniformBuffer {
+layout(set = 1, binding = 0) uniform CameraUniform {
     mat4 view;
     mat4 proj;
-    // mat4 model;
+    vec4 viewPos;
+} camera_uniform;
 
-    vec4 viewPos;                // xyz used
-    vec4 environmentMultiplier;  // xyz used
-
-    uvec4 clusterGrid;           // xTiles, yTiles, zSlices, maxLightsPerCluster
-    vec4  screenParams;          // screenWidth, screenHeight, nearPlane, farPlane
-    vec4  pbrParams;             // normalStrength, prefilterMaxMip, exposure, unused
-} ubo;
-
-layout(push_constant) uniform ObjectPushConstants {
+layout(push_constant) uniform PushConstants {
     mat4 model;
+    uint material_data_id;
 } pc;
 
 void main()
 {
-    vec4 worldPos = pc.model * vec4(inPosition.xyz, 1.0);
+    vec4 world_pos = pc.model * vec4(in_position.xyz, 1.0);
 
-    mat3 normalMatrix = mat3(transpose(inverse(pc.model)));
+    mat3 normal_matrix = transpose(inverse(mat3(pc.model)));
 
-    vFragPos      = worldPos.xyz;
-    vFragPosView  = vec3(ubo.view * worldPos);
-    vNormal       = normalize(normalMatrix * inNormal.xyz);
-    vTangent      = normalize(normalMatrix * inTangent.xyz);
-    vTangentSign  = inTangent.w;
-    vColor        = inColor.xyz;
-    vUV           = inUV;
+    frag_world_pos = world_pos.xyz;
+    frag_normal = normalize(normal_matrix * in_normal.xyz);
+    frag_tangent = normalize(normal_matrix * in_tangent.xyz);
+    frag_tangent_sign = in_tangent.w;
+    frag_uv = in_uv;
+    frag_view_pos = vec3(camera_uniform.view * world_pos);
 
-    mat4 mvp = ubo.proj * ubo.view * pc.model;
-
-    gl_Position = mvp * vec4(inPosition.xyz, 1.0);
-    // gl_Position = mvp * vec4(inPosition.xyz, 1.0);
+    gl_Position = camera_uniform.proj * camera_uniform.view * world_pos;
 }

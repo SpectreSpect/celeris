@@ -24,7 +24,8 @@ public:
         uint32_t base_mip_level = 0,
         uint32_t mip_levels_count = 1,
         uint32_t base_array_level = 0,
-        uint32_t array_levels_count = 1
+        uint32_t array_levels_count = 1,
+        VkImageViewType view_type = VK_IMAGE_VIEW_TYPE_2D
     );
     ~VulkanImageView() noexcept;
 

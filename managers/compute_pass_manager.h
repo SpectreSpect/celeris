@@ -8,6 +8,7 @@
 class VulkanDevice;
 class VulkanShaderModule;
 class ShaderManager;
+class ComputePassBuilder;
 
 class ComputePassManager {
 public:
@@ -33,6 +34,12 @@ public:
     // Voxel grid
     ComputePass world_init_cp;
 
+    // PBR
+    ComputePass equirect_to_cubemap_cp;
+    ComputePass brdf_lut_cp;
+    ComputePass prefilter_map_cp;
+    ComputePass irradiance_map_cp;
+
     ComputePassManager(VulkanDevice& device, ShaderManager& shader_manager);
 
     DescriptorPool& descriptor_pool() noexcept;
@@ -50,6 +57,12 @@ public:
 
     // Lights
     ComputePass create_build_cluster_light_lists_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+
+    // PBR
+    ComputePass create_equirect_to_cubemap_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_brdf_lut_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_prefilter_map_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_irradiance_map_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
     // Voxel grid
     ComputePass create_world_init_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);

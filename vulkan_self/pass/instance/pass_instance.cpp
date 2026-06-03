@@ -5,6 +5,8 @@
 #include "../../vulkan_command_buffer.h"
 #include "../../vulkan_buffer.h"
 #include "../../image/vulkan_texture_2d.h"
+#include "../../image/cubemap.h"
+#include "../../image/vulkan_image_view.h"
 
 PassInstance::PassInstance(PipelinePass& pass, DescriptorPool& pool, uint32_t instance_set_id) 
     :   PassObject(pass),
@@ -25,6 +27,26 @@ void PassInstance::set_storage_buffer(uint32_t binding, VulkanBuffer& storage_bu
 void PassInstance::set_texture(uint32_t binding, VulkanTexture2D& texture_2d) {
     LOG_METHOD();
     m_descriptor_set.write_texture(binding, texture_2d);
+}
+
+void PassInstance::set_storage_texture(uint32_t binding, VulkanTexture2D& texture_2d) {
+    LOG_METHOD();
+    m_descriptor_set.write_storage_texture(binding, texture_2d);
+}
+
+void PassInstance::set_cubemap(uint32_t binding, Cubemap& cubemap) {
+    LOG_METHOD();
+    m_descriptor_set.write_cubemap(binding, cubemap);
+}
+
+void PassInstance::set_storage_cubemap(uint32_t binding, Cubemap& cubemap) {
+    LOG_METHOD();
+    m_descriptor_set.write_storage_cubemap(binding, cubemap);
+}
+
+void PassInstance::set_storage_image_view(uint32_t binding, const VulkanImageView& image_view) {
+    LOG_METHOD();
+    m_descriptor_set.write_storage_image_view(binding, image_view);
 }
 
 void PassInstance::bind_description_object(VulkanCommandBuffer& command_buffer) {

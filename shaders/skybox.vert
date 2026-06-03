@@ -4,17 +4,18 @@ layout(location = 0) in vec4 inPosition;
 
 layout(location = 0) out vec4 outDir;
 
-layout(set = 0, binding = 0) uniform UniformBufferObject {
-    mat4 proj;
+layout(set = 1, binding = 0) uniform CameraUniform {
     mat4 view;
-    float exposure;
-} ubo;
+    mat4 proj;
+    vec4 viewPos;
+} camera_uniform;
+
 
 void main() {
     outDir = inPosition;
 
-    mat4 viewRot = mat4(mat3(ubo.view));
-    vec4 pos = ubo.proj * viewRot * vec4(inPosition.xyz, 1.0);
+    mat4 viewRot = mat4(mat3(camera_uniform.view));
+    vec4 pos = camera_uniform.proj * viewRot * vec4(inPosition.xyz, 1.0);
 
     gl_Position = pos.xyww;
 }

@@ -9,7 +9,12 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         unlit_fs(device, path_utils::executable_dir() / "shaders" / "unlit.frag.spv"),
 
         point_vs(device, path_utils::executable_dir() / "shaders" / "point_cloud.vert.spv"),
-        point_fs(device, path_utils::executable_dir() / "shaders" / "point_cloud.frag.spv"), 
+        point_fs(device, path_utils::executable_dir() / "shaders" / "point_cloud.frag.spv"),
+
+        skybox_vs(device, path_utils::executable_dir() / "shaders" / "skybox.vert.spv"),
+        skybox_fs(device, path_utils::executable_dir() / "shaders" / "skybox.frag.spv"),
+        pbr_vs(device, path_utils::executable_dir() / "shaders" / "pbr.vert.spv"),
+        pbr_fs(device, path_utils::executable_dir() / "shaders" / "pbr.frag.spv"),
 
         // Compute shaders
         // General
@@ -25,4 +30,10 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         build_cluster_light_lists_cs(device, path_utils::executable_dir() / "shaders" / "build_cluster_light_lists.comp.spv"),
         
         // Voxel grid
-        world_init_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "world_init.comp.spv") {}
+        world_init_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "world_init.comp.spv"),
+
+        // PBR
+        equirect_to_cubemap_cs(device, path_utils::executable_dir() / "shaders" / "equirect_to_cubemap.comp.spv"),
+        brdf_lut_cs(device, path_utils::executable_dir() / "shaders" / "brdf_lut.comp.spv"),
+        generate_prefilter_map_cs(device, path_utils::executable_dir() / "shaders" / "generate_prefilter_map.comp.spv"),
+        generate_irradiance_map_cs(device, path_utils::executable_dir() / "shaders" / "generate_irradiance_map.comp.spv") {}
