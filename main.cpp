@@ -150,30 +150,30 @@ int main() {
         // 10, // ib_page_size_order_of_two
         // 1.0, // buddy_allocator_nodes_factor
 
-    glm::vec3 voxel_size(1.0f);
-    glm::ivec3 chunk_size(16);
-    VoxelGrid::VoxelGridDesc voxel_grid_desc {
-        .chunk_size = chunk_size,
-        .voxel_size = voxel_size,
-        .count_active_chunks = 10'000,
-        .max_quads = 3'000'000,
-        .chunk_hash_table_size_factor = 1.0f,
-        .count_evict_buckets = 32,
-        .min_free_chunks = 4'500,
-        .tomb_fraction_to_rebuild = 0.2f,
-        .eviction_bucket_shell_thickness = chunk_size.x * voxel_size.x * 1,
-        .vb_page_size_order_of_two = 10,
-        .ib_page_size_order_of_two = 10,
-        .buddy_allocator_nodes_factor = 1.0,
-        .render_distance = chunk_size.x * voxel_size.x * 30,
-        .generation_distance = 10,
-        .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000)
-    };
+    // glm::vec3 voxel_size(1.0f);
+    // glm::ivec3 chunk_size(16);
+    // VoxelGrid::VoxelGridDesc voxel_grid_desc {
+    //     .chunk_size = chunk_size,
+    //     .voxel_size = voxel_size,
+    //     .count_active_chunks = 10'000,
+    //     .max_quads = 3'000'000,
+    //     .chunk_hash_table_size_factor = 1.0f,
+    //     .count_evict_buckets = 32,
+    //     .min_free_chunks = 4'500,
+    //     .tomb_fraction_to_rebuild = 0.2f,
+    //     .eviction_bucket_shell_thickness = chunk_size.x * voxel_size.x * 1,
+    //     .vb_page_size_order_of_two = 10,
+    //     .ib_page_size_order_of_two = 10,
+    //     .buddy_allocator_nodes_factor = 1.0,
+    //     .render_distance = chunk_size.x * voxel_size.x * 30,
+    //     .generation_distance = 10,
+    //     .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000)
+    // };
 
-    VoxelGrid voxel_grid(engine.physical_device(), 
-                         engine.device(), engine.compute_queue(), 
-                         compute_pass_manager, material_instance_manager, 
-                         voxel_grid_desc);
+    // VoxelGrid voxel_grid(engine.physical_device(), 
+    //                      engine.device(), engine.compute_queue(), 
+    //                      compute_pass_manager, material_instance_manager, 
+    //                      voxel_grid_desc);
 
 
     GICPPass gicp_pass(engine, compute_pass_manager);
