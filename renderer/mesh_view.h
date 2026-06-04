@@ -8,41 +8,43 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "../vulkan_self/vulkan_buffer.h"
+#include "../vulkan_self/vulkan_buffer_view.h"
 #include "../vulkan_self/vulkan_engine.h"
 #include "../vulkan_self/utils.h"
 #include "../vulkan_self/vulkan_resource_loader.h"
-
-#include "mesh_view.h"
 
 #include "../vulkan_self/logger/logger_header.h"
 
 class VulkanPhysicalDevice;
 class VulkanDevice;
-class MeshView;
 
 // const VulkanPhysicalDevice& physical_device,
 // const VulkanDevice& device,
 
-class Mesh {
+class MeshView {
 public:
-    _XCLASS_NAME(Mesh);
+    _XCLASS_NAME(MeshView);
 
-    Mesh(VulkanPhysicalDevice& physical_device, VulkanDevice& device, VulkanResourceLoader& resource_loader, 
-            void* vertex_data, uint32_t vertex_data_size_bytes, 
-            unsigned int* index_data, uint32_t index_data_size_bytes);
+    MeshView() = default;
 
-    Mesh(VulkanEngine& engine, VulkanResourceLoader& resource_loader, 
-         void* vertex_data, uint32_t vertex_data_size_bytes, 
-         unsigned int* index_data, uint32_t index_data_size_bytes);
+    MeshView(VulkanBufferView vertex_buffer_view, VulkanBufferView index_buffer_view, uint32_t index_count);
+
+    // MeshView(VulkanPhysicalDevice& physical_device, VulkanDevice& device, VulkanResourceLoader& resource_loader, 
+    //         void* vertex_data, uint32_t vertex_data_size_bytes, 
+    //         unsigned int* index_data, uint32_t index_data_size_bytes);
+
+    // MeshView(VulkanEngine& engine, VulkanResourceLoader& resource_loader, 
+    //      void* vertex_data, uint32_t vertex_data_size_bytes, 
+    //      unsigned int* index_data, uint32_t index_data_size_bytes);
 
     uint32_t index_count() const noexcept;
     void bind_vertex_buffer(VulkanCommandBuffer& command_buffer, uint32_t buffer_binding = 0, VkDeviceSize offset = 0);
     void bind_index_buffer(VulkanCommandBuffer& command_buffer, uint32_t buffer_binding = 0, VkDeviceSize offset = 0);
-
-    MeshView get_view();
+    
+    bool valid() const noexcept;
 
 private:
-    VulkanBuffer m_vertex_buffer;
-    VulkanBuffer m_index_buffer;
+    VulkanBufferView m_vertex_buffer_view;
+    VulkanBufferView m_index_buffer_view;
     uint32_t m_index_count = 0;
 };

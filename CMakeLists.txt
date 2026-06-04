@@ -42,6 +42,7 @@ add_executable(app
   vulkan_self/vulkan_semaphore.cpp
   vulkan_self/vulkan_shader_module.cpp
   vulkan_self/vulkan_buffer.cpp
+  vulkan_self/vulkan_buffer_view.cpp
   vulkan_self/vertex_layout_builder.cpp
   vulkan_self/vulkan_memory.cpp
   vulkan_self/vulkan_resource_loader.cpp
@@ -69,6 +70,7 @@ add_executable(app
   vulkan_self/vulkan_image_temp.cpp
   renderer/transform.cpp
   renderer/mesh.cpp
+  renderer/mesh_view.cpp
   renderer/render_object.cpp
   managers/compute_pass_manager.cpp
   managers/manager_bundle.cpp

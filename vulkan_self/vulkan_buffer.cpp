@@ -8,6 +8,7 @@
 #include "utils.h"
 #include "../math_utils.h"
 #include "push_constants_structures.h"
+#include "vulkan_buffer_view.h"
 
 VulkanBuffer::VulkanBuffer(
     const VulkanPhysicalDevice& physical_device,
@@ -812,4 +813,8 @@ VulkanBuffer VulkanBuffer::create_host_visible_vertex_buffer(
         engine.device(),
         size_bytes
     );
+}
+
+VulkanBufferView VulkanBuffer::get_view() noexcept {
+    return VulkanBufferView(*this);
 }

@@ -3,6 +3,8 @@
 #include <vector>
 #include <glm/glm.hpp>
 
+#include "../vulkan_self/logger/logger_header.h"
+
 
 class VulkanEngine;
 class FrameResources;
@@ -17,6 +19,8 @@ class Scene;
 
 class Renderer {
 public:
+    _XCLASS_NAME(Renderer);
+
     Renderer(VulkanEngine& engine, FrameResources& frame_resources);
 
     void render(VulkanCommandBuffer& command_buffer, RenderObject& render_object, glm::mat4 transform = glm::mat4(1.0f));

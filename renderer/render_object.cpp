@@ -2,7 +2,7 @@
 #include "renderer.h"
 
 RenderObject::RenderObject(Mesh& mesh, SlotPassInstance& material)
-    :   m_mesh(mesh),
+    :   m_mesh_view(mesh.get_view()),
         m_material(&material),
         m_material_data_id(material.slot_buffer().allocate_slot()) {}
 
@@ -14,7 +14,7 @@ RenderObject::~RenderObject() {
 
 RenderObject::RenderObject(RenderObject&& other) noexcept
     : SceneObject(std::move(other)),
-      m_mesh(other.m_mesh),
+      m_mesh_view(other.m_mesh_view),
       m_material(other.m_material),
       m_material_data_id(other.m_material_data_id)
 {
@@ -45,8 +45,8 @@ void RenderObject::sync_material() {
     m_material->sync();
 }
 
-Mesh& RenderObject::mesh() noexcept {
-    return m_mesh;
+MeshView& RenderObject::mesh_view() noexcept {
+    return m_mesh_view;
 }
 
 SlotPassInstance& RenderObject::material() noexcept {

@@ -14,6 +14,8 @@
 #include "../vulkan_self/vulkan_fence.h"
 #include "voxel_grid_structures.h"
 
+#include "../renderer/render_object.h"
+
 class VulkanPhysicalDevice;
 class VulkanDevice;
 class ComputePassManager;
@@ -75,6 +77,9 @@ public:
         VulkanBuffer dirty_list;
         VulkanBuffer voxel_write_list;
         VulkanBuffer voxels;
+
+        VulkanBuffer global_vertex_buffer;
+        VulkanBuffer global_index_buffer;
     };
 
     struct VoxelGridPassInstances {
@@ -122,6 +127,9 @@ private:
     VoxelGridParams m_params;
     VoxelGridPassInstances m_pass_instances;
     VoxelGridBuffers m_buffers;
+
+    // Mesh m_mesh;
+    // RenderObject m_render_object;
     
 private:
     uint64_t vox_per_chunk() const noexcept;
@@ -135,5 +143,6 @@ private:
     );
 
     void world_init_gpu();
+    void init_draw_buffers();
     void submit_compute_commands();
 };

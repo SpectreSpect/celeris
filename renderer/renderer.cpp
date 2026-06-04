@@ -13,6 +13,8 @@ Renderer::Renderer(VulkanEngine& engine, FrameResources& frame_resources) {
 }
 
 void Renderer::render(VulkanCommandBuffer& command_buffer, RenderObject& render_object, glm::mat4 transform) {
+    logger.check(render_object.mesh_view().valid(), "Mesh view was invalid");
+
     static TransformPushConstants pc;
     pc.model = transform;
     pc.material_data_id = render_object.material_data_id();
@@ -26,15 +28,17 @@ void Renderer::render(VulkanCommandBuffer& command_buffer, RenderObject& render_
     pass.pipeline().set_y_up_viewport(command_buffer, *m_engine);
     pass.pipeline().set_scissor(command_buffer, *m_engine);
 
-    render_object.mesh().bind_vertex_buffer(command_buffer);
-    render_object.mesh().bind_index_buffer(command_buffer);
+    render_object.mesh_view().bind_vertex_buffer(command_buffer);
+    render_object.mesh_view().bind_index_buffer(command_buffer);
 
     pass.pipeline_layout().push_constants(command_buffer, pc);
     
-    command_buffer.draw_indexed(render_object.mesh().index_count());
+    command_buffer.draw_indexed(render_object.mesh_view().index_count());
 }
 
 void Renderer::render(VulkanCommandBuffer& command_buffer, InstancedRenderObject& instanced_render_object, glm::mat4 transform) {
+        logger.check(instanced_render_object.mesh_view().valid(), "Mesh view was invalid");
+
         if (!instanced_render_object.instance_buffer_view_valid())
             return;
     
@@ -52,17 +56,17 @@ void Renderer::render(VulkanCommandBuffer& command_buffer, InstancedRenderObject
         pass.pipeline().set_y_up_viewport(command_buffer, *m_engine);
         pass.pipeline().set_scissor(command_buffer, *m_engine);
 
-        instanced_render_object.mesh().bind_vertex_buffer(command_buffer, 0);
+        instanced_render_object.mesh_view().bind_vertex_buffer(command_buffer, 0);
         // if (render_object.instance_data.external_buffer)
         //     render_object.instance_data.external_buffer->bind_as_vertex_buffer(command_buffer, 1);
         // else
         instanced_render_object.instance_buffer()->bind_as_vertex_buffer(command_buffer, 1);
 
-        instanced_render_object.mesh().bind_index_buffer(command_buffer);
+        instanced_render_object.mesh_view().bind_index_buffer(command_buffer);
 
         pass.pipeline_layout().push_constants(command_buffer, pc);
 
-        command_buffer.draw_indexed(instanced_render_object.mesh().index_count(), instanced_render_object.instance_count());
+        command_buffer.draw_indexed(instanced_render_object.mesh_view().index_count(), instanced_render_object.instance_count());
 };
 
 void Renderer::render(VulkanCommandBuffer& command_buffer, std::vector<SceneObject*> scene_objects, glm::mat4 transform) {

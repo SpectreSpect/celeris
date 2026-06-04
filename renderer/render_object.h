@@ -56,14 +56,15 @@ public:
 
     void sync_material();
 
-    Mesh& mesh() noexcept;
+    MeshView& mesh_view() noexcept;
     SlotPassInstance& material() noexcept;
     uint32_t material_data_id() const noexcept;
     
     virtual void render(Renderer& renderer, VulkanCommandBuffer& command_buffer, const glm::mat4& world_transform);
 
 private:
-    Mesh& m_mesh;
+    // Mesh& m_mesh;
+    MeshView m_mesh_view;
     SlotPassInstance* m_material = nullptr;
     uint32_t m_material_data_id = UINT32_MAX;
 };

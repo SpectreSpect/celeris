@@ -19,6 +19,7 @@
 class VulkanCommandBuffer;
 class VulkanEngine;
 class PassInstance;
+class VulkanBufferView;
 
 constexpr uint32_t FILL_LOCAL_SIZE_X = 8u;
 constexpr uint32_t FILL_LOCAL_SIZE_Y = 8u;
@@ -323,6 +324,8 @@ public:
         buffer.fill(command_buffer, fill_pass_instance, prefab_buffer, fill_value, size_bytes);
         return buffer;
     }
+
+    VulkanBufferView get_view() noexcept;
         
 private:
     VkPhysicalDevice m_physical_device = VK_NULL_HANDLE;

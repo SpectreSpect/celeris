@@ -27,6 +27,8 @@ VoxelGrid::VoxelGrid(
         m_params(create_params(desc)),
         m_pass_instances(create_pass_instances(compute_pass_manager)),
         m_buffers(create_buffers(physical_device, device, m_command_buffer))
+        // m_mesh(physical_device, device, ),
+        // m_render_object()
 {
     LOG_METHOD();
 
@@ -88,7 +90,7 @@ VoxelGrid::VoxelGrid(
 
 
     world_init_gpu();
-    // init_draw_buffers();
+    init_draw_buffers();
     // init_mesh_pool();
 }
 
@@ -181,6 +183,10 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize indirect_cmds_size = sizeof(uint32_t) + sizeof(DrawElementsIndirectCommand) * (size_t)m_params.count_active_chunks;
     VkDeviceSize failed_dirty_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
     
+    VkDeviceSize global_vertex_buffer_size = sizeof(VertexGPU) * (size_t)m_params.max_mesh_vertices;
+    VkDeviceSize global_index_buffer_size = sizeof(uint32_t) * (size_t)m_params.max_mesh_indices;
+
+    
     return VoxelGridBuffers {
         // .chunk_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_hash_table_size),
         // .free_list = VulkanBuffer::create_storage_buffer(physical_device, device, free_list_size),
@@ -207,7 +213,13 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
             voxels_size,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-        )
+        ),
+        .global_vertex_buffer = VulkanBuffer::create_vertex_buffer(physical_device, device, global_vertex_buffer_size),
+        .global_index_buffer =  VulkanBuffer::create_index_buffer(physical_device, device, global_index_buffer_size)
+
+        // global_vertex_buffer_ = BufferObject(sizeof(VertexGPU) * (size_t)max_mesh_vertices_, GL_DYNAMIC_DRAW);
+        // global_index_buffer_ = BufferObject(sizeof(uint32_t) * (size_t)max_mesh_indices_, GL_DYNAMIC_DRAW);
+
         // .mesh_buffers_status = m_buffer_filler.fill_buffer(
         //     command_buffer, 0u, VulkanBuffer::create_storage_buffer(physical_device, device, mesh_buffers_status_size)
         // ),
@@ -267,6 +279,40 @@ void VoxelGrid::world_init_gpu() {
     }
 
     submit_compute_commands();
+}
+
+
+// void VoxelGridGPU::init_draw_buffers() {
+//     static VertexLayout vertex_layout;
+//     if (vertex_layout.attributes.size() == 0) {
+//         vertex_layout.add(
+//             "position",
+//             0, 4, GL_FLOAT, GL_FALSE,
+//             sizeof(VertexGPU),
+//             offsetof(VertexGPU, pos), 
+//             0, {0.0f, 0.0f, 0.0f, 1.0f}
+//         );
+//         vertex_layout.add(
+//             "color",
+//             1, 1, GL_UNSIGNED_INT, GL_FALSE,
+//             sizeof(VertexGPU),
+//             offsetof(VertexGPU, color), 
+//             0, {0xffffffffu} // белый
+//         );
+//         vertex_layout.add(
+//             "face",
+//             2, 1, GL_UNSIGNED_INT, GL_FALSE,
+//             sizeof(VertexGPU),
+//             offsetof(VertexGPU, face), 
+//             0, {0u} // Направление 0 (хз куда это, вверх мб?)
+//         );
+//     }
+
+//     vao.setup(global_vertex_buffer_, global_index_buffer_, vertex_layout);
+// }
+
+void VoxelGrid::init_draw_buffers() {
+
 }
 
 void VoxelGrid::apply_writes_to_world_gpu(uint32_t write_count) {
