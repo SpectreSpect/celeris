@@ -94,6 +94,222 @@ VoxelGrid::VoxelGrid(
     world_init_gpu();
     // init_draw_buffers();
     init_mesh_pool();
+
+    constexpr uint32_t PRINT_COUNT = 10;
+
+    auto unpack_head_idx = [](uint32_t head) -> uint32_t {
+        return head >> HEAD_TAG_BITS;
+    };
+
+    auto unpack_head_tag = [](uint32_t head) -> uint32_t {
+        return head & HEAD_TAG_MASK;
+    };
+
+    auto unpack_state_order = [](uint32_t state) -> uint32_t {
+        return state >> ST_MASK_BITS;
+    };
+
+    auto unpack_state_kind = [](uint32_t state) -> uint32_t {
+        return state & ST_MASK;
+    };
+
+    auto state_kind_name = [](uint32_t kind) -> const char* {
+        switch (kind) {
+            case ST_FREE:   return "ST_FREE";
+            case ST_ALLOC:  return "ST_ALLOC";
+            case ST_MERGED: return "ST_MERGED";
+            default:        return "UNKNOWN";
+        }
+    };
+
+    auto print_allocator =
+        [&](const char* name,
+            VulkanBuffer& heads_buffer,
+            VulkanBuffer& nodes_buffer,
+            VulkanBuffer& state_buffer,
+            VulkanBuffer& free_nodes_list_buffer,
+            uint32_t page_count,
+            uint32_t node_count,
+            uint32_t max_order)
+    {
+        std::cout << "\n--- " << name << " allocator ---\n";
+
+        // Heads
+        std::vector<uint32_t> heads(max_order + 1u, 0u);
+
+        heads_buffer.read(
+            heads.data(),
+            sizeof(uint32_t) * heads.size(),
+            0
+        );
+
+        std::cout << "heads:\n";
+
+        for (uint32_t order = 0; order <= max_order; order++) {
+            uint32_t head = heads[order];
+
+            std::cout << "  head[" << order << "] = " << head;
+
+            if (head == INVALID_ID) {
+                std::cout << " INVALID_ID";
+            } else {
+                uint32_t node_id = unpack_head_idx(head);
+                uint32_t tag = unpack_head_tag(head);
+
+                std::cout << " node_id=" << node_id
+                          << " tag=" << tag;
+
+                if (node_id < node_count) {
+                    AllocNode node{};
+
+                    nodes_buffer.read(
+                        &node,
+                        sizeof(AllocNode),
+                        sizeof(AllocNode) * node_id
+                    );
+
+                    std::cout << " node.page=" << node.page
+                              << " node.next=" << node.next;
+                } else {
+                    std::cout << " NODE_ID_OUT_OF_RANGE";
+                }
+            }
+
+            std::cout << "\n";
+        }
+
+        // Free node stack
+        {
+            uint32_t free_node_count = 0u;
+
+            free_nodes_list_buffer.read(
+                &free_node_count,
+                sizeof(uint32_t),
+                0
+            );
+
+            std::cout << "free_node_count = " << free_node_count
+                      << " / " << node_count << "\n";
+
+            uint32_t to_read = std::min(PRINT_COUNT, node_count);
+
+            std::vector<uint32_t> free_nodes(to_read, 0u);
+
+            free_nodes_list_buffer.read(
+                free_nodes.data(),
+                sizeof(uint32_t) * to_read,
+                sizeof(uint32_t)
+            );
+
+            for (uint32_t i = 0; i < to_read; i++) {
+                std::cout << "  free_nodes_list[" << i << "] = "
+                          << free_nodes[i] << "\n";
+            }
+
+            if (free_node_count > 0u) {
+                uint32_t top_node = 0u;
+
+                free_nodes_list_buffer.read(
+                    &top_node,
+                    sizeof(uint32_t),
+                    sizeof(uint32_t) + sizeof(uint32_t) * (free_node_count - 1u)
+                );
+
+                std::cout << "  current stack top node = " << top_node << "\n";
+            }
+        }
+
+        // Page states
+        {
+            uint32_t to_read = std::min(PRINT_COUNT, page_count);
+
+            std::vector<uint32_t> states(to_read, 0u);
+
+            state_buffer.read(
+                states.data(),
+                sizeof(uint32_t) * to_read,
+                0
+            );
+
+            std::cout << "states:\n";
+
+            for (uint32_t i = 0; i < to_read; i++) {
+                uint32_t state = states[i];
+                uint32_t order = unpack_state_order(state);
+                uint32_t kind = unpack_state_kind(state);
+
+                std::cout << "  state[" << i << "] = " << state
+                          << " order=" << order
+                          << " kind=" << kind
+                          << " " << state_kind_name(kind)
+                          << "\n";
+            }
+        }
+    };
+
+    std::cout << "\n=== MESH POOL DEBUG ===\n";
+
+    print_allocator(
+        "VB",
+        m_buffers.vb_heads,
+        m_buffers.vb_nodes,
+        m_buffers.vb_state,
+        m_buffers.vb_free_nodes_list,
+        m_params.count_vb_pages,
+        m_params.count_vb_nodes,
+        m_params.vb_order
+    );
+
+    print_allocator(
+        "IB",
+        m_buffers.ib_heads,
+        m_buffers.ib_nodes,
+        m_buffers.ib_state,
+        m_buffers.ib_free_nodes_list,
+        m_params.count_ib_pages,
+        m_params.count_ib_nodes,
+        m_params.ib_order
+    );
+
+    // Chunk mesh allocations
+    {
+        std::cout << "\n--- chunk_mesh_alloc ---\n";
+
+        uint32_t to_read = std::min(PRINT_COUNT, m_params.count_active_chunks);
+
+        std::vector<ChunkMeshAlloc> allocs(to_read);
+
+        m_buffers.chunk_mesh_alloc.read(
+            allocs.data(),
+            sizeof(ChunkMeshAlloc) * to_read,
+            0
+        );
+
+        for (uint32_t i = 0; i < to_read; i++) {
+            const ChunkMeshAlloc& a = allocs[i];
+
+            std::cout << "chunk " << i
+                      << " v_startPage=" << a.v_startPage
+                      << " v_order=" << a.v_order
+                      << " needV=" << a.needV
+                      << " i_startPage=" << a.i_startPage
+                      << " i_order=" << a.i_order
+                      << " needI=" << a.needI
+                      << " is_valid=" << a.is_valid;
+
+            if (a.v_startPage == INVALID_ID) {
+                std::cout << " V_INVALID";
+            }
+
+            if (a.i_startPage == INVALID_ID) {
+                std::cout << " I_INVALID";
+            }
+
+            std::cout << "\n";
+        }
+    }
+
+    std::cout << "\n=== END MESH POOL DEBUG ===\n";
 }
 
 uint64_t VoxelGrid::vox_per_chunk() const noexcept {
@@ -196,7 +412,7 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize vb_free_nodes_list_size = sizeof(uint32_t) * (size_t)(1u + m_params.count_vb_nodes);
     
     VkDeviceSize ib_heads_size = sizeof(uint32_t) * (size_t)(m_params.ib_order + 1);
-    VkDeviceSize ib_nodes_size = sizeof(AllocNode) * (size_t)(m_params.count_vb_nodes);
+    VkDeviceSize ib_nodes_size = sizeof(AllocNode) * (size_t)(m_params.count_ib_nodes);
     VkDeviceSize ib_state_size = sizeof(uint32_t) * m_params.count_ib_pages;
     VkDeviceSize ib_free_nodes_list_size = sizeof(uint32_t) * (size_t)(1u + m_params.count_ib_nodes);
 
