@@ -87,12 +87,19 @@ public:
         VulkanBuffer global_index_buffer;
 
         VulkanBuffer vb_heads;
+        VulkanBuffer vb_nodes;
         VulkanBuffer vb_state;
         VulkanBuffer vb_free_nodes_list;
 
         VulkanBuffer ib_heads;
+        VulkanBuffer ib_nodes;
         VulkanBuffer ib_state;
         VulkanBuffer ib_free_nodes_list;
+
+        VulkanBuffer chunk_mesh_alloc;
+
+        VulkanBuffer mesh_pool_clear_uniform;
+        VulkanBuffer mesh_pool_seed_uniform;
 
         // vb_heads  vb_heads_ = BufferObject(sizeof(uint32_t) * (size_t)(vb_order_ + 1), GL_DYNAMIC_DRAW);
         // vb_state  vb_state_ = BufferObject(sizeof(uint32_t) * (size_t)count_vb_pages_, GL_DYNAMIC_DRAW);
@@ -109,6 +116,8 @@ public:
         PassInstance fill_buffer_pi;
         PassInstance world_init_pi;
         PassInstance apply_writes_to_world_pi;
+        PassInstance mesh_pool_clear_pi;
+        PassInstance mesh_pool_seed_pi;
     };
 
     struct VoxelGridParams {

@@ -161,3 +161,32 @@ struct AllocNode {
     uint32_t page;
     uint32_t next;
 };
+
+struct MeshPoolClearUniform {
+    uint32_t u_vb_pages;
+    uint32_t u_ib_pages;
+    uint32_t u_vb_nodes;
+    uint32_t u_ib_nodes;
+    uint32_t u_vb_heads_count;
+    uint32_t u_ib_heads_count;
+    uint32_t u_max_chunks;
+    uint32_t pad0;
+};
+
+struct MeshPoolSeedUniform {
+    uint32_t u_vb_max_order;
+    uint32_t u_ib_max_order;
+    uint32_t pad1;
+    uint32_t pad2;
+};
+
+// layout(std430, set = 0, binding=7) buffer UniformBuffer  { 
+//     uint u_vb_pages;
+//     uint u_ib_pages;
+//     uint u_vb_nodes;
+//     uint u_ib_nodes;
+//     uint u_vb_heads_count;
+//     uint u_ib_heads_count;
+//     uint u_max_chunks;
+//     uint pad0;
+// } ubo;

@@ -24,6 +24,8 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         // Voxel grid
         world_init_cp(create_world_init_compute_pass(device, shader_manager.world_init_cs)),
         apply_writes_to_world_cp(create_apply_writes_to_world_compute_pass(device, shader_manager.apply_writes_to_world_cs)),
+        mesh_pool_clear_cp(create_mesh_pool_clear_compute_pass(device, shader_manager.mesh_pool_clear_cs)),
+        mesh_pool_seed_cp(create_mesh_pool_seed_compute_pass(device, shader_manager.mesh_pool_seed_cs)),
 
         // PBR
         equirect_to_cubemap_cp(create_equirect_to_cubemap_compute_pass(device, shader_manager.equirect_to_cubemap_cs)),
@@ -161,6 +163,66 @@ ComputePass ComputePassManager::create_apply_writes_to_world_compute_pass(Vulkan
     builder.add_storage_buffer(5, ShaderStages::compute); // EnqueuedBuf
     builder.add_storage_buffer(6, ShaderStages::compute); // DirtyListBuf
     builder.add_push_constantsf(sizeof(ApplyVoxelWritesPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_mesh_pool_clear_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    // layout(std430, set = 0, binding=0) buffer VBHeads { uint vb_heads[]; };
+    // layout(std430, set = 0, binding=1) buffer VBState { uint vb_state[]; };
+    // layout(std430, set = 0, binding=2) buffer VBFreeNodesList  { uint vb_free_nodes_counter; uint vb_free_nodes_list[];  };
+    // layout(std430, set = 0, binding=3) buffer IBHeads { uint ib_heads[]; };
+    // layout(std430, set = 0, binding=4) buffer IBState { uint ib_state[]; };
+    // layout(std430, set = 0, binding=5) buffer IBFreeNodesList  { uint ib_free_nodes_counter; uint ib_free_nodes_list[];  };
+    // layout(std430, set = 0, binding=6) buffer ChunkMeshAllocBuf { ChunkMeshAlloc chunk_alloc[]; };
+
+    // layout(std430, set = 0, binding=7) buffer UniformBuffer
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // VBHeads
+    builder.add_storage_buffer(1, ShaderStages::compute); // VBState
+    builder.add_storage_buffer(2, ShaderStages::compute); // VBFreeNodesList
+    builder.add_storage_buffer(3, ShaderStages::compute); // IBHeads
+    builder.add_storage_buffer(4, ShaderStages::compute); // IBState
+    builder.add_storage_buffer(5, ShaderStages::compute); // IBFreeNodesList
+    builder.add_storage_buffer(6, ShaderStages::compute); // ChunkMeshAllocBuf
+
+    builder.add_uniform_buffer(7, ShaderStages::compute); // UniformBuffer
+    // builder.add_push_constantsf(sizeof(ApplyVoxelWritesPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_mesh_pool_seed_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    // layout(std430, binding=0) buffer VBHeads { uint vb_heads[]; };
+    // layout(std430, binding=1) buffer VBNodes  { Node vb_nodes[];  };
+    // layout(std430, binding=2) buffer VBState { uint vb_state[]; };
+    // layout(std430, binding=3) buffer VBFreeNodesList  { uint vb_free_nodes_counter; uint vb_free_nodes_list[];  };
+    // layout(std430, binding=4) buffer IBHeads { uint ib_heads[]; };
+    // layout(std430, binding=5) buffer IBNodes  { Node ib_nodes[];  };
+    // layout(std430, binding=6) buffer IBState { uint ib_state[]; };
+    // layout(std430, binding=7) buffer IBFreeNodesList  { uint ib_free_nodes_counter; uint ib_free_nodes_list[];  };
+    
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // VBHeads
+    builder.add_storage_buffer(1, ShaderStages::compute); // VBNodes
+    builder.add_storage_buffer(2, ShaderStages::compute); // VBState
+    builder.add_storage_buffer(3, ShaderStages::compute); // VBFreeNodesList
+    builder.add_storage_buffer(4, ShaderStages::compute); // IBHeads
+    builder.add_storage_buffer(5, ShaderStages::compute); // IBNodes
+    builder.add_storage_buffer(6, ShaderStages::compute); // IBState
+    builder.add_storage_buffer(7, ShaderStages::compute); // IBFreeNodesList
+
+    builder.add_uniform_buffer(8, ShaderStages::compute); // UniformBuffer
+
+    // builder.add_push_constantsf(sizeof(ApplyVoxelWritesPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }

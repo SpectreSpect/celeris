@@ -93,7 +93,7 @@ VoxelGrid::VoxelGrid(
 
     world_init_gpu();
     // init_draw_buffers();
-    // init_mesh_pool();
+    init_mesh_pool();
 }
 
 uint64_t VoxelGrid::vox_per_chunk() const noexcept {
@@ -163,7 +163,9 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(ComputePassMa
     return VoxelGridPassInstances {
         .fill_buffer_pi = PassInstance(compute_pass_manager.fill_buffer_cp, dp),
         .world_init_pi = PassInstance(compute_pass_manager.world_init_cp, dp),
-        .apply_writes_to_world_pi = PassInstance(compute_pass_manager.apply_writes_to_world_cp, dp)
+        .apply_writes_to_world_pi = PassInstance(compute_pass_manager.apply_writes_to_world_cp, dp),
+        .mesh_pool_clear_pi = PassInstance(compute_pass_manager.mesh_pool_clear_cp, dp),
+        .mesh_pool_seed_pi = PassInstance(compute_pass_manager.mesh_pool_seed_cp, dp)
     };
 }
 
@@ -189,12 +191,17 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize global_index_buffer_size = sizeof(uint32_t) * m_params.max_mesh_indices;
 
     VkDeviceSize vb_heads_size = sizeof(uint32_t) * (size_t)(m_params.vb_order + 1);
+    VkDeviceSize vb_nodes_size = sizeof(AllocNode) * (size_t)(m_params.count_vb_nodes);
     VkDeviceSize vb_state_size = sizeof(uint32_t) * m_params.count_vb_pages;
     VkDeviceSize vb_free_nodes_list_size = sizeof(uint32_t) * (size_t)(1u + m_params.count_vb_nodes);
     
     VkDeviceSize ib_heads_size = sizeof(uint32_t) * (size_t)(m_params.ib_order + 1);
+    VkDeviceSize ib_nodes_size = sizeof(AllocNode) * (size_t)(m_params.count_vb_nodes);
     VkDeviceSize ib_state_size = sizeof(uint32_t) * m_params.count_ib_pages;
     VkDeviceSize ib_free_nodes_list_size = sizeof(uint32_t) * (size_t)(1u + m_params.count_ib_nodes);
+
+    VkDeviceSize chunk_mesh_alloc_size = sizeof(ChunkMeshAlloc) * m_params.count_active_chunks;
+
     
     return VoxelGridBuffers {
         // .chunk_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_hash_table_size),
@@ -227,13 +234,22 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         .global_index_buffer =  VulkanBuffer::create_index_buffer(physical_device, device, global_index_buffer_size),
 
         .vb_heads = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, vb_heads_size),
+        // .vb_nodes = BufferObject(sizeof(AllocNode) * (size_t)(count_vb_nodes_), GL_DYNAMIC_DRAW);
+        .vb_nodes = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, vb_nodes_size),
         .vb_state = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, vb_state_size),
         .vb_free_nodes_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, vb_free_nodes_list_size),
 
         .ib_heads = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, ib_heads_size),
+        .ib_nodes = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, ib_nodes_size),
         .ib_state = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, ib_state_size),
         .ib_free_nodes_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, ib_free_nodes_list_size),
 
+        .chunk_mesh_alloc = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, chunk_mesh_alloc_size),
+
+        .mesh_pool_clear_uniform = VulkanBuffer::create_host_visible_uniform_buffer(physical_device, device, sizeof(MeshPoolClearUniform)),
+        .mesh_pool_seed_uniform = VulkanBuffer::create_host_visible_uniform_buffer(physical_device, device, sizeof(MeshPoolSeedUniform))
+        
+        
 
 
         // global_vertex_buffer_ = BufferObject(sizeof(VertexGPU) * (size_t)max_mesh_vertices_, GL_DYNAMIC_DRAW);
@@ -350,7 +366,107 @@ void VoxelGrid::world_init_gpu() {
 // }
 
 void VoxelGrid::init_mesh_pool() {
+    LOG_METHOD();
 
+    {
+        auto scope = m_command_buffer.begin_scope();
+
+        auto compute_write_to_compute_read_write = [&](VulkanBuffer& buffer) {
+            buffer.memory_barrier(
+                m_command_buffer,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_ACCESS_SHADER_WRITE_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+            );
+        };
+
+        // Pass 1: mesh_pool_clear
+
+        MeshPoolClearUniform mesh_pool_clear_uniform {
+            .u_vb_pages = m_params.count_vb_pages,
+            .u_ib_pages = m_params.count_ib_pages,
+            .u_vb_nodes = m_params.count_vb_nodes,
+            .u_ib_nodes = m_params.count_ib_nodes,
+            .u_vb_heads_count = m_params.vb_order + 1,
+            .u_ib_heads_count = m_params.ib_order + 1,
+            .u_max_chunks = m_params.count_active_chunks
+        };
+
+        m_buffers.mesh_pool_clear_uniform.upload(&mesh_pool_clear_uniform, sizeof(MeshPoolClearUniform));
+
+        // Host wrote the uniform/parameter buffer, compute shader will read it.
+        // m_buffers.mesh_pool_clear_uniform.memory_barrier(
+        //     m_command_buffer,
+        //     VK_PIPELINE_STAGE_HOST_BIT,
+        //     VK_ACCESS_HOST_WRITE_BIT,
+        //     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        //     VK_ACCESS_SHADER_READ_BIT
+        // );
+        
+        m_pass_instances.mesh_pool_clear_pi.set_storage_buffer(0, m_buffers.vb_heads);
+        m_pass_instances.mesh_pool_clear_pi.set_storage_buffer(1, m_buffers.vb_state);
+        m_pass_instances.mesh_pool_clear_pi.set_storage_buffer(2, m_buffers.vb_free_nodes_list);
+        m_pass_instances.mesh_pool_clear_pi.set_storage_buffer(3, m_buffers.ib_heads);
+        m_pass_instances.mesh_pool_clear_pi.set_storage_buffer(4, m_buffers.ib_state);
+        m_pass_instances.mesh_pool_clear_pi.set_storage_buffer(5, m_buffers.ib_free_nodes_list);
+        m_pass_instances.mesh_pool_clear_pi.set_storage_buffer(6, m_buffers.chunk_mesh_alloc);
+        m_pass_instances.mesh_pool_clear_pi.set_uniform_buffer(7, m_buffers.mesh_pool_clear_uniform);
+
+        m_pass_instances.mesh_pool_clear_pi.bind(m_command_buffer);
+
+        uint32_t max_count = std::max({m_params.count_vb_pages, m_params.count_ib_pages, m_params.count_active_chunks, 
+                                       m_params.count_vb_nodes, m_params.count_ib_nodes});
+        uint32_t groups_x = math_utils::div_up_u32(max_count, 256u);
+
+        m_command_buffer.dispatch(groups_x, 1, 1);
+
+        compute_write_to_compute_read_write(m_buffers.vb_heads);
+        compute_write_to_compute_read_write(m_buffers.vb_state);
+        compute_write_to_compute_read_write(m_buffers.vb_free_nodes_list);
+
+        compute_write_to_compute_read_write(m_buffers.ib_heads);
+        compute_write_to_compute_read_write(m_buffers.ib_state);
+        compute_write_to_compute_read_write(m_buffers.ib_free_nodes_list);
+
+        compute_write_to_compute_read_write(m_buffers.chunk_mesh_alloc);
+
+
+        // Pass 2: mesh_pool_seed
+
+        MeshPoolSeedUniform mesh_pool_seed_uniform {
+            .u_vb_max_order = m_params.vb_order,
+            .u_ib_max_order = m_params.ib_order
+        };
+
+        m_buffers.mesh_pool_seed_uniform.upload(&mesh_pool_seed_uniform, sizeof(MeshPoolSeedUniform));
+
+        m_pass_instances.mesh_pool_seed_pi.set_storage_buffer(0, m_buffers.vb_heads);
+        m_pass_instances.mesh_pool_seed_pi.set_storage_buffer(1, m_buffers.vb_nodes);
+        m_pass_instances.mesh_pool_seed_pi.set_storage_buffer(2, m_buffers.vb_state);
+        m_pass_instances.mesh_pool_seed_pi.set_storage_buffer(3, m_buffers.vb_free_nodes_list);
+        m_pass_instances.mesh_pool_seed_pi.set_storage_buffer(4, m_buffers.ib_heads);
+        m_pass_instances.mesh_pool_seed_pi.set_storage_buffer(5, m_buffers.ib_nodes);
+        m_pass_instances.mesh_pool_seed_pi.set_storage_buffer(6, m_buffers.ib_state);
+        m_pass_instances.mesh_pool_seed_pi.set_storage_buffer(7, m_buffers.ib_free_nodes_list);
+        m_pass_instances.mesh_pool_seed_pi.set_uniform_buffer(8, m_buffers.mesh_pool_seed_uniform);
+
+        m_pass_instances.mesh_pool_seed_pi.bind(m_command_buffer);
+
+        m_command_buffer.dispatch(1, 1, 1);
+
+        compute_write_to_compute_read_write(m_buffers.vb_heads);
+        compute_write_to_compute_read_write(m_buffers.vb_nodes);
+        compute_write_to_compute_read_write(m_buffers.vb_state);
+        compute_write_to_compute_read_write(m_buffers.vb_free_nodes_list);
+
+        compute_write_to_compute_read_write(m_buffers.ib_heads);
+        compute_write_to_compute_read_write(m_buffers.ib_nodes);
+        compute_write_to_compute_read_write(m_buffers.ib_state);
+        compute_write_to_compute_read_write(m_buffers.ib_free_nodes_list);
+    }
+
+    submit_compute_commands();
 }
 
 // void VoxelGridGPU::init_draw_buffers() {
