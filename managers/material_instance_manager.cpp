@@ -13,7 +13,7 @@ MaterialInstanceManager::MaterialInstanceManager(VulkanEngine& engine, MaterialM
         point_cloud(create_mi(material_manager.point_mp, sizeof(UnlitMaterialData))),
         st_peters_square_night_4k_hdr(material_manager.create_skybox_material(engine, texture_manager.hdr_env_maps[TextureManager::st_peters_square_night_4k_pbr_map_id])),
         dirt_pbr(material_manager.create_pbr_material(engine, texture_manager.irradiance_maps, texture_manager.prefilter_maps, texture_manager.brdf_lut)),
-        studio_kominka_02_4k_pbr(material_manager.create_pbr_material(engine, texture_manager.irradiance_maps, texture_manager.prefilter_maps, texture_manager.brdf_lut)),
+        pbr(material_manager.create_pbr_material(engine, texture_manager.irradiance_maps, texture_manager.prefilter_maps, texture_manager.brdf_lut)),
         point_cloud_ubo(VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(PointUniform))){
 
     PointUniform point_uniform{2, 0.005, 1, 0};

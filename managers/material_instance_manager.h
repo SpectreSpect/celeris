@@ -22,7 +22,7 @@ public:
     SlotPassInstance point_cloud;
     SlotPassInstance st_peters_square_night_4k_hdr;
     SlotPassInstance dirt_pbr;
-    SlotPassInstance studio_kominka_02_4k_pbr;
+    SlotPassInstance pbr;
 
     VulkanBuffer point_cloud_ubo;
 

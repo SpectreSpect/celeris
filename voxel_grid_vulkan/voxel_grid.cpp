@@ -5,6 +5,7 @@
 
 #include "../math_utils.h"
 #include "../managers/compute_pass_manager.h"
+#include "../managers/material_instance_manager.h"
 #include "voxel_grid_structures.h"
 #include "../vulkan_self/vulkan_physical_device.h"
 #include "../vulkan_self/vulkan_device.h"
@@ -17,6 +18,7 @@ VoxelGrid::VoxelGrid(
     const VulkanDevice& device,
     VulkanQueue& queue,
     ComputePassManager& compute_pass_manager,
+    MaterialInstanceManager& material_instance_manager,
     const VoxelGridDesc& desc) 
     :   m_command_pool(device, queue),
         m_command_buffer(device, m_command_pool),
@@ -26,9 +28,9 @@ VoxelGrid::VoxelGrid(
         // m_buffer_filler(physical_device, device, compute_pass_manager, 1024),
         m_params(create_params(desc)),
         m_pass_instances(create_pass_instances(compute_pass_manager)),
-        m_buffers(create_buffers(physical_device, device, m_command_buffer))
-        // m_mesh(physical_device, device, ),
-        // m_render_object()
+        m_buffers(create_buffers(physical_device, device, m_command_buffer)),
+        m_mesh_view(m_buffers.global_vertex_buffer.get_view(), m_buffers.global_index_buffer.get_view(), m_params.max_mesh_indices),
+        m_render_object(m_mesh_view, material_instance_manager.pbr)
 {
     LOG_METHOD();
 
@@ -90,7 +92,7 @@ VoxelGrid::VoxelGrid(
 
 
     world_init_gpu();
-    init_draw_buffers();
+    // init_draw_buffers();
     // init_mesh_pool();
 }
 
@@ -183,8 +185,8 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize indirect_cmds_size = sizeof(uint32_t) + sizeof(DrawElementsIndirectCommand) * (size_t)m_params.count_active_chunks;
     VkDeviceSize failed_dirty_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
     
-    VkDeviceSize global_vertex_buffer_size = sizeof(VertexGPU) * (size_t)m_params.max_mesh_vertices;
-    VkDeviceSize global_index_buffer_size = sizeof(uint32_t) * (size_t)m_params.max_mesh_indices;
+    VkDeviceSize global_vertex_buffer_size = sizeof(VertexGPU) * m_params.max_mesh_vertices;
+    VkDeviceSize global_index_buffer_size = sizeof(uint32_t) * m_params.max_mesh_indices;
 
     
     return VoxelGridBuffers {
@@ -311,9 +313,9 @@ void VoxelGrid::world_init_gpu() {
 //     vao.setup(global_vertex_buffer_, global_index_buffer_, vertex_layout);
 // }
 
-void VoxelGrid::init_draw_buffers() {
+// void VoxelGrid::init_draw_buffers() {
 
-}
+// }
 
 void VoxelGrid::apply_writes_to_world_gpu(uint32_t write_count) {
     LOG_METHOD();

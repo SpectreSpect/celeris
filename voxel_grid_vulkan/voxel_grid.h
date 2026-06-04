@@ -14,12 +14,16 @@
 #include "../vulkan_self/vulkan_fence.h"
 #include "voxel_grid_structures.h"
 
+
 #include "../renderer/render_object.h"
+#include "../renderer/mesh_view.h"
 
 class VulkanPhysicalDevice;
 class VulkanDevice;
 class ComputePassManager;
+class MaterialInstanceManager;
 class VulkanQueue;
+
 
 class VoxelGrid {
 public:
@@ -49,6 +53,7 @@ public:
         const VulkanDevice& device,
         VulkanQueue& queue,
         ComputePassManager& compute_pass_manager,
+        MaterialInstanceManager& material_instance_manager,
         const VoxelGridDesc& desc
     );
     ~VoxelGrid() noexcept = default;
@@ -128,8 +133,8 @@ private:
     VoxelGridPassInstances m_pass_instances;
     VoxelGridBuffers m_buffers;
 
-    // Mesh m_mesh;
-    // RenderObject m_render_object;
+    MeshView m_mesh_view;
+    RenderObject m_render_object;
     
 private:
     uint64_t vox_per_chunk() const noexcept;
@@ -143,6 +148,6 @@ private:
     );
 
     void world_init_gpu();
-    void init_draw_buffers();
+    // void init_draw_buffers();
     void submit_compute_commands();
 };

@@ -11,11 +11,14 @@
 #include "../vulkan_self/logger/logger_header.h"
 #include "../vulkan_self/pass/instance/slot_pass_instance.h"
 
+class MeshView;
+
 class RenderObject : public SceneObject {
 public:
     _XCHILD_NAME(RenderObject);
 
     RenderObject(Mesh& mesh, SlotPassInstance& material);
+    RenderObject(MeshView mesh_view, SlotPassInstance& material);
     ~RenderObject();
 
     RenderObject(const RenderObject&) = delete;

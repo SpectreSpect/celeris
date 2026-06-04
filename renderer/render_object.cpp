@@ -6,6 +6,11 @@ RenderObject::RenderObject(Mesh& mesh, SlotPassInstance& material)
         m_material(&material),
         m_material_data_id(material.slot_buffer().allocate_slot()) {}
 
+RenderObject::RenderObject(MeshView mesh_view, SlotPassInstance& material)
+    : m_mesh_view(mesh_view),
+      m_material(&material),
+      m_material_data_id(material.slot_buffer().allocate_slot()) {}
+
 RenderObject::~RenderObject() {
     if (m_material && m_material_data_id != UINT32_MAX) {
         m_material->slot_buffer().free_slot(m_material_data_id);

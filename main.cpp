@@ -172,7 +172,8 @@ int main() {
 
     VoxelGrid voxel_grid(engine.physical_device(), 
                          engine.device(), engine.compute_queue(), 
-                         compute_pass_manager, voxel_grid_desc);
+                         compute_pass_manager, material_instance_manager, 
+                         voxel_grid_desc);
 
 
     GICPPass gicp_pass(engine, compute_pass_manager);
@@ -181,9 +182,9 @@ int main() {
 
     Renderer renderer(engine, frame_resources);
 
-    RenderObject sphere(mesh_manager.sphere, material_instance_manager.studio_kominka_02_4k_pbr);
+    RenderObject sphere(mesh_manager.sphere, material_instance_manager.pbr);
 
-    RenderObject unlit_cube(mesh_manager.cube, material_instance_manager.studio_kominka_02_4k_pbr);
+    RenderObject unlit_cube(mesh_manager.cube, material_instance_manager.pbr);
     RenderObject unlit_cube2(mesh_manager.cube, material_instance_manager.dirt_blinn_phong);
     RenderObject unlit_cube3(mesh_manager.cube, material_instance_manager.rock_blinn_phong);
     RenderObject unlit_cube4(mesh_manager.cube, material_instance_manager.unlit);
