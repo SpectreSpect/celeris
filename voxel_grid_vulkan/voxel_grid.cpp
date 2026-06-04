@@ -188,6 +188,13 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize global_vertex_buffer_size = sizeof(VertexGPU) * m_params.max_mesh_vertices;
     VkDeviceSize global_index_buffer_size = sizeof(uint32_t) * m_params.max_mesh_indices;
 
+    VkDeviceSize vb_heads_size = sizeof(uint32_t) * (size_t)(m_params.vb_order + 1);
+    VkDeviceSize vb_state_size = sizeof(uint32_t) * m_params.count_vb_pages;
+    VkDeviceSize vb_free_nodes_list_size = sizeof(uint32_t) * (size_t)(1u + m_params.count_vb_nodes);
+    
+    VkDeviceSize ib_heads_size = sizeof(uint32_t) * (size_t)(m_params.ib_order + 1);
+    VkDeviceSize ib_state_size = sizeof(uint32_t) * m_params.count_ib_pages;
+    VkDeviceSize ib_free_nodes_list_size = sizeof(uint32_t) * (size_t)(1u + m_params.count_ib_nodes);
     
     return VoxelGridBuffers {
         // .chunk_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_hash_table_size),
@@ -217,7 +224,17 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         ),
         .global_vertex_buffer = VulkanBuffer::create_vertex_buffer(physical_device, device, global_vertex_buffer_size),
-        .global_index_buffer =  VulkanBuffer::create_index_buffer(physical_device, device, global_index_buffer_size)
+        .global_index_buffer =  VulkanBuffer::create_index_buffer(physical_device, device, global_index_buffer_size),
+
+        .vb_heads = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, vb_heads_size),
+        .vb_state = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, vb_state_size),
+        .vb_free_nodes_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, vb_free_nodes_list_size),
+
+        .ib_heads = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, ib_heads_size),
+        .ib_state = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, ib_state_size),
+        .ib_free_nodes_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, ib_free_nodes_list_size),
+
+
 
         // global_vertex_buffer_ = BufferObject(sizeof(VertexGPU) * (size_t)max_mesh_vertices_, GL_DYNAMIC_DRAW);
         // global_index_buffer_ = BufferObject(sizeof(uint32_t) * (size_t)max_mesh_indices_, GL_DYNAMIC_DRAW);
@@ -283,6 +300,58 @@ void VoxelGrid::world_init_gpu() {
     submit_compute_commands();
 }
 
+// void VoxelGridGPU::init_mesh_pool() {
+//     // Pass 1: mesh_pool_clear
+//     vb_heads_.bind_base_as_ssbo(0);
+//     vb_state_.bind_base_as_ssbo(1);
+//     vb_free_nodes_list_.bind_base_as_ssbo(2);
+
+//     ib_heads_.bind_base_as_ssbo(3);
+//     ib_state_.bind_base_as_ssbo(4);
+//     ib_free_nodes_list_.bind_base_as_ssbo(5);
+
+//     chunk_mesh_alloc_.bind_base_as_ssbo(6);
+
+//     prog_mesh_pool_clear_.use();
+
+//     glUniform1ui(glGetUniformLocation(prog_mesh_pool_clear_.id, "u_vb_pages"), count_vb_pages_);
+//     glUniform1ui(glGetUniformLocation(prog_mesh_pool_clear_.id, "u_ib_pages"), count_ib_pages_);
+//     glUniform1ui(glGetUniformLocation(prog_mesh_pool_clear_.id, "u_vb_nodes"), count_vb_nodes_);
+//     glUniform1ui(glGetUniformLocation(prog_mesh_pool_clear_.id, "u_ib_nodes"), count_ib_nodes_);
+//     glUniform1ui(glGetUniformLocation(prog_mesh_pool_clear_.id, "u_vb_heads_count"), vb_order_ + 1);
+//     glUniform1ui(glGetUniformLocation(prog_mesh_pool_clear_.id, "u_ib_heads_count"), ib_order_ + 1);
+//     glUniform1ui(glGetUniformLocation(prog_mesh_pool_clear_.id, "u_max_chunks"), count_active_chunks);
+
+//     uint32_t max_count = std::max({count_vb_pages_, count_ib_pages_, count_active_chunks, count_vb_nodes_, count_ib_nodes_});
+//     uint32_t groups_x = math_utils::div_up_u32(max_count, 256u);
+//     prog_mesh_pool_clear_.dispatch_compute(groups_x, 1, 1);
+    
+//     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+//     // Pass 2: mesh_pool_seed
+//     vb_heads_.bind_base_as_ssbo(0);
+//     vb_nodes_.bind_base_as_ssbo(1);
+//     vb_state_.bind_base_as_ssbo(2);
+//     vb_free_nodes_list_.bind_base_as_ssbo(3);
+
+//     ib_heads_.bind_base_as_ssbo(4);
+//     ib_nodes_.bind_base_as_ssbo(5);
+//     ib_state_.bind_base_as_ssbo(6);
+//     ib_free_nodes_list_.bind_base_as_ssbo(7);
+
+//     prog_mesh_pool_seed_.use();
+
+//     glUniform1ui(glGetUniformLocation(prog_mesh_pool_seed_.id, "u_vb_max_order"), vb_order_);
+//     glUniform1ui(glGetUniformLocation(prog_mesh_pool_seed_.id, "u_ib_max_order"), ib_order_);
+
+//     prog_mesh_pool_seed_.dispatch_compute(1, 1, 1);
+
+//     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+// }
+
+void VoxelGrid::init_mesh_pool() {
+
+}
 
 // void VoxelGridGPU::init_draw_buffers() {
 //     static VertexLayout vertex_layout;
