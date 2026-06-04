@@ -18,6 +18,7 @@ MaterialManager::MaterialManager(VulkanEngine& engine, ShaderManager& shader_man
     point_mp(create_point_pass(engine, frame_resources, shader_manager.point_vs, shader_manager.point_fs)),
     skybox_mp(create_skybox_pass(engine, frame_resources, shader_manager.skybox_vs, shader_manager.skybox_fs)),
     pbr_mp(create_pbr_pass(engine, frame_resources, shader_manager.pbr_vs, shader_manager.pbr_fs)),
+    voxel_mp(create_voxel_pass(engine, frame_resources, shader_manager.voxel_vs, shader_manager.voxel_fs)),
     m_pool(engine.device(), m_pool_builder) {}
 
 MaterialPass MaterialManager::create_pass(VulkanEngine& engine, MaterialPassBuilder& builder, 
@@ -176,6 +177,37 @@ MaterialPass MaterialManager::create_pbr_pass(VulkanEngine& engine, FrameResourc
     builder.add_vertex_attribute(1, 0, Formats::vec4, offsetof(PBRVertex, normal));
     builder.add_vertex_attribute(2, 0, Formats::vec2, offsetof(PBRVertex, uv));
     builder.add_vertex_attribute(3, 0, Formats::vec4, offsetof(PBRVertex, tangent));
+
+    return create_pass(engine, builder, vs, fs);
+}
+
+MaterialPass MaterialManager::create_voxel_pass(
+    VulkanEngine& engine,
+    FrameResources& frame_resources,
+    const VulkanShaderModule& vs,
+    const VulkanShaderModule& fs)
+{
+    LOG_METHOD();
+
+    struct VoxelVertex {
+        glm::vec4 position;
+        uint32_t color;
+        uint32_t face;
+        uint32_t pad0;
+        uint32_t pad1;
+    };
+
+    MaterialPassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::fragment);
+
+    builder.add_push_constants(sizeof(TransformPushConstants), 0);
+    builder.add_descriptor_set_layout(frame_resources.descriptor_layout());
+
+    builder.add_vertex_binding(0, sizeof(VoxelVertex));
+    builder.add_vertex_attribute(0, 0, Formats::vec4, offsetof(VoxelVertex, position));
+    builder.add_vertex_attribute(1, 0, VK_FORMAT_R32_UINT, offsetof(VoxelVertex, color));
+    builder.add_vertex_attribute(2, 0, VK_FORMAT_R32_UINT, offsetof(VoxelVertex, face));
 
     return create_pass(engine, builder, vs, fs);
 }

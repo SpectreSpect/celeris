@@ -1,0 +1,105 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+#include "../common/buffer_structures.inc"
+#include "utils.inc"
+
+layout(std430, set = 0, binding = 0) readonly buffer ChunkMetaBuf {
+    ChunkMeta meta[];
+};
+
+layout(std430, set = 0, binding = 1) readonly buffer ChunkMeshAllocBuf {
+    ChunkMeshAlloc chunk_mesh_alloc[];
+};
+
+layout(std430, set = 0, binding = 2) buffer IndirectCmdBuf {
+    uint cmd_count;
+    DrawElementsIndirectCommand cmds[];
+};
+
+layout(std140, set = 0, binding = 3) uniform BuildIndirectUniformBuffer {
+    uvec4 chunk_dim_max_chunks;
+    vec4 voxel_size_render_distance;
+    uvec4 pack_bits_vb_page_ib_page;
+    ivec4 pack_offset;
+    vec4 cam_pos;
+    vec4 frustum_planes[6];
+} ubo;
+
+bool sphere_in_frustum(vec3 center, float radius) {
+    for (int i = 0; i < 6; ++i) {
+        vec4 p = ubo.frustum_planes[i];
+        float dist = dot(p.xyz, center) + p.w;
+        if (dist < -radius) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void clear_command(uint chunk_id) {
+    cmds[chunk_id].count = 0u;
+    cmds[chunk_id].instanceCount = 0u;
+    cmds[chunk_id].firstIndex = 0u;
+    cmds[chunk_id].baseVertex = 0;
+    cmds[chunk_id].baseInstance = 0u;
+}
+
+void main() {
+    uint chunk_id = gl_GlobalInvocationID.x;
+    uint max_chunks = ubo.chunk_dim_max_chunks.w;
+    if (chunk_id >= max_chunks) {
+        return;
+    }
+
+    clear_command(chunk_id);
+
+    if (meta[chunk_id].used == 0u) {
+        return;
+    }
+
+    ChunkMeshAlloc mesh_alloc = chunk_mesh_alloc[chunk_id];
+    if (mesh_alloc.v_startPage == INVALID_ID || mesh_alloc.i_startPage == INVALID_ID) {
+        return;
+    }
+    if (mesh_alloc.needV == 0u || mesh_alloc.needI == 0u) {
+        return;
+    }
+
+    uvec3 chunk_dim = ubo.chunk_dim_max_chunks.xyz;
+    vec3 voxel_size = ubo.voxel_size_render_distance.xyz;
+    float render_distance = ubo.voxel_size_render_distance.w;
+    uint pack_bits = ubo.pack_bits_vb_page_ib_page.x;
+    uint ib_page_inds = ubo.pack_bits_vb_page_ib_page.z;
+    int key_offset = ubo.pack_offset.x;
+
+    ivec3 chunk_coord = unpack_key_to_coord(
+        uvec2(meta[chunk_id].key_lo, meta[chunk_id].key_hi),
+        key_offset,
+        pack_bits
+    );
+
+    vec3 chunk_size = vec3(chunk_dim) * voxel_size;
+    vec3 min_p = vec3(chunk_coord * ivec3(chunk_dim)) * voxel_size;
+    vec3 center = min_p + 0.5 * chunk_size;
+
+    vec3 diff = center - ubo.cam_pos.xyz;
+    if (dot(diff, diff) > render_distance * render_distance) {
+        return;
+    }
+
+    float radius = length(chunk_size) * 0.5;
+    if (!sphere_in_frustum(center, radius)) {
+        return;
+    }
+
+    atomicAdd(cmd_count, 1u);
+
+    cmds[chunk_id].count = mesh_alloc.needI;
+    cmds[chunk_id].instanceCount = 1u;
+    cmds[chunk_id].firstIndex = mesh_alloc.i_startPage * ib_page_inds;
+    cmds[chunk_id].baseVertex = 0;
+    cmds[chunk_id].baseInstance = chunk_id;
+}

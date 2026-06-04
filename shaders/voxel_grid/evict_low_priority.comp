@@ -1,0 +1,102 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+#include "../common/buffer_structures.inc"
+#include "chunk_hash_table/decl.inc"
+#include "utils.inc"
+
+layout(std430, set = 0, binding = 0) buffer ChunkHashTable {
+    HashTableCounters chunk_hash_table_counters;
+    ChunkHashTableSlot chunk_hash_table_slots[];
+};
+
+layout(std430, set = 0, binding = 1) buffer FreeList {
+    uint free_count;
+    uint free_list[];
+};
+
+layout(std430, set = 0, binding = 2) buffer ChunkMetaBuf {
+    ChunkMeta meta[];
+};
+
+layout(std430, set = 0, binding = 3) buffer EnqueuedBuf {
+    uint enqueued[];
+};
+
+layout(std430, set = 0, binding = 4) buffer BucketHeads {
+    BucketHead bucket_heads[];
+};
+
+layout(std430, set = 0, binding = 5) buffer BucketNext {
+    uint bucket_next[];
+};
+
+layout(std430, set = 0, binding = 6) buffer ChunkMeshAllocBuf {
+    ChunkMeshAlloc chunk_alloc[];
+};
+
+layout(std430, set = 0, binding = 7) buffer EvictedChunksList {
+    uint evicted_chunks_counter;
+    uint evicted_chunks_list[];
+};
+
+layout(push_constant) uniform EvictLowPriorityPushConstants {
+    uint u_chunk_hash_table_size;
+    uint u_bucket_count;
+};
+
+#include "chunk_hash_table/lookup_remove.inc"
+
+uint pop_bucket(uint bucket_id) {
+    for (;;) {
+        uint head = atomicAdd(bucket_heads[bucket_id].id, 0u);
+        if (head == INVALID_ID) {
+            return INVALID_ID;
+        }
+
+        memoryBarrierBuffer();
+        uint next = bucket_next[head];
+        if (atomicCompSwap(bucket_heads[bucket_id].id, head, next) == head) {
+            return head;
+        }
+    }
+}
+
+void main() {
+    uint eviction_id = gl_GlobalInvocationID.x;
+    if (eviction_id >= evicted_chunks_counter) {
+        return;
+    }
+
+    uint evict_pointer = 0u;
+    int bucket_id = int(u_bucket_count) - 1;
+    for (; bucket_id >= 0; --bucket_id) {
+        evict_pointer += bucket_heads[uint(bucket_id)].count;
+        if (evict_pointer > eviction_id) {
+            break;
+        }
+    }
+
+    if (bucket_id < 0) {
+        evicted_chunks_list[eviction_id] = INVALID_ID;
+        return;
+    }
+
+    uint victim = pop_bucket(uint(bucket_id));
+    if (victim == INVALID_ID || meta[victim].used == 0u) {
+        evicted_chunks_list[eviction_id] = INVALID_ID;
+        return;
+    }
+
+    uvec2 key = uvec2(meta[victim].key_lo, meta[victim].key_hi);
+    chunk_hash_table_remove_slot_from_hash_table(key);
+
+    meta[victim].used = 0u;
+    meta[victim].dirty_flags = NEED_GENERATION_FLAG_BIT;
+    enqueued[victim] = 0u;
+
+    free_list[free_count + eviction_id] = victim;
+    evicted_chunks_list[eviction_id] = victim;
+}

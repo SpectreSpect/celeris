@@ -1,0 +1,44 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+#include "../common/buffer_structures.inc"
+#include "chunk_hash_table/decl.inc"
+#include "utils.inc"
+
+layout(std430, set = 0, binding = 0) buffer ChunkHashTable {
+    HashTableCounters chunk_hash_table_counters;
+    ChunkHashTableSlot chunk_hash_table_slots[];
+};
+
+layout(std430, set = 0, binding = 1) readonly buffer ChunkMetaBuf {
+    ChunkMeta meta[];
+};
+
+layout(std430, set = 0, binding = 2) readonly buffer EnqueuedBuf {
+    uint enqueued[];
+};
+
+layout(push_constant) uniform FillChunkHashTablePushConstants {
+    uint u_max_chunks;
+    uint u_chunk_hash_table_size;
+    uint u_pack_bits;
+    int u_pack_offset;
+};
+
+#include "chunk_hash_table/lookup_remove.inc"
+
+void main() {
+    uint chunk_id = gl_GlobalInvocationID.x;
+    if (chunk_id >= u_max_chunks) {
+        return;
+    }
+
+    ChunkMeta chunk_meta = meta[chunk_id];
+    if (chunk_meta.used == 0u) {
+        return;
+    }
+
+    chunk_hash_table_set_slot_value(uvec2(chunk_meta.key_lo, chunk_meta.key_hi), chunk_id);
+}

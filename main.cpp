@@ -155,19 +155,19 @@ int main() {
     VoxelGrid::VoxelGridDesc voxel_grid_desc {
         .chunk_size = chunk_size,
         .voxel_size = voxel_size,
-        .count_active_chunks = 10'000,
-        .max_quads = 3'000'000,
-        .chunk_hash_table_size_factor = 1.0f,
+        .count_active_chunks = 2'048,
+        .max_quads = 500'000,
+        .chunk_hash_table_size_factor = 2.0f,
         .count_evict_buckets = 32,
-        .min_free_chunks = 4'500,
+        .min_free_chunks = 512,
         .tomb_fraction_to_rebuild = 0.2f,
         .eviction_bucket_shell_thickness = chunk_size.x * voxel_size.x * 1,
         .vb_page_size_order_of_two = 10,
         .ib_page_size_order_of_two = 10,
         .buddy_allocator_nodes_factor = 1.0,
-        .render_distance = chunk_size.x * voxel_size.x * 30,
-        .generation_distance = 10,
-        .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000)
+        .render_distance = chunk_size.x * voxel_size.x * 12,
+        .generation_distance = 4,
+        .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(512)
     };
 
     VoxelGrid voxel_grid(engine.physical_device(), 
@@ -292,12 +292,15 @@ int main() {
 
     bool g_pressed = false;
     bool n_pressed = false;
+    bool voxel_grid_update_pending = true;
 
     int step = 0;
     
     float last_frame_time = 0.0f;
     float start_time = (float)glfwGetTime();
     float timer = 0;
+    float voxel_grid_update_timer = 0.0f;
+    constexpr float voxel_grid_update_interval = 0.25f;
     uint32_t pending_skybox_environment_map_id = skybox.environment_map_id();
     bool skybox_environment_update_pending = false;
 
@@ -315,6 +318,7 @@ int main() {
         float delta_time = current_frame_time - last_frame_time;
         last_frame_time = current_frame_time;
         timer += delta_time;
+        voxel_grid_update_timer += delta_time;
         
         uint32_t image_index = 0;
         if (!engine.aquire_free_resources(image_index)) continue;
@@ -329,6 +333,17 @@ int main() {
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), window, camera);
         lighting_system.update(engine.current_frame(), window, camera);
+
+        if (voxel_grid_update_pending || voxel_grid_update_timer >= voxel_grid_update_interval) {
+            voxel_grid.stream_chunks_sphere(camera.position, -1, 1337u);
+            voxel_grid.build_mesh_from_dirty();
+            voxel_grid_update_timer = 0.0f;
+            voxel_grid_update_pending = false;
+        }
+
+        const float aspect_ratio = static_cast<float>(window.width()) / static_cast<float>(window.height());
+        const glm::mat4 voxel_view_proj = camera.get_projection_matrix(aspect_ratio) * camera.get_view_matrix();
+        voxel_grid.build_indirect_draw_commands_frustum(voxel_view_proj, camera.position);
 
         // if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
         //     g_pressed = true;
@@ -384,6 +399,7 @@ int main() {
                 engine.swapchain_resources().swapchain, clear_color);
                 // rgba(37, 150, 190)
                 renderer.render(command_buffer, scene);
+                voxel_grid.render_indirect(renderer, command_buffer, glm::mat4(1.0f));
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);

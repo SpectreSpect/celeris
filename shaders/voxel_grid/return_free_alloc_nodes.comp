@@ -1,0 +1,36 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(std430, set = 0, binding = 0) buffer VBFreeNodesList {
+    uint vb_free_nodes_counter;
+    uint vb_free_nodes_list[];
+};
+
+layout(std430, set = 0, binding = 1) buffer VBReturnedNodesList {
+    uint vb_returned_nodes_counter;
+    uint vb_returned_nodes_list[];
+};
+
+layout(std430, set = 0, binding = 2) buffer IBFreeNodesList {
+    uint ib_free_nodes_counter;
+    uint ib_free_nodes_list[];
+};
+
+layout(std430, set = 0, binding = 3) buffer IBReturnedNodesList {
+    uint ib_returned_nodes_counter;
+    uint ib_returned_nodes_list[];
+};
+
+void main() {
+    uint returned_id = gl_GlobalInvocationID.x;
+
+    if (returned_id < vb_returned_nodes_counter) {
+        vb_free_nodes_list[vb_free_nodes_counter + returned_id] = vb_returned_nodes_list[returned_id];
+    }
+
+    if (returned_id < ib_returned_nodes_counter) {
+        ib_free_nodes_list[ib_free_nodes_counter + returned_id] = ib_returned_nodes_list[returned_id];
+    }
+}

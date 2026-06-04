@@ -154,3 +154,25 @@ void VulkanCommandBuffer::draw_indexed(uint32_t index_count, uint32_t instance_c
 
     vkCmdDrawIndexed(m_command_buffer, index_count, instance_count, first_index, vertex_offset, first_instance);
 }
+
+void VulkanCommandBuffer::draw_indexed_indirect(
+    VkBuffer indirect_buffer,
+    VkDeviceSize offset,
+    uint32_t draw_count,
+    uint32_t stride)
+{
+    LOG_METHOD();
+
+    logger.check(m_command_buffer != VK_NULL_HANDLE, "Command buffer was not initialized");
+    logger.check(indirect_buffer != VK_NULL_HANDLE, "Indirect buffer was not initialized");
+    logger.check(draw_count != 0u, "Attempt to draw zero indirect commands");
+    logger.check(stride >= sizeof(VkDrawIndexedIndirectCommand), "Indirect command stride is too small");
+
+    vkCmdDrawIndexedIndirect(
+        m_command_buffer,
+        indirect_buffer,
+        offset,
+        draw_count,
+        stride
+    );
+}

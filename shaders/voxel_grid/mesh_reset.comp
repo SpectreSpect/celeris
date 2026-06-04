@@ -1,0 +1,29 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(std430, set = 0, binding = 0) readonly buffer DirtyListBuf {
+    uint dirty_count;
+    uint dirty_list[];
+};
+
+layout(std430, set = 0, binding = 1) buffer DirtyQuadCountBuf {
+    uint dirty_quad_count[];
+};
+
+layout(std430, set = 0, binding = 2) buffer EmitCounterBuf {
+    uint emit_counter[];
+};
+
+void main() {
+    uint dirty_id = gl_GlobalInvocationID.x;
+    if (dirty_id >= dirty_count) {
+        return;
+    }
+
+    dirty_quad_count[dirty_id] = 0u;
+
+    uint chunk_id = dirty_list[dirty_id];
+    emit_counter[chunk_id] = 0u;
+}

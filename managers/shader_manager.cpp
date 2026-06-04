@@ -15,6 +15,8 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         skybox_fs(device, path_utils::executable_dir() / "shaders" / "skybox.frag.spv"),
         pbr_vs(device, path_utils::executable_dir() / "shaders" / "pbr.vert.spv"),
         pbr_fs(device, path_utils::executable_dir() / "shaders" / "pbr.frag.spv"),
+        voxel_vs(device, path_utils::executable_dir() / "shaders" / "voxel.vert.spv"),
+        voxel_fs(device, path_utils::executable_dir() / "shaders" / "voxel.frag.spv"),
 
         // Compute shaders
         // General
@@ -34,6 +36,24 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         apply_writes_to_world_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "apply_writes_to_world.comp.spv"),
         mesh_pool_clear_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_pool_clear.comp.spv"),
         mesh_pool_seed_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_pool_seed.comp.spv"),
+        mesh_reset_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_reset.comp.spv"),
+        mesh_count_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_count.comp.spv"),
+        mesh_alloc_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_alloc.comp.spv"),
+        mesh_emit_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_emit.comp.spv"),
+        mesh_finalize_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_finalize.comp.spv"),
+        verify_mesh_allocation_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "verify_mesh_allocation.comp.spv"),
+        return_free_alloc_nodes_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "return_free_alloc_nodes.comp.spv"),
+        reset_dirty_count_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "reset_dirty_count.comp.spv"),
+        build_indirect_cmds_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "build_indirect_cmds.comp.spv"),
+        mark_all_used_chunks_as_dirty_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mark_all_used_chunks_as_dirty.comp.spv"),
+        stream_select_chunks_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "stream_select_chunks.comp.spv"),
+        stream_generate_terrain_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "stream_generate_terrain.comp.spv"),
+        evict_buckets_build_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "evict_buckets_build.comp.spv"),
+        evict_low_priority_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "evict_low_priority.comp.spv"),
+        free_evicted_chunks_mesh_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "free_evicted_chunks_mesh.comp.spv"),
+        reset_evicted_list_and_buckets_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "reset_evicted_list_and_buckets.comp.spv"),
+        clear_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "clear_chunk_hash_table.comp.spv"),
+        fill_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "fill_chunk_hash_table.comp.spv"),
 
         // PBR
         equirect_to_cubemap_cs(device, path_utils::executable_dir() / "shaders" / "equirect_to_cubemap.comp.spv"),

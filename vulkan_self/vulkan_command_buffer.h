@@ -65,6 +65,13 @@ public:
                       uint32_t vertex_offset = 0, 
                       uint32_t first_instance = 0);
 
+    void draw_indexed_indirect(
+        VkBuffer indirect_buffer,
+        VkDeviceSize offset,
+        uint32_t draw_count,
+        uint32_t stride
+    );
+
     static std::vector<VulkanCommandBuffer> create_command_buffers(
         const VulkanDevice& device,
         const VulkanCommandPool& command_pool,

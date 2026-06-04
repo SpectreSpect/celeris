@@ -36,6 +36,24 @@ public:
     ComputePass apply_writes_to_world_cp;
     ComputePass mesh_pool_clear_cp;
     ComputePass mesh_pool_seed_cp;
+    ComputePass mesh_reset_cp;
+    ComputePass mesh_count_cp;
+    ComputePass mesh_alloc_cp;
+    ComputePass mesh_emit_cp;
+    ComputePass mesh_finalize_cp;
+    ComputePass verify_mesh_allocation_cp;
+    ComputePass return_free_alloc_nodes_cp;
+    ComputePass reset_dirty_count_cp;
+    ComputePass build_indirect_cmds_cp;
+    ComputePass mark_all_used_chunks_as_dirty_cp;
+    ComputePass stream_select_chunks_cp;
+    ComputePass stream_generate_terrain_cp;
+    ComputePass evict_buckets_build_cp;
+    ComputePass evict_low_priority_cp;
+    ComputePass free_evicted_chunks_mesh_cp;
+    ComputePass reset_evicted_list_and_buckets_cp;
+    ComputePass clear_chunk_hash_table_cp;
+    ComputePass fill_chunk_hash_table_cp;
 
     // PBR
     ComputePass equirect_to_cubemap_cp;
@@ -72,6 +90,24 @@ public:
     ComputePass create_apply_writes_to_world_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_mesh_pool_clear_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_mesh_pool_seed_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_mesh_reset_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_mesh_count_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_mesh_alloc_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_mesh_emit_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_mesh_finalize_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_verify_mesh_allocation_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_return_free_alloc_nodes_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_reset_dirty_count_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_build_indirect_cmds_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_mark_all_used_chunks_as_dirty_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_stream_select_chunks_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_stream_generate_terrain_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_evict_buckets_build_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_evict_low_priority_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_free_evicted_chunks_mesh_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_reset_evicted_list_and_buckets_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_clear_chunk_hash_table_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_fill_chunk_hash_table_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
 private:
     DescriptorPool m_pool;

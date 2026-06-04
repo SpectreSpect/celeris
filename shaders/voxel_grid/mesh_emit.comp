@@ -1,0 +1,218 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+#include "../common/buffer_structures.inc"
+#include "chunk_hash_table/decl.inc"
+#include "utils.inc"
+
+layout(std430, set = 0, binding = 0) buffer ChunkHashTable {
+    HashTableCounters chunk_hash_table_counters;
+    ChunkHashTableSlot chunk_hash_table_slots[];
+};
+
+layout(std430, set = 0, binding = 1) readonly buffer ChunkVoxels {
+    VoxelData voxels[];
+};
+
+layout(std430, set = 0, binding = 2) buffer MeshBuffersStatusBuf {
+    uint is_vb_full;
+    uint is_ib_full;
+};
+
+layout(std430, set = 0, binding = 3) readonly buffer DirtyListBuf {
+    uint dirty_count;
+    uint dirty_list[];
+};
+
+layout(std430, set = 0, binding = 4) buffer EmitCounterBuf {
+    uint emit_counter[];
+};
+
+layout(std430, set = 0, binding = 5) buffer ChunkMeshAllocBuf {
+    ChunkMeshAlloc chunk_alloc[];
+};
+
+layout(std430, set = 0, binding = 6) readonly buffer ChunkMetaBuf {
+    ChunkMeta meta[];
+};
+
+layout(std430, set = 0, binding = 7) buffer GlobalVB {
+    Vertex vb[];
+};
+
+layout(std430, set = 0, binding = 8) buffer GlobalIB {
+    uint ib[];
+};
+
+layout(push_constant) uniform MeshEmitPushConstants {
+    uint u_chunk_hash_table_size;
+    uint u_chunk_dim_x;
+    uint u_chunk_dim_y;
+    uint u_chunk_dim_z;
+    uint u_voxels_per_chunk;
+    float u_voxel_size_x;
+    float u_voxel_size_y;
+    float u_voxel_size_z;
+    uint u_pack_bits;
+    int u_pack_offset;
+    uint u_vb_page_verts;
+    uint u_ib_page_inds;
+};
+
+#include "chunk_pool/read_voxels.inc"
+
+#define AO_STEP 0.22
+#define AO_MIN 0.35
+
+uint pack_ao_in_alpha(uint rgb, uint occl) {
+    float ao = 1.0 - float(occl) * AO_STEP;
+    ao = clamp(ao, AO_MIN, 1.0);
+    uint a = uint(ao * 255.0 + 0.5);
+    return (rgb & 0xFFFFFF00u) | a;
+}
+
+uint ao_corner(uint chunk_id, ivec3 chunk_coord, uvec3 p, ivec3 n, ivec3 u, ivec3 v, int su, int sv) {
+    ivec3 du = u * su;
+    ivec3 dv = v * sv;
+
+    uint s1 = voxel_vis(chunk_id, chunk_coord, p, n + du);
+    uint s2 = voxel_vis(chunk_id, chunk_coord, p, n + dv);
+    uint c = voxel_vis(chunk_id, chunk_coord, p, n + du + dv);
+
+    if (s1 == 1u && s2 == 1u) {
+        return 3u;
+    }
+    return s1 + s2 + c;
+}
+
+void emit_quad(uint chunk_id, ivec3 chunk_coord, uvec3 p, uint face, uint color_rgb) {
+    uint max_quads = chunk_alloc[chunk_id].needI / 6u;
+    uint q = atomicAdd(emit_counter[chunk_id], 1u);
+    if (q >= max_quads) {
+        return;
+    }
+
+    uint base_v = chunk_alloc[chunk_id].v_startPage * u_vb_page_verts + q * 4u;
+    uint base_i = chunk_alloc[chunk_id].i_startPage * u_ib_page_inds + q * 6u;
+
+    uvec3 chunk_dim = uvec3(u_chunk_dim_x, u_chunk_dim_y, u_chunk_dim_z);
+    vec3 voxel_size = vec3(u_voxel_size_x, u_voxel_size_y, u_voxel_size_z);
+    vec3 wp = vec3(chunk_coord * ivec3(chunk_dim) + ivec3(p)) * voxel_size;
+
+    ivec3 n;
+    ivec3 u;
+    ivec3 v;
+    vec3 v0;
+    vec3 v1;
+    vec3 v2;
+    vec3 v3;
+
+    if (face == 0u) {
+        n = ivec3(1, 0, 0); u = ivec3(0, 1, 0); v = ivec3(0, 0, 1);
+        v0 = wp + vec3(voxel_size.x, 0, 0);
+        v1 = wp + vec3(voxel_size.x, voxel_size.y, 0);
+        v2 = wp + vec3(voxel_size.x, voxel_size.y, voxel_size.z);
+        v3 = wp + vec3(voxel_size.x, 0, voxel_size.z);
+    } else if (face == 1u) {
+        n = ivec3(-1, 0, 0); u = ivec3(0, 0, 1); v = ivec3(0, 1, 0);
+        v0 = wp + vec3(0, 0, 0);
+        v1 = wp + vec3(0, 0, voxel_size.z);
+        v2 = wp + vec3(0, voxel_size.y, voxel_size.z);
+        v3 = wp + vec3(0, voxel_size.y, 0);
+    } else if (face == 2u) {
+        n = ivec3(0, 1, 0); u = ivec3(0, 0, 1); v = ivec3(1, 0, 0);
+        v0 = wp + vec3(0, voxel_size.y, 0);
+        v1 = wp + vec3(0, voxel_size.y, voxel_size.z);
+        v2 = wp + vec3(voxel_size.x, voxel_size.y, voxel_size.z);
+        v3 = wp + vec3(voxel_size.x, voxel_size.y, 0);
+    } else if (face == 3u) {
+        n = ivec3(0, -1, 0); u = ivec3(1, 0, 0); v = ivec3(0, 0, 1);
+        v0 = wp + vec3(0, 0, 0);
+        v1 = wp + vec3(voxel_size.x, 0, 0);
+        v2 = wp + vec3(voxel_size.x, 0, voxel_size.z);
+        v3 = wp + vec3(0, 0, voxel_size.z);
+    } else if (face == 4u) {
+        n = ivec3(0, 0, 1); u = ivec3(1, 0, 0); v = ivec3(0, 1, 0);
+        v0 = wp + vec3(0, 0, voxel_size.z);
+        v1 = wp + vec3(voxel_size.x, 0, voxel_size.z);
+        v2 = wp + vec3(voxel_size.x, voxel_size.y, voxel_size.z);
+        v3 = wp + vec3(0, voxel_size.y, voxel_size.z);
+    } else {
+        n = ivec3(0, 0, -1); u = ivec3(0, 1, 0); v = ivec3(1, 0, 0);
+        v0 = wp + vec3(0, 0, 0);
+        v1 = wp + vec3(0, voxel_size.y, 0);
+        v2 = wp + vec3(voxel_size.x, voxel_size.y, 0);
+        v3 = wp + vec3(voxel_size.x, 0, 0);
+    }
+
+    uint oc0 = ao_corner(chunk_id, chunk_coord, p, n, u, v, -1, -1);
+    uint oc1 = ao_corner(chunk_id, chunk_coord, p, n, u, v,  1, -1);
+    uint oc2 = ao_corner(chunk_id, chunk_coord, p, n, u, v,  1,  1);
+    uint oc3 = ao_corner(chunk_id, chunk_coord, p, n, u, v, -1,  1);
+
+    vb[base_v + 0u].pos = vec4(v0, 1.0); vb[base_v + 0u].color = pack_ao_in_alpha(color_rgb, oc0); vb[base_v + 0u].face = face;
+    vb[base_v + 1u].pos = vec4(v1, 1.0); vb[base_v + 1u].color = pack_ao_in_alpha(color_rgb, oc1); vb[base_v + 1u].face = face;
+    vb[base_v + 2u].pos = vec4(v2, 1.0); vb[base_v + 2u].color = pack_ao_in_alpha(color_rgb, oc2); vb[base_v + 2u].face = face;
+    vb[base_v + 3u].pos = vec4(v3, 1.0); vb[base_v + 3u].color = pack_ao_in_alpha(color_rgb, oc3); vb[base_v + 3u].face = face;
+
+    uint s02 = oc0 + oc2;
+    uint s13 = oc1 + oc3;
+
+    if (s02 <= s13) {
+        ib[base_i + 0u] = base_v + 0u;
+        ib[base_i + 1u] = base_v + 1u;
+        ib[base_i + 2u] = base_v + 2u;
+        ib[base_i + 3u] = base_v + 0u;
+        ib[base_i + 4u] = base_v + 2u;
+        ib[base_i + 5u] = base_v + 3u;
+    } else {
+        ib[base_i + 0u] = base_v + 0u;
+        ib[base_i + 1u] = base_v + 1u;
+        ib[base_i + 2u] = base_v + 3u;
+        ib[base_i + 3u] = base_v + 1u;
+        ib[base_i + 4u] = base_v + 2u;
+        ib[base_i + 5u] = base_v + 3u;
+    }
+}
+
+void main() {
+    if (is_vb_full == 1u || is_ib_full == 1u) {
+        return;
+    }
+
+    uint voxel_id = gl_GlobalInvocationID.x;
+    uint dirty_id = gl_GlobalInvocationID.y;
+
+    if (dirty_id >= dirty_count || voxel_id >= u_voxels_per_chunk) {
+        return;
+    }
+
+    uint chunk_id = dirty_list[dirty_id];
+    if (chunk_alloc[chunk_id].v_startPage == INVALID_ID || chunk_alloc[chunk_id].i_startPage == INVALID_ID) {
+        return;
+    }
+
+    uvec2 key = uvec2(meta[chunk_id].key_lo, meta[chunk_id].key_hi);
+    ivec3 chunk_coord = unpack_key_to_coord(key, u_pack_offset, u_pack_bits);
+
+    uint lx = voxel_id % u_chunk_dim_x;
+    uint ly = (voxel_id / u_chunk_dim_x) % u_chunk_dim_y;
+    uint lz = voxel_id / (u_chunk_dim_x * u_chunk_dim_y);
+    uvec3 p = uvec3(lx, ly, lz);
+
+    VoxelData voxel_data = voxel_data_in_chunk(chunk_id, p);
+    if ((read_voxel_flags(voxel_data.type_flags) & VOXEL_VISABILITY_FLAG_BIT) == 0u) {
+        return;
+    }
+
+    uint color = voxel_data.color;
+
+    if (voxel_vis(chunk_id, chunk_coord, p, ivec3( 1,  0,  0)) == 0u) emit_quad(chunk_id, chunk_coord, p, 0u, color);
+    if (voxel_vis(chunk_id, chunk_coord, p, ivec3(-1,  0,  0)) == 0u) emit_quad(chunk_id, chunk_coord, p, 1u, color);
+    if (voxel_vis(chunk_id, chunk_coord, p, ivec3( 0,  1,  0)) == 0u) emit_quad(chunk_id, chunk_coord, p, 2u, color);
+    if (voxel_vis(chunk_id, chunk_coord, p, ivec3( 0, -1,  0)) == 0u) emit_quad(chunk_id, chunk_coord, p, 3u, color);
+    if (voxel_vis(chunk_id, chunk_coord, p, ivec3( 0,  0,  1)) == 0u) emit_quad(chunk_id, chunk_coord, p, 4u, color);
+    if (voxel_vis(chunk_id, chunk_coord, p, ivec3( 0,  0, -1)) == 0u) emit_quad(chunk_id, chunk_coord, p, 5u, color);
+}

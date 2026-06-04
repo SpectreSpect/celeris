@@ -23,6 +23,9 @@ public:
     VulkanShaderModule pbr_vs;
     VulkanShaderModule pbr_fs;
 
+    VulkanShaderModule voxel_vs;
+    VulkanShaderModule voxel_fs;
+
     // Compute shaders
     // General
     VulkanShaderModule fill_buffer_cs;
@@ -41,6 +44,24 @@ public:
     VulkanShaderModule apply_writes_to_world_cs;
     VulkanShaderModule mesh_pool_clear_cs;
     VulkanShaderModule mesh_pool_seed_cs;
+    VulkanShaderModule mesh_reset_cs;
+    VulkanShaderModule mesh_count_cs;
+    VulkanShaderModule mesh_alloc_cs;
+    VulkanShaderModule mesh_emit_cs;
+    VulkanShaderModule mesh_finalize_cs;
+    VulkanShaderModule verify_mesh_allocation_cs;
+    VulkanShaderModule return_free_alloc_nodes_cs;
+    VulkanShaderModule reset_dirty_count_cs;
+    VulkanShaderModule build_indirect_cmds_cs;
+    VulkanShaderModule mark_all_used_chunks_as_dirty_cs;
+    VulkanShaderModule stream_select_chunks_cs;
+    VulkanShaderModule stream_generate_terrain_cs;
+    VulkanShaderModule evict_buckets_build_cs;
+    VulkanShaderModule evict_low_priority_cs;
+    VulkanShaderModule free_evicted_chunks_mesh_cs;
+    VulkanShaderModule reset_evicted_list_and_buckets_cs;
+    VulkanShaderModule clear_chunk_hash_table_cs;
+    VulkanShaderModule fill_chunk_hash_table_cs;
 
     // PBR
     VulkanShaderModule equirect_to_cubemap_cs;

@@ -180,6 +180,16 @@ struct MeshPoolSeedUniform {
     uint32_t pad2;
 };
 
+struct alignas(16) BuildIndirectUniform {
+    glm::uvec4 chunk_dim_max_chunks;
+    glm::vec4 voxel_size_render_distance;
+    glm::uvec4 pack_bits_vb_page_ib_page;
+    glm::ivec4 pack_offset;
+    glm::vec4 cam_pos;
+    glm::vec4 frustum_planes[6];
+};
+static_assert(sizeof(BuildIndirectUniform) == 176);
+
 // layout(std430, set = 0, binding=7) buffer UniformBuffer  { 
 //     uint u_vb_pages;
 //     uint u_ib_pages;

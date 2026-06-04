@@ -1,0 +1,134 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+#include "../common/buffer_structures.inc"
+#include "utils.inc"
+
+layout(std430, set = 0, binding = 0) buffer MeshBuffersStatusBuf {
+    uint is_vb_full;
+    uint is_ib_full;
+};
+
+layout(std430, set = 0, binding = 1) readonly buffer DirtyListBuf {
+    uint dirty_count;
+    uint dirty_list[];
+};
+
+layout(std430, set = 0, binding = 2) readonly buffer DirtyQuadCountBuf {
+    uint dirty_quad_count[];
+};
+
+layout(std430, set = 0, binding = 3) readonly buffer ChunkMetaBuf {
+    ChunkMeta meta[];
+};
+
+layout(std430, set = 0, binding = 4) buffer ChunkMeshAllocLocalBuf {
+    ChunkMeshAlloc chunk_alloc_local[];
+};
+
+layout(std430, set = 0, binding = 5) readonly buffer ChunkMeshAllocGlobalBuf {
+    ChunkMeshAlloc chunk_alloc_global[];
+};
+
+layout(std430, set = 0, binding = 6) buffer BBHeads {
+    uint bb_heads[];
+};
+
+layout(std430, set = 0, binding = 7) buffer BBState {
+    uint bb_state[];
+};
+
+layout(std430, set = 0, binding = 8) buffer BBNodes {
+    Node bb_nodes[];
+};
+
+layout(std430, set = 0, binding = 9) buffer BBFreeNodesList {
+    uint bb_free_nodes_counter;
+    uint bb_free_nodes_list[];
+};
+
+layout(std430, set = 0, binding = 10) buffer BBReturnedNodesList {
+    uint bb_returned_nodes_counter;
+    uint bb_returned_nodes_list[];
+};
+
+layout(push_constant) uniform MeshAllocPushConstants {
+    uint bb_pages;
+    uint bb_page_elements;
+    uint bb_max_order;
+    uint bb_quad_size;
+    uint u_is_vb_phase;
+};
+
+#define PREFIX bb
+#include "../common/allocator.inc"
+
+bool is_vb_phase = u_is_vb_phase == 1u;
+
+void clear_local_alloc(uint dirty_id, bool valid) {
+    if (is_vb_phase) {
+        chunk_alloc_local[dirty_id].v_startPage = INVALID_ID;
+        chunk_alloc_local[dirty_id].v_order = 0u;
+        chunk_alloc_local[dirty_id].needV = 0u;
+    } else {
+        chunk_alloc_local[dirty_id].i_startPage = INVALID_ID;
+        chunk_alloc_local[dirty_id].i_order = 0u;
+        chunk_alloc_local[dirty_id].needI = 0u;
+    }
+
+    chunk_alloc_local[dirty_id].is_valid = valid ? 1u : 0u;
+}
+
+void main() {
+    uint dirty_id = gl_GlobalInvocationID.x;
+    if (dirty_id >= dirty_count) {
+        return;
+    }
+
+    uint chunk_id = dirty_list[dirty_id];
+
+    if (is_vb_full == 1u || is_ib_full == 1u) {
+        clear_local_alloc(dirty_id, false);
+        return;
+    }
+
+    if (meta[chunk_id].used == 0u) {
+        clear_local_alloc(dirty_id, true);
+        return;
+    }
+
+    uint quads = dirty_quad_count[dirty_id];
+    if (quads == 0u) {
+        clear_local_alloc(dirty_id, true);
+        return;
+    }
+
+    uint need = quads * bb_quad_size;
+    uint pages = div_up_u32(need, bb_page_elements);
+    uint order = ceil_log2_u32(pages);
+
+    uint start = bb_alloc_pages(order);
+    if (start == INVALID_ID) {
+        if (is_vb_phase) {
+            atomicExchange(is_vb_full, 1u);
+        } else {
+            atomicExchange(is_ib_full, 1u);
+        }
+        clear_local_alloc(dirty_id, false);
+        return;
+    }
+
+    if (is_vb_phase) {
+        chunk_alloc_local[dirty_id].v_startPage = start;
+        chunk_alloc_local[dirty_id].v_order = order;
+        chunk_alloc_local[dirty_id].needV = need;
+    } else {
+        chunk_alloc_local[dirty_id].i_startPage = start;
+        chunk_alloc_local[dirty_id].i_order = order;
+        chunk_alloc_local[dirty_id].needI = need;
+    }
+
+    chunk_alloc_local[dirty_id].is_valid = 1u;
+}

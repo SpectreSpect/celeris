@@ -1,0 +1,49 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+#include "../common/buffer_structures.inc"
+
+layout(std430, set = 0, binding = 0) readonly buffer DirtyListBuf {
+    uint dirty_count;
+    uint dirty_list[];
+};
+
+layout(std430, set = 0, binding = 1) buffer EnqueuedBuf {
+    uint enqueued[];
+};
+
+layout(std430, set = 0, binding = 2) buffer ChunkMetaBuf {
+    ChunkMeta meta[];
+};
+
+layout(std430, set = 0, binding = 3) buffer ChunkMeshAllocBuf {
+    ChunkMeshAlloc chunk_alloc[];
+};
+
+layout(std430, set = 0, binding = 4) buffer FailedDirtyListBuf {
+    uint failed_dirty_count;
+    uint failed_dirty_list[];
+};
+
+void main() {
+    uint dirty_id = gl_GlobalInvocationID.x;
+    if (dirty_id >= dirty_count) {
+        return;
+    }
+
+    uint chunk_id = dirty_list[dirty_id];
+
+    if (chunk_alloc[chunk_id].is_valid == 0u) {
+        if (enqueued[chunk_id] != 2u) {
+            uint idx = atomicAdd(failed_dirty_count, 1u);
+            failed_dirty_list[idx] = chunk_id;
+            enqueued[chunk_id] = 2u;
+        }
+    } else {
+        enqueued[chunk_id] = 0u;
+    }
+
+    meta[chunk_id].dirty_flags &= ~DIRTY_FLAG_BIT;
+}

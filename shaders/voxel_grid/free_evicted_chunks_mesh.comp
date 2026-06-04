@@ -1,0 +1,59 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+#include "../common/buffer_structures.inc"
+#include "utils.inc"
+
+layout(std430, set = 0, binding = 0) buffer GlobalChunkMeshAllocBuf { ChunkMeshAlloc chunk_alloc_global[]; };
+layout(std430, set = 0, binding = 1) buffer VBHeads { uint vb_heads[]; };
+layout(std430, set = 0, binding = 2) buffer VBState { uint vb_state[]; };
+layout(std430, set = 0, binding = 3) buffer VBNodes { Node vb_nodes[]; };
+layout(std430, set = 0, binding = 4) buffer VBFreeNodesList { uint vb_free_nodes_counter; uint vb_free_nodes_list[]; };
+layout(std430, set = 0, binding = 5) buffer VBReturnedNodesList { uint vb_returned_nodes_counter; uint vb_returned_nodes_list[]; };
+layout(std430, set = 0, binding = 6) buffer IBHeads { uint ib_heads[]; };
+layout(std430, set = 0, binding = 7) buffer IBState { uint ib_state[]; };
+layout(std430, set = 0, binding = 8) buffer IBNodes { Node ib_nodes[]; };
+layout(std430, set = 0, binding = 9) buffer IBFreeNodesList { uint ib_free_nodes_counter; uint ib_free_nodes_list[]; };
+layout(std430, set = 0, binding = 10) buffer IBReturnedNodesList { uint ib_returned_nodes_counter; uint ib_returned_nodes_list[]; };
+layout(std430, set = 0, binding = 11) buffer EvictedChunksList { uint evicted_chunks_counter; uint evicted_chunks_list[]; };
+
+layout(push_constant) uniform FreeEvictedChunksMeshPushConstants {
+    uint vb_max_order;
+    uint ib_max_order;
+};
+
+#define PREFIX vb
+#include "../common/allocator.inc"
+
+#define PREFIX ib
+#include "../common/allocator.inc"
+
+void main() {
+    uint evicted_id = gl_GlobalInvocationID.x;
+    if (evicted_id >= evicted_chunks_counter) {
+        return;
+    }
+
+    uint chunk_id = evicted_chunks_list[evicted_id];
+    if (chunk_id == INVALID_ID) {
+        return;
+    }
+
+    ChunkMeshAlloc chunk_alloc = chunk_alloc_global[chunk_id];
+    if (chunk_alloc.v_startPage != INVALID_ID) {
+        vb_free_pages(chunk_alloc.v_startPage, chunk_alloc.v_order);
+    }
+    if (chunk_alloc.i_startPage != INVALID_ID) {
+        ib_free_pages(chunk_alloc.i_startPage, chunk_alloc.i_order);
+    }
+
+    chunk_alloc_global[chunk_id].v_startPage = INVALID_ID;
+    chunk_alloc_global[chunk_id].v_order = 0u;
+    chunk_alloc_global[chunk_id].needV = 0u;
+    chunk_alloc_global[chunk_id].i_startPage = INVALID_ID;
+    chunk_alloc_global[chunk_id].i_order = 0u;
+    chunk_alloc_global[chunk_id].needI = 0u;
+    chunk_alloc_global[chunk_id].is_valid = 1u;
+}

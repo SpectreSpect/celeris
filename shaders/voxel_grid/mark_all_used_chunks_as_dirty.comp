@@ -1,0 +1,43 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+#include "../common/buffer_structures.inc"
+
+layout(std430, set = 0, binding = 0) buffer ChunkMetaBuf {
+    ChunkMeta meta[];
+};
+
+layout(std430, set = 0, binding = 1) buffer EnqueuedBuf {
+    uint enqueued[];
+};
+
+layout(std430, set = 0, binding = 2) buffer DirtyListBuf {
+    uint dirty_count;
+    uint dirty_list[];
+};
+
+layout(push_constant) uniform MarkAllUsedChunksDirtyPushConstants {
+    uint u_max_chunks;
+};
+
+void mark_dirty(uint chunk_id) {
+    uint was = atomicCompSwap(enqueued[chunk_id], 0u, 1u);
+    if (was == 0u) {
+        atomicOr(meta[chunk_id].dirty_flags, DIRTY_FLAG_BIT);
+        uint dirty_id = atomicAdd(dirty_count, 1u);
+        dirty_list[dirty_id] = chunk_id;
+    }
+}
+
+void main() {
+    uint chunk_id = gl_GlobalInvocationID.x;
+    if (chunk_id >= u_max_chunks) {
+        return;
+    }
+
+    if (meta[chunk_id].used == 1u) {
+        mark_dirty(chunk_id);
+    }
+}

@@ -12,6 +12,8 @@
 #include "../vulkan_self/descriptor_set/descriptor_pool.h"
 #include "../vulkan_self/vulkan_queue.h"
 #include "../vulkan_self/push_constants_structures.h"
+#include "../renderer/material_data_types.h"
+#include "../renderer/renderer.h"
 
 VoxelGrid::VoxelGrid(
     const VulkanPhysicalDevice& physical_device,
@@ -30,9 +32,11 @@ VoxelGrid::VoxelGrid(
         m_pass_instances(create_pass_instances(compute_pass_manager)),
         m_buffers(create_buffers(physical_device, device, m_command_buffer)),
         m_mesh_view(m_buffers.global_vertex_buffer.get_view(), m_buffers.global_index_buffer.get_view(), m_params.max_mesh_indices),
-        m_render_object(m_mesh_view, material_instance_manager.pbr)
+        m_render_object(m_mesh_view, material_instance_manager.voxel)
 {
     LOG_METHOD();
+
+    m_render_object.set_material_data<UnlitMaterialData>({glm::vec4(1.0f)});
 
     
 
@@ -165,7 +169,26 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(ComputePassMa
         .world_init_pi = PassInstance(compute_pass_manager.world_init_cp, dp),
         .apply_writes_to_world_pi = PassInstance(compute_pass_manager.apply_writes_to_world_cp, dp),
         .mesh_pool_clear_pi = PassInstance(compute_pass_manager.mesh_pool_clear_cp, dp),
-        .mesh_pool_seed_pi = PassInstance(compute_pass_manager.mesh_pool_seed_cp, dp)
+        .mesh_pool_seed_pi = PassInstance(compute_pass_manager.mesh_pool_seed_cp, dp),
+        .mesh_reset_pi = PassInstance(compute_pass_manager.mesh_reset_cp, dp),
+        .mesh_count_pi = PassInstance(compute_pass_manager.mesh_count_cp, dp),
+        .mesh_alloc_vertex_pi = PassInstance(compute_pass_manager.mesh_alloc_cp, dp),
+        .mesh_alloc_index_pi = PassInstance(compute_pass_manager.mesh_alloc_cp, dp),
+        .mesh_emit_pi = PassInstance(compute_pass_manager.mesh_emit_cp, dp),
+        .mesh_finalize_pi = PassInstance(compute_pass_manager.mesh_finalize_cp, dp),
+        .verify_mesh_allocation_pi = PassInstance(compute_pass_manager.verify_mesh_allocation_cp, dp),
+        .return_free_alloc_nodes_pi = PassInstance(compute_pass_manager.return_free_alloc_nodes_cp, dp),
+        .reset_dirty_count_pi = PassInstance(compute_pass_manager.reset_dirty_count_cp, dp),
+        .build_indirect_cmds_pi = PassInstance(compute_pass_manager.build_indirect_cmds_cp, dp),
+        .mark_all_used_chunks_as_dirty_pi = PassInstance(compute_pass_manager.mark_all_used_chunks_as_dirty_cp, dp),
+        .stream_select_chunks_pi = PassInstance(compute_pass_manager.stream_select_chunks_cp, dp),
+        .stream_generate_terrain_pi = PassInstance(compute_pass_manager.stream_generate_terrain_cp, dp),
+        .evict_buckets_build_pi = PassInstance(compute_pass_manager.evict_buckets_build_cp, dp),
+        .evict_low_priority_pi = PassInstance(compute_pass_manager.evict_low_priority_cp, dp),
+        .free_evicted_chunks_mesh_pi = PassInstance(compute_pass_manager.free_evicted_chunks_mesh_cp, dp),
+        .reset_evicted_list_and_buckets_pi = PassInstance(compute_pass_manager.reset_evicted_list_and_buckets_cp, dp),
+        .clear_chunk_hash_table_pi = PassInstance(compute_pass_manager.clear_chunk_hash_table_cp, dp),
+        .fill_chunk_hash_table_pi = PassInstance(compute_pass_manager.fill_chunk_hash_table_cp, dp)
     };
 }
 
@@ -184,8 +207,14 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize dirty_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
     VkDeviceSize voxel_write_list_size = sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * m_params.max_write_count;
     VkDeviceSize voxels_size = sizeof(VoxelDataGPU) * vox_per_chunk() * (size_t)m_params.count_active_chunks;
+    VkDeviceSize dirty_quad_count_size = sizeof(uint32_t) * (size_t)m_params.count_active_chunks;
+    VkDeviceSize emit_counters_size = sizeof(uint32_t) * (size_t)m_params.count_active_chunks;
     VkDeviceSize indirect_cmds_size = sizeof(uint32_t) + sizeof(DrawElementsIndirectCommand) * (size_t)m_params.count_active_chunks;
     VkDeviceSize failed_dirty_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
+    VkDeviceSize load_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
+    VkDeviceSize bucket_heads_size = sizeof(BucketHead) * (size_t)m_params.count_evict_buckets;
+    VkDeviceSize bucket_next_size = sizeof(uint32_t) * (size_t)m_params.count_active_chunks;
+    VkDeviceSize evicted_chunks_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
     
     VkDeviceSize global_vertex_buffer_size = sizeof(VertexGPU) * m_params.max_mesh_vertices;
     VkDeviceSize global_index_buffer_size = sizeof(uint32_t) * m_params.max_mesh_indices;
@@ -194,11 +223,13 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize vb_nodes_size = sizeof(AllocNode) * (size_t)(m_params.count_vb_nodes);
     VkDeviceSize vb_state_size = sizeof(uint32_t) * m_params.count_vb_pages;
     VkDeviceSize vb_free_nodes_list_size = sizeof(uint32_t) * (size_t)(1u + m_params.count_vb_nodes);
+    VkDeviceSize vb_returned_nodes_list_size = sizeof(uint32_t) * (size_t)(1u + m_params.count_vb_nodes);
     
     VkDeviceSize ib_heads_size = sizeof(uint32_t) * (size_t)(m_params.ib_order + 1);
     VkDeviceSize ib_nodes_size = sizeof(AllocNode) * (size_t)(m_params.count_ib_nodes);
     VkDeviceSize ib_state_size = sizeof(uint32_t) * m_params.count_ib_pages;
     VkDeviceSize ib_free_nodes_list_size = sizeof(uint32_t) * (size_t)(1u + m_params.count_ib_nodes);
+    VkDeviceSize ib_returned_nodes_list_size = sizeof(uint32_t) * (size_t)(1u + m_params.count_ib_nodes);
 
     VkDeviceSize chunk_mesh_alloc_size = sizeof(ChunkMeshAlloc) * m_params.count_active_chunks;
 
@@ -214,7 +245,13 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         .free_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, free_list_size),
         .chunk_meta = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, chunk_meta_size),
         .enqueued = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, enqueued_size),
-        .indirect_cmds = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, indirect_cmds_size),
+        .indirect_cmds = VulkanBuffer(
+            physical_device,
+            device,
+            indirect_cmds_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        ),
         .failed_dirty_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, failed_dirty_list_size),
 
         // .mesh_buffers_status = VulkanBuffer::create_storage_buffer(physical_device, device, mesh_buffers_status_size),
@@ -230,24 +267,47 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         ),
-        .global_vertex_buffer = VulkanBuffer::create_vertex_buffer(physical_device, device, global_vertex_buffer_size),
-        .global_index_buffer =  VulkanBuffer::create_index_buffer(physical_device, device, global_index_buffer_size),
+        .dirty_quad_count = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, dirty_quad_count_size),
+        .emit_counters = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, emit_counters_size),
+
+        .global_vertex_buffer = VulkanBuffer(
+            physical_device,
+            device,
+            global_vertex_buffer_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        ),
+        .global_index_buffer = VulkanBuffer(
+            physical_device,
+            device,
+            global_index_buffer_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        ),
 
         .vb_heads = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, vb_heads_size),
         // .vb_nodes = BufferObject(sizeof(AllocNode) * (size_t)(count_vb_nodes_), GL_DYNAMIC_DRAW);
         .vb_nodes = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, vb_nodes_size),
         .vb_state = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, vb_state_size),
         .vb_free_nodes_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, vb_free_nodes_list_size),
+        .vb_returned_nodes_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, vb_returned_nodes_list_size),
 
         .ib_heads = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, ib_heads_size),
         .ib_nodes = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, ib_nodes_size),
         .ib_state = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, ib_state_size),
         .ib_free_nodes_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, ib_free_nodes_list_size),
+        .ib_returned_nodes_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, ib_returned_nodes_list_size),
 
         .chunk_mesh_alloc = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, chunk_mesh_alloc_size),
+        .chunk_mesh_alloc_local = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, chunk_mesh_alloc_size),
 
         .mesh_pool_clear_uniform = VulkanBuffer::create_host_visible_uniform_buffer(physical_device, device, sizeof(MeshPoolClearUniform)),
-        .mesh_pool_seed_uniform = VulkanBuffer::create_host_visible_uniform_buffer(physical_device, device, sizeof(MeshPoolSeedUniform))
+        .mesh_pool_seed_uniform = VulkanBuffer::create_host_visible_uniform_buffer(physical_device, device, sizeof(MeshPoolSeedUniform)),
+        .build_indirect_uniform = VulkanBuffer::create_host_visible_uniform_buffer(physical_device, device, sizeof(BuildIndirectUniform)),
+        .load_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, load_list_size),
+        .bucket_heads = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, bucket_heads_size),
+        .bucket_next = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, bucket_next_size),
+        .evicted_chunks_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, evicted_chunks_list_size)
         
         
 
@@ -368,6 +428,10 @@ void VoxelGrid::world_init_gpu() {
 void VoxelGrid::init_mesh_pool() {
     LOG_METHOD();
 
+    uint32_t zero = 0u;
+    m_buffers.vb_returned_nodes_list.upload(&zero, sizeof(zero), 0);
+    m_buffers.ib_returned_nodes_list.upload(&zero, sizeof(zero), 0);
+
     {
         auto scope = m_command_buffer.begin_scope();
 
@@ -464,6 +528,631 @@ void VoxelGrid::init_mesh_pool() {
         compute_write_to_compute_read_write(m_buffers.ib_nodes);
         compute_write_to_compute_read_write(m_buffers.ib_state);
         compute_write_to_compute_read_write(m_buffers.ib_free_nodes_list);
+    }
+
+    submit_compute_commands();
+}
+
+void VoxelGrid::dispatch_mesh_alloc_phase(bool vertex_phase) {
+    PassInstance& pass = vertex_phase
+        ? m_pass_instances.mesh_alloc_vertex_pi
+        : m_pass_instances.mesh_alloc_index_pi;
+
+    pass.set_storage_buffer(0, m_buffers.mesh_buffers_status);
+    pass.set_storage_buffer(1, m_buffers.dirty_list);
+    pass.set_storage_buffer(2, m_buffers.dirty_quad_count);
+    pass.set_storage_buffer(3, m_buffers.chunk_meta);
+    pass.set_storage_buffer(4, m_buffers.chunk_mesh_alloc_local);
+    pass.set_storage_buffer(5, m_buffers.chunk_mesh_alloc);
+
+    if (vertex_phase) {
+        pass.set_storage_buffer(6, m_buffers.vb_heads);
+        pass.set_storage_buffer(7, m_buffers.vb_state);
+        pass.set_storage_buffer(8, m_buffers.vb_nodes);
+        pass.set_storage_buffer(9, m_buffers.vb_free_nodes_list);
+        pass.set_storage_buffer(10, m_buffers.vb_returned_nodes_list);
+    } else {
+        pass.set_storage_buffer(6, m_buffers.ib_heads);
+        pass.set_storage_buffer(7, m_buffers.ib_state);
+        pass.set_storage_buffer(8, m_buffers.ib_nodes);
+        pass.set_storage_buffer(9, m_buffers.ib_free_nodes_list);
+        pass.set_storage_buffer(10, m_buffers.ib_returned_nodes_list);
+    }
+
+    pass.bind(m_command_buffer);
+    pass.push_constants(m_command_buffer, MeshAllocPushConstants{
+        .bb_pages = vertex_phase ? m_params.count_vb_pages : m_params.count_ib_pages,
+        .bb_page_elements = vertex_phase ? m_params.vb_page_size : m_params.ib_page_size,
+        .bb_max_order = vertex_phase ? m_params.vb_order : m_params.ib_order,
+        .bb_quad_size = vertex_phase ? 4u : 6u,
+        .u_is_vb_phase = vertex_phase ? 1u : 0u
+    });
+
+    m_command_buffer.dispatch(math_utils::div_up_u32(m_params.count_active_chunks, 256u), 1, 1);
+}
+
+void VoxelGrid::memory_barrier_compute_rw(VulkanBuffer& buffer) {
+    buffer.memory_barrier(
+        m_command_buffer,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+    );
+}
+
+void VoxelGrid::build_mesh_from_dirty() {
+    LOG_METHOD();
+
+    {
+        auto scope = m_command_buffer.begin_scope();
+
+        m_pass_instances.mesh_reset_pi.set_storage_buffer(0, m_buffers.dirty_list);
+        m_pass_instances.mesh_reset_pi.set_storage_buffer(1, m_buffers.dirty_quad_count);
+        m_pass_instances.mesh_reset_pi.set_storage_buffer(2, m_buffers.emit_counters);
+        m_pass_instances.mesh_reset_pi.bind(m_command_buffer);
+        m_command_buffer.dispatch(math_utils::div_up_u32(m_params.count_active_chunks, 256u), 1, 1);
+
+        memory_barrier_compute_rw(m_buffers.dirty_quad_count);
+        memory_barrier_compute_rw(m_buffers.emit_counters);
+
+        m_pass_instances.mesh_count_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+        m_pass_instances.mesh_count_pi.set_storage_buffer(1, m_buffers.voxels);
+        m_pass_instances.mesh_count_pi.set_storage_buffer(2, m_buffers.dirty_list);
+        m_pass_instances.mesh_count_pi.set_storage_buffer(3, m_buffers.dirty_quad_count);
+        m_pass_instances.mesh_count_pi.set_storage_buffer(4, m_buffers.chunk_meta);
+        m_pass_instances.mesh_count_pi.bind(m_command_buffer);
+        m_pass_instances.mesh_count_pi.push_constants(m_command_buffer, MeshGridPushConstants{
+            .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
+            .u_chunk_dim_x = m_params.chunk_size.x,
+            .u_chunk_dim_y = m_params.chunk_size.y,
+            .u_chunk_dim_z = m_params.chunk_size.z,
+            .u_voxels_per_chunk = static_cast<uint32_t>(vox_per_chunk()),
+            .u_pack_bits = math_utils::BITS,
+            .u_pack_offset = static_cast<int32_t>(math_utils::OFFSET)
+        });
+        m_command_buffer.dispatch(
+            math_utils::div_up_u32(static_cast<uint32_t>(vox_per_chunk()), 256u),
+            m_params.count_active_chunks,
+            1
+        );
+
+        memory_barrier_compute_rw(m_buffers.dirty_quad_count);
+
+        dispatch_mesh_alloc_phase(true);
+        memory_barrier_compute_rw(m_buffers.chunk_mesh_alloc_local);
+        memory_barrier_compute_rw(m_buffers.vb_heads);
+        memory_barrier_compute_rw(m_buffers.vb_state);
+        memory_barrier_compute_rw(m_buffers.vb_nodes);
+        memory_barrier_compute_rw(m_buffers.vb_free_nodes_list);
+        memory_barrier_compute_rw(m_buffers.vb_returned_nodes_list);
+
+        dispatch_mesh_alloc_phase(false);
+        memory_barrier_compute_rw(m_buffers.chunk_mesh_alloc_local);
+        memory_barrier_compute_rw(m_buffers.ib_heads);
+        memory_barrier_compute_rw(m_buffers.ib_state);
+        memory_barrier_compute_rw(m_buffers.ib_nodes);
+        memory_barrier_compute_rw(m_buffers.ib_free_nodes_list);
+        memory_barrier_compute_rw(m_buffers.ib_returned_nodes_list);
+
+        m_pass_instances.verify_mesh_allocation_pi.set_storage_buffer(0, m_buffers.chunk_mesh_alloc_local);
+        m_pass_instances.verify_mesh_allocation_pi.set_storage_buffer(1, m_buffers.chunk_mesh_alloc);
+        m_pass_instances.verify_mesh_allocation_pi.set_storage_buffer(2, m_buffers.dirty_list);
+        m_pass_instances.verify_mesh_allocation_pi.set_storage_buffer(3, m_buffers.mesh_buffers_status);
+        m_pass_instances.verify_mesh_allocation_pi.set_storage_buffer(4, m_buffers.vb_heads);
+        m_pass_instances.verify_mesh_allocation_pi.set_storage_buffer(5, m_buffers.vb_state);
+        m_pass_instances.verify_mesh_allocation_pi.set_storage_buffer(6, m_buffers.vb_nodes);
+        m_pass_instances.verify_mesh_allocation_pi.set_storage_buffer(7, m_buffers.vb_free_nodes_list);
+        m_pass_instances.verify_mesh_allocation_pi.set_storage_buffer(8, m_buffers.vb_returned_nodes_list);
+        m_pass_instances.verify_mesh_allocation_pi.set_storage_buffer(9, m_buffers.ib_heads);
+        m_pass_instances.verify_mesh_allocation_pi.set_storage_buffer(10, m_buffers.ib_state);
+        m_pass_instances.verify_mesh_allocation_pi.set_storage_buffer(11, m_buffers.ib_nodes);
+        m_pass_instances.verify_mesh_allocation_pi.set_storage_buffer(12, m_buffers.ib_free_nodes_list);
+        m_pass_instances.verify_mesh_allocation_pi.set_storage_buffer(13, m_buffers.ib_returned_nodes_list);
+        m_pass_instances.verify_mesh_allocation_pi.bind(m_command_buffer);
+        m_pass_instances.verify_mesh_allocation_pi.push_constants(m_command_buffer, VerifyMeshAllocationPushConstants{
+            .vb_max_order = m_params.vb_order,
+            .ib_max_order = m_params.ib_order
+        });
+        m_command_buffer.dispatch(math_utils::div_up_u32(m_params.count_active_chunks, 256u), 1, 1);
+
+        memory_barrier_compute_rw(m_buffers.chunk_mesh_alloc);
+        memory_barrier_compute_rw(m_buffers.vb_returned_nodes_list);
+        memory_barrier_compute_rw(m_buffers.ib_returned_nodes_list);
+
+        uint32_t max_returned_nodes = std::max(m_params.count_vb_nodes, m_params.count_ib_nodes);
+        m_pass_instances.return_free_alloc_nodes_pi.set_storage_buffer(0, m_buffers.vb_free_nodes_list);
+        m_pass_instances.return_free_alloc_nodes_pi.set_storage_buffer(1, m_buffers.vb_returned_nodes_list);
+        m_pass_instances.return_free_alloc_nodes_pi.set_storage_buffer(2, m_buffers.ib_free_nodes_list);
+        m_pass_instances.return_free_alloc_nodes_pi.set_storage_buffer(3, m_buffers.ib_returned_nodes_list);
+        m_pass_instances.return_free_alloc_nodes_pi.bind(m_command_buffer);
+        m_command_buffer.dispatch(math_utils::div_up_u32(max_returned_nodes, 256u), 1, 1);
+
+        memory_barrier_compute_rw(m_buffers.vb_free_nodes_list);
+        memory_barrier_compute_rw(m_buffers.ib_free_nodes_list);
+
+        m_pass_instances.mesh_emit_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+        m_pass_instances.mesh_emit_pi.set_storage_buffer(1, m_buffers.voxels);
+        m_pass_instances.mesh_emit_pi.set_storage_buffer(2, m_buffers.mesh_buffers_status);
+        m_pass_instances.mesh_emit_pi.set_storage_buffer(3, m_buffers.dirty_list);
+        m_pass_instances.mesh_emit_pi.set_storage_buffer(4, m_buffers.emit_counters);
+        m_pass_instances.mesh_emit_pi.set_storage_buffer(5, m_buffers.chunk_mesh_alloc);
+        m_pass_instances.mesh_emit_pi.set_storage_buffer(6, m_buffers.chunk_meta);
+        m_pass_instances.mesh_emit_pi.set_storage_buffer(7, m_buffers.global_vertex_buffer);
+        m_pass_instances.mesh_emit_pi.set_storage_buffer(8, m_buffers.global_index_buffer);
+        m_pass_instances.mesh_emit_pi.bind(m_command_buffer);
+        m_pass_instances.mesh_emit_pi.push_constants(m_command_buffer, MeshEmitPushConstants{
+            .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
+            .u_chunk_dim_x = m_params.chunk_size.x,
+            .u_chunk_dim_y = m_params.chunk_size.y,
+            .u_chunk_dim_z = m_params.chunk_size.z,
+            .u_voxels_per_chunk = static_cast<uint32_t>(vox_per_chunk()),
+            .u_voxel_size_x = m_params.voxel_size.x,
+            .u_voxel_size_y = m_params.voxel_size.y,
+            .u_voxel_size_z = m_params.voxel_size.z,
+            .u_pack_bits = math_utils::BITS,
+            .u_pack_offset = static_cast<int32_t>(math_utils::OFFSET),
+            .u_vb_page_verts = m_params.vb_page_size,
+            .u_ib_page_inds = m_params.ib_page_size
+        });
+        m_command_buffer.dispatch(
+            math_utils::div_up_u32(static_cast<uint32_t>(vox_per_chunk()), 256u),
+            m_params.count_active_chunks,
+            1
+        );
+
+        m_buffers.global_vertex_buffer.memory_barrier(
+            m_command_buffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+            VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT
+        );
+        m_buffers.global_index_buffer.memory_barrier(
+            m_command_buffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+            VK_ACCESS_INDEX_READ_BIT
+        );
+        memory_barrier_compute_rw(m_buffers.emit_counters);
+
+        m_pass_instances.mesh_finalize_pi.set_storage_buffer(0, m_buffers.dirty_list);
+        m_pass_instances.mesh_finalize_pi.set_storage_buffer(1, m_buffers.enqueued);
+        m_pass_instances.mesh_finalize_pi.set_storage_buffer(2, m_buffers.chunk_meta);
+        m_pass_instances.mesh_finalize_pi.set_storage_buffer(3, m_buffers.chunk_mesh_alloc);
+        m_pass_instances.mesh_finalize_pi.set_storage_buffer(4, m_buffers.failed_dirty_list);
+        m_pass_instances.mesh_finalize_pi.bind(m_command_buffer);
+        m_command_buffer.dispatch(math_utils::div_up_u32(m_params.count_active_chunks, 256u), 1, 1);
+
+        memory_barrier_compute_rw(m_buffers.failed_dirty_list);
+
+        m_pass_instances.reset_dirty_count_pi.set_storage_buffer(0, m_buffers.dirty_list);
+        m_pass_instances.reset_dirty_count_pi.set_storage_buffer(1, m_buffers.vb_free_nodes_list);
+        m_pass_instances.reset_dirty_count_pi.set_storage_buffer(2, m_buffers.vb_returned_nodes_list);
+        m_pass_instances.reset_dirty_count_pi.set_storage_buffer(3, m_buffers.ib_free_nodes_list);
+        m_pass_instances.reset_dirty_count_pi.set_storage_buffer(4, m_buffers.ib_returned_nodes_list);
+        m_pass_instances.reset_dirty_count_pi.bind(m_command_buffer);
+        m_command_buffer.dispatch(1, 1, 1);
+    }
+
+    submit_compute_commands();
+}
+
+void VoxelGrid::build_indirect_draw_commands_frustum(
+    const glm::mat4& view_proj,
+    const glm::vec3& camera_position)
+{
+    LOG_METHOD();
+
+    std::array<glm::vec4, 6> planes = math_utils::extract_frustum_planes(view_proj);
+
+    BuildIndirectUniform uniform{};
+    uniform.chunk_dim_max_chunks = glm::uvec4(
+        m_params.chunk_size.x,
+        m_params.chunk_size.y,
+        m_params.chunk_size.z,
+        m_params.count_active_chunks
+    );
+    uniform.voxel_size_render_distance = glm::vec4(
+        m_params.voxel_size.x,
+        m_params.voxel_size.y,
+        m_params.voxel_size.z,
+        m_params.render_distance
+    );
+    uniform.pack_bits_vb_page_ib_page = glm::uvec4(
+        math_utils::BITS,
+        m_params.vb_page_size,
+        m_params.ib_page_size,
+        0u
+    );
+    uniform.pack_offset = glm::ivec4(
+        static_cast<int32_t>(math_utils::OFFSET),
+        0,
+        0,
+        0
+    );
+    uniform.cam_pos = glm::vec4(camera_position, 0.0f);
+    for (size_t i = 0; i < planes.size(); ++i) {
+        uniform.frustum_planes[i] = planes[i];
+    }
+
+    uint32_t zero = 0u;
+    m_buffers.indirect_cmds.upload(&zero, sizeof(zero), 0);
+    m_buffers.build_indirect_uniform.upload(&uniform, sizeof(uniform));
+
+    {
+        auto scope = m_command_buffer.begin_scope();
+
+        m_buffers.indirect_cmds.memory_barrier(
+            m_command_buffer,
+            VK_PIPELINE_STAGE_HOST_BIT,
+            VK_ACCESS_HOST_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT
+        );
+        m_buffers.build_indirect_uniform.memory_barrier(
+            m_command_buffer,
+            VK_PIPELINE_STAGE_HOST_BIT,
+            VK_ACCESS_HOST_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT
+        );
+
+        m_pass_instances.build_indirect_cmds_pi.set_storage_buffer(0, m_buffers.chunk_meta);
+        m_pass_instances.build_indirect_cmds_pi.set_storage_buffer(1, m_buffers.chunk_mesh_alloc);
+        m_pass_instances.build_indirect_cmds_pi.set_storage_buffer(2, m_buffers.indirect_cmds);
+        m_pass_instances.build_indirect_cmds_pi.set_uniform_buffer(3, m_buffers.build_indirect_uniform);
+        m_pass_instances.build_indirect_cmds_pi.bind(m_command_buffer);
+
+        m_command_buffer.dispatch(math_utils::div_up_u32(m_params.count_active_chunks, 256u), 1, 1);
+
+        m_buffers.indirect_cmds.memory_barrier(
+            m_command_buffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+            VK_ACCESS_INDIRECT_COMMAND_READ_BIT
+        );
+    }
+
+    submit_compute_commands();
+}
+
+void VoxelGrid::render_indirect(Renderer& renderer, VulkanCommandBuffer& command_buffer, const glm::mat4& world_transform) {
+    renderer.render_indirect(
+        command_buffer,
+        m_render_object,
+        m_buffers.indirect_cmds,
+        m_params.count_active_chunks,
+        world_transform
+    );
+}
+
+void VoxelGrid::reset_load_list_counter() {
+    uint32_t zero = 0u;
+    m_buffers.load_list.upload(&zero, sizeof(zero), 0);
+}
+
+void VoxelGrid::reset_bucket_heads() {
+    std::vector<BucketHead> bucket_heads(m_params.count_evict_buckets);
+    for (BucketHead& head : bucket_heads) {
+        head.id = INVALID_ID;
+        head.count = 0u;
+    }
+
+    uint32_t zero = 0u;
+    m_buffers.bucket_heads.upload(bucket_heads);
+    m_buffers.evicted_chunks_list.upload(&zero, sizeof(zero), 0);
+}
+
+uint32_t VoxelGrid::free_chunk_count() const {
+    uint32_t free_count = 0u;
+    const_cast<VulkanBuffer&>(m_buffers.free_list).read(&free_count, sizeof(free_count), 0);
+    return free_count;
+}
+
+void VoxelGrid::record_rebuild_chunk_hash_table() {
+    m_pass_instances.clear_chunk_hash_table_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+    m_pass_instances.clear_chunk_hash_table_pi.bind(m_command_buffer);
+    m_pass_instances.clear_chunk_hash_table_pi.push_constants(
+        m_command_buffer,
+        ClearChunkHashTablePushConstants{.u_chunk_hash_table_size = m_params.chunk_hash_table_size}
+    );
+    m_command_buffer.dispatch(math_utils::div_up_u32(m_params.chunk_hash_table_size, 256u), 1, 1);
+
+    memory_barrier_compute_rw(m_buffers.chunk_hash_table);
+
+    m_pass_instances.fill_chunk_hash_table_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+    m_pass_instances.fill_chunk_hash_table_pi.set_storage_buffer(1, m_buffers.chunk_meta);
+    m_pass_instances.fill_chunk_hash_table_pi.set_storage_buffer(2, m_buffers.enqueued);
+    m_pass_instances.fill_chunk_hash_table_pi.bind(m_command_buffer);
+    m_pass_instances.fill_chunk_hash_table_pi.push_constants(m_command_buffer, FillChunkHashTablePushConstants{
+        .u_max_chunks = m_params.count_active_chunks,
+        .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
+        .u_pack_bits = math_utils::BITS,
+        .u_pack_offset = static_cast<int32_t>(math_utils::OFFSET)
+    });
+    m_command_buffer.dispatch(math_utils::div_up_u32(m_params.count_active_chunks, 256u), 1, 1);
+
+    memory_barrier_compute_rw(m_buffers.chunk_hash_table);
+}
+
+void VoxelGrid::mark_all_used_chunks_as_dirty() {
+    LOG_METHOD();
+
+    {
+        auto scope = m_command_buffer.begin_scope();
+
+        m_pass_instances.mark_all_used_chunks_as_dirty_pi.set_storage_buffer(0, m_buffers.chunk_meta);
+        m_pass_instances.mark_all_used_chunks_as_dirty_pi.set_storage_buffer(1, m_buffers.enqueued);
+        m_pass_instances.mark_all_used_chunks_as_dirty_pi.set_storage_buffer(2, m_buffers.dirty_list);
+        m_pass_instances.mark_all_used_chunks_as_dirty_pi.bind(m_command_buffer);
+        m_pass_instances.mark_all_used_chunks_as_dirty_pi.push_constants(
+            m_command_buffer,
+            MarkAllUsedChunksDirtyPushConstants{.u_max_chunks = m_params.count_active_chunks}
+        );
+        m_command_buffer.dispatch(math_utils::div_up_u32(m_params.count_active_chunks, 256u), 1, 1);
+
+        memory_barrier_compute_rw(m_buffers.dirty_list);
+        memory_barrier_compute_rw(m_buffers.enqueued);
+        memory_barrier_compute_rw(m_buffers.chunk_meta);
+    }
+
+    submit_compute_commands();
+}
+
+void VoxelGrid::stream_chunks_sphere(const glm::vec3& camera_position, int radius_chunks, uint32_t seed) {
+    LOG_METHOD();
+
+    if (radius_chunks < 0) {
+        radius_chunks = static_cast<int>(m_params.generation_distance);
+    }
+
+    ensure_free_chunks_gpu(camera_position);
+    reset_load_list_counter();
+
+    {
+        auto scope = m_command_buffer.begin_scope();
+
+        m_buffers.load_list.memory_barrier(
+            m_command_buffer,
+            VK_PIPELINE_STAGE_HOST_BIT,
+            VK_ACCESS_HOST_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+        );
+
+        m_pass_instances.stream_select_chunks_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+        m_pass_instances.stream_select_chunks_pi.set_storage_buffer(1, m_buffers.free_list);
+        m_pass_instances.stream_select_chunks_pi.set_storage_buffer(2, m_buffers.chunk_meta);
+        m_pass_instances.stream_select_chunks_pi.set_storage_buffer(3, m_buffers.enqueued);
+        m_pass_instances.stream_select_chunks_pi.set_storage_buffer(4, m_buffers.load_list);
+        m_pass_instances.stream_select_chunks_pi.bind(m_command_buffer);
+        m_pass_instances.stream_select_chunks_pi.push_constants(m_command_buffer, StreamSelectChunksPushConstants{
+            .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
+            .u_max_load_entries = m_params.count_active_chunks,
+            .u_chunk_dim_x = m_params.chunk_size.x,
+            .u_chunk_dim_y = m_params.chunk_size.y,
+            .u_chunk_dim_z = m_params.chunk_size.z,
+            .u_voxel_size_x = m_params.voxel_size.x,
+            .u_voxel_size_y = m_params.voxel_size.y,
+            .u_voxel_size_z = m_params.voxel_size.z,
+            .u_cam_pos_local_x = camera_position.x,
+            .u_cam_pos_local_y = camera_position.y,
+            .u_cam_pos_local_z = camera_position.z,
+            .u_radius_chunks = radius_chunks,
+            .u_pack_bits = math_utils::BITS,
+            .u_pack_offset = static_cast<int32_t>(math_utils::OFFSET)
+        });
+
+        uint32_t side = static_cast<uint32_t>(2 * radius_chunks + 1);
+        m_command_buffer.dispatch(
+            math_utils::div_up_u32(side, 8u),
+            math_utils::div_up_u32(side, 8u),
+            math_utils::div_up_u32(side, 8u)
+        );
+
+        memory_barrier_compute_rw(m_buffers.load_list);
+        memory_barrier_compute_rw(m_buffers.chunk_hash_table);
+        memory_barrier_compute_rw(m_buffers.free_list);
+        memory_barrier_compute_rw(m_buffers.chunk_meta);
+    }
+
+    submit_compute_commands();
+
+    uint32_t load_count = 0u;
+    m_buffers.load_list.read(&load_count, sizeof(load_count), 0);
+    load_count = std::min(load_count, m_params.count_active_chunks);
+    if (load_count == 0u) {
+        return;
+    }
+
+    {
+        auto scope = m_command_buffer.begin_scope();
+
+        m_buffers.load_list.memory_barrier(
+            m_command_buffer,
+            VK_PIPELINE_STAGE_HOST_BIT,
+            VK_ACCESS_HOST_READ_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT
+        );
+
+        m_pass_instances.stream_generate_terrain_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+        m_pass_instances.stream_generate_terrain_pi.set_storage_buffer(1, m_buffers.load_list);
+        m_pass_instances.stream_generate_terrain_pi.set_storage_buffer(2, m_buffers.voxels);
+        m_pass_instances.stream_generate_terrain_pi.set_storage_buffer(3, m_buffers.chunk_meta);
+        m_pass_instances.stream_generate_terrain_pi.set_storage_buffer(4, m_buffers.enqueued);
+        m_pass_instances.stream_generate_terrain_pi.set_storage_buffer(5, m_buffers.dirty_list);
+        m_pass_instances.stream_generate_terrain_pi.bind(m_command_buffer);
+        m_pass_instances.stream_generate_terrain_pi.push_constants(m_command_buffer, StreamGenerateTerrainPushConstants{
+            .u_chunk_dim_x = m_params.chunk_size.x,
+            .u_chunk_dim_y = m_params.chunk_size.y,
+            .u_chunk_dim_z = m_params.chunk_size.z,
+            .u_voxels_per_chunk = static_cast<uint32_t>(vox_per_chunk()),
+            .u_pack_bits = math_utils::BITS,
+            .u_pack_offset = static_cast<int32_t>(math_utils::OFFSET),
+            .u_seed = seed,
+            .u_chunk_hash_table_size = m_params.chunk_hash_table_size
+        });
+
+        m_command_buffer.dispatch(
+            math_utils::div_up_u32(static_cast<uint32_t>(vox_per_chunk()), 256u),
+            load_count,
+            1
+        );
+
+        memory_barrier_compute_rw(m_buffers.voxels);
+        memory_barrier_compute_rw(m_buffers.dirty_list);
+        memory_barrier_compute_rw(m_buffers.enqueued);
+        memory_barrier_compute_rw(m_buffers.chunk_meta);
+    }
+
+    submit_compute_commands();
+}
+
+void VoxelGrid::ensure_free_chunks_gpu(const glm::vec3& camera_position) {
+    LOG_METHOD();
+
+    uint32_t current_free_count = free_chunk_count();
+    if (current_free_count >= m_params.min_free_chunks) {
+        return;
+    }
+
+    uint32_t eviction_count = m_params.min_free_chunks - current_free_count;
+    eviction_count = std::min(eviction_count, m_params.count_active_chunks);
+
+    reset_bucket_heads();
+    m_buffers.evicted_chunks_list.upload(&eviction_count, sizeof(eviction_count), 0);
+
+    {
+        auto scope = m_command_buffer.begin_scope();
+
+        m_buffers.bucket_heads.memory_barrier(
+            m_command_buffer,
+            VK_PIPELINE_STAGE_HOST_BIT,
+            VK_ACCESS_HOST_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+        );
+        m_buffers.evicted_chunks_list.memory_barrier(
+            m_command_buffer,
+            VK_PIPELINE_STAGE_HOST_BIT,
+            VK_ACCESS_HOST_WRITE_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+        );
+
+        m_pass_instances.evict_buckets_build_pi.set_storage_buffer(0, m_buffers.chunk_meta);
+        m_pass_instances.evict_buckets_build_pi.set_storage_buffer(1, m_buffers.bucket_heads);
+        m_pass_instances.evict_buckets_build_pi.set_storage_buffer(2, m_buffers.bucket_next);
+        m_pass_instances.evict_buckets_build_pi.bind(m_command_buffer);
+        m_pass_instances.evict_buckets_build_pi.push_constants(m_command_buffer, EvictBucketsBuildPushConstants{
+            .u_max_chunks = m_params.count_active_chunks,
+            .u_bucket_count = m_params.count_evict_buckets,
+            .u_cam_pos_x = camera_position.x,
+            .u_cam_pos_y = camera_position.y,
+            .u_cam_pos_z = camera_position.z,
+            .u_chunk_dim_x = m_params.chunk_size.x,
+            .u_chunk_dim_y = m_params.chunk_size.y,
+            .u_chunk_dim_z = m_params.chunk_size.z,
+            .u_voxel_size_x = m_params.voxel_size.x,
+            .u_voxel_size_y = m_params.voxel_size.y,
+            .u_voxel_size_z = m_params.voxel_size.z,
+            .u_pack_bits = math_utils::BITS,
+            .u_pack_offset = static_cast<int32_t>(math_utils::OFFSET),
+            .f_eviction_bucket_shell_thickness = m_params.eviction_bucket_shell_thickness
+        });
+        m_command_buffer.dispatch(math_utils::div_up_u32(m_params.count_active_chunks, 256u), 1, 1);
+
+        memory_barrier_compute_rw(m_buffers.bucket_heads);
+        memory_barrier_compute_rw(m_buffers.bucket_next);
+
+        m_pass_instances.evict_low_priority_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+        m_pass_instances.evict_low_priority_pi.set_storage_buffer(1, m_buffers.free_list);
+        m_pass_instances.evict_low_priority_pi.set_storage_buffer(2, m_buffers.chunk_meta);
+        m_pass_instances.evict_low_priority_pi.set_storage_buffer(3, m_buffers.enqueued);
+        m_pass_instances.evict_low_priority_pi.set_storage_buffer(4, m_buffers.bucket_heads);
+        m_pass_instances.evict_low_priority_pi.set_storage_buffer(5, m_buffers.bucket_next);
+        m_pass_instances.evict_low_priority_pi.set_storage_buffer(6, m_buffers.chunk_mesh_alloc);
+        m_pass_instances.evict_low_priority_pi.set_storage_buffer(7, m_buffers.evicted_chunks_list);
+        m_pass_instances.evict_low_priority_pi.bind(m_command_buffer);
+        m_pass_instances.evict_low_priority_pi.push_constants(m_command_buffer, EvictLowPriorityPushConstants{
+            .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
+            .u_bucket_count = m_params.count_evict_buckets
+        });
+        m_command_buffer.dispatch(math_utils::div_up_u32(eviction_count, 256u), 1, 1);
+
+        memory_barrier_compute_rw(m_buffers.evicted_chunks_list);
+        memory_barrier_compute_rw(m_buffers.chunk_mesh_alloc);
+        memory_barrier_compute_rw(m_buffers.chunk_hash_table);
+        memory_barrier_compute_rw(m_buffers.free_list);
+        memory_barrier_compute_rw(m_buffers.chunk_meta);
+        memory_barrier_compute_rw(m_buffers.enqueued);
+
+        m_pass_instances.free_evicted_chunks_mesh_pi.set_storage_buffer(0, m_buffers.chunk_mesh_alloc);
+        m_pass_instances.free_evicted_chunks_mesh_pi.set_storage_buffer(1, m_buffers.vb_heads);
+        m_pass_instances.free_evicted_chunks_mesh_pi.set_storage_buffer(2, m_buffers.vb_state);
+        m_pass_instances.free_evicted_chunks_mesh_pi.set_storage_buffer(3, m_buffers.vb_nodes);
+        m_pass_instances.free_evicted_chunks_mesh_pi.set_storage_buffer(4, m_buffers.vb_free_nodes_list);
+        m_pass_instances.free_evicted_chunks_mesh_pi.set_storage_buffer(5, m_buffers.vb_returned_nodes_list);
+        m_pass_instances.free_evicted_chunks_mesh_pi.set_storage_buffer(6, m_buffers.ib_heads);
+        m_pass_instances.free_evicted_chunks_mesh_pi.set_storage_buffer(7, m_buffers.ib_state);
+        m_pass_instances.free_evicted_chunks_mesh_pi.set_storage_buffer(8, m_buffers.ib_nodes);
+        m_pass_instances.free_evicted_chunks_mesh_pi.set_storage_buffer(9, m_buffers.ib_free_nodes_list);
+        m_pass_instances.free_evicted_chunks_mesh_pi.set_storage_buffer(10, m_buffers.ib_returned_nodes_list);
+        m_pass_instances.free_evicted_chunks_mesh_pi.set_storage_buffer(11, m_buffers.evicted_chunks_list);
+        m_pass_instances.free_evicted_chunks_mesh_pi.bind(m_command_buffer);
+        m_pass_instances.free_evicted_chunks_mesh_pi.push_constants(m_command_buffer, VerifyMeshAllocationPushConstants{
+            .vb_max_order = m_params.vb_order,
+            .ib_max_order = m_params.ib_order
+        });
+        m_command_buffer.dispatch(math_utils::div_up_u32(eviction_count, 256u), 1, 1);
+
+        memory_barrier_compute_rw(m_buffers.chunk_mesh_alloc);
+        memory_barrier_compute_rw(m_buffers.vb_returned_nodes_list);
+        memory_barrier_compute_rw(m_buffers.ib_returned_nodes_list);
+
+        m_pass_instances.reset_evicted_list_and_buckets_pi.set_storage_buffer(0, m_buffers.bucket_heads);
+        m_pass_instances.reset_evicted_list_and_buckets_pi.set_storage_buffer(1, m_buffers.evicted_chunks_list);
+        m_pass_instances.reset_evicted_list_and_buckets_pi.set_storage_buffer(2, m_buffers.free_list);
+        m_pass_instances.reset_evicted_list_and_buckets_pi.bind(m_command_buffer);
+        m_pass_instances.reset_evicted_list_and_buckets_pi.push_constants(
+            m_command_buffer,
+            ResetEvictedListAndBucketsPushConstants{.u_bucket_count = m_params.count_evict_buckets}
+        );
+        m_command_buffer.dispatch(math_utils::div_up_u32(m_params.count_evict_buckets, 256u), 1, 1);
+
+        memory_barrier_compute_rw(m_buffers.free_list);
+        memory_barrier_compute_rw(m_buffers.bucket_heads);
+        memory_barrier_compute_rw(m_buffers.evicted_chunks_list);
+
+        uint32_t max_returned_nodes = std::max(m_params.count_vb_nodes, m_params.count_ib_nodes);
+        m_pass_instances.return_free_alloc_nodes_pi.set_storage_buffer(0, m_buffers.vb_free_nodes_list);
+        m_pass_instances.return_free_alloc_nodes_pi.set_storage_buffer(1, m_buffers.vb_returned_nodes_list);
+        m_pass_instances.return_free_alloc_nodes_pi.set_storage_buffer(2, m_buffers.ib_free_nodes_list);
+        m_pass_instances.return_free_alloc_nodes_pi.set_storage_buffer(3, m_buffers.ib_returned_nodes_list);
+        m_pass_instances.return_free_alloc_nodes_pi.bind(m_command_buffer);
+        m_command_buffer.dispatch(math_utils::div_up_u32(max_returned_nodes, 256u), 1, 1);
+
+        memory_barrier_compute_rw(m_buffers.vb_free_nodes_list);
+        memory_barrier_compute_rw(m_buffers.ib_free_nodes_list);
+
+        m_pass_instances.reset_dirty_count_pi.set_storage_buffer(0, m_buffers.dirty_list);
+        m_pass_instances.reset_dirty_count_pi.set_storage_buffer(1, m_buffers.vb_free_nodes_list);
+        m_pass_instances.reset_dirty_count_pi.set_storage_buffer(2, m_buffers.vb_returned_nodes_list);
+        m_pass_instances.reset_dirty_count_pi.set_storage_buffer(3, m_buffers.ib_free_nodes_list);
+        m_pass_instances.reset_dirty_count_pi.set_storage_buffer(4, m_buffers.ib_returned_nodes_list);
+        m_pass_instances.reset_dirty_count_pi.bind(m_command_buffer);
+        m_command_buffer.dispatch(1, 1, 1);
+
+        memory_barrier_compute_rw(m_buffers.vb_free_nodes_list);
+        memory_barrier_compute_rw(m_buffers.vb_returned_nodes_list);
+        memory_barrier_compute_rw(m_buffers.ib_free_nodes_list);
+        memory_barrier_compute_rw(m_buffers.ib_returned_nodes_list);
+
+        record_rebuild_chunk_hash_table();
     }
 
     submit_compute_commands();

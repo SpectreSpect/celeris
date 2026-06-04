@@ -1,0 +1,72 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+#include "../common/buffer_structures.inc"
+#include "chunk_hash_table/decl.inc"
+#include "utils.inc"
+
+layout(std430, set = 0, binding = 0) buffer ChunkHashTable {
+    HashTableCounters chunk_hash_table_counters;
+    ChunkHashTableSlot chunk_hash_table_slots[];
+};
+
+layout(std430, set = 0, binding = 1) readonly buffer ChunkVoxels {
+    VoxelData voxels[];
+};
+
+layout(std430, set = 0, binding = 2) readonly buffer DirtyListBuf {
+    uint dirty_count;
+    uint dirty_list[];
+};
+
+layout(std430, set = 0, binding = 3) buffer DirtyQuadCountBuf {
+    uint dirty_quad_count[];
+};
+
+layout(std430, set = 0, binding = 4) readonly buffer ChunkMetaBuf {
+    ChunkMeta meta[];
+};
+
+layout(push_constant) uniform MeshGridPushConstants {
+    uint u_chunk_hash_table_size;
+    uint u_chunk_dim_x;
+    uint u_chunk_dim_y;
+    uint u_chunk_dim_z;
+    uint u_voxels_per_chunk;
+    uint u_pack_bits;
+    int u_pack_offset;
+};
+
+#include "chunk_pool/read_voxels.inc"
+
+void main() {
+    uint voxel_id = gl_GlobalInvocationID.x;
+    uint dirty_id = gl_GlobalInvocationID.y;
+
+    if (dirty_id >= dirty_count || voxel_id >= u_voxels_per_chunk) {
+        return;
+    }
+
+    uint chunk_id = dirty_list[dirty_id];
+    uvec2 key = uvec2(meta[chunk_id].key_lo, meta[chunk_id].key_hi);
+    ivec3 chunk_coord = unpack_key_to_coord(key, u_pack_offset, u_pack_bits);
+
+    uint lx = voxel_id % u_chunk_dim_x;
+    uint ly = (voxel_id / u_chunk_dim_x) % u_chunk_dim_y;
+    uint lz = voxel_id / (u_chunk_dim_x * u_chunk_dim_y);
+    uvec3 p = uvec3(lx, ly, lz);
+
+    VoxelData voxel_data = voxel_data_in_chunk(chunk_id, p);
+    if ((read_voxel_flags(voxel_data.type_flags) & VOXEL_VISABILITY_FLAG_BIT) == 0u) {
+        return;
+    }
+
+    if (voxel_vis(chunk_id, chunk_coord, p, ivec3( 1,  0,  0)) == 0u) atomicAdd(dirty_quad_count[dirty_id], 1u);
+    if (voxel_vis(chunk_id, chunk_coord, p, ivec3(-1,  0,  0)) == 0u) atomicAdd(dirty_quad_count[dirty_id], 1u);
+    if (voxel_vis(chunk_id, chunk_coord, p, ivec3( 0,  1,  0)) == 0u) atomicAdd(dirty_quad_count[dirty_id], 1u);
+    if (voxel_vis(chunk_id, chunk_coord, p, ivec3( 0, -1,  0)) == 0u) atomicAdd(dirty_quad_count[dirty_id], 1u);
+    if (voxel_vis(chunk_id, chunk_coord, p, ivec3( 0,  0,  1)) == 0u) atomicAdd(dirty_quad_count[dirty_id], 1u);
+    if (voxel_vis(chunk_id, chunk_coord, p, ivec3( 0,  0, -1)) == 0u) atomicAdd(dirty_quad_count[dirty_id], 1u);
+}

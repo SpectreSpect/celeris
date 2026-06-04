@@ -51,11 +51,16 @@ VulkanDevice::VulkanDevice(const VulkanPhysicalDevice& physical_device) {
         supported_features.imageCubeArray == VK_TRUE,
         "Physical device does not support imageCubeArray"
     );
+    logger.check(
+        supported_features.multiDrawIndirect == VK_TRUE,
+        "Physical device does not support multiDrawIndirect"
+    );
 
 
     VkPhysicalDeviceFeatures device_features{};
     device_features.shaderFloat64 = VK_TRUE;
     device_features.imageCubeArray = VK_TRUE;
+    device_features.multiDrawIndirect = VK_TRUE;
 
     VkDeviceCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

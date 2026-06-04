@@ -1,0 +1,77 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+#include "../common/buffer_structures.inc"
+#include "utils.inc"
+
+layout(std430, set = 0, binding = 0) readonly buffer ChunkMetaBuf {
+    ChunkMeta meta[];
+};
+
+layout(std430, set = 0, binding = 1) buffer BucketHeads {
+    BucketHead bucket_heads[];
+};
+
+layout(std430, set = 0, binding = 2) buffer BucketNext {
+    uint bucket_next[];
+};
+
+layout(push_constant) uniform EvictBucketsBuildPushConstants {
+    uint u_max_chunks;
+    uint u_bucket_count;
+    float u_cam_pos_x;
+    float u_cam_pos_y;
+    float u_cam_pos_z;
+    uint u_chunk_dim_x;
+    uint u_chunk_dim_y;
+    uint u_chunk_dim_z;
+    float u_voxel_size_x;
+    float u_voxel_size_y;
+    float u_voxel_size_z;
+    uint u_pack_bits;
+    int u_pack_offset;
+    float f_eviction_bucket_shell_thickness;
+};
+
+void push_bucket(uint bucket_id, uint chunk_id) {
+    uint old = atomicExchange(bucket_heads[bucket_id].id, chunk_id);
+    bucket_next[chunk_id] = old;
+    atomicAdd(bucket_heads[bucket_id].count, 1u);
+}
+
+uint bucket_for_coord(ivec3 chunk_coord) {
+    uvec3 chunk_dim = uvec3(u_chunk_dim_x, u_chunk_dim_y, u_chunk_dim_z);
+    vec3 voxel_size = vec3(u_voxel_size_x, u_voxel_size_y, u_voxel_size_z);
+    vec3 chunk_size = vec3(chunk_dim) * voxel_size;
+    vec3 min_p = vec3(chunk_coord * ivec3(chunk_dim)) * voxel_size;
+    vec3 center = min_p + 0.5 * chunk_size;
+
+    vec3 diff = center - vec3(u_cam_pos_x, u_cam_pos_y, u_cam_pos_z);
+    float dist = sqrt(dot(diff, diff));
+
+    uint bucket_id = uint(dist / f_eviction_bucket_shell_thickness);
+    if (bucket_id >= u_bucket_count) {
+        bucket_id = u_bucket_count - 1u;
+    }
+    return bucket_id;
+}
+
+void main() {
+    uint chunk_id = gl_GlobalInvocationID.x;
+    if (chunk_id >= u_max_chunks) {
+        return;
+    }
+    if (meta[chunk_id].used == 0u) {
+        return;
+    }
+
+    ivec3 chunk_coord = unpack_key_to_coord(
+        uvec2(meta[chunk_id].key_lo, meta[chunk_id].key_hi),
+        u_pack_offset,
+        u_pack_bits
+    );
+
+    push_bucket(bucket_for_coord(chunk_coord), chunk_id);
+}

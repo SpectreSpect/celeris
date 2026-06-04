@@ -69,6 +69,15 @@ public:
         const std::vector<glm::ivec3>& positions,
         const std::vector<VoxelDataGPU>& voxels
     );
+    void build_mesh_from_dirty();
+    void build_indirect_draw_commands_frustum(
+        const glm::mat4& view_proj,
+        const glm::vec3& camera_position
+    );
+    void render_indirect(Renderer& renderer, VulkanCommandBuffer& command_buffer, const glm::mat4& world_transform);
+    void mark_all_used_chunks_as_dirty();
+    void stream_chunks_sphere(const glm::vec3& camera_position, int radius_chunks, uint32_t seed);
+    void ensure_free_chunks_gpu(const glm::vec3& camera_position);
 
 public:
     struct VoxelGridBuffers {
@@ -82,6 +91,8 @@ public:
         VulkanBuffer dirty_list;
         VulkanBuffer voxel_write_list;
         VulkanBuffer voxels;
+        VulkanBuffer dirty_quad_count;
+        VulkanBuffer emit_counters;
 
         VulkanBuffer global_vertex_buffer;
         VulkanBuffer global_index_buffer;
@@ -90,16 +101,24 @@ public:
         VulkanBuffer vb_nodes;
         VulkanBuffer vb_state;
         VulkanBuffer vb_free_nodes_list;
+        VulkanBuffer vb_returned_nodes_list;
 
         VulkanBuffer ib_heads;
         VulkanBuffer ib_nodes;
         VulkanBuffer ib_state;
         VulkanBuffer ib_free_nodes_list;
+        VulkanBuffer ib_returned_nodes_list;
 
         VulkanBuffer chunk_mesh_alloc;
+        VulkanBuffer chunk_mesh_alloc_local;
 
         VulkanBuffer mesh_pool_clear_uniform;
         VulkanBuffer mesh_pool_seed_uniform;
+        VulkanBuffer build_indirect_uniform;
+        VulkanBuffer load_list;
+        VulkanBuffer bucket_heads;
+        VulkanBuffer bucket_next;
+        VulkanBuffer evicted_chunks_list;
 
         // vb_heads  vb_heads_ = BufferObject(sizeof(uint32_t) * (size_t)(vb_order_ + 1), GL_DYNAMIC_DRAW);
         // vb_state  vb_state_ = BufferObject(sizeof(uint32_t) * (size_t)count_vb_pages_, GL_DYNAMIC_DRAW);
@@ -118,11 +137,30 @@ public:
         PassInstance apply_writes_to_world_pi;
         PassInstance mesh_pool_clear_pi;
         PassInstance mesh_pool_seed_pi;
+        PassInstance mesh_reset_pi;
+        PassInstance mesh_count_pi;
+        PassInstance mesh_alloc_vertex_pi;
+        PassInstance mesh_alloc_index_pi;
+        PassInstance mesh_emit_pi;
+        PassInstance mesh_finalize_pi;
+        PassInstance verify_mesh_allocation_pi;
+        PassInstance return_free_alloc_nodes_pi;
+        PassInstance reset_dirty_count_pi;
+        PassInstance build_indirect_cmds_pi;
+        PassInstance mark_all_used_chunks_as_dirty_pi;
+        PassInstance stream_select_chunks_pi;
+        PassInstance stream_generate_terrain_pi;
+        PassInstance evict_buckets_build_pi;
+        PassInstance evict_low_priority_pi;
+        PassInstance free_evicted_chunks_mesh_pi;
+        PassInstance reset_evicted_list_and_buckets_pi;
+        PassInstance clear_chunk_hash_table_pi;
+        PassInstance fill_chunk_hash_table_pi;
     };
 
     struct VoxelGridParams {
         glm::uvec3 chunk_size = {0u, 0u, 0u};
-        glm::uvec3 voxel_size = {0u, 0u, 0u};
+        glm::vec3 voxel_size = {0.0f, 0.0f, 0.0f};
         uint32_t count_active_chunks = 0u;
         uint32_t count_evict_buckets = 0u;
         uint32_t max_write_count = 0u;
@@ -177,5 +215,11 @@ private:
     void world_init_gpu();
     // void init_draw_buffers();
     void init_mesh_pool();
+    void dispatch_mesh_alloc_phase(bool vertex_phase);
+    void memory_barrier_compute_rw(VulkanBuffer& buffer);
+    void reset_load_list_counter();
+    void reset_bucket_heads();
+    uint32_t free_chunk_count() const;
+    void record_rebuild_chunk_hash_table();
     void submit_compute_commands();
 };

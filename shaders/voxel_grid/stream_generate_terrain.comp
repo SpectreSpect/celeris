@@ -1,0 +1,112 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+#include "../common/buffer_structures.inc"
+#include "chunk_hash_table/decl.inc"
+#include "utils.inc"
+
+layout(std430, set = 0, binding = 0) buffer ChunkHashTable {
+    HashTableCounters chunk_hash_table_counters;
+    ChunkHashTableSlot chunk_hash_table_slots[];
+};
+
+layout(std430, set = 0, binding = 1) readonly buffer LoadList {
+    uint load_list_counter;
+    uint load_list[];
+};
+
+layout(std430, set = 0, binding = 2) buffer ChunkVoxels {
+    VoxelData voxels[];
+};
+
+layout(std430, set = 0, binding = 3) buffer ChunkMetaBuf {
+    ChunkMeta meta[];
+};
+
+layout(std430, set = 0, binding = 4) buffer EnqueuedBuf {
+    uint enqueued[];
+};
+
+layout(std430, set = 0, binding = 5) buffer DirtyListBuf {
+    uint dirty_count;
+    uint dirty_list[];
+};
+
+layout(push_constant) uniform StreamGenerateTerrainPushConstants {
+    uint u_chunk_dim_x;
+    uint u_chunk_dim_y;
+    uint u_chunk_dim_z;
+    uint u_voxels_per_chunk;
+    uint u_pack_bits;
+    int u_pack_offset;
+    uint u_seed;
+    uint u_chunk_hash_table_size;
+};
+
+#include "chunk_pool/mark_dirty.inc"
+
+float value_noise(vec2 x) {
+    ivec2 i = ivec2(floor(x));
+    vec2 f = fract(x);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+
+    float a = hash_ivec2(i + ivec2(0, 0), u_seed);
+    float b = hash_ivec2(i + ivec2(1, 0), u_seed);
+    float c = hash_ivec2(i + ivec2(0, 1), u_seed);
+    float d = hash_ivec2(i + ivec2(1, 1), u_seed);
+
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+float fbm(vec2 p) {
+    float sum = 0.0;
+    float amp = 0.5;
+    for (int octave = 0; octave < 5; ++octave) {
+        sum += amp * value_noise(p);
+        p *= 2.0;
+        amp *= 0.5;
+    }
+    return sum;
+}
+
+void main() {
+    uint voxel_id = gl_GlobalInvocationID.x;
+    uint list_id = gl_GlobalInvocationID.y;
+
+    if (list_id >= load_list_counter || voxel_id >= u_voxels_per_chunk) {
+        return;
+    }
+
+    uint chunk_id = load_list[list_id];
+    ivec3 chunk_coord = unpack_key_to_coord(
+        uvec2(meta[chunk_id].key_lo, meta[chunk_id].key_hi),
+        u_pack_offset,
+        u_pack_bits
+    );
+
+    uint lx = voxel_id % u_chunk_dim_x;
+    uint ly = (voxel_id / u_chunk_dim_x) % u_chunk_dim_y;
+    uint lz = voxel_id / (u_chunk_dim_x * u_chunk_dim_y);
+    ivec3 local = ivec3(lx, ly, lz);
+    ivec3 world_voxel = chunk_coord * ivec3(u_chunk_dim_x, u_chunk_dim_y, u_chunk_dim_z) + local;
+
+    vec2 xz = vec2(world_voxel.x, world_voxel.z) * 0.03;
+    float n = fbm(xz);
+    float height = 20.0 + n * 30.0;
+
+    uint type = (float(world_voxel.y) <= height) ? 1u : 0u;
+    uint voxel_flags = (type != 0u) ? VOXEL_VISABILITY_FLAG_BIT : VOXEL_EASY_OVERWRITE_FLAG_BIT;
+
+    VoxelData voxel_data;
+    voxel_data.type_flags = pack_voxel_type_flags(type, voxel_flags);
+    vec3 color = (type != 0u) ? mix(vec3(0.15, 0.35, 0.10), vec3(0.45, 0.30, 0.15), n) : vec3(0.0);
+    voxel_data.color = pack_color(color);
+
+    voxels[chunk_id * u_voxels_per_chunk + voxel_id] = voxel_data;
+
+    if (voxel_id == 0u) {
+        mark_dirty_around(chunk_id, chunk_coord);
+    }
+}

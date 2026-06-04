@@ -1,5 +1,7 @@
 #include "vulkan_fence.h"
 
+#include <vulkan/vk_enum_string_helper.h>
+
 #include "vulkan_device.h"
 #include "collect_handles_helper.h"
 
@@ -102,7 +104,10 @@ bool VulkanFence::wait(VkDevice device, std::span<const VkFence> fences, VkBool3
     if (result == VK_TIMEOUT)
         return false;
 
-    logger.check(result == VK_SUCCESS, "Failed to wait fences");
+    logger.check(result == VK_SUCCESS)
+        << "Failed to wait fences: "
+        << clr(string_VkResult(result), LoggerPalette::blue)
+        << "\n";
     return true;
 }
 

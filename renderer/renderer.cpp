@@ -4,6 +4,7 @@
 #include "instanced_render_object.h"
 #include "../vulkan_self/vulkan_command_buffer.h"
 #include "../vulkan_self/pass/material_pass/material_pass.h"
+#include "../vulkan_self/vulkan_buffer.h"
 #include "resources/frame_resources.h"
 #include "scene.h"
 
@@ -34,6 +35,44 @@ void Renderer::render(VulkanCommandBuffer& command_buffer, RenderObject& render_
     pass.pipeline_layout().push_constants(command_buffer, pc);
     
     command_buffer.draw_indexed(render_object.mesh_view().index_count());
+}
+
+void Renderer::render_indirect(
+    VulkanCommandBuffer& command_buffer,
+    RenderObject& render_object,
+    VulkanBuffer& indirect_buffer,
+    uint32_t draw_count,
+    glm::mat4 transform)
+{
+    logger.check(render_object.mesh_view().valid(), "Mesh view was invalid");
+    logger.check(draw_count != 0u, "Attempt to render zero indirect commands");
+
+    static TransformPushConstants pc;
+    pc.model = transform;
+    pc.material_data_id = render_object.material_data_id();
+
+    render_object.sync_material();
+
+    SlotPassInstance& material = render_object.material();
+    auto& pass = static_cast<MaterialPass&>(material.pipepline_pass());
+
+    material.bind(command_buffer);
+    m_frame_resources->bind(m_engine->current_frame(), command_buffer, pass.pipeline(), 1);
+
+    pass.pipeline().set_y_up_viewport(command_buffer, *m_engine);
+    pass.pipeline().set_scissor(command_buffer, *m_engine);
+
+    render_object.mesh_view().bind_vertex_buffer(command_buffer);
+    render_object.mesh_view().bind_index_buffer(command_buffer);
+
+    pass.pipeline_layout().push_constants(command_buffer, pc);
+
+    command_buffer.draw_indexed_indirect(
+        indirect_buffer.handle(),
+        sizeof(uint32_t),
+        draw_count,
+        sizeof(VkDrawIndexedIndirectCommand)
+    );
 }
 
 void Renderer::render(VulkanCommandBuffer& command_buffer, InstancedRenderObject& instanced_render_object, glm::mat4 transform) {
