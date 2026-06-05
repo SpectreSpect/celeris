@@ -64,11 +64,11 @@ public:
     VoxelGrid(VoxelGrid&&) noexcept = default;
     VoxelGrid& operator=(VoxelGrid&&) noexcept = default;
 
-    void apply_writes_to_world_gpu(uint32_t write_count);
-    void apply_writes_to_world_from_cpu(
-        const std::vector<glm::ivec3>& positions,
-        const std::vector<VoxelDataGPU>& voxels
-    );
+    // void apply_writes_to_world_gpu(uint32_t write_count);
+    // void apply_writes_to_world_from_cpu(
+    //     const std::vector<glm::ivec3>& positions,
+    //     const std::vector<VoxelDataGPU>& voxels
+    // );
 
     void update();
 
@@ -123,7 +123,7 @@ public:
     struct VoxelGridPassInstances {
         PassInstance fill_buffer_pi;
         PassInstance world_init_pi;
-        PassInstance apply_writes_to_world_pi;
+        // PassInstance apply_writes_to_world_pi;
         PassInstance mesh_pool_clear_pi;
         PassInstance mesh_pool_seed_pi;
         PassInstance mesh_reset_pi;
@@ -190,5 +190,6 @@ private:
     void init_mesh_pool();
     void submit_compute_commands();
     void mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void mesh_count(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t pack_bits, uint32_t pack_offset);
     void build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, int pack_offset);
 };
