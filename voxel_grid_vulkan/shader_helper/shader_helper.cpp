@@ -45,5 +45,13 @@ void ShaderHelper::prepare_dispatch_args(VulkanCommandBuffer& command_buffer, Vu
     
     command_buffer.dispatch(1, 1, 1);
 
-    dispatch_args.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    // dispatch_args.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+
+    dispatch_args.memory_barrier(
+        command_buffer,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+        VK_ACCESS_INDIRECT_COMMAND_READ_BIT
+    );
 }

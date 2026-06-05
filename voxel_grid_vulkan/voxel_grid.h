@@ -70,6 +70,8 @@ public:
         const std::vector<VoxelDataGPU>& voxels
     );
 
+    void update();
+
 public:
     struct VoxelGridBuffers {
         VulkanBuffer chunk_hash_table;
@@ -101,6 +103,12 @@ public:
         VulkanBuffer mesh_pool_clear_uniform;
         VulkanBuffer mesh_pool_seed_uniform;
 
+        VulkanBuffer dispatch_args;
+
+        VulkanBuffer dirty_quad_count;
+        VulkanBuffer emit_counters;
+
+
         // vb_heads  vb_heads_ = BufferObject(sizeof(uint32_t) * (size_t)(vb_order_ + 1), GL_DYNAMIC_DRAW);
         // vb_state  vb_state_ = BufferObject(sizeof(uint32_t) * (size_t)count_vb_pages_, GL_DYNAMIC_DRAW);
         // vb_free_nodes_list   vb_free_nodes_list_ = BufferObject(sizeof(uint32_t) * (size_t)(1u + count_vb_nodes_), GL_DYNAMIC_DRAW);
@@ -118,6 +126,7 @@ public:
         PassInstance apply_writes_to_world_pi;
         PassInstance mesh_pool_clear_pi;
         PassInstance mesh_pool_seed_pi;
+        PassInstance mesh_reset_pi;
     };
 
     struct VoxelGridParams {
@@ -180,4 +189,6 @@ private:
     // void init_draw_buffers();
     void init_mesh_pool();
     void submit_compute_commands();
+    void mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, int pack_offset);
 };

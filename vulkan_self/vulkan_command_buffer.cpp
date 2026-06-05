@@ -2,6 +2,7 @@
 
 #include "vulkan_device.h"
 #include "vulkan_command_pool.h"
+#include "vulkan_buffer.h"
 
 #include <utility>
 
@@ -144,6 +145,14 @@ void VulkanCommandBuffer::dispatch(uint32_t x_groups, uint32_t y_groups, uint32_
     logger.check(m_command_buffer != VK_NULL_HANDLE, "Command buffer was not initialized");
 
     vkCmdDispatch(m_command_buffer, x_groups, y_groups, z_groups);
+}
+
+void VulkanCommandBuffer::dispatch_indirect(const VulkanBuffer& args) {
+    LOG_METHOD();
+
+    logger.check(m_command_buffer != VK_NULL_HANDLE, "Command buffer was not initialized");
+
+    vkCmdDispatchIndirect(m_command_buffer, args.handle(), 0);
 }
 
 void VulkanCommandBuffer::draw_indexed(uint32_t index_count, uint32_t instance_count, uint32_t first_index, 
