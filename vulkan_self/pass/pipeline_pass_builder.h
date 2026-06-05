@@ -17,6 +17,8 @@ public:
 
     PipelinePassBuilder() = default;
 
+    void set_descriptor_set_flags(VkDescriptorSetLayoutCreateFlags flags);
+
     void add_uniform_buffer(uint32_t binding, VkShaderStageFlags shader_stage_flags);
     void add_storage_buffer(uint32_t binding, VkShaderStageFlags shader_stage_flags);
     void add_combined_image_sampler(uint32_t binding, VkShaderStageFlags shader_stage_flags);
@@ -32,6 +34,6 @@ public:
     VulkanPipelineLayout create_pipeline_layout(VulkanDevice& device, const DescriptorSetLayout& material_ds_layout);
 
 private:
-    DescriptorSetLayoutBuilder m_material_dsl_builder;
+    DescriptorSetLayoutBuilder m_dsl_builder;
     PipelineLayoutBuilder m_pipeline_layout_builder;
 };

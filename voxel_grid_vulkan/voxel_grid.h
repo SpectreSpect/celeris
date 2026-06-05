@@ -13,7 +13,7 @@
 #include "../vulkan_self/vulkan_command_pool.h"
 #include "../vulkan_self/vulkan_fence.h"
 #include "voxel_grid_structures.h"
-
+#include "shader_helper/shader_helper.h"
 
 #include "../renderer/render_object.h"
 #include "../renderer/mesh_view.h"
@@ -50,7 +50,7 @@ public:
 public:
     VoxelGrid(
         const VulkanPhysicalDevice& physical_device,
-        const VulkanDevice& device,
+        VulkanDevice& device,
         VulkanQueue& queue,
         ComputePassManager& compute_pass_manager,
         MaterialInstanceManager& material_instance_manager,
@@ -162,6 +162,8 @@ private:
 
     MeshView m_mesh_view;
     RenderObject m_render_object;
+
+    ShaderHelper m_shader_helper;
     
 private:
     uint64_t vox_per_chunk() const noexcept;

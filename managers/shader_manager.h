@@ -41,6 +41,7 @@ public:
     VulkanShaderModule apply_writes_to_world_cs;
     VulkanShaderModule mesh_pool_clear_cs;
     VulkanShaderModule mesh_pool_seed_cs;
+    VulkanShaderModule dispatch_adapter_cs;
 
     // PBR
     VulkanShaderModule equirect_to_cubemap_cs;
