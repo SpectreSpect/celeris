@@ -13,6 +13,8 @@
 #include "../vulkan_self/vulkan_queue.h"
 #include "../vulkan_self/push_constants_structures.h"
 
+#include "shader_helper/buffer_dispatch_arg.h"
+
 VoxelGrid::VoxelGrid(
     const VulkanPhysicalDevice& physical_device,
     VulkanDevice& device,
@@ -96,13 +98,33 @@ VoxelGrid::VoxelGrid(
     // init_draw_buffers();
     init_mesh_pool();
 
-    // VulkanBuffer dispatch_args = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, (VkDeviceSize)sizeof(glm::uvec3));
-    // {
-    //     auto scope = m_command_buffer.begin_scope();
+    VulkanBuffer dispatch_args = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, (VkDeviceSize)sizeof(glm::uvec3));
+
+    VulkanBuffer arg_x = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, sizeof(uint32_t));
+    VulkanBuffer arg_y = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, sizeof(uint32_t));
+    VulkanBuffer arg_z = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, sizeof(uint32_t));
+
+    uint32_t x = 1000;
+    uint32_t y = 2222;
+    uint32_t z = 4444;
+
+    arg_x.upload(&x, sizeof(uint32_t));
+    arg_y.upload(&y, sizeof(uint32_t));
+    arg_z.upload(&z, sizeof(uint32_t));
+
+    {
+        auto scope = m_command_buffer.begin_scope();
     
-    //     m_shader_helper.prepare_dispatch_args(m_command_buffer, dispatch_args, ValueDispatchArg(1000), ValueDispatchArg(1000), ValueDispatchArg(1000));
-    // }
-    // submit_compute_commands();
+        // m_shader_helper.prepare_dispatch_args(m_command_buffer, dispatch_args, DispatchArg(&arg_x, 0, 32432), ValueDispatchArg(1000), ValueDispatchArg(1000));
+        m_shader_helper.prepare_dispatch_args(m_command_buffer, dispatch_args, BufferDispatchArg(&arg_x), BufferDispatchArg(&arg_y), BufferDispatchArg(&arg_z));
+    }
+
+    submit_compute_commands();
+
+    glm::uvec3 args;
+    dispatch_args.read(&args, sizeof(glm::uvec3), 0);
+
+    std::cout << args.x << " " << args.y << " " << args.z << std::endl;
 }
 
 uint64_t VoxelGrid::vox_per_chunk() const noexcept {
