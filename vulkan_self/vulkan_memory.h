@@ -156,13 +156,15 @@ private:
     static uint32_t find_memory_type(
         VkPhysicalDevice physical_device,
         uint32_t type_filter,
-        VkMemoryPropertyFlags properties
+        VkMemoryPropertyFlags required_properties,
+        VkDeviceSize allocation_size
     );
 
     static uint32_t find_memory_type(
         const VulkanPhysicalDevice& physical_device,
         uint32_t type_filter,
-        VkMemoryPropertyFlags properties
+        VkMemoryPropertyFlags required_properties,
+        VkDeviceSize allocation_size
     );
 
     static VkMemoryPropertyFlags get_memory_type_properties(

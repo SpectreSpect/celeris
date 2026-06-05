@@ -7,12 +7,12 @@
 
 namespace {
 constexpr std::array<const char*, TextureManager::max_pbr_cubemap_count> pbr_hdr_filenames = {
-    "studio_kominka_02_4k.hdr",
-    "st_peters_square_night_4k.hdr",
-    "ferndale_studio_06_4k.hdr",
-    "qwantani_moonrise_puresky_4k.hdr",
-    "citrus_orchard_puresky_4k.hdr",
-    "moonless_golf_4k.hdr"
+    // "studio_kominka_02_4k.hdr",
+    "st_peters_square_night_4k.hdr"
+    // "ferndale_studio_06_4k.hdr",
+    // "qwantani_moonrise_puresky_4k.hdr",
+    // "citrus_orchard_puresky_4k.hdr",
+    // "moonless_golf_4k.hdr"
 };
 }
 
@@ -51,11 +51,9 @@ TextureManager::TextureManager(VulkanEngine& engine, VulkanResourceLoader& resou
 
     resource_loader.submit();
 
-    dirt_env_map.emplace(equirect_to_cubemap_pass.generate(dirt_texture, 100));
-
     hdr_env_maps.reserve(hdr_textures.size());
     for (uint32_t pbr_map_id = 0; pbr_map_id < hdr_textures.size(); ++pbr_map_id) {
-        hdr_env_maps.emplace_back(equirect_to_cubemap_pass.generate(hdr_textures[pbr_map_id], 2048));
+        hdr_env_maps.emplace_back(equirect_to_cubemap_pass.generate(hdr_textures[pbr_map_id], 1024));
         generate_pbr_maps(hdr_env_maps.back(), pbr_map_id);
     }
 }
