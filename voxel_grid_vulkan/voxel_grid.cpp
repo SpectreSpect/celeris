@@ -110,7 +110,7 @@ void VoxelGrid::mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuff
     m_pass_instances.mesh_reset_pi.set_storage_buffer(2, m_buffers.emit_counters);
 
     m_pass_instances.mesh_reset_pi.bind(command_buffer);
-    
+
     command_buffer.dispatch_indirect(dispatch_args);
 
     m_buffers.dirty_quad_count.memory_barrier_compute_write_to_compute_write_read(command_buffer);
@@ -667,44 +667,11 @@ void VoxelGrid::apply_writes_to_world_from_cpu(
 }
 
 void VoxelGrid::update() {
-    uint32_t dirty_count = 123;
-    std::vector<uint32_t> dirty_list(5, 0);
-
-    m_buffers.dirty_list.read(&dirty_count, sizeof(uint32_t), 0);
-    m_buffers.dirty_list.read(dirty_list.data(), dirty_list.size() * sizeof(uint32_t), sizeof(uint32_t));
-
-    std::cout << "dirty count: " << dirty_count << std::endl;
-
-    for (int i = 0; i < dirty_list.size(); i++) {
-        std::cout << "dirty slot " << i << ": " << dirty_list[i] << std::endl;
-    }
-
-    std::cout << std::endl;
-
     {
         auto scope = m_command_buffer.begin_scope();
         build_mesh_from_dirty(m_command_buffer, 0, 0);
     }
     submit_compute_commands();
-
-    // m_pass_instances.mesh_reset_pi.set_storage_buffer(0, m_buffers.dirty_list); // readonly
-    // m_pass_instances.mesh_reset_pi.set_storage_buffer(1, m_buffers.dirty_quad_count);
-    // m_pass_instances.mesh_reset_pi.set_storage_buffer(2, m_buffers.emit_counters);
-
-    // VkDeviceSize dirty_quad_count_size = sizeof(uint32_t) * m_params.count_active_chunks;
-    // VkDeviceSize emit_counters_size = sizeof(uint32_t) * m_params.count_active_chunks;
-    
-    std::vector<uint32_t> dirty_quad_count(5, 0);
-    std::vector<uint32_t> emit_counter_count(5, 0);
-
-    m_buffers.dirty_quad_count.read(dirty_quad_count.data(), dirty_quad_count.size() * sizeof(uint32_t), 0);
-    m_buffers.emit_counters.read(emit_counter_count.data(), emit_counter_count.size() * sizeof(uint32_t), 0);
-
-    for (int i = 0; i < dirty_quad_count.size(); i++) {
-        std::cout << "dirty_quad_count: " << dirty_quad_count[i] << "   emit_counter: " << emit_counter_count[i] << std::endl;
-    }
-
-    std::cout << std::endl;
 }
 
 void VoxelGrid::submit_compute_commands() {
