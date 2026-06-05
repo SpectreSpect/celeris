@@ -280,6 +280,17 @@ public:
         VkDeviceSize size_bytes
     );
 
+    static VulkanBuffer create_host_visible_indirect_storage_buffer(
+        const VulkanPhysicalDevice& physical_device,
+        const VulkanDevice& device,
+        VkDeviceSize size_bytes
+    );
+
+    static VulkanBuffer create_host_visible_indirect_storage_buffer(
+        const VulkanEngine& engine,
+        VkDeviceSize size_bytes
+    );
+
     static VulkanBuffer create_host_visible_transfer_dst_storage_buffer(
         const VulkanPhysicalDevice& physical_device,
         const VulkanDevice& device,
