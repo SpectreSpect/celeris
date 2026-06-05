@@ -5,7 +5,7 @@
 #include "descriptor_set_layout_builder.h"
 #include <vulkan/vk_enum_string_helper.h>
 
-DescriptorSetLayout::DescriptorSetLayout(const VulkanDevice& device, std::span<const VkDescriptorSetLayoutBinding> bindings
+DescriptorSetLayout::DescriptorSetLayout(const VulkanDevice& device, std::span<const VkDescriptorSetLayoutBinding> bindings, VkDescriptorSetLayoutCreateFlags flags
 ) : m_device(device.handle())  {
     LOG_METHOD();
 
@@ -16,6 +16,7 @@ DescriptorSetLayout::DescriptorSetLayout(const VulkanDevice& device, std::span<c
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
     layoutInfo.pBindings = bindings.data();
+    layoutInfo.flags = flags;
 
     VkResult result = vkCreateDescriptorSetLayout(device.handle(), &layoutInfo, nullptr, &m_layout);
 
@@ -23,7 +24,7 @@ DescriptorSetLayout::DescriptorSetLayout(const VulkanDevice& device, std::span<c
 }
 
 DescriptorSetLayout::DescriptorSetLayout(const VulkanDevice& device, const DescriptorSetLayoutBuilder& builder
-) : DescriptorSetLayout(device, builder.get_bindings()) {}
+) : DescriptorSetLayout(device, builder.get_bindings(), builder.flags()) {}
 
 DescriptorSetLayout::DescriptorSetLayout(DescriptorSetLayout&& other) noexcept
     :   m_layout(std::exchange(other.m_layout, VK_NULL_HANDLE)),

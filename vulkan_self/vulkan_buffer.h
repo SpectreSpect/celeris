@@ -174,6 +174,8 @@ public:
         VkDeviceSize size_bytes = VK_WHOLE_SIZE
     ) const;
 
+    void memory_barrier_compute_write_to_compute_write_read(VulkanCommandBuffer& command_buffer) const;
+
     void transfer_write_to_vertex_read_barrier(
         VulkanCommandBuffer& command_buffer,
         VkDeviceSize offset_bytes = 0,

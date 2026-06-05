@@ -393,6 +393,16 @@ void VulkanBuffer::memory_barrier(
     );
 }
 
+void VulkanBuffer::memory_barrier_compute_write_to_compute_write_read(VulkanCommandBuffer& command_buffer) const {
+    memory_barrier(
+        command_buffer,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+    );
+}
+
 void VulkanBuffer::transfer_write_to_vertex_read_barrier(
     VulkanCommandBuffer& command_buffer,
     VkDeviceSize offset_bytes,

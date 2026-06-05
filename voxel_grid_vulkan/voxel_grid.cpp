@@ -15,7 +15,7 @@
 
 VoxelGrid::VoxelGrid(
     const VulkanPhysicalDevice& physical_device,
-    const VulkanDevice& device,
+    VulkanDevice& device,
     VulkanQueue& queue,
     ComputePassManager& compute_pass_manager,
     MaterialInstanceManager& material_instance_manager,
@@ -30,7 +30,8 @@ VoxelGrid::VoxelGrid(
         m_pass_instances(create_pass_instances(compute_pass_manager)),
         m_buffers(create_buffers(physical_device, device, m_command_buffer)),
         m_mesh_view(m_buffers.global_vertex_buffer.get_view(), m_buffers.global_index_buffer.get_view(), m_params.max_mesh_indices),
-        m_render_object(m_mesh_view, material_instance_manager.pbr)
+        m_render_object(m_mesh_view, material_instance_manager.pbr),
+        m_shader_helper(device, compute_pass_manager)
 {
     LOG_METHOD();
 
@@ -94,6 +95,14 @@ VoxelGrid::VoxelGrid(
     world_init_gpu();
     // init_draw_buffers();
     init_mesh_pool();
+
+    // VulkanBuffer dispatch_args = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, (VkDeviceSize)sizeof(glm::uvec3));
+    // {
+    //     auto scope = m_command_buffer.begin_scope();
+    
+    //     m_shader_helper.prepare_dispatch_args(m_command_buffer, dispatch_args, ValueDispatchArg(1000), ValueDispatchArg(1000), ValueDispatchArg(1000));
+    // }
+    // submit_compute_commands();
 }
 
 uint64_t VoxelGrid::vox_per_chunk() const noexcept {
@@ -338,7 +347,7 @@ void VoxelGrid::world_init_gpu() {
         );
     }
 
-    submit_compute_commands();
+    // submit_compute_commands();
 }
 
 // void VoxelGridGPU::init_mesh_pool() {
@@ -490,8 +499,6 @@ void VoxelGrid::init_mesh_pool() {
         compute_write_to_compute_read_write(m_buffers.ib_state);
         compute_write_to_compute_read_write(m_buffers.ib_free_nodes_list);
     }
-
-    submit_compute_commands();
 }
 
 // void VoxelGridGPU::init_draw_buffers() {

@@ -12,7 +12,7 @@ class DescriptorSetLayout {
 public:
     _XCLASS_NAME(DescriptorSetLayout);
 
-    explicit DescriptorSetLayout(const VulkanDevice& device, std::span<const VkDescriptorSetLayoutBinding> bindings);
+    explicit DescriptorSetLayout(const VulkanDevice& device, std::span<const VkDescriptorSetLayoutBinding> bindings, VkDescriptorSetLayoutCreateFlags flags = 0);
     explicit DescriptorSetLayout(const VulkanDevice& device, const DescriptorSetLayoutBuilder& builder);
 
     DescriptorSetLayout(const DescriptorSetLayout&) = delete;

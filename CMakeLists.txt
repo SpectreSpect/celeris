@@ -91,7 +91,6 @@ add_executable(app
   vulkan_self/pass/pipeline_pass_builder.cpp
   vulkan_self/pass/instance/slot_pass_object.cpp
   vulkan_self/pass/instance/slot_pass_instance.cpp
-
   renderer/instanced_render_object.cpp
   renderer/instance_batch.cpp
   renderer/instance_buffer_view.cpp
@@ -110,6 +109,9 @@ add_executable(app
   imgui_layer.cpp
   renderer/lighting_system/lighting_system.cpp
   voxel_grid_vulkan/voxel_grid.cpp
+  voxel_grid_vulkan/shader_helper/shader_helper.cpp
+  voxel_grid_vulkan/shader_helper/dispatch_arg.cpp
+  voxel_grid_vulkan/shader_helper/value_dispatch_arg.cpp
   vulkan_self/buffer_filler.cpp
   renderer/pbr/equirect_to_cubemap_pass.cpp
   renderer/pbr/brdf_lut_pass.cpp

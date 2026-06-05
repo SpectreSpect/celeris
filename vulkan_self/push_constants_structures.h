@@ -29,3 +29,17 @@ struct ApplyVoxelWritesPushConstants {
     uint32_t u_pack_bits;
     int32_t u_pack_offset;
 };
+
+struct DispatchAdapterPushConstants {
+    uint32_t u_offset_bytes_0;
+    uint32_t u_offset_bytes_1;
+    uint32_t u_offset_bytes_2;
+
+    uint32_t u_direct_value_0;
+    uint32_t u_direct_value_1;
+    uint32_t u_direct_value_2;
+
+    uint32_t u_x_workgroup_size;
+    uint32_t u_y_workgroup_size;
+    uint32_t u_z_workgroup_size;
+};

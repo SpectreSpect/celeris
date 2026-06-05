@@ -26,6 +26,7 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         apply_writes_to_world_cp(create_apply_writes_to_world_compute_pass(device, shader_manager.apply_writes_to_world_cs)),
         mesh_pool_clear_cp(create_mesh_pool_clear_compute_pass(device, shader_manager.mesh_pool_clear_cs)),
         mesh_pool_seed_cp(create_mesh_pool_seed_compute_pass(device, shader_manager.mesh_pool_seed_cs)),
+        dispatch_adapter_cp(create_dispatch_adapter_compute_pass(device, shader_manager.dispatch_adapter_cs)),
 
         // PBR
         equirect_to_cubemap_cp(create_equirect_to_cubemap_compute_pass(device, shader_manager.equirect_to_cubemap_cs)),
@@ -113,6 +114,23 @@ ComputePass ComputePassManager::create_gicp_reduce_compute_pass(VulkanDevice& de
     builder.add_uniform_buffer(0, ShaderStages::compute); // UniformBufferObject
     builder.add_storage_buffer(1, ShaderStages::compute); // SourcePartialBuffer
     builder.add_storage_buffer(2, ShaderStages::compute); // OutputPartialBuffer
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_dispatch_adapter_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.set_descriptor_set_flags(VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // Buffer0
+    builder.add_storage_buffer(1, ShaderStages::compute); // Buffer1
+    builder.add_storage_buffer(2, ShaderStages::compute); // Buffer2
+    builder.add_storage_buffer(3, ShaderStages::compute); // DispatchBuf
+
+    builder.add_push_constantsf(sizeof(DispatchAdapterPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }

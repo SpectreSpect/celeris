@@ -34,6 +34,7 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         apply_writes_to_world_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "apply_writes_to_world.comp.spv"),
         mesh_pool_clear_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_pool_clear.comp.spv"),
         mesh_pool_seed_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_pool_seed.comp.spv"),
+        dispatch_adapter_cs(device, path_utils::executable_dir() / "shaders" / "dispatch_adapter.comp.spv"),
 
         // PBR
         equirect_to_cubemap_cs(device, path_utils::executable_dir() / "shaders" / "equirect_to_cubemap.comp.spv"),
