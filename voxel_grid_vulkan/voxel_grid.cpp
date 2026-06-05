@@ -211,6 +211,31 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
 
     VkDeviceSize chunk_mesh_alloc_size = sizeof(ChunkMeshAlloc) * m_params.count_active_chunks;
 
+    VkDeviceSize total_size = 
+        free_list_size + 
+        chunk_hash_table_size + 
+        mesh_buffers_status_size +
+        chunk_meta_size +
+        enqueued_size + 
+        dirty_list_size +
+        voxel_write_list_size + 
+        voxels_size +
+        indirect_cmds_size +
+        failed_dirty_list_size +
+        global_vertex_buffer_size +
+        global_index_buffer_size +
+        vb_heads_size +
+        vb_nodes_size +
+        vb_state_size +
+        vb_free_nodes_list_size +
+        ib_heads_size +
+        ib_nodes_size +
+        ib_state_size +
+        ib_free_nodes_list_size +
+        chunk_mesh_alloc_size;
+
+    VulkanBuffer vertex_buffer = VulkanBuffer::create_vertex_buffer(physical_device, device, global_vertex_buffer_size);
+
     
     return VoxelGridBuffers {
         // .chunk_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_hash_table_size),
@@ -239,7 +264,7 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         ),
-        .global_vertex_buffer = VulkanBuffer::create_vertex_buffer(physical_device, device, global_vertex_buffer_size),
+        .global_vertex_buffer = std::move(vertex_buffer),
         .global_index_buffer =  VulkanBuffer::create_index_buffer(physical_device, device, global_index_buffer_size),
 
         .vb_heads = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, vb_heads_size),

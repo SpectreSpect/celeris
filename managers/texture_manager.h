@@ -23,14 +23,14 @@ private:
     VulkanResourceLoader& m_resource_loader;
 
 public:
-    static constexpr uint32_t studio_kominka_02_4k_pbr_map_id = 0;
-    static constexpr uint32_t st_peters_square_night_4k_pbr_map_id = 1;
-    static constexpr uint32_t ferndale_studio_06_4k_pbr_map_id = 2;
-    static constexpr uint32_t qwantani_moonrise_puresky_4k_pbr_map_id = 3;
-    static constexpr uint32_t citrus_orchard_puresky_4k_pbr_map_id = 4;
-    static constexpr uint32_t moonless_golf_4k_pbr_map_id = 5;
+    // static constexpr uint32_t studio_kominka_02_4k_pbr_map_id = 0;
+    static constexpr uint32_t st_peters_square_night_4k_pbr_map_id = 0;
+    // static constexpr uint32_t ferndale_studio_06_4k_pbr_map_id = 2;
+    // static constexpr uint32_t qwantani_moonrise_puresky_4k_pbr_map_id = 3;
+    // static constexpr uint32_t citrus_orchard_puresky_4k_pbr_map_id = 4;
+    // static constexpr uint32_t moonless_golf_4k_pbr_map_id = 5;
 
-    static constexpr uint32_t max_pbr_cubemap_count = 6;
+    static constexpr uint32_t max_pbr_cubemap_count = 1;
 
     EquirectToCubemapPass equirect_to_cubemap_pass;
     BrdfLutPass brdf_lut_pass;
@@ -45,8 +45,6 @@ public:
     VulkanTexture2D rock_texture;
     std::vector<VulkanTexture2D> hdr_textures;
     std::vector<Cubemap> hdr_env_maps;
-
-    std::optional<Cubemap> dirt_env_map = std::nullopt;
 
     TextureManager(VulkanEngine& engine, VulkanResourceLoader& resource_loader, ComputePassManager& compute_pass_manager);
 

@@ -390,10 +390,10 @@ int main() {
 
                 ImGui::Begin("Debug");
 
-                if (ImGui::Button("Previous frame")) {
-                    pending_skybox_environment_map_id = TextureManager::studio_kominka_02_4k_pbr_map_id;
-                    skybox_environment_update_pending = true;
-                }
+                // if (ImGui::Button("Previous frame")) {
+                //     pending_skybox_environment_map_id = TextureManager::studio_kominka_02_4k_pbr_map_id;
+                //     skybox_environment_update_pending = true;
+                // }
 
                 ImGui::End();
                 

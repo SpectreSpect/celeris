@@ -74,7 +74,6 @@ MaterialPass MaterialManager::create_unlit_pass(VulkanEngine& engine, FrameResou
         glm::vec4 position;
         glm::vec4 normal;
         glm::vec2 uv;
-        glm::vec4 tangent;
     };
 
     MaterialPassBuilder builder;
@@ -90,7 +89,6 @@ MaterialPass MaterialManager::create_unlit_pass(VulkanEngine& engine, FrameResou
     builder.add_vertex_attribute(0, 0, Formats::vec4, offsetof(UnlitVertex, position));
     builder.add_vertex_attribute(1, 0, Formats::vec4, offsetof(UnlitVertex, normal));
     builder.add_vertex_attribute(2, 0, Formats::vec2, offsetof(UnlitVertex, uv));
-    builder.add_vertex_attribute(3, 0, Formats::vec4, offsetof(UnlitVertex, tangent));
 
     return create_pass(engine, builder, vs, fs);
 }
