@@ -13,6 +13,8 @@
 #include "../vulkan_self/vulkan_queue.h"
 #include "../vulkan_self/push_constants_structures.h"
 
+#include "shader_helper/buffer_dispatch_arg.h"
+
 VoxelGrid::VoxelGrid(
     const VulkanPhysicalDevice& physical_device,
     VulkanDevice& device,
@@ -95,14 +97,6 @@ VoxelGrid::VoxelGrid(
     world_init_gpu();
     // init_draw_buffers();
     init_mesh_pool();
-
-    // VulkanBuffer dispatch_args = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, (VkDeviceSize)sizeof(glm::uvec3));
-    // {
-    //     auto scope = m_command_buffer.begin_scope();
-    
-    //     m_shader_helper.prepare_dispatch_args(m_command_buffer, dispatch_args, ValueDispatchArg(1000), ValueDispatchArg(1000), ValueDispatchArg(1000));
-    // }
-    // submit_compute_commands();
 }
 
 uint64_t VoxelGrid::vox_per_chunk() const noexcept {
