@@ -100,6 +100,48 @@ VoxelGrid::VoxelGrid(
     world_init_gpu();
     // init_draw_buffers();
     init_mesh_pool();
+
+
+    m_buffers.load_list.upload(std::vector<uint32_t>{1, 2, 3});
+    std::vector<uint32_t> load_list_before = m_buffers.load_list.read_vector<uint32_t>(3);
+    
+    {
+        auto scope = m_command_buffer.begin_scope();
+        reset_load_list_counter(m_command_buffer);
+    }
+    submit_compute_commands();
+
+    std::vector<uint32_t> load_list_after = m_buffers.load_list.read_vector<uint32_t>(3);
+
+    logger.log() << "Load list before reset_load_list_counter:\n";
+    for (uint32_t value : load_list_before) {
+        logger.log() << clr(std::to_string(value), LoggerPalette::orange) << "\n";
+    }
+
+    std::cout << std::endl;
+
+    logger.log() << "Load list after reset_load_list_counter:\n";
+    for (uint32_t value : load_list_after) {
+        logger.log() << clr(std::to_string(value), LoggerPalette::blue) << "\n";
+    }
+
+    std::cout << std::endl;
+    
+
+    {
+        auto scope = m_command_buffer.begin_scope();
+        mark_chunk_to_generate(m_command_buffer, {0.0f, 0.0f, 0.0f}, 5);
+    }
+    submit_compute_commands();
+
+    std::vector<uint32_t> load_list_after_mark = m_buffers.load_list.read_vector<uint32_t>(3);
+
+    logger.log() << "Load list after mark_chunk_to_generate:\n";
+    for (uint32_t value : load_list_after_mark) {
+        logger.log() << clr(std::to_string(value), LoggerPalette::red) << "\n";
+    }
+
+    
 }
 
 void VoxelGrid::mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args) {
@@ -296,7 +338,13 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         // .dirty_list = VulkanBuffer::create_storage_buffer(physical_device, device, dirty_list_size),
         .mesh_buffers_status = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, mesh_buffers_status_size),
         .dirty_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, dirty_list_size),
-        .load_list = VulkanBuffer::create_storage_buffer(physical_device, device, load_list_size),
+        .load_list = VulkanBuffer(
+            physical_device,
+            device,
+            load_list_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        ),
         .voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, voxel_write_list_size),
         .voxels = VulkanBuffer(
             physical_device,
