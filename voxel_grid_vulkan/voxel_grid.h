@@ -135,6 +135,7 @@ public:
         PassInstance mesh_count_pi;
         PassInstance mesh_alloc_vb_pi;
         PassInstance mesh_alloc_ib_pi;
+        PassInstance verify_mesh_allocation_pi;
         PassInstance stream_select_chunks_pi;
     };
 
@@ -205,8 +206,9 @@ private:
 
     void mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void mesh_count(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t pack_bits, int32_t pack_offset); // not checked
-    void mesh_alloc_vb(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
-    void mesh_alloc_ib(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
-    void mesh_alloc(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void mesh_alloc_vb(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args); // not checked
+    void mesh_alloc_ib(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args); // not checked
+    void mesh_alloc(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args); // not checked
+    void verify_mesh_allocation(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args); // not checked
     void build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, int pack_offset);
 };

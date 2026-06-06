@@ -83,3 +83,7 @@ struct MeshAllocPushConstants {
     uint32_t u_is_vb_phase;
 };
 
+struct VerifyMeshAllocationPushConstants {
+    uint32_t vb_max_order;
+    uint32_t ib_max_order;
+};
