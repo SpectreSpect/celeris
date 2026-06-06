@@ -27,6 +27,7 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         mesh_pool_clear_cp(create_mesh_pool_clear_compute_pass(device, shader_manager.mesh_pool_clear_cs)),
         mesh_pool_seed_cp(create_mesh_pool_seed_compute_pass(device, shader_manager.mesh_pool_seed_cs)),
         dispatch_adapter_cp(create_dispatch_adapter_compute_pass(device, shader_manager.dispatch_adapter_cs)),
+        stream_select_chunks_cp(create_stream_select_chunks_compute_pass(device, shader_manager.stream_select_chunks_cs)),
 
         // PBR
         equirect_to_cubemap_cp(create_equirect_to_cubemap_compute_pass(device, shader_manager.equirect_to_cubemap_cs)),
@@ -241,6 +242,22 @@ ComputePass ComputePassManager::create_mesh_pool_seed_compute_pass(VulkanDevice&
     builder.add_uniform_buffer(8, ShaderStages::compute); // UniformBuffer
 
     // builder.add_push_constantsf(sizeof(ApplyVoxelWritesPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_stream_select_chunks_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // ChunkHashTable
+    builder.add_storage_buffer(1, ShaderStages::compute); // FreeList
+    builder.add_storage_buffer(2, ShaderStages::compute); // ChunkMetaBuf
+    builder.add_storage_buffer(3, ShaderStages::compute); // EnqueuedBuf
+    builder.add_storage_buffer(4, ShaderStages::compute); // LoadList
+    
+    builder.add_push_constantsf(sizeof(StreamSelectChunksPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }

@@ -80,6 +80,7 @@ public:
         VulkanBuffer failed_dirty_list;
         VulkanBuffer mesh_buffers_status;
         VulkanBuffer dirty_list;
+        VulkanBuffer load_list;
         VulkanBuffer voxel_write_list;
         VulkanBuffer voxels;
 
@@ -118,6 +119,7 @@ public:
         PassInstance apply_writes_to_world_pi;
         PassInstance mesh_pool_clear_pi;
         PassInstance mesh_pool_seed_pi;
+        PassInstance stream_select_chunks_pi;
     };
 
     struct VoxelGridParams {
@@ -180,4 +182,8 @@ private:
     // void init_draw_buffers();
     void init_mesh_pool();
     void submit_compute_commands();
+
+    void reset_load_list_counter(VulkanCommandBuffer& command_buffer);
+    void mark_chunk_to_generate(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks);
+    void stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks, uint32_t seed);
 };

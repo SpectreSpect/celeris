@@ -10,6 +10,7 @@
 class DescriptorSetLayoutBuilder {
 public:
     _XCLASS_NAME(DescriptorSetLayout);
+    VkDescriptorSetLayoutCreateFlags m_flags = 0;
 
     DescriptorSetLayoutBuilder() = default;
 
@@ -26,5 +27,5 @@ public:
 
 private:
     std::vector<VkDescriptorSetLayoutBinding> m_bindings;
-    VkDescriptorSetLayoutCreateFlags m_flags = 0;
+
 };
