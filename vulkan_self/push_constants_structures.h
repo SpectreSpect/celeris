@@ -91,3 +91,11 @@ struct VerifyMeshAllocationPushConstants {
 struct ReturnFreeAllocNodesPushConstants {
     glm::uvec4 u3_chunk_size;
 };
+
+struct MarkWriteChunksToGeneratePushConstants {
+    glm::uvec4 u_chunk_dim;
+
+    uint32_t u_chunk_hash_table_size;
+    uint32_t u_pack_offset;
+    uint32_t u_pack_bits;
+};

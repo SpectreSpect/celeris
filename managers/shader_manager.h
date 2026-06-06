@@ -51,6 +51,7 @@ public:
     VulkanShaderModule stream_select_chunks_cs;
     VulkanShaderModule insert_elements_to_voxel_write_list_cs;
     VulkanShaderModule add_voxel_write_list_counters_together_cs;
+    VulkanShaderModule mark_write_chunks_to_generate_cs;
 
     // PBR
     VulkanShaderModule equirect_to_cubemap_cs;
