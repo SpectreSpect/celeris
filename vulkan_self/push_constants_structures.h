@@ -112,3 +112,15 @@ struct MeshEmitPushConstants {
     uint32_t u_chunk_hash_table_size;
     uint32_t u_voxels_per_chunk;
 };
+
+struct StreamGenerateTerrainPushConstants {
+    glm::ivec4 u_chunk_dim;
+    uint32_t u_voxels_per_chunk;
+
+    uint32_t u_pack_bits;
+    int32_t  u_pack_offset;
+
+    uint32_t u_seed;
+
+    uint32_t u_chunk_hash_table_size;
+};

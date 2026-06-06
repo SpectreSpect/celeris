@@ -13,7 +13,7 @@ void mark_dirty(uint chunkId) {
     }
 }
 
-void try_mark_neighbor(ivec3 ncoord, bool read_only = false) {
+void try_mark_neighbor(ivec3 ncoord, bool read_only) {
     uint slot_id = chunk_hash_table_lookup_hash_table_slot_id(pack_key_uvec2(ncoord, u_pack_offset, u_pack_bits), read_only);
     if (slot_id == INVALID_ID) return;
 
@@ -23,6 +23,10 @@ void try_mark_neighbor(ivec3 ncoord, bool read_only = false) {
     if (used == 1u) {
         mark_dirty(chunk_id);
     }
+}
+
+void try_mark_neighbor(ivec3 ncoord) {
+    try_mark_neighbor(ncoord, false);
 }
 
 void mark_dirty_around(uint chunkId, ivec3 chunk_coord) {

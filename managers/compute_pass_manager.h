@@ -50,6 +50,7 @@ public:
     ComputePass insert_elements_to_voxel_write_list_cp;
     ComputePass add_voxel_write_list_counters_together_cp;
     ComputePass mark_write_chunks_to_generate_cp;
+    ComputePass stream_generate_terrain_cp;
 
     // PBR
     ComputePass equirect_to_cubemap_cp;
@@ -101,6 +102,7 @@ public:
     ComputePass create_insert_elements_to_voxel_write_list_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_add_voxel_write_list_counters_together_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_mark_write_chunks_to_generate_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_stream_generate_terrain_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
 private:
     DescriptorPool m_pool;
