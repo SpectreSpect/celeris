@@ -1,10 +1,6 @@
-#ifndef CHUNK_HASH_TABLE_POP_FREE_CHUNK_ID_GLSL
-#define CHUNK_HASH_TABLE_POP_FREE_CHUNK_ID_GLSL
+#ifndef CHUNK_HASH_TABLE_POP_FREE_CHUNK_ID
+#define CHUNK_HASH_TABLE_POP_FREE_CHUNK_ID
 
-// Expected external symbols:
-//   free_count - SSBO uint lvalue
-//   free_list[] - SSBO array of free chunk ids
-//   INVALID_ID
 uint pop_free_chunk_id(uvec2 key, out bool success) {
     for (;;) {
         uint old_counter = atomicAdd(free_count, 0u);
@@ -21,4 +17,4 @@ uint pop_free_chunk_id(uvec2 key, out bool success) {
     }
 }
 
-#endif // CHUNK_HASH_TABLE_POP_FREE_CHUNK_ID_GLSL
+#endif

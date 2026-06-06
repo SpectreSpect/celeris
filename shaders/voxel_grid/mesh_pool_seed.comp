@@ -30,7 +30,7 @@ layout(std140, set = 0, binding=8) uniform UniformBuffer  {
 
 // ----- include -----
 // #include "../utils.glsl" <--- original path
-#include "utils.inc"
+#include "../common/utils.inc"
 #include "../common/allocator.inc"
 // -------------------
 

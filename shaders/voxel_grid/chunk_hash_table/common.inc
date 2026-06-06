@@ -1,12 +1,8 @@
-#ifndef CHUNK_HASH_TABLE_COMMON_GLSL
-#define CHUNK_HASH_TABLE_COMMON_GLSL
-
-// Vulkan GLSL include file. Do not put #version here.
-// Requires GL_GOOGLE_include_directive in the including shader.
-// Pulls in the common template-like hash-table implementation for ChunkHashTableSlot.
+#ifndef CHUNK_HASH_TABLE_COMMON
+#define CHUNK_HASH_TABLE_COMMON
 
 #include "config_begin.inc"
 #include "../../common/hash_table/hash_table_common_impl.inc"
 #include "config_end.inc"
 
-#endif // CHUNK_HASH_TABLE_COMMON_GLSL
+#endif

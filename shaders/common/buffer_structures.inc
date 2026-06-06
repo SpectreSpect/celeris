@@ -23,7 +23,7 @@ struct ChunkMeshAlloc {
     uint i_startPage;
     uint i_order;
     uint needI;
-    bool is_valid;
+    uint is_valid;
 };
 
 struct Node {
