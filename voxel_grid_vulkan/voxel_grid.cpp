@@ -350,6 +350,75 @@ void VoxelGrid::return_free_alloc_nodes(VulkanCommandBuffer& command_buffer, Vul
     m_buffers.ib_returned_nodes_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
+void VoxelGrid::mesh_emit(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args, uint32_t pack_bits, int32_t pack_offset) {
+    m_pass_instances.mesh_emit_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+    m_pass_instances.mesh_emit_pi.set_storage_buffer(1, m_buffers.voxels);
+    m_pass_instances.mesh_emit_pi.set_storage_buffer(2, m_buffers.mesh_buffers_status);
+    m_pass_instances.mesh_emit_pi.set_storage_buffer(3, m_buffers.dirty_list);
+    m_pass_instances.mesh_emit_pi.set_storage_buffer(4, m_buffers.emit_counters);
+    m_pass_instances.mesh_emit_pi.set_storage_buffer(5, m_buffers.chunk_mesh_alloc);
+
+    m_pass_instances.mesh_emit_pi.set_storage_buffer(6, m_buffers.chunk_meta);
+
+    m_pass_instances.mesh_emit_pi.set_storage_buffer(7, m_buffers.global_vertex_buffer);
+    m_pass_instances.mesh_emit_pi.set_storage_buffer(8, m_buffers.global_index_buffer);
+
+    m_pass_instances.mesh_emit_pi.push_constants(m_command_buffer, MeshEmitPushConstants{
+        .u_chunk_dim = glm::uvec4(m_params.chunk_size, 0),
+        .u_voxel_size = glm::uvec4(m_params.voxel_size, 0),
+
+        .u_pack_bits = pack_bits,
+        .u_pack_offset = pack_offset,
+
+        .u_vb_page_verts = m_params.vb_page_size,
+        .u_ib_page_inds = m_params.ib_page_size,
+
+        .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
+        .u_voxels_per_chunk = static_cast<uint32_t>(vox_per_chunk())
+    });
+
+    m_pass_instances.mesh_emit_pi.bind(command_buffer);
+
+    command_buffer.dispatch_indirect(dispatch_args);
+
+    m_buffers.chunk_hash_table.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.mesh_buffers_status.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.emit_counters.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.chunk_mesh_alloc.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.global_vertex_buffer.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.global_index_buffer.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+
+    // chunk_hash_table_.bind_base_as_ssbo(0);
+    // voxels_.bind_base_as_ssbo(1);
+    // mesh_buffers_status_.bind_base_as_ssbo(2);
+    // dirty_list_.bind_base_as_ssbo(3);
+    // emit_counters_.bind_base_as_ssbo(4);
+    // chunk_mesh_alloc_.bind_base_as_ssbo(5);
+
+    // chunk_meta_.bind_base_as_ssbo(6);
+
+    // global_vertex_buffer_.bind_base_as_ssbo(7);
+    // global_index_buffer_.bind_base_as_ssbo(8);
+
+    // glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, dispatch_args.id());
+
+    // prog_mesh_emit_.use();
+    // glUniform1ui(glGetUniformLocation(prog_mesh_emit_.id, "u_chunk_hash_table_size"), chunk_hash_table_size);
+    // glUniform3i(glGetUniformLocation(prog_mesh_emit_.id, "u_chunk_dim"), chunk_size.x, chunk_size.y, chunk_size.z);
+    // glUniform1ui(glGetUniformLocation(prog_mesh_emit_.id, "u_voxels_per_chunk"), vox_per_chunk);
+    // glUniform3f(glGetUniformLocation(prog_mesh_emit_.id, "u_voxel_size"), voxel_size.x, voxel_size.y, voxel_size.z);
+
+    // glUniform1ui(glGetUniformLocation(prog_mesh_emit_.id, "u_pack_bits"), pack_bits);
+    // glUniform1i(glGetUniformLocation(prog_mesh_emit_.id, "u_pack_offset"), pack_offset);
+
+    // glUniform1ui(glGetUniformLocation(prog_mesh_emit_.id, "u_vb_page_verts"), vb_page_size_);
+    // glUniform1ui(glGetUniformLocation(prog_mesh_emit_.id, "u_ib_page_inds"), ib_page_size_);
+
+    // glDispatchComputeIndirect(0);
+
+    // glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+}
+
 void VoxelGrid::build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, int pack_offset) {
     m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, BufferDispatchArg(&m_buffers.dirty_list, 0u));
     mesh_reset(command_buffer, m_buffers.dispatch_args);
@@ -367,8 +436,8 @@ void VoxelGrid::build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint3
     prepare_return_free_alloc_nodes(command_buffer, m_buffers.dispatch_args);
     return_free_alloc_nodes(command_buffer, m_buffers.dispatch_args);
 
-    // shader_helper->prepare_dispatch_args(dispatch_args, ValueDispatchArg(vox_per_chunk), BufferDispatchArg(&dirty_list_, 0u));
-    // mesh_emit(dispatch_args, pack_bits, pack_offset);
+    m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, ValueDispatchArg(vox_per_chunk()), BufferDispatchArg(&m_buffers.dirty_list, 0u));
+    mesh_emit(command_buffer, m_buffers.dispatch_args, pack_bits, pack_offset);
 
     // shader_helper->prepare_dispatch_args(dispatch_args, BufferDispatchArg(&dirty_list_, 0u));
     // mesh_finalize(dispatch_args);
@@ -453,6 +522,7 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(ComputePassMa
         .verify_mesh_allocation_pi = PassInstance(compute_pass_manager.verify_mesh_allocation_cp, dp),
         .return_free_alloc_nodes_dispatch_adapter_pi = PassInstance(compute_pass_manager.return_free_alloc_nodes_dispatch_adapter_cp, dp),
         .return_free_alloc_nodes_pi = PassInstance(compute_pass_manager.return_free_alloc_nodes_cp, dp),
+        .mesh_emit_pi = PassInstance(compute_pass_manager.mesh_emit_cp, dp),
         .stream_select_chunks_pi = PassInstance(compute_pass_manager.stream_select_chunks_cp, dp)
     };
 }
@@ -582,8 +652,8 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         ),
-        .global_vertex_buffer = VulkanBuffer::create_vertex_buffer(physical_device, device, global_vertex_buffer_size),
-        .global_index_buffer =  VulkanBuffer::create_index_buffer(physical_device, device, global_index_buffer_size),
+        .global_vertex_buffer = VulkanBuffer::create_host_visible_storage_vertex_buffer(physical_device, device, global_vertex_buffer_size),
+        .global_index_buffer =  VulkanBuffer::create_host_visible_storage_index_buffer(physical_device, device, global_index_buffer_size),
 
         .vb_heads = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, vb_heads_size),
         // .vb_nodes = BufferObject(sizeof(AllocNode) * (size_t)(count_vb_nodes_), GL_DYNAMIC_DRAW);
