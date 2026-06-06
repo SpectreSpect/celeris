@@ -39,6 +39,7 @@ public:
     ComputePass dispatch_adapter_cp;
     ComputePass mesh_reset_cp;
     ComputePass mesh_count_cp;
+    ComputePass mesh_alloc_cp;
     ComputePass stream_select_chunks_cp;
 
     // PBR
@@ -79,6 +80,7 @@ public:
     ComputePass create_dispatch_adapter_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_mesh_reset_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_mesh_count_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_mesh_alloc_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_stream_select_chunks_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
 private:

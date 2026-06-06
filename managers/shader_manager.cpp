@@ -37,6 +37,7 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         dispatch_adapter_cs(device, path_utils::executable_dir() / "shaders" / "dispatch_adapter.comp.spv"),
         mesh_reset_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_reset.comp.spv"),
         mesh_count_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_count.comp.spv"),
+        mesh_alloc_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_alloc.comp.spv"),
         stream_select_chunks_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "stream_select_chunks.comp.spv"),
 
         // PBR

@@ -109,6 +109,10 @@ public:
         VulkanBuffer dirty_quad_count;
         VulkanBuffer emit_counters;
 
+        VulkanBuffer chunk_mesh_alloc_local;
+        VulkanBuffer vb_returned_nodes_list;
+        VulkanBuffer ib_returned_nodes_list;
+
 
         // vb_heads  vb_heads_ = BufferObject(sizeof(uint32_t) * (size_t)(vb_order_ + 1), GL_DYNAMIC_DRAW);
         // vb_state  vb_state_ = BufferObject(sizeof(uint32_t) * (size_t)count_vb_pages_, GL_DYNAMIC_DRAW);
@@ -129,6 +133,8 @@ public:
         PassInstance mesh_pool_seed_pi;
         PassInstance mesh_reset_pi;
         PassInstance mesh_count_pi;
+        PassInstance mesh_alloc_vb_pi;
+        PassInstance mesh_alloc_ib_pi;
         PassInstance stream_select_chunks_pi;
     };
 
@@ -199,5 +205,8 @@ private:
 
     void mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void mesh_count(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t pack_bits, int32_t pack_offset); // not checked
+    void mesh_alloc_vb(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void mesh_alloc_ib(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void mesh_alloc(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, int pack_offset);
 };
