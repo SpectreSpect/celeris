@@ -326,14 +326,28 @@ void VoxelGrid::prepare_return_free_alloc_nodes(VulkanCommandBuffer& command_buf
         VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
         VK_ACCESS_INDIRECT_COMMAND_READ_BIT
     );
+}
 
-    // vb_returned_nodes_list.bind_base_as_ssbo(0);
-    // ib_returned_nodes_list.bind_base_as_ssbo(1);
-    // dispatch_args.bind_base_as_ssbo(2);
+void VoxelGrid::return_free_alloc_nodes(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args) {
+    m_pass_instances.return_free_alloc_nodes_pi.set_storage_buffer(0, m_buffers.vb_free_nodes_list);
+    m_pass_instances.return_free_alloc_nodes_pi.set_storage_buffer(1, m_buffers.vb_returned_nodes_list);
 
-    // prog_return_free_alloc_nodes_dispatch_adapter_.use();
-    // prog_return_free_alloc_nodes_dispatch_adapter_.dispatch_compute(1, 1, 1);
-    // glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+    m_pass_instances.return_free_alloc_nodes_pi.set_storage_buffer(2, m_buffers.ib_free_nodes_list);
+    m_pass_instances.return_free_alloc_nodes_pi.set_storage_buffer(3, m_buffers.ib_returned_nodes_list);
+
+    m_pass_instances.return_free_alloc_nodes_pi.push_constants(m_command_buffer, ReturnFreeAllocNodesPushConstants{
+        .u3_chunk_size = glm::uvec4(m_params.chunk_size, 0)
+    });
+
+    m_pass_instances.return_free_alloc_nodes_pi.bind(command_buffer);
+
+    command_buffer.dispatch_indirect(dispatch_args);
+
+    m_buffers.vb_free_nodes_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.vb_returned_nodes_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+
+    m_buffers.ib_free_nodes_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.ib_returned_nodes_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
 void VoxelGrid::build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, int pack_offset) {
@@ -351,7 +365,7 @@ void VoxelGrid::build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint3
     verify_mesh_allocation(command_buffer, m_buffers.dispatch_args);
 
     prepare_return_free_alloc_nodes(command_buffer, m_buffers.dispatch_args);
-    // return_free_alloc_nodes(dispatch_args);
+    return_free_alloc_nodes(command_buffer, m_buffers.dispatch_args);
 
     // shader_helper->prepare_dispatch_args(dispatch_args, ValueDispatchArg(vox_per_chunk), BufferDispatchArg(&dirty_list_, 0u));
     // mesh_emit(dispatch_args, pack_bits, pack_offset);
@@ -438,6 +452,7 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(ComputePassMa
         .mesh_alloc_ib_pi = PassInstance(compute_pass_manager.mesh_alloc_cp, dp),
         .verify_mesh_allocation_pi = PassInstance(compute_pass_manager.verify_mesh_allocation_cp, dp),
         .return_free_alloc_nodes_dispatch_adapter_pi = PassInstance(compute_pass_manager.return_free_alloc_nodes_dispatch_adapter_cp, dp),
+        .return_free_alloc_nodes_pi = PassInstance(compute_pass_manager.return_free_alloc_nodes_cp, dp),
         .stream_select_chunks_pi = PassInstance(compute_pass_manager.stream_select_chunks_cp, dp)
     };
 }
