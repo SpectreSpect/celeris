@@ -8,7 +8,7 @@
 #include "../image/cubemap_array.h"
 #include "../image/vulkan_image_view.h"
 
-void DescriptorSet::write_buffer(uint32_t binding, VulkanBuffer& buffer, VkDescriptorType descriptor_type) {
+void DescriptorSet::write_buffer(uint32_t binding, const VulkanBuffer& buffer, VkDescriptorType descriptor_type) {
     LOG_METHOD();
 
     logger.check(buffer.size() > 0, "Video buffer size must be greater than 0");
@@ -30,12 +30,12 @@ void DescriptorSet::write_buffer(uint32_t binding, VulkanBuffer& buffer, VkDescr
     vkUpdateDescriptorSets(m_device, 1, &write, 0, nullptr);
 }
 
-void DescriptorSet::write_uniform_buffer(uint32_t binding, VulkanBuffer& buffer) {
+void DescriptorSet::write_uniform_buffer(uint32_t binding, const VulkanBuffer& buffer) {
     LOG_METHOD();
     write_buffer(binding, buffer, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 }
 
-void DescriptorSet::write_storage_buffer(uint32_t binding, VulkanBuffer& buffer) {
+void DescriptorSet::write_storage_buffer(uint32_t binding, const VulkanBuffer& buffer) {
     LOG_METHOD();
     write_buffer(binding, buffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 }

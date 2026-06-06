@@ -13,17 +13,17 @@ PassWriter::PassWriter(VulkanDevice& device, PipelinePass& pass)
     logger.check(pass.pipeline().handle() != VK_NULL_HANDLE, "Pipeline is not initialized");
 }
 
-void PassWriter::set_uniform_buffer(uint32_t binding, VulkanBuffer& uniform_buffer) {
+void PassWriter::set_uniform_buffer(uint32_t binding, const VulkanBuffer& uniform_buffer) {
     LOG_METHOD();
     m_writer.write_uniform_buffer(binding, uniform_buffer);
 }
 
-void PassWriter::set_storage_buffer(uint32_t binding, VulkanBuffer& storage_buffer) {
+void PassWriter::set_storage_buffer(uint32_t binding, const VulkanBuffer& storage_buffer) {
     LOG_METHOD();
     m_writer.write_storage_buffer(binding, storage_buffer);
 }
 
-void PassWriter::set_texture(uint32_t binding, VulkanTexture2D& texture_2d) {
+void PassWriter::set_texture(uint32_t binding, const VulkanTexture2D& texture_2d) {
     LOG_METHOD();
     m_writer.write_texture(binding, texture_2d);
 }

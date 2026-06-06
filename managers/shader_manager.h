@@ -38,7 +38,7 @@ public:
 
     // Voxel grid
     VulkanShaderModule world_init_cs;
-    VulkanShaderModule apply_writes_to_world_cs;
+    // VulkanShaderModule apply_writes_to_world_cs;
     VulkanShaderModule mesh_pool_clear_cs;
     VulkanShaderModule mesh_pool_seed_cs;
     VulkanShaderModule dispatch_adapter_cs;
@@ -49,6 +49,8 @@ public:
     VulkanShaderModule return_free_alloc_nodes_dispatch_adapter_cs;
     VulkanShaderModule return_free_alloc_nodes_cs;
     VulkanShaderModule stream_select_chunks_cs;
+    VulkanShaderModule insert_elements_to_voxel_write_list_cs;
+    VulkanShaderModule add_voxel_write_list_counters_together_cs;
 
     // PBR
     VulkanShaderModule equirect_to_cubemap_cs;
