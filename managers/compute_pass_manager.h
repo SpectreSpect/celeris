@@ -41,6 +41,7 @@ public:
     ComputePass mesh_count_cp;
     ComputePass mesh_alloc_cp;
     ComputePass verify_mesh_allocation_cp;
+    ComputePass return_free_alloc_nodes_dispatch_adapter_cp;
     ComputePass stream_select_chunks_cp;
 
     // PBR
@@ -83,6 +84,7 @@ public:
     ComputePass create_mesh_count_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_mesh_alloc_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_verify_mesh_allocation_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_return_free_alloc_nodes_dispatch_adapter_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_stream_select_chunks_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
 private:
