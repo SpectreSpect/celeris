@@ -37,10 +37,6 @@ VoxelGrid::VoxelGrid(
 {
     LOG_METHOD();
 
-    
-
-
-
     // init_programs(*shader_manager); #TODO
 
     // dispatch_args = BufferObject::from_fill(sizeof(uint32_t) * 3u, GL_DYNAMIC_DRAW, 1u, *shader_manager);
