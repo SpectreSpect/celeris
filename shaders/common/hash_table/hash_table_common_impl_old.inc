@@ -1,0 +1,90 @@
+// Template-like Vulkan GLSL include file.
+// Expected before include:
+//   #define HT_PREFIX some_prefix_
+//   #define TABLE_COUNTERS counters_instance
+// Optional before include:
+//   #define TOMB_CHECK_LIST_SIZE 32u  // must be a power of two because mask wrapping is used
+
+#include "hash_table_decl.inc"
+
+#ifndef HT_PREFIX
+#error "HT_PREFIX must be defined before including hash_table_common_impl.inc"
+#endif
+
+#ifndef TABLE_COUNTERS
+#error "TABLE_COUNTERS must be defined before including hash_table_common_impl.inc"
+#endif
+
+#ifdef HASH_TABLE_PREFIX
+#undef HASH_TABLE_PREFIX
+#endif
+#define HASH_TABLE_PREFIX(NAME) HT_CAT(HT_PREFIX, NAME)
+
+#ifndef TOMB_CHECK_LIST_SIZE
+#define TOMB_CHECK_LIST_SIZE 32u
+#endif
+
+const uint HASH_TABLE_PREFIX(TOMB_LIST_MASK) = TOMB_CHECK_LIST_SIZE - 1u;
+
+// Private per-invocation helper queue used while probing one hash-table operation.
+uint HASH_TABLE_PREFIX(tomb_check_list)[TOMB_CHECK_LIST_SIZE];
+uint HASH_TABLE_PREFIX(tomb_list_head_id) = INVALID_ID;
+uint HASH_TABLE_PREFIX(tomb_list_tail_id) = INVALID_ID;
+uint HASH_TABLE_PREFIX(tomb_list_count_elements) = 0u;
+
+#define COUNTER_TYPE_NAME empty
+#include "hash_table_counters_impl.inc"
+
+#define COUNTER_TYPE_NAME occupied
+#include "hash_table_counters_impl.inc"
+
+#define COUNTER_TYPE_NAME tomb
+#include "hash_table_counters_impl.inc"
+
+void HASH_TABLE_PREFIX(reset_all_counters_as_empty)() {
+    uint floored_empty_count = HASH_TABLE_SIZE / COUNT_TABLE_COUNTERS;
+    uint reminder = HASH_TABLE_SIZE % COUNT_TABLE_COUNTERS;
+
+    for (uint i = 0u; i < COUNT_TABLE_COUNTERS; i++) {
+        TABLE_COUNTERS.count_empty[i] = floored_empty_count + (i < reminder ? 1u : 0u);
+        TABLE_COUNTERS.count_occupied[i] = 0u;
+        TABLE_COUNTERS.count_tomb[i] = 0u;
+    }
+}
+
+bool HASH_TABLE_PREFIX(push_tomb_id)(uint slot_id) {
+    if (HASH_TABLE_PREFIX(tomb_list_count_elements) >= TOMB_CHECK_LIST_SIZE) {
+        return false;
+    }
+
+    if (HASH_TABLE_PREFIX(tomb_list_count_elements) == 0u) {
+        HASH_TABLE_PREFIX(tomb_list_head_id) = 0u;
+        HASH_TABLE_PREFIX(tomb_list_tail_id) = 0u;
+    } else {
+        HASH_TABLE_PREFIX(tomb_list_head_id) =
+            (HASH_TABLE_PREFIX(tomb_list_head_id) + 1u) & HASH_TABLE_PREFIX(TOMB_LIST_MASK);
+    }
+
+    HASH_TABLE_PREFIX(tomb_check_list)[HASH_TABLE_PREFIX(tomb_list_head_id)] = slot_id;
+    HASH_TABLE_PREFIX(tomb_list_count_elements)++;
+    return true;
+}
+
+uint HASH_TABLE_PREFIX(pop_tail_tomb_id)() {
+    if (HASH_TABLE_PREFIX(tomb_list_count_elements) == 0u) {
+        return INVALID_ID;
+    }
+
+    uint result = HASH_TABLE_PREFIX(tomb_check_list)[HASH_TABLE_PREFIX(tomb_list_tail_id)];
+    HASH_TABLE_PREFIX(tomb_list_count_elements)--;
+
+    if (HASH_TABLE_PREFIX(tomb_list_count_elements) == 0u) {
+        HASH_TABLE_PREFIX(tomb_list_head_id) = INVALID_ID;
+        HASH_TABLE_PREFIX(tomb_list_tail_id) = INVALID_ID;
+    } else {
+        HASH_TABLE_PREFIX(tomb_list_tail_id) =
+            (HASH_TABLE_PREFIX(tomb_list_tail_id) + 1u) & HASH_TABLE_PREFIX(TOMB_LIST_MASK);
+    }
+
+    return result;
+}

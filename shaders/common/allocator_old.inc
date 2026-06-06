@@ -1,4 +1,5 @@
-#include "utils.inc"
+// #include "../utils.glsl" <---- original path
+#include "../voxel_grid/utils.inc"
 
 /*
 Для корректной работы кода перед #include необходимо обязательно определить:
@@ -36,8 +37,8 @@ const uint ST_MASK = (1u << ST_MASK_BITS) - 1u;
 const uint HEAD_TAG_MASK = (1u << HEAD_TAG_BITS) - 1u;
 const uint INVALID_HEAD_IDX = INVALID_ID >> HEAD_TAG_BITS;
 
-uint pack_state(uint order, uint kind) { return (order << ST_MASK_BITS) | (kind & ST_MASK); };
-uint pack_head(uint start, uint tag) {return (start << HEAD_TAG_BITS) | (tag & HEAD_TAG_MASK); };
+uint pack_state(uint order, uint kind) { return (order << ST_MASK_BITS) | (kind & ST_MASK); }
+uint pack_head(uint start, uint tag) {return (start << HEAD_TAG_BITS) | (tag & HEAD_TAG_MASK); }
 
 #endif
 

@@ -1,12 +1,38 @@
+// Template-like Vulkan GLSL include file.
+// Expected before include:
+//   hash_table_common_impl.inc has already been included for this HT_PREFIX
+//   SLOT_KEY_TYPE
+//   SLOT_VALUE_TYPE
+//   KEY_HASH_FUNC(key) -> uint
+//   HASH_TABLE_SIZE -> uint-like expression
+//   SLOTS_BUFFER -> array-like object whose elements have .state, .key, .value
+// Optional before include:
+//   KEY_COMP_FUNC(a, b) -> bool
+
 #include "hash_table_decl.inc"
 
-uint HASH_TABLE_PREFIX(lookup_hash_table_slot_id)(SLOT_KEY_TYPE key, bool read_only = false) {
+#ifndef HT_PREFIX
+#error "HT_PREFIX must be defined before including hash_table_lookup_remove_impl.inc"
+#endif
+
+#ifndef HASH_TABLE_PREFIX
+#define HASH_TABLE_PREFIX(NAME) HT_CAT(HT_PREFIX, NAME)
+#endif
+
+uint HASH_TABLE_PREFIX(lookup_hash_table_slot_id)(SLOT_KEY_TYPE key, bool read_only) {
     uint idx = KEY_HASH_FUNC(key) % HASH_TABLE_SIZE;
 
     for (uint probe = 0u; probe < MAX_PROBES;) {
-        uint state = read_only ? SLOTS_BUFFER[idx].state : atomicAdd(SLOTS_BUFFER[idx].state, 0u);
+        uint state;
+        if (read_only) {
+            state = SLOTS_BUFFER[idx].state;
+        } else {
+            state = atomicAdd(SLOTS_BUFFER[idx].state, 0u);
+        }
 
-        if (state == SLOT_LOCKED) continue;
+        if (state == SLOT_LOCKED) {
+            continue;
+        }
 
         if (state == SLOT_TOMB) {
             idx = (idx + 1u) % HASH_TABLE_SIZE;
@@ -14,21 +40,26 @@ uint HASH_TABLE_PREFIX(lookup_hash_table_slot_id)(SLOT_KEY_TYPE key, bool read_o
             continue;
         }
 
-        if (state == SLOT_EMPTY) return INVALID_ID;
+        if (state == SLOT_EMPTY) {
+            return INVALID_ID;
+        }
 
         if (state == SLOT_OCCUPIED) {
-            if (!read_only)
+            if (!read_only) {
                 memoryBarrierBuffer();
-            
+            }
+
             #ifdef KEY_COMP_FUNC
-                if (KEY_COMP_FUNC(SLOTS_BUFFER[idx].key, key))
+                if (KEY_COMP_FUNC(SLOTS_BUFFER[idx].key, key)) {
                     return idx;
+                }
             #else
-                if (SLOTS_BUFFER[idx].key == key) 
+                if (SLOTS_BUFFER[idx].key == key) {
                     return idx;
+                }
             #endif
         }
-        
+
         idx = (idx + 1u) % HASH_TABLE_SIZE;
         probe++;
     }
@@ -36,17 +67,27 @@ uint HASH_TABLE_PREFIX(lookup_hash_table_slot_id)(SLOT_KEY_TYPE key, bool read_o
     return INVALID_ID;
 }
 
+// GLSL has no default arguments, so this overload replaces:
+//   bool read_only = false
+uint HASH_TABLE_PREFIX(lookup_hash_table_slot_id)(SLOT_KEY_TYPE key) {
+    return HASH_TABLE_PREFIX(lookup_hash_table_slot_id)(key, false);
+}
+
 bool HASH_TABLE_PREFIX(remove_slot_from_hash_table)(SLOT_KEY_TYPE key) {
-    uint idx  = KEY_HASH_FUNC(key) % HASH_TABLE_SIZE;
+    uint idx = KEY_HASH_FUNC(key) % HASH_TABLE_SIZE;
 
     for (uint probe = 0u; probe < MAX_PROBES;) {
         uint state = atomicAdd(SLOTS_BUFFER[idx].state, 0u);
 
-        if (state == SLOT_LOCKED) continue;
+        if (state == SLOT_LOCKED) {
+            continue;
+        }
 
-        if (state == SLOT_EMPTY) return false;
+        if (state == SLOT_EMPTY) {
+            return false;
+        }
 
-        if (state == SLOT_TOMB) { 
+        if (state == SLOT_TOMB) {
             idx = (idx + 1u) % HASH_TABLE_SIZE;
             probe++;
             continue;
@@ -57,31 +98,29 @@ bool HASH_TABLE_PREFIX(remove_slot_from_hash_table)(SLOT_KEY_TYPE key) {
 
             #ifdef KEY_COMP_FUNC
                 if (KEY_COMP_FUNC(SLOTS_BUFFER[idx].key, key)) {
-                    // atomicExchange(SLOTS_BUFFER[idx].state, SLOT_TOMB);
-                    // atomicAdd(TABLE_COUNTERS.count_tomb, 1u);
-                    // return true;
-
                     uint prev = atomicCompSwap(SLOTS_BUFFER[idx].state, SLOT_OCCUPIED, SLOT_TOMB);
-                    if (prev == SLOT_OCCUPIED) { // Удаляем слот
+                    if (prev == SLOT_OCCUPIED) {
                         HASH_TABLE_PREFIX(add_tomb_counter)(idx, 1u);
                         HASH_TABLE_PREFIX(add_occupied_counter)(idx, 0xFFFFFFFFu);
                         return true;
-                    } else if (prev == SLOT_TOMB) return true;
-                    else continue;
+                    } else if (prev == SLOT_TOMB) {
+                        return true;
+                    } else {
+                        continue;
+                    }
                 }
             #else
                 if (SLOTS_BUFFER[idx].key == key) {
                     uint prev = atomicCompSwap(SLOTS_BUFFER[idx].state, SLOT_OCCUPIED, SLOT_TOMB);
-                    if (prev == SLOT_OCCUPIED) { // Удаляем слот
+                    if (prev == SLOT_OCCUPIED) {
                         HASH_TABLE_PREFIX(add_tomb_counter)(idx, 1u);
                         HASH_TABLE_PREFIX(add_occupied_counter)(idx, 0xFFFFFFFFu);
                         return true;
-                    } else if (prev == SLOT_TOMB) return true;
-                    else continue;
-
-                    // atomicExchange(SLOTS_BUFFER[idx].state, SLOT_TOMB);
-                    // atomicAdd(TABLE_COUNTERS.count_tomb, 1u);
-                    // return true;
+                    } else if (prev == SLOT_TOMB) {
+                        return true;
+                    } else {
+                        continue;
+                    }
                 }
             #endif
         }
@@ -105,33 +144,41 @@ bool HASH_TABLE_PREFIX(set_slot_value)(SLOT_KEY_TYPE key, SLOT_VALUE_TYPE value)
         uint state = atomicAdd(SLOTS_BUFFER[idx].state, 0u);
 
         if (state == SLOT_EMPTY || probe == MAX_PROBES) {
-            if (probe >= MAX_PROBES) idx = INVALID_ID;
+            if (probe >= MAX_PROBES) {
+                idx = INVALID_ID;
+            }
 
-            // Не нашли элемент. Значит создаём (в приоритете в first_tomb)
-            if (last_tomb_id == INVALID_ID) last_tomb_id = HASH_TABLE_PREFIX(pop_tail_tomb_id)();
+            // Not found. Create it, preferring the oldest remembered tomb slot.
+            if (last_tomb_id == INVALID_ID) {
+                last_tomb_id = HASH_TABLE_PREFIX(pop_tail_tomb_id)();
+            }
 
-            uint idx_to_create = last_tomb_id == INVALID_ID ? idx : last_tomb_id;
-            uint slot_state = last_tomb_id == INVALID_ID ? SLOT_EMPTY : SLOT_TOMB;
+            uint idx_to_create = (last_tomb_id == INVALID_ID) ? idx : last_tomb_id;
+            uint slot_state = (last_tomb_id == INVALID_ID) ? SLOT_EMPTY : SLOT_TOMB;
 
-            if (idx_to_create == INVALID_ID) return false; // Нет ни SLOT_EMPTY, ни SLOT_TOMB в очереди
+            if (idx_to_create == INVALID_ID) {
+                return false;
+            }
 
             uint prev = atomicCompSwap(SLOTS_BUFFER[idx_to_create].state, slot_state, SLOT_LOCKED);
             if (prev != slot_state) {
-                // кто-то успел — перепроверяем этот же idx
-                if (prev == SLOT_LOCKED) continue;
+                if (prev == SLOT_LOCKED) {
+                    continue;
+                }
 
                 if (slot_state == SLOT_TOMB && prev == SLOT_OCCUPIED) {
-                    // Условие говорит, что мы проверяем tomb_check_list_counter - 1u слот и он оказался занят
-
                     memoryBarrierBuffer();
+
                     #ifdef KEY_COMP_FUNC
-                    if (KEY_COMP_FUNC(SLOTS_BUFFER[idx_to_create].key, key))
-                        return false;
+                        if (KEY_COMP_FUNC(SLOTS_BUFFER[idx_to_create].key, key)) {
+                            return false;
+                        }
                     #else
-                    if (SLOTS_BUFFER[idx_to_create].key == key)
-                        return false;
+                        if (SLOTS_BUFFER[idx_to_create].key == key) {
+                            return false;
+                        }
                     #endif
-                    
+
                     last_tomb_id = INVALID_ID;
                 }
 
@@ -146,20 +193,18 @@ bool HASH_TABLE_PREFIX(set_slot_value)(SLOT_KEY_TYPE key, SLOT_VALUE_TYPE value)
 
             HASH_TABLE_PREFIX(add_occupied_counter)(idx_to_create, 1u);
 
-            // публикуем key и value
             SLOTS_BUFFER[idx_to_create].key = key;
             SLOTS_BUFFER[idx_to_create].value = value;
 
-            // гарантируем, что key/value видимы до публикации id
             memoryBarrierBuffer();
-
-            // публикуем состояние (и одновременно "анлочим")
             atomicExchange(SLOTS_BUFFER[idx_to_create].state, SLOT_OCCUPIED);
 
             return true;
         }
 
-        if (state == SLOT_LOCKED) continue;
+        if (state == SLOT_LOCKED) {
+            continue;
+        }
 
         if (state == SLOT_TOMB) {
             HASH_TABLE_PREFIX(push_tomb_id)(idx);
@@ -172,14 +217,15 @@ bool HASH_TABLE_PREFIX(set_slot_value)(SLOT_KEY_TYPE key, SLOT_VALUE_TYPE value)
             memoryBarrierBuffer();
 
             #ifdef KEY_COMP_FUNC
-                if (KEY_COMP_FUNC(SLOTS_BUFFER[idx].key, key))
+                if (KEY_COMP_FUNC(SLOTS_BUFFER[idx].key, key)) {
                     return false;
+                }
             #else
-                if (SLOTS_BUFFER[idx].key == key)
+                if (SLOTS_BUFFER[idx].key == key) {
                     return false;
+                }
             #endif
         }
-
 
         idx = (idx + 1u) % HASH_TABLE_SIZE;
         probe++;
