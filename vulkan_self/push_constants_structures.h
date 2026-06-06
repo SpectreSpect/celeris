@@ -44,15 +44,24 @@ struct DispatchAdapterPushConstants {
     uint32_t u_z_workgroup_size;
 };
 
-struct StreamSelectChunksPushConstants {
-    uint32_t u_chunk_hash_table_size;   // pow2
-    uint32_t u_max_load_entries;  // обычно = count_active_chunks
-    glm::ivec3 u_chunk_dim;
-    glm::vec3 u_voxel_size;
+struct alignas(16) StreamSelectChunksPushConstants {
+    uint32_t u_chunk_hash_table_size;
+    uint32_t u_max_load_entries;
+    uint32_t _pad0;
+    uint32_t _pad1;
 
-    glm::vec3 u_cam_pos_local; // камера в локальных координатах грида
-    int32_t u_radius_chunks; // R в чанках
+    glm::ivec4 u_chunk_dim;
+    glm::vec4 u_voxel_size;
 
+    glm::vec4 u_cam_pos_local;
+
+    int32_t u_radius_chunks;
     uint32_t u_pack_bits;
     int32_t u_pack_offset;
+    uint32_t _pad2;
 };
+
+static_assert(offsetof(StreamSelectChunksPushConstants, u_chunk_dim) == 16);
+static_assert(offsetof(StreamSelectChunksPushConstants, u_voxel_size) == 32);
+static_assert(offsetof(StreamSelectChunksPushConstants, u_cam_pos_local) == 48);
+static_assert(offsetof(StreamSelectChunksPushConstants, u_radius_chunks) == 64);

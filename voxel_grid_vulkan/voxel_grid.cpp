@@ -698,9 +698,9 @@ void VoxelGrid::mark_chunk_to_generate(VulkanCommandBuffer& command_buffer, glm:
     m_pass_instances.stream_select_chunks_pi.push_constants(command_buffer, StreamSelectChunksPushConstants{
         .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
         .u_max_load_entries = m_params.count_active_chunks,
-        .u_chunk_dim = m_params.chunk_size,
-        .u_voxel_size = m_params.voxel_size,
-        .u_cam_pos_local = cam_local,
+        .u_chunk_dim = glm::ivec4(m_params.chunk_size, 0),
+        .u_voxel_size = glm::vec4(m_params.voxel_size, 0.0f),
+        .u_cam_pos_local = glm::vec4(cam_local, 0),
         .u_radius_chunks = radius_chunks,
         .u_pack_bits = math_utils::BITS,
         .u_pack_offset =  math_utils::OFFSET
