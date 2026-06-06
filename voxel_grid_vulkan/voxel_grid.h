@@ -144,8 +144,9 @@ public:
         PassInstance mesh_finalize_pi;
         PassInstance reset_dirty_count_pi;
         PassInstance stream_select_chunks_pi;
-        PassWriter insert_elements_to_voxel_write_list_pi;
-        PassWriter add_voxel_write_list_counters_together_pi;
+        PassWriter insert_elements_to_voxel_write_list_pw;
+        PassWriter add_voxel_write_list_counters_together_pw;
+        PassInstance mark_write_chunks_to_generate_pi;
     };
 
     struct VoxelGridParams {
@@ -224,6 +225,8 @@ private:
 
     void reset_load_list_counter(VulkanCommandBuffer& command_buffer);
     void mark_chunk_to_generate(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks);
+    void mark_write_chunks_to_generate(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void reset_voxel_write_list_counter(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_write_list);
     void stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks, uint32_t seed);
 
     void mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);

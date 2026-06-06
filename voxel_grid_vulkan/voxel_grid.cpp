@@ -502,8 +502,9 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(VulkanDevice&
         .mesh_finalize_pi = PassInstance(compute_pass_manager.mesh_finalize_cp, dp),
         .reset_dirty_count_pi = PassInstance(compute_pass_manager.reset_dirty_count_cp, dp),
         .stream_select_chunks_pi = PassInstance(compute_pass_manager.stream_select_chunks_cp, dp),
-        .insert_elements_to_voxel_write_list_pi = PassWriter(device, compute_pass_manager.insert_elements_to_voxel_write_list_cp),
-        .add_voxel_write_list_counters_together_pi = PassWriter(device, compute_pass_manager.add_voxel_write_list_counters_together_cp),
+        .insert_elements_to_voxel_write_list_pw = PassWriter(device, compute_pass_manager.insert_elements_to_voxel_write_list_cp),
+        .add_voxel_write_list_counters_together_pw = PassWriter(device, compute_pass_manager.add_voxel_write_list_counters_together_cp),
+        .mark_write_chunks_to_generate_pi = PassInstance(compute_pass_manager.mark_write_chunks_to_generate_cp, dp)
     };
 }
 
@@ -695,10 +696,10 @@ void VoxelGrid::insert_elements_to_voxel_write_list(
 {
     LOG_METHOD();
 
-    m_pass_instances.insert_elements_to_voxel_write_list_pi.set_storage_buffer(0, voxel_write_list_src);
-    m_pass_instances.insert_elements_to_voxel_write_list_pi.set_storage_buffer(1, voxel_write_list_dsc);
+    m_pass_instances.insert_elements_to_voxel_write_list_pw.set_storage_buffer(0, voxel_write_list_src);
+    m_pass_instances.insert_elements_to_voxel_write_list_pw.set_storage_buffer(1, voxel_write_list_dsc);
 
-    m_pass_instances.insert_elements_to_voxel_write_list_pi.bind(command_buffer);
+    m_pass_instances.insert_elements_to_voxel_write_list_pw.bind(command_buffer);
 
     command_buffer.dispatch_indirect(dispatch_args);
     voxel_write_list_dsc.memory_barrier_compute_write_to_compute_write_read(command_buffer);
@@ -711,10 +712,10 @@ void VoxelGrid::add_voxel_write_list_counters_together(
 {
     LOG_METHOD();
 
-    m_pass_instances.add_voxel_write_list_counters_together_pi.set_storage_buffer(0, voxel_write_list_src);
-    m_pass_instances.add_voxel_write_list_counters_together_pi.set_storage_buffer(1, voxel_write_list_dsc);
+    m_pass_instances.add_voxel_write_list_counters_together_pw.set_storage_buffer(0, voxel_write_list_src);
+    m_pass_instances.add_voxel_write_list_counters_together_pw.set_storage_buffer(1, voxel_write_list_dsc);
 
-    m_pass_instances.add_voxel_write_list_counters_together_pi.bind(command_buffer);
+    m_pass_instances.add_voxel_write_list_counters_together_pw.bind(command_buffer);
 
     command_buffer.dispatch(1, 1, 1);
     voxel_write_list_dsc.memory_barrier_compute_write_to_compute_write_read(command_buffer);
@@ -1103,6 +1104,39 @@ void VoxelGrid::mark_chunk_to_generate(VulkanCommandBuffer& command_buffer, glm:
     m_buffers.load_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
+void VoxelGrid::mark_write_chunks_to_generate(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args) {
+    LOG_METHOD();
+
+    m_pass_instances.mark_write_chunks_to_generate_pi.set_storage_buffer(0, m_buffers.voxel_write_list);
+    m_pass_instances.mark_write_chunks_to_generate_pi.set_storage_buffer(1, m_buffers.load_list);
+    m_pass_instances.mark_write_chunks_to_generate_pi.set_storage_buffer(2, m_buffers.chunk_hash_table);
+    m_pass_instances.mark_write_chunks_to_generate_pi.set_storage_buffer(3, m_buffers.free_list);
+    m_pass_instances.mark_write_chunks_to_generate_pi.set_storage_buffer(4, m_buffers.chunk_meta);
+
+    m_pass_instances.mark_write_chunks_to_generate_pi.bind(command_buffer);
+
+    m_pass_instances.mark_write_chunks_to_generate_pi.push_constants(command_buffer, MarkWriteChunksToGeneratePushConstants{
+        .u_chunk_dim = glm::uvec4{m_params.chunk_size.x, m_params.chunk_size.y, m_params.chunk_size.z, 0},
+        .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
+        .u_pack_offset = math_utils::OFFSET,
+        .u_pack_bits = math_utils::BITS
+    });
+
+    command_buffer.dispatch_indirect(dispatch_args);
+
+    m_buffers.load_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.chunk_hash_table.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.free_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.chunk_meta.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+}
+
+void VoxelGrid::reset_voxel_write_list_counter(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_write_list) {
+    LOG_METHOD();
+    
+    voxel_write_list.fill(command_buffer, 0u, sizeof(uint32_t));
+    voxel_write_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+}
+
 void VoxelGrid::stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks, uint32_t seed) {
     LOG_METHOD();
 
@@ -1116,10 +1150,10 @@ void VoxelGrid::stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::v
 
     merge_voxel_write_lists(command_buffer, m_buffers.local_voxel_write_list, m_buffers.voxel_write_list);
 
-    // reset_voxel_write_list_counter(local_voxel_write_list_);
+    reset_voxel_write_list_counter(command_buffer, m_buffers.local_voxel_write_list);
     
-    // shader_helper->prepare_dispatch_args(dispatch_args, BufferDispatchArg(&voxel_write_list_, 0));
-    // mark_write_chunks_to_generate(dispatch_args);
+    m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, BufferDispatchArg(&m_buffers.voxel_write_list, 0));
+    mark_write_chunks_to_generate(command_buffer, m_buffers.dispatch_args);
 
     // shader_helper->prepare_dispatch_args(dispatch_args, ValueDispatchArg(vox_per_chunk), BufferDispatchArg(&load_list_, 0u));
     // generate_terrain(dispatch_args, seed);

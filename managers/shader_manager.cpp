@@ -47,6 +47,7 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         stream_select_chunks_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "stream_select_chunks.comp.spv"),
         insert_elements_to_voxel_write_list_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "insert_elements_to_voxel_write_list.comp.spv"),
         add_voxel_write_list_counters_together_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "add_voxel_write_list_counters_together.comp.spv"),
+        mark_write_chunks_to_generate_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mark_write_chunks_to_generate.comp.spv"),
         
         // PBR
         equirect_to_cubemap_cs(device, path_utils::executable_dir() / "shaders" / "equirect_to_cubemap.comp.spv"),
