@@ -128,6 +128,7 @@ public:
         PassInstance mesh_pool_clear_pi;
         PassInstance mesh_pool_seed_pi;
         PassInstance mesh_reset_pi;
+        PassInstance mesh_count_pi;
         PassInstance stream_select_chunks_pi;
     };
 
@@ -197,5 +198,6 @@ private:
     void stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks, uint32_t seed);
 
     void mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void mesh_count(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t pack_bits, int32_t pack_offset); // not checked
     void build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, int pack_offset);
 };
