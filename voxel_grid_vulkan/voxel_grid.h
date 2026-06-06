@@ -140,6 +140,7 @@ public:
         PassInstance verify_mesh_allocation_pi;
         PassInstance return_free_alloc_nodes_dispatch_adapter_pi;
         PassInstance return_free_alloc_nodes_pi;
+        PassInstance mesh_emit_pi;
         PassInstance stream_select_chunks_pi;
         PassWriter insert_elements_to_voxel_write_list_pi;
         PassWriter add_voxel_write_list_counters_together_pi;
@@ -231,5 +232,6 @@ private:
     void verify_mesh_allocation(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args); // not checked
     void prepare_return_free_alloc_nodes(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args); // not checked
     void return_free_alloc_nodes(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args);
+    void mesh_emit(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args, uint32_t pack_bits, int32_t pack_offset);
     void build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, int pack_offset);
 };
