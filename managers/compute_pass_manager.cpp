@@ -35,6 +35,7 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         return_free_alloc_nodes_cp(create_return_free_alloc_nodes_compute_pass(device, shader_manager.return_free_alloc_nodes_cs)),
         mesh_emit_cp(create_mesh_emit_compute_pass(device, shader_manager.mesh_emit_cs)),
         mesh_finalize_cp(create_mesh_finalize_compute_pass(device, shader_manager.mesh_finalize_cs)),
+        reset_dirty_count_cp(create_reset_dirty_count_compute_pass(device, shader_manager.reset_dirty_count_cs)),
         stream_select_chunks_cp(create_stream_select_chunks_compute_pass(device, shader_manager.stream_select_chunks_cs)),
         insert_elements_to_voxel_write_list_cp(create_insert_elements_to_voxel_write_list_compute_pass(device, shader_manager.insert_elements_to_voxel_write_list_cs)),
         add_voxel_write_list_counters_together_cp(create_add_voxel_write_list_counters_together_compute_pass(device, shader_manager.add_voxel_write_list_counters_together_cs)),
@@ -281,6 +282,20 @@ ComputePass ComputePassManager::create_mesh_finalize_compute_pass(VulkanDevice& 
     builder.add_storage_buffer(2, ShaderStages::compute); // ChunkMetaBuf
     builder.add_storage_buffer(3, ShaderStages::compute); // ChunkMeshAllocBuf
     builder.add_storage_buffer(4, ShaderStages::compute); // FailedDirtyListBuf
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_reset_dirty_count_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // DirtyListBuf
+    builder.add_storage_buffer(1, ShaderStages::compute); // VBFreeNodesList
+    builder.add_storage_buffer(2, ShaderStages::compute); // VBReturnedNodesList
+    builder.add_storage_buffer(3, ShaderStages::compute); // IBFreeNodesList
+    builder.add_storage_buffer(4, ShaderStages::compute); // IBReturnedNodesList
 
     return create_pass(device, compute_shader_module, builder);
 }
