@@ -1,10 +1,3 @@
-// End of Chunk hash-table template configuration for Vulkan GLSL.
-// This file intentionally has no include guard: it closes a macro configuration block.
-
-#ifdef HASH_TABLE_PREFIX
-#undef HASH_TABLE_PREFIX
-#endif
-
 #undef HT_PREFIX
 #undef SLOT_VALUE_TYPE
 #undef SLOT_KEY_TYPE

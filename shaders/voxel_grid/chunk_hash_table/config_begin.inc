@@ -1,11 +1,4 @@
-// Chunk hash-table template configuration for Vulkan GLSL.
-// This file intentionally has no include guard: it is a macro configuration block.
-// Include config_end.inc after the template implementation.
-
-// The generic Vulkan implementation concatenates HT_PREFIX directly with function names.
-// Use a trailing underscore to preserve names like chunk_hash_table_lookup_hash_table_slot_id.
-#define HT_PREFIX chunk_hash_table_
-
+#define HT_PREFIX chunk_hash_table
 #define SLOT_VALUE_TYPE uint
 #define SLOT_KEY_TYPE uvec2
 #define SLOT_TYPE ChunkHashTableSlot
