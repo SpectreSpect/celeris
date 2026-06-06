@@ -74,3 +74,20 @@ struct MeshCountPushConstants {
     uint32_t u_pack_bits;
     int32_t  u_pack_offset;
 };
+
+struct MeshAllocPushConstants {
+    uint32_t bb_pages;
+    uint32_t bb_page_elements;  // например 256
+    uint32_t bb_max_order;   // log2(u_bb_pages)
+    uint32_t bb_quad_size;
+    uint32_t u_is_vb_phase;
+};
+
+struct VerifyMeshAllocationPushConstants {
+    uint32_t vb_max_order;
+    uint32_t ib_max_order;
+};
+
+struct ReturnFreeAllocNodesPushConstants {
+    glm::uvec4 u3_chunk_size;
+};

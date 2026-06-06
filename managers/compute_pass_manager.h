@@ -39,6 +39,10 @@ public:
     ComputePass dispatch_adapter_cp;
     ComputePass mesh_reset_cp;
     ComputePass mesh_count_cp;
+    ComputePass mesh_alloc_cp;
+    ComputePass verify_mesh_allocation_cp;
+    ComputePass return_free_alloc_nodes_dispatch_adapter_cp;
+    ComputePass return_free_alloc_nodes_cp;
     ComputePass stream_select_chunks_cp;
     ComputePass insert_elements_to_voxel_write_list_cp;
     ComputePass add_voxel_write_list_counters_together_cp;
@@ -81,6 +85,10 @@ public:
     ComputePass create_dispatch_adapter_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_mesh_reset_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_mesh_count_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_mesh_alloc_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_verify_mesh_allocation_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_return_free_alloc_nodes_dispatch_adapter_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_return_free_alloc_nodes_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_stream_select_chunks_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_insert_elements_to_voxel_write_list_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_add_voxel_write_list_counters_together_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
