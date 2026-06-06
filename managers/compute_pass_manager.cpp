@@ -29,6 +29,7 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         dispatch_adapter_cp(create_dispatch_adapter_compute_pass(device, shader_manager.dispatch_adapter_cs)),
         mesh_reset_cp(create_mesh_reset_compute_pass(device, shader_manager.mesh_reset_cs)),
         mesh_count_cp(create_mesh_count_compute_pass(device, shader_manager.mesh_count_cs)),
+        mesh_alloc_cp(create_mesh_alloc_compute_pass(device, shader_manager.mesh_alloc_cs)),
         stream_select_chunks_cp(create_stream_select_chunks_compute_pass(device, shader_manager.stream_select_chunks_cs)),
 
         // PBR
@@ -164,6 +165,28 @@ ComputePass ComputePassManager::create_mesh_count_compute_pass(VulkanDevice& dev
     builder.add_storage_buffer(4, ShaderStages::compute); // ChunkMetaBuf
 
     builder.add_push_constantsf(sizeof(MeshCountPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_mesh_alloc_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // MeshBuffersStatusBuf
+    builder.add_storage_buffer(1, ShaderStages::compute); // DirtyListBuf
+    builder.add_storage_buffer(2, ShaderStages::compute); // DirtyQuadCountBuf
+    builder.add_storage_buffer(3, ShaderStages::compute); // ChunkMetaBuf
+    builder.add_storage_buffer(4, ShaderStages::compute); // ChunkMeshAllocLocalBuf
+    builder.add_storage_buffer(5, ShaderStages::compute); // ChunkMeshAllocGlobalBuf
+    builder.add_storage_buffer(6, ShaderStages::compute); // BBHeads
+    builder.add_storage_buffer(7, ShaderStages::compute); // BBState
+    builder.add_storage_buffer(8, ShaderStages::compute); // BBNodes
+    builder.add_storage_buffer(9, ShaderStages::compute); // BBFreeNodesList
+    builder.add_storage_buffer(10, ShaderStages::compute); // BBReturnedNodesList
+
+    builder.add_push_constantsf(sizeof(MeshAllocPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }
