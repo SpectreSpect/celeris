@@ -526,7 +526,8 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(VulkanDevice&
         .stream_select_chunks_pi = PassInstance(compute_pass_manager.stream_select_chunks_cp, dp),
         .insert_elements_to_voxel_write_list_pw = PassWriter(device, compute_pass_manager.insert_elements_to_voxel_write_list_cp),
         .add_voxel_write_list_counters_together_pw = PassWriter(device, compute_pass_manager.add_voxel_write_list_counters_together_cp),
-        .mark_write_chunks_to_generate_pi = PassInstance(compute_pass_manager.mark_write_chunks_to_generate_cp, dp)
+        .mark_write_chunks_to_generate_pi = PassInstance(compute_pass_manager.mark_write_chunks_to_generate_cp, dp),
+        .stream_generate_terrain_pi = PassInstance(compute_pass_manager.stream_generate_terrain_cp, dp)
     };
 }
 
@@ -1152,6 +1153,36 @@ void VoxelGrid::mark_write_chunks_to_generate(VulkanCommandBuffer& command_buffe
     m_buffers.chunk_meta.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
+void VoxelGrid::generate_terrain(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t seed) {
+    LOG_METHOD();
+
+    m_pass_instances.stream_generate_terrain_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+    m_pass_instances.stream_generate_terrain_pi.set_storage_buffer(1, m_buffers.load_list);
+    m_pass_instances.stream_generate_terrain_pi.set_storage_buffer(2, m_buffers.voxels);
+    m_pass_instances.stream_generate_terrain_pi.set_storage_buffer(3, m_buffers.chunk_meta);
+    m_pass_instances.stream_generate_terrain_pi.set_storage_buffer(4, m_buffers.enqueued);
+    m_pass_instances.stream_generate_terrain_pi.set_storage_buffer(5, m_buffers.dirty_list);
+
+    m_pass_instances.stream_generate_terrain_pi.bind(command_buffer);
+
+    m_pass_instances.stream_generate_terrain_pi.push_constants(command_buffer, StreamGenerateTerrainPushConstants{
+        .u_chunk_dim = glm::ivec4(m_params.chunk_size.x, m_params.chunk_size.y, m_params.chunk_size.z, 0), 
+        .u_voxels_per_chunk = static_cast<uint32_t>(vox_per_chunk()),
+        .u_pack_bits = math_utils::BITS,
+        .u_pack_offset = math_utils::OFFSET,
+        .u_seed = seed,
+        .u_chunk_hash_table_size = m_params.chunk_hash_table_size
+    });
+
+    command_buffer.dispatch_indirect(dispatch_args);
+
+    m_buffers.chunk_hash_table.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.voxels.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.chunk_meta.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.enqueued.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.dirty_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+}
+
 void VoxelGrid::reset_voxel_write_list_counter(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_write_list) {
     LOG_METHOD();
     
@@ -1177,11 +1208,11 @@ void VoxelGrid::stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::v
     m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, BufferDispatchArg(&m_buffers.voxel_write_list, 0));
     mark_write_chunks_to_generate(command_buffer, m_buffers.dispatch_args);
 
-    // shader_helper->prepare_dispatch_args(dispatch_args, ValueDispatchArg(vox_per_chunk), BufferDispatchArg(&load_list_, 0u));
-    // generate_terrain(dispatch_args, seed);
+    m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, ValueDispatchArg(vox_per_chunk()), BufferDispatchArg(&m_buffers.load_list, 0u));
+    generate_terrain(command_buffer, m_buffers.dispatch_args, seed);
 
-    // shader_helper->prepare_dispatch_args(dispatch_args, BufferDispatchArg(&voxel_write_list_, 0u));
+    m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, BufferDispatchArg(&m_buffers.voxel_write_list, 0u));
     // write_voxels_to_grid();
 
-    // reset_voxel_write_list_counter(voxel_write_list_);
+    reset_voxel_write_list_counter(command_buffer, m_buffers.voxel_write_list);
 }
