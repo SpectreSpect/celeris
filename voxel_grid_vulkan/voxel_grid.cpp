@@ -1023,6 +1023,13 @@ void VoxelGrid::mark_chunk_to_generate(VulkanCommandBuffer& command_buffer, glm:
     m_buffers.load_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
+void VoxelGrid::reset_voxel_write_list_counter(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_write_list) {
+    LOG_METHOD();
+    
+    voxel_write_list.fill(command_buffer, 0u, sizeof(uint32_t));
+    voxel_write_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+}
+
 void VoxelGrid::stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks, uint32_t seed) {
     LOG_METHOD();
 
@@ -1036,7 +1043,7 @@ void VoxelGrid::stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::v
 
     merge_voxel_write_lists(command_buffer, m_buffers.local_voxel_write_list, m_buffers.voxel_write_list);
 
-    // reset_voxel_write_list_counter(local_voxel_write_list_);
+    reset_voxel_write_list_counter(command_buffer, m_buffers.local_voxel_write_list);
     
     // shader_helper->prepare_dispatch_args(dispatch_args, BufferDispatchArg(&voxel_write_list_, 0));
     // mark_write_chunks_to_generate(dispatch_args);
