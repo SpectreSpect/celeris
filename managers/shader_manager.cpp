@@ -41,6 +41,8 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         verify_mesh_allocation_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "verify_mesh_allocation.comp.spv"),
         return_free_alloc_nodes_dispatch_adapter_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "return_free_alloc_nodes_dispatch_adapter.comp.spv"),
         return_free_alloc_nodes_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "return_free_alloc_nodes.comp.spv"),
+        mesh_emit_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_emit.comp.spv"),
+        mesh_finalize_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_finalize.comp.spv"),
         stream_select_chunks_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "stream_select_chunks.comp.spv"),
         insert_elements_to_voxel_write_list_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "insert_elements_to_voxel_write_list.comp.spv"),
         add_voxel_write_list_counters_together_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "add_voxel_write_list_counters_together.comp.spv"),
