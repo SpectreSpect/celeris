@@ -1,5 +1,5 @@
-#ifndef COMMON_UTILS
-#define COMMON_UTILS
+#ifndef UTILS_COMMON
+#define UTILS_COMMON
 
 #define CAT_(A, B) A##B
 #define CAT(A, B)  CAT_(A, B)
