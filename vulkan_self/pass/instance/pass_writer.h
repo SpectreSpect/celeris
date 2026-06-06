@@ -22,9 +22,9 @@ public:
     PassWriter(PassWriter&&) noexcept = default;
     PassWriter& operator=(PassWriter&&) noexcept = default;
 
-    virtual void set_uniform_buffer(uint32_t binding, VulkanBuffer& uniform_buffer) override;
-    virtual void set_storage_buffer(uint32_t binding, VulkanBuffer& storage_buffer) override;
-    virtual void set_texture(uint32_t binding, VulkanTexture2D& texture_2d) override;
+    virtual void set_uniform_buffer(uint32_t binding, const VulkanBuffer& uniform_buffer) override;
+    virtual void set_storage_buffer(uint32_t binding, const VulkanBuffer& storage_buffer) override;
+    virtual void set_texture(uint32_t binding, const VulkanTexture2D& texture_2d) override;
 
     virtual void bind_description_object(VulkanCommandBuffer& command_buffer) override;
 

@@ -24,9 +24,9 @@ public:
     explicit DescriptorSet(VkDevice device, VkDescriptorSet descriptor_set) noexcept
         : m_device(device), m_descriptor_set(descriptor_set) {};
     
-    void write_buffer(uint32_t binding, VulkanBuffer& buffer, VkDescriptorType descriptor_type);
-    void write_uniform_buffer(uint32_t binding, VulkanBuffer& buffer);
-    void write_storage_buffer(uint32_t binding, VulkanBuffer& buffer);
+    void write_buffer(uint32_t binding, const VulkanBuffer& buffer, VkDescriptorType descriptor_type);
+    void write_uniform_buffer(uint32_t binding, const VulkanBuffer& buffer);
+    void write_storage_buffer(uint32_t binding, const VulkanBuffer& buffer);
     void write_texture(uint32_t binding, const VulkanTexture2D& texture);
     void write_cubemap(uint32_t binding, const Cubemap& cubemap);
     void write_cubemap_array(uint32_t binding, const CubemapArray& cubemap_array);

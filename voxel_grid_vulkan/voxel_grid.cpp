@@ -29,7 +29,7 @@ VoxelGrid::VoxelGrid(
         m_compute_pass_manager(&compute_pass_manager),
         // m_buffer_filler(physical_device, device, compute_pass_manager, 1024),
         m_params(create_params(desc)),
-        m_pass_instances(create_pass_instances(compute_pass_manager)),
+        m_pass_instances(create_pass_instances(device, compute_pass_manager)),
         m_buffers(create_buffers(physical_device, device, m_command_buffer)),
         m_mesh_view(m_buffers.global_vertex_buffer.get_view(), m_buffers.global_index_buffer.get_view(), m_params.max_mesh_indices),
         m_render_object(m_mesh_view, material_instance_manager.pbr),
@@ -103,41 +103,9 @@ VoxelGrid::VoxelGrid(
     
     {
         auto scope = m_command_buffer.begin_scope();
-        reset_load_list_counter(m_command_buffer);
+        stream_chunks_sphere(m_command_buffer, {0.0f, 0.0f, 0.0f}, 5, 534346);
     }
     submit_compute_commands();
-
-    std::vector<uint32_t> load_list_after = m_buffers.load_list.read_vector<uint32_t>(3);
-
-    logger.log() << "Load list before reset_load_list_counter:\n";
-    for (uint32_t value : load_list_before) {
-        logger.log() << clr(std::to_string(value), LoggerPalette::orange) << "\n";
-    }
-
-    std::cout << std::endl;
-
-    logger.log() << "Load list after reset_load_list_counter:\n";
-    for (uint32_t value : load_list_after) {
-        logger.log() << clr(std::to_string(value), LoggerPalette::blue) << "\n";
-    }
-
-    std::cout << std::endl;
-    
-
-    {
-        auto scope = m_command_buffer.begin_scope();
-        mark_chunk_to_generate(m_command_buffer, {0.0f, 0.0f, 0.0f}, 5);
-    }
-    submit_compute_commands();
-
-    std::vector<uint32_t> load_list_after_mark = m_buffers.load_list.read_vector<uint32_t>(3);
-
-    logger.log() << "Load list after mark_chunk_to_generate:\n";
-    for (uint32_t value : load_list_after_mark) {
-        logger.log() << clr(std::to_string(value), LoggerPalette::red) << "\n";
-    }
-
-    
 }
 
 void VoxelGrid::mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args) {
@@ -261,7 +229,7 @@ VoxelGrid::VoxelGridParams VoxelGrid::create_params(const VoxelGridDesc& desc) c
     return params;
 }
 
-VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(ComputePassManager& compute_pass_manager) const {
+VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(VulkanDevice& device, ComputePassManager& compute_pass_manager) const {
     LOG_METHOD();
     
     DescriptorPool& dp = compute_pass_manager.descriptor_pool();
@@ -269,12 +237,14 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(ComputePassMa
     return VoxelGridPassInstances {
         .fill_buffer_pi = PassInstance(compute_pass_manager.fill_buffer_cp, dp),
         .world_init_pi = PassInstance(compute_pass_manager.world_init_cp, dp),
-        .apply_writes_to_world_pi = PassInstance(compute_pass_manager.apply_writes_to_world_cp, dp),
+        // .apply_writes_to_world_pi = PassInstance(compute_pass_manager.apply_writes_to_world_cp, dp),
         .mesh_pool_clear_pi = PassInstance(compute_pass_manager.mesh_pool_clear_cp, dp),
         .mesh_pool_seed_pi = PassInstance(compute_pass_manager.mesh_pool_seed_cp, dp),
         .mesh_reset_pi = PassInstance(compute_pass_manager.mesh_reset_cp, dp),
         .mesh_count_pi = PassInstance(compute_pass_manager.mesh_count_cp, dp),
-        .stream_select_chunks_pi = PassInstance(compute_pass_manager.stream_select_chunks_cp, dp)
+        .stream_select_chunks_pi = PassInstance(compute_pass_manager.stream_select_chunks_cp, dp),
+        .insert_elements_to_voxel_write_list_pi = PassWriter(device, compute_pass_manager.insert_elements_to_voxel_write_list_cp),
+        .add_voxel_write_list_counters_together_pi = PassWriter(device, compute_pass_manager.add_voxel_write_list_counters_together_cp)
     };
 }
 
@@ -292,6 +262,7 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize enqueued_size = sizeof(uint32_t) * (size_t)m_params.count_active_chunks;
     VkDeviceSize dirty_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
     VkDeviceSize load_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
+    VkDeviceSize local_voxel_write_list_size = sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * m_params.max_write_count;
     VkDeviceSize voxel_write_list_size = sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * m_params.max_write_count;
     VkDeviceSize voxels_size = sizeof(VoxelDataGPU) * vox_per_chunk() * (size_t)m_params.count_active_chunks;
     VkDeviceSize indirect_cmds_size = sizeof(uint32_t) + sizeof(DrawElementsIndirectCommand) * (size_t)m_params.count_active_chunks;
@@ -317,29 +288,21 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize dirty_quad_count_size = sizeof(uint32_t) * m_params.count_active_chunks;
     VkDeviceSize emit_counters_size = sizeof(uint32_t) * m_params.count_active_chunks;
 
-    VkDeviceSize total_size = 
-        free_list_size + 
-        chunk_hash_table_size + 
-        mesh_buffers_status_size +
-        chunk_meta_size +
-        enqueued_size + 
-        dirty_list_size +
-        load_list_size +
-        voxel_write_list_size + 
-        voxels_size +
-        indirect_cmds_size +
-        failed_dirty_list_size +
-        global_vertex_buffer_size +
-        global_index_buffer_size +
-        vb_heads_size +
-        vb_nodes_size +
-        vb_state_size +
-        vb_free_nodes_list_size +
-        ib_heads_size +
-        ib_nodes_size +
-        ib_state_size +
-        ib_free_nodes_list_size +
-        chunk_mesh_alloc_size;
+
+    VulkanBuffer local_voxel_write_list = VulkanBuffer(
+        physical_device,
+        device,
+        local_voxel_write_list_size,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    );
+
+    {
+        auto scope = m_command_buffer.begin_scope();
+
+        local_voxel_write_list.fill(m_command_buffer, 0u);
+    }
+    submit_compute_commands();
     
     return VoxelGridBuffers {
         // .chunk_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_hash_table_size),
@@ -366,6 +329,7 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
         ),
+        .local_voxel_write_list = std::move(local_voxel_write_list),
         .voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, voxel_write_list_size),
         .voxels = VulkanBuffer(
             physical_device,
@@ -412,6 +376,47 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         //     command_buffer, 0u, VulkanBuffer::create_storage_buffer(physical_device, device, voxel_write_list_size)
         // )
     };
+}
+
+void VoxelGrid::insert_elements_to_voxel_write_list(
+    VulkanCommandBuffer& command_buffer,
+    const VulkanBuffer& dispatch_args,
+    const VulkanBuffer& voxel_write_list_src,
+    VulkanBuffer& voxel_write_list_dsc)
+{
+    LOG_METHOD();
+
+    m_pass_instances.insert_elements_to_voxel_write_list_pi.set_storage_buffer(0, voxel_write_list_src);
+    m_pass_instances.insert_elements_to_voxel_write_list_pi.set_storage_buffer(1, voxel_write_list_dsc);
+
+    m_pass_instances.insert_elements_to_voxel_write_list_pi.bind(command_buffer);
+
+    command_buffer.dispatch_indirect(dispatch_args);
+    voxel_write_list_dsc.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+}
+
+void VoxelGrid::add_voxel_write_list_counters_together(
+    VulkanCommandBuffer& command_buffer,
+    const VulkanBuffer& voxel_write_list_src,
+    VulkanBuffer& voxel_write_list_dsc)
+{
+    LOG_METHOD();
+
+    m_pass_instances.add_voxel_write_list_counters_together_pi.set_storage_buffer(0, voxel_write_list_src);
+    m_pass_instances.add_voxel_write_list_counters_together_pi.set_storage_buffer(1, voxel_write_list_dsc);
+
+    m_pass_instances.add_voxel_write_list_counters_together_pi.bind(command_buffer);
+
+    command_buffer.dispatch(1, 1, 1);
+    voxel_write_list_dsc.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+}
+
+void VoxelGrid::merge_voxel_write_lists(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src, VulkanBuffer& voxel_write_list_dsc) {
+    LOG_METHOD();
+
+    m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, BufferDispatchArg(&voxel_write_list_src, 0));
+    insert_elements_to_voxel_write_list(command_buffer, m_buffers.dispatch_args, voxel_write_list_src, voxel_write_list_dsc);
+    add_voxel_write_list_counters_together(command_buffer, voxel_write_list_src, voxel_write_list_dsc);
 }
 
 void VoxelGrid::world_init_gpu() {
@@ -635,94 +640,94 @@ void VoxelGrid::init_mesh_pool() {
 
 // }
 
-void VoxelGrid::apply_writes_to_world_gpu(uint32_t write_count) {
-    LOG_METHOD();
+// void VoxelGrid::apply_writes_to_world_gpu(uint32_t write_count) {
+//     LOG_METHOD();
 
-    if (write_count == 0u) {
-        return;
-    }
+//     if (write_count == 0u) {
+//         return;
+//     }
 
-    logger.check(write_count <= m_params.max_write_count, "write_count exceeded max_write_count");
+//     logger.check(write_count <= m_params.max_write_count, "write_count exceeded max_write_count");
 
-    {
-        auto scope = m_command_buffer.begin_scope();
+//     {
+//         auto scope = m_command_buffer.begin_scope();
 
-        m_buffers.voxel_write_list.memory_barrier(
-            m_command_buffer,
-            VK_PIPELINE_STAGE_HOST_BIT,
-            VK_ACCESS_HOST_WRITE_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_ACCESS_SHADER_READ_BIT
-        );
+//         m_buffers.voxel_write_list.memory_barrier(
+//             m_command_buffer,
+//             VK_PIPELINE_STAGE_HOST_BIT,
+//             VK_ACCESS_HOST_WRITE_BIT,
+//             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+//             VK_ACCESS_SHADER_READ_BIT
+//         );
 
-        m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
-        m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(1, m_buffers.voxel_write_list);
-        m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(2, m_buffers.voxels);
-        m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(3, m_buffers.free_list);
-        m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(4, m_buffers.chunk_meta);
-        m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(5, m_buffers.enqueued);
-        m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(6, m_buffers.dirty_list);
+//         m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+//         m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(1, m_buffers.voxel_write_list);
+//         m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(2, m_buffers.voxels);
+//         m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(3, m_buffers.free_list);
+//         m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(4, m_buffers.chunk_meta);
+//         m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(5, m_buffers.enqueued);
+//         m_pass_instances.apply_writes_to_world_pi.set_storage_buffer(6, m_buffers.dirty_list);
 
-        m_pass_instances.apply_writes_to_world_pi.bind(m_command_buffer);
+//         m_pass_instances.apply_writes_to_world_pi.bind(m_command_buffer);
 
-        m_pass_instances.apply_writes_to_world_pi.push_constants(m_command_buffer, ApplyVoxelWritesPushConstants{
-            .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
-            .u_chunk_dim_x = m_params.chunk_size.x,
-            .u_chunk_dim_y = m_params.chunk_size.y,
-            .u_chunk_dim_z = m_params.chunk_size.z,
-            .u_voxels_per_chunk = static_cast<uint32_t>(vox_per_chunk()),
-            .u_pack_bits = math_utils::BITS,
-            .u_pack_offset = static_cast<int32_t>(math_utils::OFFSET)
-        });
+//         m_pass_instances.apply_writes_to_world_pi.push_constants(m_command_buffer, ApplyVoxelWritesPushConstants{
+//             .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
+//             .u_chunk_dim_x = m_params.chunk_size.x,
+//             .u_chunk_dim_y = m_params.chunk_size.y,
+//             .u_chunk_dim_z = m_params.chunk_size.z,
+//             .u_voxels_per_chunk = static_cast<uint32_t>(vox_per_chunk()),
+//             .u_pack_bits = math_utils::BITS,
+//             .u_pack_offset = static_cast<int32_t>(math_utils::OFFSET)
+//         });
 
-        m_command_buffer.dispatch(math_utils::div_up_u32(write_count, 256u), 1, 1);
+//         m_command_buffer.dispatch(math_utils::div_up_u32(write_count, 256u), 1, 1);
 
-        m_buffers.voxels.memory_barrier(
-            m_command_buffer,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_ACCESS_SHADER_WRITE_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
-        );
-        m_buffers.dirty_list.memory_barrier(
-            m_command_buffer,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_ACCESS_SHADER_WRITE_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
-        );
-    }
+//         m_buffers.voxels.memory_barrier(
+//             m_command_buffer,
+//             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+//             VK_ACCESS_SHADER_WRITE_BIT,
+//             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+//             VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+//         );
+//         m_buffers.dirty_list.memory_barrier(
+//             m_command_buffer,
+//             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+//             VK_ACCESS_SHADER_WRITE_BIT,
+//             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+//             VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+//         );
+//     }
 
-    submit_compute_commands();
-}
+//     submit_compute_commands();
+// }
 
-void VoxelGrid::apply_writes_to_world_from_cpu(
-    const std::vector<glm::ivec3>& positions,
-    const std::vector<VoxelDataGPU>& voxels)
-{
-    LOG_METHOD();
+// void VoxelGrid::apply_writes_to_world_from_cpu(
+//     const std::vector<glm::ivec3>& positions,
+//     const std::vector<VoxelDataGPU>& voxels)
+// {
+//     LOG_METHOD();
 
-    logger.check(positions.size() == voxels.size(), "positions and voxels must have the same size");
-    logger.check(positions.size() <= m_params.max_write_count, "CPU voxel write batch exceeded max_write_count");
+//     logger.check(positions.size() == voxels.size(), "positions and voxels must have the same size");
+//     logger.check(positions.size() <= m_params.max_write_count, "CPU voxel write batch exceeded max_write_count");
 
-    uint32_t write_count = static_cast<uint32_t>(positions.size());
-    m_buffers.voxel_write_list.upload(&write_count, sizeof(write_count), 0);
+//     uint32_t write_count = static_cast<uint32_t>(positions.size());
+//     m_buffers.voxel_write_list.upload(&write_count, sizeof(write_count), 0);
 
-    if (write_count == 0u) {
-        return;
-    }
+//     if (write_count == 0u) {
+//         return;
+//     }
 
-    std::vector<VoxelWriteGPU> writes(write_count);
-    for (uint32_t i = 0; i < write_count; ++i) {
-        writes[i].world_voxel = glm::ivec4(positions[i], 0);
-        writes[i].voxel_data = voxels[i];
-        writes[i].set_flags = OVERWRITE_BIT;
-        writes[i].pad1 = 0u;
-    }
+//     std::vector<VoxelWriteGPU> writes(write_count);
+//     for (uint32_t i = 0; i < write_count; ++i) {
+//         writes[i].world_voxel = glm::ivec4(positions[i], 0);
+//         writes[i].voxel_data = voxels[i];
+//         writes[i].set_flags = OVERWRITE_BIT;
+//         writes[i].pad1 = 0u;
+//     }
 
-    m_buffers.voxel_write_list.upload(writes, sizeof(uint32_t) * 4);
-    apply_writes_to_world_gpu(write_count);
-}
+//     m_buffers.voxel_write_list.upload(writes, sizeof(uint32_t) * 4);
+//     apply_writes_to_world_gpu(write_count);
+// }
 
 void VoxelGrid::update() {
     {
@@ -800,7 +805,7 @@ void VoxelGrid::stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::v
 
     mark_chunk_to_generate(command_buffer, cam_world_pos, radius_chunks);
 
-    // merge_voxel_write_lists(local_voxel_write_list_, voxel_write_list_);
+    merge_voxel_write_lists(command_buffer, m_buffers.local_voxel_write_list, m_buffers.voxel_write_list);
 
     // reset_voxel_write_list_counter(local_voxel_write_list_);
     

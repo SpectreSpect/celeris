@@ -8,6 +8,7 @@
 #include "../vulkan_self/logger/logger_header.h"
 #include "../vulkan_self/vulkan_buffer.h"
 #include "../vulkan_self/pass/instance/pass_instance.h"
+#include "../vulkan_self/pass/instance/pass_writer.h"
 #include "../vulkan_self/buffer_filler.h"
 #include "../vulkan_self/vulkan_command_buffer.h"
 #include "../vulkan_self/vulkan_command_pool.h"
@@ -64,11 +65,11 @@ public:
     VoxelGrid(VoxelGrid&&) noexcept = default;
     VoxelGrid& operator=(VoxelGrid&&) noexcept = default;
 
-    void apply_writes_to_world_gpu(uint32_t write_count);
-    void apply_writes_to_world_from_cpu(
-        const std::vector<glm::ivec3>& positions,
-        const std::vector<VoxelDataGPU>& voxels
-    );
+    // void apply_writes_to_world_gpu(uint32_t write_count);
+    // void apply_writes_to_world_from_cpu(
+    //     const std::vector<glm::ivec3>& positions,
+    //     const std::vector<VoxelDataGPU>& voxels
+    // );
 
     void update();
 
@@ -83,6 +84,7 @@ public:
         VulkanBuffer mesh_buffers_status;
         VulkanBuffer dirty_list;
         VulkanBuffer load_list;
+        VulkanBuffer local_voxel_write_list;
         VulkanBuffer voxel_write_list;
         VulkanBuffer voxels;
 
@@ -124,12 +126,14 @@ public:
     struct VoxelGridPassInstances {
         PassInstance fill_buffer_pi;
         PassInstance world_init_pi;
-        PassInstance apply_writes_to_world_pi;
+        // PassInstance apply_writes_to_world_pi;
         PassInstance mesh_pool_clear_pi;
         PassInstance mesh_pool_seed_pi;
         PassInstance mesh_reset_pi;
         PassInstance mesh_count_pi;
         PassInstance stream_select_chunks_pi;
+        PassWriter insert_elements_to_voxel_write_list_pi;
+        PassWriter add_voxel_write_list_counters_together_pi;
     };
 
     struct VoxelGridParams {
@@ -181,12 +185,25 @@ private:
     uint64_t vox_per_chunk() const noexcept;
 
     VoxelGridParams create_params(const VoxelGridDesc& desc) const;
-    VoxelGridPassInstances create_pass_instances(ComputePassManager& compute_pass_manager) const;
+    VoxelGridPassInstances create_pass_instances(VulkanDevice& device, ComputePassManager& compute_pass_manager) const;
     VoxelGridBuffers create_buffers(
         const VulkanPhysicalDevice& physical_device,
         const VulkanDevice& device,
         VulkanCommandBuffer& command_buffer
     );
+
+    void insert_elements_to_voxel_write_list(
+        VulkanCommandBuffer& command_buffer,
+        const VulkanBuffer& dispatch_args,
+        const VulkanBuffer& voxel_write_list_src,
+        VulkanBuffer& voxel_write_list_dsc
+    );
+    void add_voxel_write_list_counters_together(
+        VulkanCommandBuffer& command_buffer,
+        const VulkanBuffer& voxel_write_list_src,
+        VulkanBuffer& voxel_write_list_dsc
+    );
+    void merge_voxel_write_lists(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src, VulkanBuffer& voxel_write_list_dsc);
 
     void world_init_gpu();
     // void init_draw_buffers();

@@ -22,12 +22,12 @@ public:
 
     PassInstance(PipelinePass& pass, DescriptorPool& pool, uint32_t instance_set_id = 0);
 
-    virtual void set_uniform_buffer(uint32_t binding, VulkanBuffer& uniform_buffer) override;
-    virtual void set_storage_buffer(uint32_t binding, VulkanBuffer& storage_buffer) override;
-    virtual void set_texture(uint32_t binding, VulkanTexture2D& texture_2d) override;
-    void set_storage_texture(uint32_t binding, VulkanTexture2D& texture_2d);
-    void set_cubemap(uint32_t binding, Cubemap& cubemap);
-    void set_storage_cubemap(uint32_t binding, Cubemap& cubemap);
+    virtual void set_uniform_buffer(uint32_t binding, const VulkanBuffer& uniform_buffer) override;
+    virtual void set_storage_buffer(uint32_t binding, const VulkanBuffer& storage_buffer) override;
+    virtual void set_texture(uint32_t binding, const VulkanTexture2D& texture_2d) override;
+    void set_storage_texture(uint32_t binding, const VulkanTexture2D& texture_2d);
+    void set_cubemap(uint32_t binding, const Cubemap& cubemap);
+    void set_storage_cubemap(uint32_t binding, const Cubemap& cubemap);
     void set_storage_image_view(uint32_t binding, const VulkanImageView& image_view);
 
     virtual void bind_description_object(VulkanCommandBuffer& command_buffer) override;

@@ -24,9 +24,9 @@ public:
     PassObject(PassObject&&) noexcept = default;
     PassObject& operator=(PassObject&&) noexcept = default;
 
-    virtual void set_uniform_buffer(uint32_t binding, VulkanBuffer& uniform_buffer) = 0;
-    virtual void set_storage_buffer(uint32_t binding, VulkanBuffer& storage_buffer) = 0;
-    virtual void set_texture(uint32_t binding, VulkanTexture2D& texture_2d) = 0;
+    virtual void set_uniform_buffer(uint32_t binding, const VulkanBuffer& uniform_buffer) = 0;
+    virtual void set_storage_buffer(uint32_t binding, const VulkanBuffer& storage_buffer) = 0;
+    virtual void set_texture(uint32_t binding, const VulkanTexture2D& texture_2d) = 0;
 
     template <class... Args>
     void push_constants(VulkanCommandBuffer& command_buffer, Args&&... args) const {
