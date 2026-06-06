@@ -1,66 +1,31 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 
-layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 256) in;
 
+// ----- include -----
 #include "../common/buffer_structures.inc"
-#include "chunk_hash_table/decl.inc"
+// -------------------
 
-layout(std430, set = 0, binding = 0) buffer ChunkHashTable {
-    HashTableCounters chunk_hash_table_counters;
-    ChunkHashTableSlot chunk_hash_table_slots[];
-};
+layout(std430, set = 0, binding=0) buffer ChunkHashTable { HashTableCounters chunk_hash_table_counters; ChunkHashTableSlot chunk_hash_table_slots[]; };
+layout(std430, set = 0, binding=1) buffer FreeList { uint free_count; uint free_list[]; };
+layout(std430, set = 0, binding=2) buffer MeshBuffersStatusBuf { uint is_vb_full; uint is_ib_full; };
+layout(std430, set = 0, binding=3) buffer ChunkMetaBuf { ChunkMeta meta[]; };
+layout(std430, set = 0, binding=4) buffer EnqueuedBuf { uint enqueued[]; };
+layout(std430, set = 0, binding=5) buffer DirtyListBuf { uint dirty_count; uint dirty_list[]; };
+layout(std430, set = 0, binding=6) buffer VoxelWriteList { uint write_count; VoxelWrite writes[]; };
+layout(std430, set = 0, binding=7) buffer IndirectCmdBuf { uint cmd_count; DrawElementsIndirectCommand cmds[]; };
+layout(std430, set = 0, binding=8) buffer FailedDirtyListBuf { uint failed_dirty_count; uint failed_dirty_list[]; }; 
 
-layout(std430, set = 0, binding = 1) buffer FreeList {
-    uint free_count;
-    uint free_list[];
-};
-
-layout(std430, set = 0, binding = 2) buffer MeshBuffersStatusBuf {
-    uint is_vb_full;
-    uint is_ib_full;
-};
-
-layout(std430, set = 0, binding = 3) buffer ChunkMetaBuf {
-    ChunkMeta meta[];
-};
-
-layout(std430, set = 0, binding = 4) buffer EnqueuedBuf {
-    uint enqueued[];
-};
-
-layout(std430, set = 0, binding = 5) buffer DirtyListBuf {
-    uint dirty_count;
-    uint dirty_list[];
-};
-
-layout(std430, set = 0, binding = 6) buffer VoxelWriteList {
-    uint write_count;
-    uint write_pad0;
-    uint write_pad1;
-    uint write_pad2;
-    VoxelWrite writes[];
-};
-
-layout(std430, set = 0, binding = 7) buffer IndirectCmdBuf {
-    uint cmd_count;
-    DrawElementsIndirectCommand cmds[];
-};
-
-layout(std430, set = 0, binding = 8) buffer FailedDirtyListBuf {
-    uint failed_dirty_count;
-    uint failed_dirty_list[];
-};
 
 layout(push_constant) uniform WorldInitPushConstants {
     uint u_chunk_hash_table_size;
     uint u_max_chunks;
 };
 
-// Function implementation includes.
-// These must come after buffers and push constants, because the template uses:
-// chunk_hash_table_counters, chunk_hash_table_slots, u_chunk_hash_table_size.
+// ----- include -----
 #include "chunk_hash_table/common.inc"
+// -------------------
 
 void main() {
     uint i = gl_GlobalInvocationID.x;
@@ -82,15 +47,15 @@ void main() {
     }
 
     if (i == 0u) {
-        write_count = 0u;
-        dirty_count = 0u;
-        cmd_count = 0u;
-        free_count = u_max_chunks;
+        write_count = 0u; 
+        dirty_count = 0u; 
+        cmd_count = 0u; 
+        free_count = u_max_chunks; 
         failed_dirty_count = 0u;
-
+        
         is_vb_full = 0u;
         is_ib_full = 0u;
 
-        chunk_hash_table_reset_all_counters_as_empty();
+        reset_all_counters_as_empty();
     }
 }

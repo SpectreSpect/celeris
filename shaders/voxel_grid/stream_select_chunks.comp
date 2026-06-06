@@ -44,7 +44,7 @@ layout(push_constant) uniform StreamSelectChunksPushConstants {
 };
 
 // ----- include -----
-#include "utils.inc"
+#include "../common/utils.inc"
 #include "chunk_hash_table/common.inc"
 #include "chunk_hash_table/get_or_create.inc"
 #include "chunk_hash_table/lookup_remove.inc"

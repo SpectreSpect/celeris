@@ -1,6 +1,6 @@
 #include "hash_table_decl.inc"
 
-uint HASH_TABLE_PREFIX(lookup_hash_table_slot_id)(SLOT_KEY_TYPE key, bool read_only = false) {
+uint HASH_TABLE_PREFIX(lookup_hash_table_slot_id)(SLOT_KEY_TYPE key, bool read_only) {
     uint idx = KEY_HASH_FUNC(key) % HASH_TABLE_SIZE;
 
     for (uint probe = 0u; probe < MAX_PROBES;) {
@@ -34,6 +34,10 @@ uint HASH_TABLE_PREFIX(lookup_hash_table_slot_id)(SLOT_KEY_TYPE key, bool read_o
     }
 
     return INVALID_ID;
+}
+
+uint HASH_TABLE_PREFIX(lookup_hash_table_slot_id)(SLOT_KEY_TYPE key) {
+    return HASH_TABLE_PREFIX(lookup_hash_table_slot_id)(key, false);
 }
 
 bool HASH_TABLE_PREFIX(remove_slot_from_hash_table)(SLOT_KEY_TYPE key) {
