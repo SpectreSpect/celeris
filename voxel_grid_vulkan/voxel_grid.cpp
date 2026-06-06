@@ -115,12 +115,36 @@ void VoxelGrid::mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuff
     m_buffers.emit_counters.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
+void VoxelGrid::mesh_count(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t pack_bits, int32_t pack_offset) {
+    m_pass_instances.mesh_count_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+    m_pass_instances.mesh_count_pi.set_storage_buffer(1, m_buffers.voxels);
+    m_pass_instances.mesh_count_pi.set_storage_buffer(2, m_buffers.dirty_list);
+    m_pass_instances.mesh_count_pi.set_storage_buffer(3, m_buffers.dirty_quad_count);
+    m_pass_instances.mesh_count_pi.set_storage_buffer(4, m_buffers.chunk_meta);
+
+    m_pass_instances.mesh_count_pi.push_constants(m_command_buffer, MeshCountPushConstants{
+        .u_chunk_dim = glm::ivec4(m_params.chunk_size, 0),
+        .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
+        .u_voxels_per_chunk = static_cast<uint32_t>(vox_per_chunk()),
+        .u_pack_bits = pack_bits,
+        .u_pack_offset = pack_offset
+    });
+
+    m_pass_instances.mesh_count_pi.bind(command_buffer);
+
+    command_buffer.dispatch_indirect(dispatch_args);
+
+    m_buffers.chunk_hash_table.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.dirty_quad_count.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+}
+
 void VoxelGrid::build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, int pack_offset) {
     m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, BufferDispatchArg(&m_buffers.dirty_list, 0u));
     mesh_reset(command_buffer, m_buffers.dispatch_args);
 
-    // shader_helper->prepare_dispatch_args(dispatch_args, ValueDispatchArg(vox_per_chunk), BufferDispatchArg(&dirty_list_, 0u));
-    // mesh_count(dispatch_args, pack_bits, pack_offset);
+    m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, 
+                                          ValueDispatchArg(vox_per_chunk()), BufferDispatchArg(&m_buffers.dirty_list, 0u));
+    mesh_count(command_buffer, m_buffers.dispatch_args, pack_bits, pack_offset);
 
     // shader_helper->prepare_dispatch_args(dispatch_args, BufferDispatchArg(&dirty_list_, 0u));
     // mesh_alloc(dispatch_args);
@@ -211,6 +235,7 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(ComputePassMa
         .mesh_pool_clear_pi = PassInstance(compute_pass_manager.mesh_pool_clear_cp, dp),
         .mesh_pool_seed_pi = PassInstance(compute_pass_manager.mesh_pool_seed_cp, dp),
         .mesh_reset_pi = PassInstance(compute_pass_manager.mesh_reset_cp, dp),
+        .mesh_count_pi = PassInstance(compute_pass_manager.mesh_count_cp, dp),
         .stream_select_chunks_pi = PassInstance(compute_pass_manager.stream_select_chunks_cp, dp)
     };
 }
