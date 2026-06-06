@@ -136,6 +136,7 @@ public:
         PassInstance mesh_alloc_vb_pi;
         PassInstance mesh_alloc_ib_pi;
         PassInstance verify_mesh_allocation_pi;
+        PassInstance return_free_alloc_nodes_dispatch_adapter_pi;
         PassInstance stream_select_chunks_pi;
     };
 
@@ -210,5 +211,6 @@ private:
     void mesh_alloc_ib(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args); // not checked
     void mesh_alloc(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args); // not checked
     void verify_mesh_allocation(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args); // not checked
+    void prepare_return_free_alloc_nodes(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args); // not checked
     void build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, int pack_offset);
 };

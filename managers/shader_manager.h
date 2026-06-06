@@ -46,6 +46,7 @@ public:
     VulkanShaderModule mesh_count_cs;
     VulkanShaderModule mesh_alloc_cs;
     VulkanShaderModule verify_mesh_allocation_cs;
+    VulkanShaderModule return_free_alloc_nodes_dispatch_adapter_cs;
     VulkanShaderModule stream_select_chunks_cs;
 
     // PBR
