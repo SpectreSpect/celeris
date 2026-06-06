@@ -637,7 +637,13 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
         ),
         .local_voxel_write_list = std::move(local_voxel_write_list),
-        .voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, voxel_write_list_size),
+        .voxel_write_list = VulkanBuffer(
+            physical_device,
+            device,
+            voxel_write_list_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        ),
         .voxels = VulkanBuffer(
             physical_device,
             device,
