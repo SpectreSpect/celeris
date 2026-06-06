@@ -43,6 +43,7 @@ public:
     VulkanShaderModule mesh_pool_seed_cs;
     VulkanShaderModule dispatch_adapter_cs;
     VulkanShaderModule mesh_reset_cs;
+    VulkanShaderModule mesh_count_cs;
     VulkanShaderModule stream_select_chunks_cs;
 
     // PBR

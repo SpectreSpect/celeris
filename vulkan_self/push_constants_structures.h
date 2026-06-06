@@ -65,3 +65,12 @@ static_assert(offsetof(StreamSelectChunksPushConstants, u_chunk_dim) == 16);
 static_assert(offsetof(StreamSelectChunksPushConstants, u_voxel_size) == 32);
 static_assert(offsetof(StreamSelectChunksPushConstants, u_cam_pos_local) == 48);
 static_assert(offsetof(StreamSelectChunksPushConstants, u_radius_chunks) == 64);
+
+struct MeshCountPushConstants {
+    glm::ivec4 u_chunk_dim;
+    uint32_t  u_chunk_hash_table_size;
+    uint32_t  u_voxels_per_chunk;
+
+    uint32_t u_pack_bits;
+    int32_t  u_pack_offset;
+};
