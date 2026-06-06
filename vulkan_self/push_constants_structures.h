@@ -43,3 +43,16 @@ struct DispatchAdapterPushConstants {
     uint32_t u_y_workgroup_size;
     uint32_t u_z_workgroup_size;
 };
+
+struct StreamSelectChunksPushConstants {
+    uint32_t u_chunk_hash_table_size;   // pow2
+    uint32_t u_max_load_entries;  // обычно = count_active_chunks
+    glm::ivec3 u_chunk_dim;
+    glm::vec3 u_voxel_size;
+
+    glm::vec3 u_cam_pos_local; // камера в локальных координатах грида
+    int32_t u_radius_chunks; // R в чанках
+
+    uint32_t u_pack_bits;
+    int32_t u_pack_offset;
+};

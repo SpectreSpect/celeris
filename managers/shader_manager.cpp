@@ -36,6 +36,7 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         mesh_pool_seed_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_pool_seed.comp.spv"),
         dispatch_adapter_cs(device, path_utils::executable_dir() / "shaders" / "dispatch_adapter.comp.spv"),
         mesh_reset_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_reset.comp.spv"),
+        stream_select_chunks_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "stream_select_chunks.comp.spv"),
 
         // PBR
         equirect_to_cubemap_cs(device, path_utils::executable_dir() / "shaders" / "equirect_to_cubemap.comp.spv"),

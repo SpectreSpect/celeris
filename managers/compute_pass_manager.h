@@ -38,6 +38,7 @@ public:
     ComputePass mesh_pool_seed_cp;
     ComputePass dispatch_adapter_cp;
     ComputePass mesh_reset_cp;
+    ComputePass stream_select_chunks_cp;
 
     // PBR
     ComputePass equirect_to_cubemap_cp;
@@ -76,6 +77,7 @@ public:
     ComputePass create_apply_writes_to_world_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_mesh_pool_clear_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_mesh_pool_seed_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_stream_select_chunks_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
 private:
     DescriptorPool m_pool;

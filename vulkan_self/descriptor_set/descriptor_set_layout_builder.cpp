@@ -52,7 +52,7 @@ DescriptorSetLayoutBuilder& DescriptorSetLayoutBuilder::add_storage_image(uint32
     return *this;
 }
 
-std::span<const VkDescriptorSetLayoutBinding> DescriptorSetLayoutBuilder::get_bindings() const noexcept{
+std::span<const VkDescriptorSetLayoutBinding> DescriptorSetLayoutBuilder::get_bindings() const noexcept {
     return m_bindings;
 }
 
