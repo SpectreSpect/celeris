@@ -43,7 +43,7 @@ layout(push_constant) uniform MeshEmitPushConstants {
 // uniform uint u_ib_page_inds;
 
 // ----- include -----
-#include "../commong/utils.inc"
+#include "../common/utils.inc"
 #include "chunk_pool/read_voxels.inc"
 // -------------------
 
@@ -84,7 +84,7 @@ void emit_quad(uint chunkId, ivec3 chunkCoord, ivec3 p, uint face, uint colorRGB
     uint baseV = chunk_alloc[chunkId].v_startPage * u_vb_page_verts + q * 4u;
     uint baseI = chunk_alloc[chunkId].i_startPage * u_ib_page_inds + q * 6u;
 
-    vec3 wp = vec3(chunkCoord * u_chunk_dim + p) * u_voxel_size;
+    vec3 wp = vec3(chunkCoord * u_chunk_dim.xyz + p) * u_voxel_size.xyz;
 
     // Определяем базис плоскости грани: нормаль N и два тангенса U,V (в воксельных шагах)
     ivec3 N, U, V;
