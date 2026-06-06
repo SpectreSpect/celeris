@@ -10,6 +10,7 @@
 class VulkanCommandPool;
 class VulkanDevice;
 class VulkanCommandBuffer;
+class VulkanBuffer;
 
 class CommandBufferScope {
 public:
@@ -58,6 +59,7 @@ public:
     void reset();
 
     void dispatch(uint32_t x_groups, uint32_t y_groups, uint32_t z_groups);
+    void dispatch_indirect(const VulkanBuffer& args);
 
     void draw_indexed(uint32_t index_count, 
                       uint32_t instance_count = 1, 

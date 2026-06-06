@@ -326,6 +326,8 @@ int main() {
         lighting_system.set_light_source(0, light_source0);
         lighting_system.set_light_source(1, light_source1);
 
+        voxel_grid.update();
+        
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), window, camera);
         lighting_system.update(engine.current_frame(), window, camera);

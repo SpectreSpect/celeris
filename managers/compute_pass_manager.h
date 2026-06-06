@@ -37,6 +37,7 @@ public:
     ComputePass mesh_pool_clear_cp;
     ComputePass mesh_pool_seed_cp;
     ComputePass dispatch_adapter_cp;
+    ComputePass mesh_reset_cp;
     ComputePass stream_select_chunks_cp;
 
     // PBR
@@ -60,6 +61,7 @@ public:
     ComputePass create_reset_voxel_point_map_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_gicp_reduce_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_dispatch_adapter_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_mesh_reset_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
     // Lights
     ComputePass create_build_cluster_light_lists_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
