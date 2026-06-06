@@ -1,9 +1,10 @@
-#ifndef COMMON_BUFFER_STRUCTURES
-#define COMMON_BUFFER_STRUCTURES
+#ifndef BUFFER_STRUCTURES
+#define BUFFER_STRUCTURES
+
 
 #include "hash_table/hash_table_decl.inc"
 #include "../voxel_grid/chunk_hash_table/decl.inc"
-#include "../voxel_rasterization/counter_hash_table/decl.inc"
+// #include "../voxel_rasterization/counter_hash_table/decl.inc"
 
 #define DIRTY_FLAG_BIT 1u
 #define NEED_GENERATION_FLAG_BIT 2u
@@ -23,7 +24,7 @@ struct ChunkMeshAlloc {
     uint i_startPage;
     uint i_order;
     uint needI;
-    bool is_valid;
+    uint is_valid;
 };
 
 struct Node {
@@ -83,5 +84,4 @@ struct BucketHead {
     uint id;
     uint count;
 };
-
 #endif
