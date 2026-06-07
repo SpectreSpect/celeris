@@ -262,6 +262,27 @@ void VoxelGrid::free_evicted_chunks_mesh(VulkanCommandBuffer& command_buffer, co
     m_buffers.evicted_chunks_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
+void VoxelGrid::reset_evicted_list_and_buckets(VulkanCommandBuffer& command_buffer) {
+    LOG_METHOD();
+
+    m_pass_instances.reset_evicted_list_and_buckets_pi.set_storage_buffer(0, m_buffers.bucket_heads);
+    m_pass_instances.reset_evicted_list_and_buckets_pi.set_storage_buffer(1, m_buffers.evicted_chunks_list);
+    m_pass_instances.reset_evicted_list_and_buckets_pi.set_storage_buffer(2, m_buffers.free_list);
+
+    m_pass_instances.reset_evicted_list_and_buckets_pi.bind(command_buffer);
+
+    m_pass_instances.reset_evicted_list_and_buckets_pi.push_constants(command_buffer, ResetEvictedListAndBucketsPushConstants{
+        .u_bucket_count = m_params.count_evict_buckets
+    });
+
+    uint32_t bucket_count_groups = math_utils::div_up_u32(m_params.count_evict_buckets, 256u);
+    command_buffer.dispatch(bucket_count_groups, 1, 1);
+
+    m_buffers.bucket_heads.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.evicted_chunks_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.free_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+}
+
 void VoxelGrid::ensure_free_chunks_gpu(VulkanCommandBuffer& command_buffer, glm::vec3 cam_pos, uint32_t pack_bits, uint32_t pack_offset) {
     LOG_METHOD();
     
@@ -274,7 +295,7 @@ void VoxelGrid::ensure_free_chunks_gpu(VulkanCommandBuffer& command_buffer, glm:
     
     free_evicted_chunks_mesh(command_buffer, m_buffers.dispatch_args); // dispatch_args здесь уже подготовлен
 
-    // reset_evicted_list_and_buckets();
+    reset_evicted_list_and_buckets(command_buffer);
 
     // prepare_return_free_alloc_nodes(dispatch_args);
     // return_free_alloc_nodes(dispatch_args);
@@ -686,7 +707,8 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(VulkanDevice&
         .evict_buckets_build_pi = PassInstance(compute_pass_manager.evict_buckets_build_cp, dp),
         .evict_low_priority_dispatch_adapter_pw = PassWriter(device, compute_pass_manager.evict_low_priority_dispatch_adapter_cp),
         .evict_low_priority_pi = PassInstance(compute_pass_manager.evict_low_priority_cp, dp),
-        .free_evicted_chunks_mesh_pi = PassInstance(compute_pass_manager.free_evicted_chunks_mesh_cp, dp)
+        .free_evicted_chunks_mesh_pi = PassInstance(compute_pass_manager.free_evicted_chunks_mesh_cp, dp),
+        .reset_evicted_list_and_buckets_pi = PassInstance(compute_pass_manager.reset_evicted_list_and_buckets_cp, dp)
     };
 }
 
