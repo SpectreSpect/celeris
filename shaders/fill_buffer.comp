@@ -2,13 +2,14 @@
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 
-layout(std430, set = 0, binding = 0) readonly buffer PrefabBuffer {
-    uint data[];
-} prefabBuffer;
-
-layout(std430, set = 0, binding = 1) buffer ClearableBuffer {
+layout(std430, set = 0, binding = 0) buffer ClearableBuffer {
     uint data[];
 } clearableBuffer;
+
+#define BYTE_MASK 0xFFu
+
+#define PREFAB_MAX_UINTS 25u
+#define PREFAB_MAX_BYTES (PREFAB_MAX_UINTS * 4u)
 
 layout(push_constant) uniform PushConstants {
     uint prefab_data_bytes;
@@ -21,9 +22,9 @@ layout(push_constant) uniform PushConstants {
     uint count_invocations_z;
 
     uint invocation_stride_bytes;
-} pc;
 
-#define BYTE_MASK 0xFFu
+    uint prefab_data[PREFAB_MAX_UINTS];
+} pc;
 
 uint read_prefab_byte(uint byte_offset) {
     uint src_byte_offset = byte_offset % pc.prefab_data_bytes;
@@ -31,7 +32,7 @@ uint read_prefab_byte(uint byte_offset) {
     uint src_byte_index  = src_byte_offset & 3u;
     uint src_shift       = src_byte_index * 8u;
 
-    return (prefabBuffer.data[src_uint_index] >> src_shift) & BYTE_MASK;
+    return (pc.prefab_data[src_uint_index] >> src_shift) & BYTE_MASK;
 }
 
 uint build_prefab_uint(uint byte_offset) {
@@ -66,6 +67,7 @@ void write_dst_byte_atomic(uint dst_byte_offset, uint byte_value) {
 
 void main() {
     if (pc.prefab_data_bytes == 0u ||
+        pc.prefab_data_bytes > PREFAB_MAX_BYTES ||
         pc.invocation_stride_bytes == 0u ||
         pc.clearable_data_bytes == 0u) {
         return;
@@ -126,7 +128,7 @@ void main() {
             uint src_byte_offset = rel_byte_off % pc.prefab_data_bytes;
             uint src_uint_index  = src_byte_offset >> 2u;
 
-            clearableBuffer.data[dst_uint_index] = prefabBuffer.data[src_uint_index];
+            clearableBuffer.data[dst_uint_index] = pc.prefab_data[src_uint_index];
         } else {
             clearableBuffer.data[dst_uint_index] = build_prefab_uint(rel_byte_off);
         }

@@ -67,8 +67,9 @@ ComputePass ComputePassManager::create_fill_buffer_compute_pass(VulkanDevice& de
     LOG_METHOD();
 
     ComputePassBuilder builder;
-    builder.add_storage_buffer(0, ShaderStages::compute); // PrefabBuffer
-    builder.add_storage_buffer(1, ShaderStages::compute); // ClearableBuffer
+    builder.set_descriptor_set_flags(VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // ClearableBuffer
     builder.add_push_constantsf(sizeof(FillBufferPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);

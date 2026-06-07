@@ -1,10 +1,8 @@
 #include "vulkan_buffer.h"
 
-#include <utility>
-
 #include "vulkan_command_buffer.h"
 #include "vulkan_engine.h"
-#include "../vulkan_self/pass/instance/pass_instance.h"
+#include "../vulkan_self/pass/instance/pass_writer.h"
 #include "utils.h"
 #include "../math_utils.h"
 #include "push_constants_structures.h"
@@ -214,48 +212,30 @@ void VulkanBuffer::fill(VulkanCommandBuffer& command_buffer, uint32_t data, VkDe
     vkCmdFillBuffer(command_buffer.handle(), m_buffer, offset, size_bytes, data);
 }
 
-void VulkanBuffer::fill(
+VulkanBuffer& VulkanBuffer::fill(
     VulkanCommandBuffer& command_buffer,
-    PassInstance& fill_pass_instance,
-    VulkanBuffer& prefab_buffer,
-    const void* data,
-    uint32_t data_size_bytes,
-    uint32_t size_bytes,
-    uint32_t offset,
-    uint32_t invocation_stride)
+    PassWriter& fill_pass_writer,
+    const void* prefab,
+    uint32_t prifab_size_bytes,
+    uint32_t fillable_area_size_bytes,
+    uint32_t fillable_area_offset,
+    uint32_t invocation_stride) &
 {
     LOG_METHOD();
 
-    if (size_bytes == 0) {
-        return;
+    if (fillable_area_size_bytes == 0) {
+        return *this;
     }
 
-    logger.check(data != nullptr, "data must not be nullptr");
-    logger.check(data_size_bytes != 0, "data_size_bytes must not be 0");
+    logger.check(prefab != nullptr, "prifab must not be nullptr");
+    logger.check(prifab_size_bytes != 0, "prifab_size_bytes must not be 0");
+    logger.check(prifab_size_bytes <= PREFAB_MAX_UINTS * static_cast<uint32_t>(sizeof(uint32_t)), "The maximum size of the prefab has been exceeded");
     logger.check(invocation_stride != 0u, "invocation_stride must not be 0");
-    logger.check(offset <= m_size, "Fill offset is out of bounds");
-    logger.check(size_bytes <= m_size - offset, "Fill area exceeded the buffer size");
+    logger.check(fillable_area_offset <= m_size, "Fillable area offset is out of bounds");
+    logger.check(fillable_area_size_bytes <= m_size - fillable_area_offset, "Fill area exceeded the buffer size");
     logger.check(has_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), "Destination buffer must have VK_BUFFER_USAGE_STORAGE_BUFFER_BIT");
-    logger.check(prefab_buffer.has_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), "prefab_buffer must have VK_BUFFER_USAGE_STORAGE_BUFFER_BIT");
-    logger.check(prefab_buffer.has_memory_property(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT),
-             "prefab_buffer must be host-visible");
 
-    const VkDeviceSize prefab_required_bytes = Utils::align_up(data_size_bytes, 4);
-
-    prefab_buffer.ensure_capacity(prefab_required_bytes);
-    prefab_buffer.upload(data, data_size_bytes);
-
-    prefab_buffer.memory_barrier(
-        command_buffer,
-        VK_PIPELINE_STAGE_HOST_BIT,
-        VK_ACCESS_HOST_WRITE_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_ACCESS_SHADER_READ_BIT,
-        0,
-        data_size_bytes
-    );
-
-    const uint32_t total_count_invocations = math_utils::div_up_u32(size_bytes, invocation_stride);
+    const uint32_t total_count_invocations = math_utils::div_up_u32(fillable_area_size_bytes, invocation_stride);
 
     uint32_t count_invocations_x = 0;
     uint32_t count_invocations_y = 0;
@@ -279,36 +259,50 @@ void VulkanBuffer::fill(
     const uint32_t groups_y = math_utils::div_up_u32(count_invocations_y, FILL_LOCAL_SIZE_Y);
     const uint32_t groups_z = math_utils::div_up_u32(count_invocations_z, FILL_LOCAL_SIZE_Z);
 
-    FillBufferPushConstants pc{};
-    pc.prefab_data_bytes = data_size_bytes;
-    pc.clearable_data_bytes = size_bytes;
+    FillBufferPushConstants pc{
+        .prefab_data_bytes = prifab_size_bytes,
+        .clearable_data_bytes = fillable_area_size_bytes,
 
-    pc.clearable_data_offset_bytes = offset;
+        .clearable_data_offset_bytes = fillable_area_offset,
 
-    pc.count_invocations_x = count_invocations_x;
-    pc.count_invocations_y = count_invocations_y;
-    pc.count_invocations_z = count_invocations_z;
+        .count_invocations_x = count_invocations_x,
+        .count_invocations_y = count_invocations_y,
+        .count_invocations_z = count_invocations_z,
 
-    pc.invocation_stride_bytes = invocation_stride;
+        .invocation_stride_bytes = invocation_stride
+    };
 
-    fill_pass_instance.set_storage_buffer(0, prefab_buffer);
-    fill_pass_instance.set_storage_buffer(1, *this);
+    std::memcpy(pc.prefab_data, prefab, prifab_size_bytes);
 
-    fill_pass_instance.bind(command_buffer);
-
-    fill_pass_instance.push_constants(command_buffer, pc);
+    fill_pass_writer.set_storage_buffer(0, *this);
+    fill_pass_writer.bind(command_buffer);
+    fill_pass_writer.push_constants(command_buffer, pc);
 
     command_buffer.dispatch(groups_x, groups_y, groups_z);
 
-    memory_barrier(
+    return *this;
+}
+
+VulkanBuffer&& VulkanBuffer::fill(
+    VulkanCommandBuffer& command_buffer,
+    PassWriter& fill_pass_writer,
+    const void* prefab,
+    uint32_t prifab_size_bytes,
+    uint32_t fillable_area_size_bytes,
+    uint32_t fillable_area_offset,
+    uint32_t invocation_stride) &&
+{
+    static_cast<VulkanBuffer&>(*this).fill(
         command_buffer,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_ACCESS_SHADER_WRITE_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-        offset,
-        size_bytes
+        fill_pass_writer,
+        prefab,
+        prifab_size_bytes,
+        fillable_area_size_bytes,
+        fillable_area_offset,
+        invocation_stride
     );
+
+    return std::move(*this);
 }
 
 void VulkanBuffer::upload(const void* data, VkDeviceSize size_bytes, VkDeviceSize offset_bytes) {
