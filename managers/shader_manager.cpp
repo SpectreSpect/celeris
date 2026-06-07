@@ -58,6 +58,7 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         reset_evicted_list_and_buckets_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "reset_evicted_list_and_buckets.comp.spv"),
         hash_table_conditional_dispatch_adapter_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "hash_table_conditional_dispatch_adapter.comp.spv"),
         clear_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "clear_chunk_hash_table.comp.spv"),
+        fill_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "fill_chunk_hash_table.comp.spv"),
         
         // PBR
         equirect_to_cubemap_cs(device, path_utils::executable_dir() / "shaders" / "equirect_to_cubemap.comp.spv"),

@@ -165,6 +165,7 @@ public:
         PassInstance reset_evicted_list_and_buckets_pi;
         PassWriter hash_table_conditional_dispatch_adapter_pw;
         PassInstance clear_chunk_hash_table_pi;
+        PassInstance fill_chunk_hash_table_pi;
     };
 
     struct VoxelGridParams {
@@ -250,7 +251,8 @@ private:
     
     void conditional_prepare_rebuild(VulkanCommandBuffer& command_buffer, VulkanBuffer& clear_dispatch_args, VulkanBuffer& fill_dispatch_args);
     void clear_chunk_hash_table(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
-    void rebuild_chunk_hash_table(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, uint32_t pack_offset);
+    void fill_chunk_hash_table(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t pack_bits, int pack_offset);
+    void rebuild_chunk_hash_table(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, int pack_offset);
 
     void reset_heads(VulkanCommandBuffer& command_buffer); 
     void build_bucket_lists(VulkanCommandBuffer& command_buffer, glm::vec3 cam_pos);
@@ -258,17 +260,17 @@ private:
     void evict_lowpriority_chunks(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void free_evicted_chunks_mesh(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void reset_evicted_list_and_buckets(VulkanCommandBuffer& command_buffer);
-    void ensure_free_chunks_gpu(VulkanCommandBuffer& command_buffer, glm::vec3 cam_pos, uint32_t pack_bits, uint32_t pack_offset);
+    void ensure_free_chunks_gpu(VulkanCommandBuffer& command_buffer, glm::vec3 cam_pos, uint32_t pack_bits, int pack_offset);
 
     void mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
-    void mesh_count(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t pack_bits, int32_t pack_offset); // not checked
+    void mesh_count(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t pack_bits, int pack_offset); // not checked
     void mesh_alloc_vb(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args); // not checked
     void mesh_alloc_ib(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args); // not checked
     void mesh_alloc(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args); // not checked
     void verify_mesh_allocation(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args); // not checked
     void prepare_return_free_alloc_nodes(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args); // not checked
     void return_free_alloc_nodes(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args);
-    void mesh_emit(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args, uint32_t pack_bits, int32_t pack_offset);
+    void mesh_emit(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args, uint32_t pack_bits, int pack_offset);
     void mesh_finalize(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args);
     void reset_dirty_count(VulkanCommandBuffer& command_buffer);
     void reset_cmd_count(VulkanCommandBuffer& command_buffer);
