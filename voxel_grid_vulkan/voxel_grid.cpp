@@ -555,6 +555,11 @@ void VoxelGrid::build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint3
     reset_dirty_count(command_buffer);
 }
 
+void VoxelGrid::build_indirect_draw_commands_frustum() {
+    // reset_cmd_count();
+    // build_draw_commands(viewProj, cam_pos, pack_bits, pack_offset);
+}
+
 uint64_t VoxelGrid::vox_per_chunk() const noexcept {
     return static_cast<uint64_t>(m_params.chunk_size.x) * 
            static_cast<uint64_t>(m_params.chunk_size.y) * 
@@ -1223,6 +1228,8 @@ void VoxelGrid::update() {
     {
         auto scope = m_command_buffer.begin_scope();
         build_mesh_from_dirty(m_command_buffer, math_utils::BITS, math_utils::OFFSET);
+        // build_indirect_draw_commands_frustum(state.vp, state.camera->position, math_utils::BITS, math_utils::OFFSET);
+        // draw_indirect(vao.id, state.transform, state.vp, state.camera->position);
     }
     submit_compute_commands();
 }

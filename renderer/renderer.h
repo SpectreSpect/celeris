@@ -13,6 +13,7 @@ class InstancedRenderObject;
 class TransformPushConstants;
 class SceneObject;
 class RenderObject;
+class VulkanBuffer;
 
 class InstancedRenderObject;
 class Scene;
@@ -30,8 +31,10 @@ public:
     // void render(VulkanCommandBuffer& command_buffer, InstancedRenderObject& render_object);
 
     void render(VulkanCommandBuffer& command_buffer, std::vector<SceneObject*> scene_objects, glm::mat4 transform = glm::mat4(1.0f));
-    
     void render(VulkanCommandBuffer& command_buffer, Scene& scene);
+
+    void render_indirect(VulkanCommandBuffer& command_buffer, RenderObject& render_object, VulkanBuffer& indirect_commands, 
+                         uint32_t indirect_offset, uint32_t count_offset, uint32_t max_draws);
 
 private:
     VulkanEngine* m_engine = nullptr;

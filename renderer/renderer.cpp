@@ -83,3 +83,43 @@ void Renderer::render(VulkanCommandBuffer& command_buffer, std::vector<SceneObje
 void Renderer::render(VulkanCommandBuffer& command_buffer, Scene& scene) {
     render(command_buffer , scene.scene_objects);
 }
+
+void Renderer::render_indirect(VulkanCommandBuffer& command_buffer, RenderObject& render_object, VulkanBuffer& indirect_commands, 
+                     uint32_t indirect_offset, uint32_t count_offset, uint32_t max_draws) {
+        
+    render_object.sync_material();
+    
+    logger.check(render_object.mesh_view().valid(), "Mesh view was invalid");
+
+    static TransformPushConstants pc;
+    pc.model = render_object.transform.get_model_matrix(); // TEMPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP
+    pc.material_data_id = render_object.material_data_id();
+
+    SlotPassInstance& material = render_object.material();
+    auto& pass = static_cast<MaterialPass&>(material.pipepline_pass());
+
+    material.bind(command_buffer);
+    m_frame_resources->bind(m_engine->current_frame(), command_buffer, pass.pipeline(), 1);
+
+    pass.pipeline().set_y_up_viewport(command_buffer, *m_engine);
+    pass.pipeline().set_scissor(command_buffer, *m_engine);
+
+    render_object.mesh_view().bind_vertex_buffer(command_buffer);
+    render_object.mesh_view().bind_index_buffer(command_buffer);
+
+    pass.pipeline_layout().push_constants(command_buffer, pc);
+    
+    // command_buffer.draw_indexed(render_object.mesh_view().index_count());
+
+    uint32_t stride = sizeof(VkDrawIndexedIndirectCommand); // 20 bytes
+
+    vkCmdDrawIndexedIndirectCount(
+        command_buffer.handle(),
+        indirect_commands.handle(), // draw commands buffer
+        indirect_offset,             // commands start after cmd_count
+        indirect_commands.handle(), // count buffer, same VkBuffer is okay
+        count_offset,                // cmd_count is at byte 0
+        max_draws,
+        stride
+    );
+}

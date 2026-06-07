@@ -52,6 +52,7 @@
 #include "renderer/pbr/irradiance_map_pass.h"
 #include "vulkan_self/image/cubemap_array.h"
 #include "voxel_grid_vulkan/voxel_grid.h"
+#include "renderer/static_mesh_data.h"
 
 #include <vector>
 
@@ -84,6 +85,14 @@ struct SimpleStorage {
     glm::vec4 color1;
     glm::vec4 color2;
 };
+
+// struct DrawElementsIndirectCommand {
+//     uint32_t count;
+//     uint32_t instanceCount;
+//     uint32_t firstIndex;
+//     int32_t  baseVertex;
+//     uint32_t baseInstance;
+// };
 
 int main() {
     GlfwContext glfw_context;
@@ -181,8 +190,51 @@ int main() {
     VoxelMapPointReseter voxel_map_reseter(engine, compute_pass_manager);
 
     Renderer renderer(engine, frame_resources);
-
+    
+    VulkanBuffer indirect_command_buffer(engine.physical_device(), 
+                                         engine.device(), 
+                                         sizeof(uint32_t) + sizeof(DrawElementsIndirectCommand) * 2,
+                                         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    
     RenderObject sphere(mesh_manager.sphere, material_instance_manager.pbr);
+
+    RenderObject two_spheres(mesh_manager.two_sphere_indirect_test, material_instance_manager.pbr);
+    
+    // uint32_t indirect_command_count = 1;
+    // DrawElementsIndirectCommand commands {
+    //     .count = sphere.mesh_view().index_count(), 
+    //     .instanceCount = 1,
+    //     .firstIndex = 0,
+    //     .baseVertex = 0,
+    //     .baseInstance = 0
+    // };
+
+    // indirect_command_buffer.upload(&indirect_command_count, sizeof(uint32_t), 0);
+    // indirect_command_buffer.upload(&commands, sizeof(DrawElementsIndirectCommand), sizeof(uint32_t));
+
+
+    uint32_t draw_count = 2;
+
+    VkDrawIndexedIndirectCommand commands[2] = {
+        {
+            .indexCount    = StaticMeshData::two_sphere_inidirect_test.sphere_index_count,
+            .instanceCount = 1,
+            .firstIndex    = StaticMeshData::two_sphere_inidirect_test.first_sphere_first_index,
+            .vertexOffset  = StaticMeshData::two_sphere_inidirect_test.first_sphere_base_vertex,
+            .firstInstance = 0
+        },
+        {
+            .indexCount    = StaticMeshData::two_sphere_inidirect_test.sphere_index_count,
+            .instanceCount = 1,
+            .firstIndex    = StaticMeshData::two_sphere_inidirect_test.second_sphere_first_index,
+            .vertexOffset  = StaticMeshData::two_sphere_inidirect_test.second_sphere_base_vertex,
+            .firstInstance = 0
+        }
+    };
+
+    indirect_command_buffer.upload(&draw_count, sizeof(uint32_t), 0);
+    indirect_command_buffer.upload(&commands, sizeof(DrawElementsIndirectCommand) * 2, sizeof(uint32_t));
 
     RenderObject unlit_cube(mesh_manager.cube, material_instance_manager.pbr);
     RenderObject unlit_cube2(mesh_manager.cube, material_instance_manager.dirt_blinn_phong);
@@ -256,6 +308,7 @@ int main() {
     // unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube.set_material_data<PBRMaterialData>(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
     sphere.set_material_data(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
+    two_spheres.set_material_data(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
 
     unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube3.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
@@ -285,7 +338,7 @@ int main() {
     // scene.add(voxel_map_point_cloud);
 
     // scene.add(unlit_cube);
-    scene.add(sphere);
+    // scene.add(sphere);
     scene.add(skybox);
 
     skybox.update(scene);
@@ -386,6 +439,8 @@ int main() {
                 engine.swapchain_resources().swapchain, clear_color);
                 // rgba(37, 150, 190)
                 renderer.render(command_buffer, scene);
+
+                renderer.render_indirect(command_buffer, two_spheres, indirect_command_buffer, sizeof(uint32_t), 0, 2);
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);

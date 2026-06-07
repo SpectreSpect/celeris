@@ -256,4 +256,5 @@ private:
     void mesh_finalize(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args);
     void reset_dirty_count(VulkanCommandBuffer& command_buffer);
     void build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, int pack_offset);
+    void build_indirect_draw_commands_frustum();
 };
