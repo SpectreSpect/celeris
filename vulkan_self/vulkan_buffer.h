@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstring>
 #include <optional>
+#include <utility>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -18,7 +19,7 @@
 
 class VulkanCommandBuffer;
 class VulkanEngine;
-class PassInstance;
+class PassWriter;
 class VulkanBufferView;
 
 constexpr uint32_t FILL_LOCAL_SIZE_X = 8u;
@@ -74,39 +75,71 @@ public:
 
     void fill(VulkanCommandBuffer& command_buffer, uint32_t data);
     void fill(VulkanCommandBuffer& command_buffer, uint32_t data, VkDeviceSize size_bytes, VkDeviceSize offset = 0);
-    void fill(
+    
+    VulkanBuffer& fill(
         VulkanCommandBuffer& command_buffer,
-        PassInstance& fill_pass_instance,
-        VulkanBuffer& prefab_buffer,
-        const void* data,
-        uint32_t data_size_bytes,
-        uint32_t size_bytes,
-        uint32_t offset = 0u,
+        PassWriter& fill_pass_writer,
+        const void* prefab,
+        uint32_t prifab_size_bytes,
+        uint32_t fillable_area_size_bytes,
+        uint32_t fillable_area_offset = 0u,
         uint32_t invocation_stride = 4u
-    );
+    ) &;
+
+    VulkanBuffer&& fill(
+        VulkanCommandBuffer& command_buffer,
+        PassWriter& fill_pass_writer,
+        const void* prefab,
+        uint32_t prifab_size_bytes,
+        uint32_t fillable_area_size_bytes,
+        uint32_t fillable_area_offset = 0u,
+        uint32_t invocation_stride = 4u
+    ) &&;
 
     template <class T>
-    void fill(
+    VulkanBuffer& fill(
         VulkanCommandBuffer& command_buffer,
-        PassInstance& fill_pass_instance,
-        VulkanBuffer& prefab_buffer,
-        T fill_value,
-        uint32_t size_bytes,
-        uint32_t offset = 0u,
-        uint32_t invocation_stride = 4u)
+        PassWriter& fill_pass_writer,
+        const T& prefab,
+        uint32_t fillable_area_size_bytes,
+        uint32_t fillable_area_offset = 0u,
+        uint32_t invocation_stride = 4u) &
     {
         static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
         
         fill(
             command_buffer,
-            fill_pass_instance,
-            prefab_buffer,
-            &fill_value,
-            sizeof(T),
-            size_bytes,
-            offset,
+            fill_pass_writer,
+            &prefab,
+            sizeof(prefab),
+            fillable_area_size_bytes,
+            fillable_area_offset,
             invocation_stride
         );
+
+        return *this;
+    }
+
+    template <class T>
+    VulkanBuffer&& fill(
+        VulkanCommandBuffer& command_buffer,
+        PassWriter& fill_pass_writer,
+        const T& prefab,
+        uint32_t fillable_area_size_bytes,
+        uint32_t fillable_area_offset = 0u,
+        uint32_t invocation_stride = 4u) &&
+    {
+        // Хотя он и так будет lvalue, но для понятности сделаю static_cast
+        static_cast<VulkanBuffer&>(*this).fill(
+            command_buffer,
+            fill_pass_writer,
+            prefab,
+            fillable_area_size_bytes,
+            fillable_area_offset,
+            invocation_stride
+        );
+        
+        return std::move(*this);
     }
 
     void upload(const void* data, VkDeviceSize size_bytes, VkDeviceSize offset_bytes = 0);
@@ -335,17 +368,23 @@ public:
         VkDeviceSize size_bytes
     );
 
+    /*
+        Функция внутри себя не ставит memory_barrier, его нужно ставить руками!
+        Не забывайте!!!
+    */
     template <class T>
     static VulkanBuffer from_fill(
         const VulkanPhysicalDevice& physical_device,
         const VulkanDevice& device,
         VulkanCommandBuffer& command_buffer,
-        PassInstance& fill_pass_instance,
-        VulkanBuffer& prefab_buffer,
-        T fill_value,
-        VkDeviceSize size_bytes,
+        PassWriter& fill_pass_writer,
+        VkDeviceSize buffer_size_bytes,
         VkBufferUsageFlags usage,
-        VkMemoryPropertyFlags memory_properties)
+        VkMemoryPropertyFlags memory_properties,
+        T prefab,
+        uint32_t fillable_area_size_bytes,
+        uint32_t fillable_area_offset = 0,
+        uint32_t invocation_stride = 4u)
     {
         LOG_NAMED("VulkanBuffer");
 
@@ -353,10 +392,19 @@ public:
         
         logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
         logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
-        logger.check(size_bytes != 0, "Attempt to create a buffer with zero size");
+        logger.check(buffer_size_bytes != 0, "Attempt to create a buffer with zero size");
 
-        VulkanBuffer buffer(physical_device, device, size_bytes, usage, memory_properties);
-        buffer.fill(command_buffer, fill_pass_instance, prefab_buffer, fill_value, size_bytes);
+        VulkanBuffer buffer(physical_device, device, buffer_size_bytes, usage, memory_properties);
+        
+        buffer.fill(
+            command_buffer,
+            fill_pass_writer,
+            prefab,
+            fillable_area_size_bytes,
+            fillable_area_offset,
+            invocation_stride
+        );
+
         return buffer;
     }
 

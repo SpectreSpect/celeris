@@ -9,7 +9,6 @@
 #include "../vulkan_self/vulkan_buffer.h"
 #include "../vulkan_self/pass/instance/pass_instance.h"
 #include "../vulkan_self/pass/instance/pass_writer.h"
-#include "../vulkan_self/buffer_filler.h"
 #include "../vulkan_self/vulkan_command_buffer.h"
 #include "../vulkan_self/vulkan_command_pool.h"
 #include "../vulkan_self/vulkan_fence.h"
@@ -87,6 +86,7 @@ public:
         VulkanBuffer local_voxel_write_list;
         VulkanBuffer voxel_write_list;
         VulkanBuffer voxels;
+        VulkanBuffer bucket_heads;
 
         VulkanBuffer global_vertex_buffer;
         VulkanBuffer global_index_buffer;
@@ -128,7 +128,7 @@ public:
     };
 
     struct VoxelGridPassInstances {
-        PassInstance fill_buffer_pi;
+        PassWriter fill_buffer_pw;
         PassInstance world_init_pi;
         // PassInstance apply_writes_to_world_pi;
         PassInstance mesh_pool_clear_pi;
@@ -185,8 +185,6 @@ private:
     VulkanQueue* m_queue = nullptr;
     ComputePassManager* m_compute_pass_manager = nullptr;
 
-    // BufferFiller m_buffer_filler;
-
     VoxelGridParams m_params;
     VoxelGridPassInstances m_pass_instances;
     VoxelGridBuffers m_buffers;
@@ -232,6 +230,9 @@ private:
     void write_voxels_to_grid(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void reset_voxel_write_list_counter(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_write_list);
     void stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks, uint32_t seed);
+
+    void reset_heads(VulkanCommandBuffer& command_buffer); 
+    void ensure_free_chunks_gpu(VulkanCommandBuffer& command_buffer, glm::vec3 cam_pos, uint32_t pack_bits, uint32_t pack_offset); 
 
     void mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void mesh_count(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t pack_bits, int32_t pack_offset); // not checked

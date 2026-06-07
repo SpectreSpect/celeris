@@ -8,16 +8,8 @@
 #include <vulkan/vulkan.h>
 
 #include "logger/logger_header.h"
-#include "vulkan_buffer.h"
-#include "pass/instance/pass_instance.h"
-#include "vulkan_fence.h"
 
-class ComputePassManager;
-class VulkanPhysicalDevice;
-class VulkanDevice;
-class VulkanCommandBuffer;
-class VulkanCommandPool;
-class VulkanQueue;
+#include "pass/instance/pass_writer.h"
 
 class BufferFiller {
 public:
@@ -109,12 +101,7 @@ private:
     };
 
 private:
-    VkPhysicalDevice m_physical_device = VK_NULL_HANDLE;
-    VkDevice m_device = VK_NULL_HANDLE;
-    VulkanQueue* m_queue = nullptr; // Нужен стабильный адерес (в VulkanDevice обеспечено)
-    std::vector<FillResource> m_fill_resources;
-    VulkanBuffer m_prifab_buffer;
-    size_t current_fill_resource_id = 0;
+    PassWriter m_fill_writer;
 
     static std::vector<FillResource> create_fill_resources(
         const VulkanDevice& device,

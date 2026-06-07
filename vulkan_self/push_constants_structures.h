@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+inline constexpr uint32_t PREFAB_MAX_UINTS = 25u;
+
 struct FillBufferPushConstants {
     uint32_t prefab_data_bytes;
     uint32_t clearable_data_bytes;
@@ -13,6 +15,8 @@ struct FillBufferPushConstants {
     uint32_t count_invocations_z;
 
     uint32_t invocation_stride_bytes;
+
+    uint32_t prefab_data[PREFAB_MAX_UINTS];
 };
 
 struct WorldInitPushConstants {
