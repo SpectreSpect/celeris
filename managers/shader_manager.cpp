@@ -53,6 +53,7 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         evict_buckets_build_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "evict_buckets_build.comp.spv"),
         evict_low_priority_dispatch_adapter_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "evict_low_priority_dispatch_adapter.comp.spv"),
         evict_low_priority_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "evict_low_priority.comp.spv"),
+        build_indirect_cmds_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "build_indirect_cmds.comp.spv"),
         
         // PBR
         equirect_to_cubemap_cs(device, path_utils::executable_dir() / "shaders" / "equirect_to_cubemap.comp.spv"),

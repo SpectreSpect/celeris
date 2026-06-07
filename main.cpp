@@ -192,11 +192,7 @@ int main() {
 
     Renderer renderer(engine, frame_resources);
     
-    VulkanBuffer indirect_command_buffer(engine.physical_device(), 
-                                         engine.device(), 
-                                         sizeof(uint32_t) + sizeof(DrawElementsIndirectCommand) * 2,
-                                         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
-                                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    VulkanBuffer indirect_command_buffer = VulkanBuffer::create_host_visible_indirect_storage_buffer(engine, sizeof(uint32_t) + sizeof(DrawElementsIndirectCommand) * 2);
     
     RenderObject sphere(mesh_manager.sphere, material_instance_manager.pbr);
 
@@ -386,14 +382,14 @@ int main() {
         lighting_system.set_light_source(0, light_source0);
         lighting_system.set_light_source(1, light_source1);
 
-        voxel_grid.update();
+        voxel_grid.update(window, camera);
         
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), window, camera);
         lighting_system.update(engine.current_frame(), window, camera);
 
-        sphere.transform.position.y = sin(timer) * 2;
-        two_spheres.transform.position.x = cos(timer) * 10;
+        // sphere.transform.position.y = sin(timer) * 2;
+        // two_spheres.transform.position.x = cos(timer) * 10;
         
 
         // if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {

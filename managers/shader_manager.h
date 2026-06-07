@@ -60,6 +60,7 @@ public:
     VulkanShaderModule evict_buckets_build_cs;
     VulkanShaderModule evict_low_priority_dispatch_adapter_cs;
     VulkanShaderModule evict_low_priority_cs;
+    VulkanShaderModule build_indirect_cmds_cs;
 
     // PBR
     VulkanShaderModule equirect_to_cubemap_cs;

@@ -161,3 +161,9 @@ struct EvictLowPriorityPushConstants {
     uint32_t u_chunk_hash_table_size;
     uint32_t u_bucket_count;
 };
+
+struct BuildIndirectCmdsPushConstants {
+    glm::vec4 cam_pos;
+    // 6 плоскостей фрустума в world space: ax+by+cz+d >= 0 (внутри)
+    glm::vec4 u_frustum_planes[6];
+};
