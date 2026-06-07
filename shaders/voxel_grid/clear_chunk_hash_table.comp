@@ -1,0 +1,27 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256) in;
+
+// ----- include -----
+#include "../common/buffer_structures.inc"
+// -------------------
+
+// --- hash table ---
+layout(std430, set = 0, binding=0) coherent buffer ChunkHashTable { HashTableCounters chunk_hash_table_counters; ChunkHashTableSlot chunk_hash_table_slots[]; };
+
+layout(push_constant) uniform ClearChunkHashTablePushConstants {
+    uint u_chunk_hash_table_size;
+};
+
+// ----- include -----
+#include "chunk_hash_table/common.inc"
+// -------------------
+
+void main() {
+    uint slot_id = gl_GlobalInvocationID.x;
+    if (slot_id >= u_chunk_hash_table_size) return;
+
+    chunk_hash_table_slots[slot_id].key = uvec2(0u, 0u);
+    chunk_hash_table_slots[slot_id].state = SLOT_EMPTY;
+}

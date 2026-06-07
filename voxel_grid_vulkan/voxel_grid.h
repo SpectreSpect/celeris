@@ -113,6 +113,7 @@ public:
         VulkanBuffer mesh_pool_seed_uniform;
 
         VulkanBuffer dispatch_args;
+        VulkanBuffer dispatch_args_additional;
 
         VulkanBuffer dirty_quad_count;
         VulkanBuffer emit_counters;
@@ -160,6 +161,10 @@ public:
         PassWriter evict_low_priority_dispatch_adapter_pw;
         PassInstance evict_low_priority_pi;
         PassInstance build_indirect_cmds_pi;
+        PassInstance free_evicted_chunks_mesh_pi;
+        PassInstance reset_evicted_list_and_buckets_pi;
+        PassWriter hash_table_conditional_dispatch_adapter_pw;
+        PassInstance clear_chunk_hash_table_pi;
     };
 
     struct VoxelGridParams {
@@ -242,12 +247,18 @@ private:
     void write_voxels_to_grid(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void reset_voxel_write_list_counter(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_write_list);
     void stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks, uint32_t seed);
+    
+    void conditional_prepare_rebuild(VulkanCommandBuffer& command_buffer, VulkanBuffer& clear_dispatch_args, VulkanBuffer& fill_dispatch_args);
+    void clear_chunk_hash_table(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void rebuild_chunk_hash_table(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, uint32_t pack_offset);
 
     void reset_heads(VulkanCommandBuffer& command_buffer); 
     void build_bucket_lists(VulkanCommandBuffer& command_buffer, glm::vec3 cam_pos);
     void prepare_evict_lowpriority_chunks(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args);
-    void evict_lowpriority_chunks(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args); 
-    void ensure_free_chunks_gpu(VulkanCommandBuffer& command_buffer, glm::vec3 cam_pos, uint32_t pack_bits, uint32_t pack_offset); 
+    void evict_lowpriority_chunks(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void free_evicted_chunks_mesh(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void reset_evicted_list_and_buckets(VulkanCommandBuffer& command_buffer);
+    void ensure_free_chunks_gpu(VulkanCommandBuffer& command_buffer, glm::vec3 cam_pos, uint32_t pack_bits, uint32_t pack_offset);
 
     void mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void mesh_count(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t pack_bits, int32_t pack_offset); // not checked
