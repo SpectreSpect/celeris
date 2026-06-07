@@ -16,6 +16,7 @@ class RenderObject;
 class VulkanBuffer;
 
 class InstancedRenderObject;
+class IndirectRenderObject;
 class Scene;
 
 class Renderer {
@@ -25,7 +26,8 @@ public:
     Renderer(VulkanEngine& engine, FrameResources& frame_resources);
 
     void render(VulkanCommandBuffer& command_buffer, RenderObject& render_object, glm::mat4 transform = glm::mat4(1.0f));
-    void render(VulkanCommandBuffer& command_buffer, InstancedRenderObject& render_object, glm::mat4 transform = glm::mat4(1.0f));
+    void render(VulkanCommandBuffer& command_buffer, InstancedRenderObject& instanced_render_object, glm::mat4 transform = glm::mat4(1.0f));
+    void render(VulkanCommandBuffer& command_buffer, IndirectRenderObject& indirect_render_object, glm::mat4 transform = glm::mat4(1.0f));
 
     // void render(VulkanCommandBuffer& command_buffer, RenderObject& render_object);
     // void render(VulkanCommandBuffer& command_buffer, InstancedRenderObject& render_object);

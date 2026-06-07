@@ -2,6 +2,7 @@
 #include "transform_push_constants.h"
 #include "render_object.h"
 #include "instanced_render_object.h"
+#include "indirect_render_object.h"
 #include "../vulkan_self/vulkan_command_buffer.h"
 #include "../vulkan_self/pass/material_pass/material_pass.h"
 #include "resources/frame_resources.h"
@@ -67,6 +68,48 @@ void Renderer::render(VulkanCommandBuffer& command_buffer, InstancedRenderObject
         pass.pipeline_layout().push_constants(command_buffer, pc);
 
         command_buffer.draw_indexed(instanced_render_object.mesh_view().index_count(), instanced_render_object.instance_count());
+};
+
+
+void Renderer::render(VulkanCommandBuffer& command_buffer, IndirectRenderObject& indirect_render_object, glm::mat4 transform) {
+        logger.check(indirect_render_object.mesh_view().valid(), "Mesh view was invalid");
+
+        if (!indirect_render_object.indirect_buffer_view_valid())
+            return;
+    
+        static TransformPushConstants pc;
+        pc.model = transform;
+        pc.material_data_id = indirect_render_object.material_data_id();
+
+        SlotPassInstance& material = indirect_render_object.material();
+        material.bind(command_buffer);
+        auto& pass = static_cast<MaterialPass&>(material.pipepline_pass());
+
+        m_frame_resources->bind(m_engine->current_frame(), command_buffer, pass.pipeline(), 1);
+
+        pass.pipeline().set_y_up_viewport(command_buffer, *m_engine);
+        pass.pipeline().set_scissor(command_buffer, *m_engine);
+
+        indirect_render_object.mesh_view().bind_vertex_buffer(command_buffer, 0);
+        // if (render_object.instance_data.external_buffer)
+        //     render_object.instance_data.external_buffer->bind_as_vertex_buffer(command_buffer, 1);
+        // else
+
+        indirect_render_object.mesh_view().bind_index_buffer(command_buffer);
+
+        pass.pipeline_layout().push_constants(command_buffer, pc);
+
+        VulkanBuffer& indirect_buffer = *indirect_render_object.indirect_buffer();
+
+        vkCmdDrawIndexedIndirectCount(
+            command_buffer.handle(),
+            indirect_buffer.handle(), // draw commands buffer
+            sizeof(uint32_t),             // commands start after cmd_count
+            indirect_buffer.handle(), // count buffer, same VkBuffer is okay
+            0,                // cmd_count is at byte 0
+            indirect_render_object.max_draw_count(),
+            sizeof(VkDrawIndexedIndirectCommand)
+        );
 };
 
 void Renderer::render(VulkanCommandBuffer& command_buffer, std::vector<SceneObject*> scene_objects, glm::mat4 transform) {

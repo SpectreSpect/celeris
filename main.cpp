@@ -53,6 +53,7 @@
 #include "vulkan_self/image/cubemap_array.h"
 #include "voxel_grid_vulkan/voxel_grid.h"
 #include "renderer/static_mesh_data.h"
+#include "renderer/indirect_render_object.h"
 
 #include <vector>
 
@@ -199,7 +200,7 @@ int main() {
     
     RenderObject sphere(mesh_manager.sphere, material_instance_manager.pbr);
 
-    RenderObject two_spheres(mesh_manager.two_sphere_indirect_test, material_instance_manager.pbr);
+    
     
     // uint32_t indirect_command_count = 1;
     // DrawElementsIndirectCommand commands {
@@ -235,6 +236,9 @@ int main() {
 
     indirect_command_buffer.upload(&draw_count, sizeof(uint32_t), 0);
     indirect_command_buffer.upload(&commands, sizeof(DrawElementsIndirectCommand) * 2, sizeof(uint32_t));
+
+
+    IndirectRenderObject two_spheres(mesh_manager.two_sphere_indirect_test, material_instance_manager.pbr, indirect_command_buffer, 2);
 
     RenderObject unlit_cube(mesh_manager.cube, material_instance_manager.pbr);
     RenderObject unlit_cube2(mesh_manager.cube, material_instance_manager.dirt_blinn_phong);
@@ -337,9 +341,12 @@ int main() {
 
     // scene.add(voxel_map_point_cloud);
 
+    sphere.add_child(two_spheres);
+
     // scene.add(unlit_cube);
-    // scene.add(sphere);
+    scene.add(sphere);
     scene.add(skybox);
+    
 
     skybox.update(scene);
 
@@ -384,6 +391,10 @@ int main() {
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), window, camera);
         lighting_system.update(engine.current_frame(), window, camera);
+
+        sphere.transform.position.y = sin(timer) * 2;
+        two_spheres.transform.position.x = cos(timer) * 10;
+        
 
         // if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
         //     g_pressed = true;
@@ -440,7 +451,7 @@ int main() {
                 // rgba(37, 150, 190)
                 renderer.render(command_buffer, scene);
 
-                renderer.render_indirect(command_buffer, two_spheres, indirect_command_buffer, sizeof(uint32_t), 0, 2);
+                // renderer.render_indirect(command_buffer, two_spheres, indirect_command_buffer, sizeof(uint32_t), 0, 2);
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
