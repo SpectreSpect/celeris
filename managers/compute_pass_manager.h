@@ -59,6 +59,7 @@ public:
     ComputePass reset_evicted_list_and_buckets_cp;
     ComputePass hash_table_conditional_dispatch_adapter_cp;
     ComputePass clear_chunk_hash_table_cp;
+    ComputePass fill_chunk_hash_table_cp;
 
     // PBR
     ComputePass equirect_to_cubemap_cp;
@@ -121,6 +122,7 @@ public:
 
     ComputePass create_hash_table_conditional_dispatch_adapter_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_clear_chunk_hash_table_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_fill_chunk_hash_table_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
 private:
     DescriptorPool m_pool;

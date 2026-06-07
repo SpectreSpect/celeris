@@ -176,13 +176,35 @@ void VoxelGrid::clear_chunk_hash_table(VulkanCommandBuffer& command_buffer, cons
     m_buffers.chunk_hash_table.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
-void VoxelGrid::rebuild_chunk_hash_table(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, uint32_t pack_offset) {
+void VoxelGrid::fill_chunk_hash_table(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t pack_bits, int pack_offset) {
+    LOG_METHOD();
+
+    m_pass_instances.fill_chunk_hash_table_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+    m_pass_instances.fill_chunk_hash_table_pi.set_storage_buffer(1, m_buffers.chunk_meta);
+    m_pass_instances.fill_chunk_hash_table_pi.set_storage_buffer(2, m_buffers.enqueued);
+
+    m_pass_instances.fill_chunk_hash_table_pi.bind(command_buffer);
+
+    m_pass_instances.fill_chunk_hash_table_pi.push_constants(command_buffer, FillChunkHashTablePushConstants{
+        .u_max_chunks = m_params.count_active_chunks,
+        .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
+        .u_pack_bits = pack_bits,
+        .u_pack_offset = pack_offset
+    });
+
+    command_buffer.dispatch_indirect(dispatch_args);
+
+    m_buffers.chunk_hash_table.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.enqueued.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+}
+
+void VoxelGrid::rebuild_chunk_hash_table(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, int pack_offset) {
     LOG_METHOD();
 
     conditional_prepare_rebuild(command_buffer, m_buffers.dispatch_args, m_buffers.dispatch_args_additional);
 
     clear_chunk_hash_table(command_buffer, m_buffers.dispatch_args);
-    // fill_chunk_hash_table(dispatch_args_additional, pack_bits, pack_offset);
+    fill_chunk_hash_table(command_buffer, m_buffers.dispatch_args_additional, pack_bits, pack_offset);
 }
 
 void VoxelGrid::reset_heads(VulkanCommandBuffer& command_buffer) {
@@ -344,7 +366,7 @@ void VoxelGrid::reset_evicted_list_and_buckets(VulkanCommandBuffer& command_buff
     m_buffers.free_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
-void VoxelGrid::ensure_free_chunks_gpu(VulkanCommandBuffer& command_buffer, glm::vec3 cam_pos, uint32_t pack_bits, uint32_t pack_offset) {
+void VoxelGrid::ensure_free_chunks_gpu(VulkanCommandBuffer& command_buffer, glm::vec3 cam_pos, uint32_t pack_bits, int pack_offset) {
     LOG_METHOD();
     
     reset_heads(command_buffer);
@@ -377,7 +399,7 @@ void VoxelGrid::mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuff
     m_buffers.emit_counters.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
-void VoxelGrid::mesh_count(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t pack_bits, int32_t pack_offset) {
+void VoxelGrid::mesh_count(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t pack_bits, int pack_offset) {
     m_pass_instances.mesh_count_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
     m_pass_instances.mesh_count_pi.set_storage_buffer(1, m_buffers.voxels);
     m_pass_instances.mesh_count_pi.set_storage_buffer(2, m_buffers.dirty_list);
@@ -576,7 +598,7 @@ void VoxelGrid::return_free_alloc_nodes(VulkanCommandBuffer& command_buffer, Vul
     m_buffers.ib_returned_nodes_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
-void VoxelGrid::mesh_emit(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args, uint32_t pack_bits, int32_t pack_offset) {
+void VoxelGrid::mesh_emit(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args, uint32_t pack_bits, int pack_offset) {
     m_pass_instances.mesh_emit_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
     m_pass_instances.mesh_emit_pi.set_storage_buffer(1, m_buffers.voxels);
     m_pass_instances.mesh_emit_pi.set_storage_buffer(2, m_buffers.mesh_buffers_status);
@@ -771,7 +793,8 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(VulkanDevice&
         .free_evicted_chunks_mesh_pi = PassInstance(compute_pass_manager.free_evicted_chunks_mesh_cp, dp),
         .reset_evicted_list_and_buckets_pi = PassInstance(compute_pass_manager.reset_evicted_list_and_buckets_cp, dp),
         .hash_table_conditional_dispatch_adapter_pw = PassWriter(device, compute_pass_manager.hash_table_conditional_dispatch_adapter_cp),
-        .clear_chunk_hash_table_pi = PassInstance(compute_pass_manager.clear_chunk_hash_table_cp, dp)
+        .clear_chunk_hash_table_pi = PassInstance(compute_pass_manager.clear_chunk_hash_table_cp, dp),
+        .fill_chunk_hash_table_pi = PassInstance(compute_pass_manager.fill_chunk_hash_table_cp, dp)
     };
 }
 

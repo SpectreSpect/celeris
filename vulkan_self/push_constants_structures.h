@@ -180,3 +180,10 @@ struct HashTableConditionalDispatchAdapterPushConstants {
 struct ClearChunkHashTablePushConstants {
     uint32_t u_chunk_hash_table_size;
 };
+
+struct FillChunkHashTablePushConstants {
+    uint32_t u_max_chunks;
+    uint32_t u_chunk_hash_table_size;
+    uint32_t u_pack_bits;
+    int32_t u_pack_offset;
+};
