@@ -166,3 +166,7 @@ struct FreeEvictedChunksMeshPushConstants {
     uint32_t vb_max_order;
     uint32_t ib_max_order;
 };
+
+struct ResetEvictedListAndBucketsPushConstants {
+    uint32_t u_bucket_count;
+};

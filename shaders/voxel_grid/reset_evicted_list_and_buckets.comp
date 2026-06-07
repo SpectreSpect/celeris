@@ -1,0 +1,28 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256) in;
+
+// ----- include -----
+#include "../common/buffer_structures.inc"
+// -------------------
+
+layout(std430, set = 0, binding=0) coherent buffer BucketHeads { BucketHead bucket_heads[]; };
+layout(std430, set = 0, binding=1) buffer EvictedChunksList { uint evicted_chunks_counter; uint evicted_chunks_list[]; };
+layout(std430, set = 0, binding=2) buffer FreeList { uint free_count; uint free_list[]; };
+
+layout(push_constant) uniform ResetEvictedListAndBucketsPushConstants {
+    uint u_bucket_count;
+};
+
+void main() {
+    if (gl_GlobalInvocationID.x == 0u) {
+        free_count += evicted_chunks_counter;
+        evicted_chunks_counter = 0u;
+    }
+
+    uint bucket_id = gl_GlobalInvocationID.x;
+    if (bucket_id >= u_bucket_count) return;
+
+    bucket_heads[bucket_id].count = 0u;
+}
