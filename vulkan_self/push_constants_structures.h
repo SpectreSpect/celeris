@@ -170,3 +170,9 @@ struct FreeEvictedChunksMeshPushConstants {
 struct ResetEvictedListAndBucketsPushConstants {
     uint32_t u_bucket_count;
 };
+
+struct HashTableConditionalDispatchAdapterPushConstants {
+    uint32_t u_chunk_hash_table_size;
+    uint32_t u_max_chunks;
+    uint32_t u_tombs_to_rebuild;
+};
