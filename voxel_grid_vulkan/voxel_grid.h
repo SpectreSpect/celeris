@@ -23,6 +23,8 @@ class VulkanDevice;
 class ComputePassManager;
 class MaterialInstanceManager;
 class VulkanQueue;
+class Camera;
+class Window;
 
 
 class VoxelGrid {
@@ -70,7 +72,7 @@ public:
     //     const std::vector<VoxelDataGPU>& voxels
     // );
 
-    void update();
+    void update(Window& window, Camera& camera);
 
 public:
     struct VoxelGridBuffers {
@@ -120,6 +122,7 @@ public:
         VulkanBuffer vb_returned_nodes_list;
         VulkanBuffer ib_returned_nodes_list;
 
+        VulkanBuffer build_indirect_cmds_uniform;
 
         // vb_heads  vb_heads_ = BufferObject(sizeof(uint32_t) * (size_t)(vb_order_ + 1), GL_DYNAMIC_DRAW);
         // vb_state  vb_state_ = BufferObject(sizeof(uint32_t) * (size_t)count_vb_pages_, GL_DYNAMIC_DRAW);
@@ -157,6 +160,7 @@ public:
         PassInstance evict_buckets_build_pi;
         PassWriter evict_low_priority_dispatch_adapter_pw;
         PassInstance evict_low_priority_pi;
+        PassInstance build_indirect_cmds_pi;
         PassInstance free_evicted_chunks_mesh_pi;
         PassInstance reset_evicted_list_and_buckets_pi;
         PassWriter hash_table_conditional_dispatch_adapter_pw;
@@ -235,6 +239,7 @@ private:
     // void init_draw_buffers();
     void init_mesh_pool();
     void submit_compute_commands();
+    
 
     void reset_load_list_counter(VulkanCommandBuffer& command_buffer);
     void mark_chunk_to_generate(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks);
@@ -268,5 +273,13 @@ private:
     void mesh_emit(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args, uint32_t pack_bits, int pack_offset);
     void mesh_finalize(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args);
     void reset_dirty_count(VulkanCommandBuffer& command_buffer);
+    void reset_cmd_count(VulkanCommandBuffer& command_buffer);
+    void build_draw_commands(VulkanCommandBuffer& command_buffer, const glm::mat4& view_proj, const glm::vec3& cam_pos, uint32_t pack_bits, int pack_offset);
+
     void build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, int pack_offset);
+    void build_indirect_draw_commands_frustum(VulkanCommandBuffer& command_buffer, 
+                                              const glm::mat4& viewProj, 
+                                              const glm::vec3& cam_pos,
+                                              uint32_t pack_bits,
+                                              int pack_offset);
 };

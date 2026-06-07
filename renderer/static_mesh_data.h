@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <cstdint>
+#include <cstddef>
 #include <cmath>
 #include <algorithm>
 
@@ -122,7 +123,78 @@ namespace StaticMeshData{
     inline std::vector<float> sphere_vertices = sphere_mesh_data.vertices;
     inline std::vector<uint32_t> sphere_indices = sphere_mesh_data.indices;
 
-    std::vector<float> cube_vertices = {
+
+    struct TwoSphereIndirectTestData {
+        MeshData mesh;
+
+        uint32_t sphere_vertex_count = 0;
+        uint32_t sphere_index_count = 0;
+
+        uint32_t first_sphere_first_index = 0;
+        int32_t  first_sphere_base_vertex = 0;
+
+        uint32_t second_sphere_first_index = 0;
+        int32_t  second_sphere_base_vertex = 0;
+    };
+
+    inline void translate_mesh_positions_x(MeshData& mesh, float x_offset) {
+        constexpr uint32_t vertex_stride_floats = 14;
+        constexpr uint32_t position_x_offset = 0;
+
+        for (size_t i = 0; i < mesh.vertices.size(); i += vertex_stride_floats) {
+            mesh.vertices[i + position_x_offset] += x_offset;
+        }
+    }
+
+    inline TwoSphereIndirectTestData generate_two_sphere_indirect_test(
+        uint32_t sector_count = 64,
+        uint32_t stack_count = 32,
+        float radius = 0.5f,
+        float spacing = 1.5f)
+    {
+        MeshData left_sphere = generate_uv_sphere(sector_count, stack_count, radius);
+        MeshData right_sphere = generate_uv_sphere(sector_count, stack_count, radius);
+
+        translate_mesh_positions_x(left_sphere, -spacing * 0.5f);
+        translate_mesh_positions_x(right_sphere, spacing * 0.5f);
+
+        TwoSphereIndirectTestData result{};
+        result.sphere_vertex_count = static_cast<uint32_t>(left_sphere.vertices.size() / 14);
+        result.sphere_index_count = static_cast<uint32_t>(left_sphere.indices.size());
+
+        result.first_sphere_first_index = 0;
+        result.first_sphere_base_vertex = 0;
+
+        result.second_sphere_first_index = result.sphere_index_count;
+        result.second_sphere_base_vertex = static_cast<int32_t>(result.sphere_vertex_count);
+
+        result.mesh.vertices.reserve(left_sphere.vertices.size() + right_sphere.vertices.size());
+        result.mesh.vertices.insert(result.mesh.vertices.end(), left_sphere.vertices.begin(), left_sphere.vertices.end());
+        result.mesh.vertices.insert(result.mesh.vertices.end(), right_sphere.vertices.begin(), right_sphere.vertices.end());
+
+        // Important for the indirect test:
+        // The second sphere deliberately reuses local 0-based indices.
+        // Its indirect command must use baseVertex = second_sphere_base_vertex.
+        result.mesh.indices.reserve(left_sphere.indices.size() + right_sphere.indices.size());
+        result.mesh.indices.insert(result.mesh.indices.end(), left_sphere.indices.begin(), left_sphere.indices.end());
+        result.mesh.indices.insert(result.mesh.indices.end(), right_sphere.indices.begin(), right_sphere.indices.end());
+
+        return result;
+    }
+
+    // User-facing test mesh. Kept with the original requested typo in the name.
+    inline TwoSphereIndirectTestData two_sphere_inidirect_test = generate_two_sphere_indirect_test();
+    inline MeshData two_sphere_inidirect_test_mesh_data = two_sphere_inidirect_test.mesh;
+    inline std::vector<float> two_sphere_inidirect_test_vertices = two_sphere_inidirect_test_mesh_data.vertices;
+    inline std::vector<uint32_t> two_sphere_inidirect_test_indices = two_sphere_inidirect_test_mesh_data.indices;
+
+    // Correctly spelled aliases, in case you want to use the fixed name later.
+    inline TwoSphereIndirectTestData& two_sphere_indirect_test = two_sphere_inidirect_test;
+    inline MeshData& two_sphere_indirect_test_mesh_data = two_sphere_inidirect_test_mesh_data;
+    inline std::vector<float>& two_sphere_indirect_test_vertices = two_sphere_inidirect_test_vertices;
+    inline std::vector<uint32_t>& two_sphere_indirect_test_indices = two_sphere_inidirect_test_indices;
+
+    inline std::vector<float> cube_vertices = {
         // position                         normal                         uv          tangent
 
         // Front face, normal +Z, tangent +X
@@ -162,7 +234,7 @@ namespace StaticMeshData{
         -0.5f, -0.5f,  0.5f, 1.0f,         0.0f, -1.0f,  0.0f, 0.0f,      0.0f, 1.0f,  1.0f, 0.0f,  0.0f,  1.0f  // 23
     };
 
-    std::vector<uint32_t> cube_indices = {
+    inline std::vector<uint32_t> cube_indices = {
         // Front face
         0, 1, 2,
         2, 3, 0,
@@ -188,20 +260,20 @@ namespace StaticMeshData{
         22, 23, 20
     };
 
-    std::vector<float> point_cloud_quad_corners = { // vertex buffer
+    inline std::vector<float> point_cloud_quad_corners = { // vertex buffer
         -1.0f, -1.0f,  // v0
         -1.0f, +1.0f,  // v1
         +1.0f, -1.0f,  // v2
         +1.0f, +1.0f   // v3
     };
 
-    std::vector<uint32_t> point_cloud_quad_indices = { // index_buffer
+    inline std::vector<uint32_t> point_cloud_quad_indices = { // index_buffer
         0, 1, 2,
         2, 1, 3
     };
 
     
-    std::vector<float> skybox_cube_vertices = {
+    inline std::vector<float> skybox_cube_vertices = {
         // position.x, position.y, position.z, position.w
 
         -1.0f, -1.0f, -1.0f, 1.0f, // 0
@@ -215,7 +287,7 @@ namespace StaticMeshData{
         -1.0f,  1.0f,  1.0f, 1.0f  // 7
     };
 
-    std::vector<uint32_t> skybox_cube_indices = {
+    inline std::vector<uint32_t> skybox_cube_indices = {
         // Back face, -Z
         0, 2, 1,
         2, 0, 3,

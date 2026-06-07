@@ -72,6 +72,7 @@ add_executable(app
   renderer/mesh.cpp
   renderer/mesh_view.cpp
   renderer/render_object.cpp
+  renderer/indirect_render_object.cpp
   managers/compute_pass_manager.cpp
   managers/manager_bundle.cpp
   managers/material_instance_manager.cpp

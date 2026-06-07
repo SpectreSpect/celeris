@@ -12,6 +12,7 @@
 #include "../vulkan_self/descriptor_set/descriptor_pool.h"
 #include "../vulkan_self/vulkan_queue.h"
 #include "../vulkan_self/push_constants_structures.h"
+#include "../camera/camera.h"
 
 #include "shader_helper/buffer_dispatch_arg.h"
 
@@ -663,6 +664,7 @@ void VoxelGrid::reset_dirty_count(VulkanCommandBuffer& command_buffer) {
     m_pass_instances.reset_dirty_count_pi.set_storage_buffer(3, m_buffers.ib_free_nodes_list);
     m_pass_instances.reset_dirty_count_pi.set_storage_buffer(4, m_buffers.ib_returned_nodes_list);
 
+    m_pass_instances.reset_dirty_count_pi.bind(command_buffer);
 
     command_buffer.dispatch(1, 1, 1);
 
@@ -673,6 +675,91 @@ void VoxelGrid::reset_dirty_count(VulkanCommandBuffer& command_buffer) {
 
     m_buffers.ib_free_nodes_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
     m_buffers.ib_returned_nodes_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+}
+
+void VoxelGrid::reset_cmd_count(VulkanCommandBuffer& command_buffer) {
+    m_buffers.indirect_cmds.fill(command_buffer, 0u, sizeof(uint32_t), 0u);
+
+    m_buffers.indirect_cmds.memory_barrier(
+        command_buffer,
+        VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+        VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT,
+        VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT
+    );
+
+    // indirect_cmds_.update_subdata_fill<uint32_t>(0u, 0u, sizeof(uint32_t), *shader_manager);
+    // glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+}
+
+void VoxelGrid::build_draw_commands(VulkanCommandBuffer& command_buffer, const glm::mat4& view_proj, const glm::vec3& cam_pos, uint32_t pack_bits, int pack_offset) {
+    auto planes = math_utils::extract_frustum_planes(view_proj);
+
+    BuildIndirectCmdsUniform unifrom_data {
+        .u_max_chunks = m_params.count_active_chunks,
+
+        // для AABB/sphere размеров чанка
+        .u_chunk_dim = glm::ivec4(m_params.chunk_size, 0),   // (16,16,16)
+        .u_voxel_size = glm::vec4(m_params.voxel_size, 0.0f),    // (sx,sy,sz)
+
+        // pack/unpack как в C++
+        .u_pack_bits = pack_bits,
+        .u_pack_offset = pack_offset,
+
+        .u_vb_page_verts = m_params.vb_page_size,
+        .u_ib_page_inds = m_params.ib_page_size,
+
+        .render_distance = m_params.render_distance
+    };
+
+    m_buffers.build_indirect_cmds_uniform.upload(&unifrom_data, sizeof(BuildIndirectCmdsUniform));
+
+    m_pass_instances.build_indirect_cmds_pi.set_storage_buffer(0, m_buffers.chunk_meta);
+    m_pass_instances.build_indirect_cmds_pi.set_storage_buffer(1, m_buffers.chunk_mesh_alloc);
+    m_pass_instances.build_indirect_cmds_pi.set_storage_buffer(2, m_buffers.indirect_cmds);
+    m_pass_instances.build_indirect_cmds_pi.set_uniform_buffer(3, m_buffers.build_indirect_cmds_uniform);
+
+    m_pass_instances.build_indirect_cmds_pi.bind(command_buffer);
+
+    uint32_t chunk_groups = math_utils::div_up_u32(m_params.count_active_chunks, 256u);
+
+    command_buffer.dispatch(chunk_groups, 1, 1);
+
+    m_buffers.chunk_mesh_alloc.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.indirect_cmds.memory_barrier(
+        command_buffer,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+        VK_ACCESS_INDIRECT_COMMAND_READ_BIT
+    );
+    
+
+    // chunk_meta_.bind_base_as_ssbo(0);
+    // chunk_mesh_alloc_.bind_base_as_ssbo(1);
+    // indirect_cmds_.bind_base_as_ssbo(2);
+
+    // prog_build_indirect_cmds_.use();
+
+    // glUniform1ui(glGetUniformLocation(prog_build_indirect_cmds_.id, "u_max_chunks"), count_active_chunks);
+    // glUniform3i(glGetUniformLocation(prog_build_indirect_cmds_.id, "u_chunk_dim"), chunk_size.x, chunk_size.y, chunk_size.z);
+    // glUniform3f(glGetUniformLocation(prog_build_indirect_cmds_.id, "u_voxel_size"), voxel_size.x, voxel_size.y, voxel_size.z);
+
+    // glUniform1ui(glGetUniformLocation(prog_build_indirect_cmds_.id, "u_pack_bits"), pack_bits);
+    // glUniform1i(glGetUniformLocation(prog_build_indirect_cmds_.id, "u_pack_offset"), pack_offset);
+
+    // glUniform1ui(glGetUniformLocation(prog_build_indirect_cmds_.id, "u_vb_page_verts"), vb_page_size_);
+    // glUniform1ui(glGetUniformLocation(prog_build_indirect_cmds_.id, "u_ib_page_inds"), ib_page_size_);
+
+    // glUniform3f(glGetUniformLocation(prog_build_indirect_cmds_.id, "cam_pos"), cam_pos.x, cam_pos.y, cam_pos.z);
+    // glUniform1f(glGetUniformLocation(prog_build_indirect_cmds_.id, "render_distance"), render_distance);
+
+    // GLint loc = glGetUniformLocation(prog_build_indirect_cmds_.id, "u_frustum_planes");
+    // glUniform4fv(loc, 6, &planes[0].x);
+
+    // uint32_t chunk_groups = math_utils::div_up_u32(count_active_chunks, 256u);
+    // prog_build_indirect_cmds_.dispatch_compute(chunk_groups, 1, 1);
+    // glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 }
 
 void VoxelGrid::build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, int pack_offset) {
@@ -699,6 +786,15 @@ void VoxelGrid::build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint3
     mesh_finalize(command_buffer, m_buffers.dispatch_args);
 
     reset_dirty_count(command_buffer);
+}
+
+void VoxelGrid::build_indirect_draw_commands_frustum(VulkanCommandBuffer& command_buffer, 
+                                                     const glm::mat4& viewProj, 
+                                                     const glm::vec3& cam_pos,
+                                                     uint32_t pack_bits,
+                                                     int pack_offset) {
+    reset_cmd_count(command_buffer);
+    build_draw_commands(command_buffer, viewProj, cam_pos, pack_bits, pack_offset);
 }
 
 uint64_t VoxelGrid::vox_per_chunk() const noexcept {
@@ -790,6 +886,7 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(VulkanDevice&
         .evict_buckets_build_pi = PassInstance(compute_pass_manager.evict_buckets_build_cp, dp),
         .evict_low_priority_dispatch_adapter_pw = PassWriter(device, compute_pass_manager.evict_low_priority_dispatch_adapter_cp),
         .evict_low_priority_pi = PassInstance(compute_pass_manager.evict_low_priority_cp, dp),
+        .build_indirect_cmds_pi = PassInstance(compute_pass_manager.build_indirect_cmds_cp, dp),
         .free_evicted_chunks_mesh_pi = PassInstance(compute_pass_manager.free_evicted_chunks_mesh_cp, dp),
         .reset_evicted_list_and_buckets_pi = PassInstance(compute_pass_manager.reset_evicted_list_and_buckets_cp, dp),
         .hash_table_conditional_dispatch_adapter_pw = PassWriter(device, compute_pass_manager.hash_table_conditional_dispatch_adapter_cp),
@@ -932,6 +1029,8 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     submit_compute_commands();
 
     
+
+    
     return VoxelGridBuffers {
         // .chunk_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_hash_table_size),
         // .free_list = VulkanBuffer::create_storage_buffer(physical_device, device, free_list_size),
@@ -943,7 +1042,19 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         .free_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, free_list_size),
         .chunk_meta = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, chunk_meta_size),
         .enqueued = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, enqueued_size),
-        .indirect_cmds = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, indirect_cmds_size),
+        // .indirect_cmds = VulkanBuffer::create_host_visible_indirect_storage_buffer(physical_device, device, indirect_cmds_size),
+
+        .indirect_cmds = VulkanBuffer(
+            physical_device,
+            device,
+            indirect_cmds_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+            VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT |
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        ),
+
         .failed_dirty_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, failed_dirty_list_size),
 
         // .mesh_buffers_status = VulkanBuffer::create_storage_buffer(physical_device, device, mesh_buffers_status_size),
@@ -1002,7 +1113,8 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
 
         .chunk_mesh_alloc_local = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, chunk_mesh_alloc_local_size),
         .vb_returned_nodes_list = std::move(vb_returned_nodes_list),
-        .ib_returned_nodes_list = std::move(ib_returned_nodes_list)
+        .ib_returned_nodes_list = std::move(ib_returned_nodes_list),
+        .build_indirect_cmds_uniform = VulkanBuffer::create_host_visible_uniform_buffer(physical_device, device, sizeof(BuildIndirectCmdsUniform))
 
 
         // global_vertex_buffer_ = BufferObject(sizeof(VertexGPU) * (size_t)max_mesh_vertices_, GL_DYNAMIC_DRAW);
@@ -1371,10 +1483,15 @@ void VoxelGrid::init_mesh_pool() {
 //     apply_writes_to_world_gpu(write_count);
 // }
 
-void VoxelGrid::update() {
+void VoxelGrid::update(Window& window, Camera& camera) {
+    float aspect = float(window.width()) / float(window.height());
+    glm::mat4 vp = camera.get_projection_matrix(aspect) * camera.get_view_matrix();
+
     {
         auto scope = m_command_buffer.begin_scope();
         build_mesh_from_dirty(m_command_buffer, math_utils::BITS, math_utils::OFFSET);
+        build_indirect_draw_commands_frustum(m_command_buffer, vp, camera.position, math_utils::BITS, math_utils::OFFSET);
+        // draw_indirect(vao.id, state.transform, state.vp, state.camera->position);
     }
     submit_compute_commands();
 }
