@@ -160,12 +160,28 @@ void VoxelGrid::conditional_prepare_rebuild(VulkanCommandBuffer& command_buffer,
     );
 }
 
+void VoxelGrid::clear_chunk_hash_table(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args) {
+    LOG_METHOD();
+
+    m_pass_instances.clear_chunk_hash_table_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+
+    m_pass_instances.clear_chunk_hash_table_pi.bind(command_buffer);
+
+    m_pass_instances.clear_chunk_hash_table_pi.push_constants(command_buffer, ClearChunkHashTablePushConstants{
+        .u_chunk_hash_table_size = m_params.chunk_hash_table_size
+    });
+
+    command_buffer.dispatch_indirect(dispatch_args);
+
+    m_buffers.chunk_hash_table.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+}
+
 void VoxelGrid::rebuild_chunk_hash_table(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, uint32_t pack_offset) {
     LOG_METHOD();
 
     conditional_prepare_rebuild(command_buffer, m_buffers.dispatch_args, m_buffers.dispatch_args_additional);
 
-    // clear_chunk_hash_table(dispatch_args);
+    clear_chunk_hash_table(command_buffer, m_buffers.dispatch_args);
     // fill_chunk_hash_table(dispatch_args_additional, pack_bits, pack_offset);
 }
 
@@ -754,7 +770,8 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(VulkanDevice&
         .evict_low_priority_pi = PassInstance(compute_pass_manager.evict_low_priority_cp, dp),
         .free_evicted_chunks_mesh_pi = PassInstance(compute_pass_manager.free_evicted_chunks_mesh_cp, dp),
         .reset_evicted_list_and_buckets_pi = PassInstance(compute_pass_manager.reset_evicted_list_and_buckets_cp, dp),
-        .hash_table_conditional_dispatch_adapter_pw = PassWriter(device, compute_pass_manager.hash_table_conditional_dispatch_adapter_cp)
+        .hash_table_conditional_dispatch_adapter_pw = PassWriter(device, compute_pass_manager.hash_table_conditional_dispatch_adapter_cp),
+        .clear_chunk_hash_table_pi = PassInstance(compute_pass_manager.clear_chunk_hash_table_cp, dp)
     };
 }
 

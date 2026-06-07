@@ -48,6 +48,7 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         free_evicted_chunks_mesh_cp(create_free_evicted_chunks_mesh_compute_pass(device, shader_manager.free_evicted_chunks_mesh_cs)),
         reset_evicted_list_and_buckets_cp(create_reset_evicted_list_and_buckets_compute_pass(device, shader_manager.reset_evicted_list_and_buckets_cs)),
         hash_table_conditional_dispatch_adapter_cp(create_hash_table_conditional_dispatch_adapter_compute_pass(device, shader_manager.hash_table_conditional_dispatch_adapter_cs)),
+        clear_chunk_hash_table_cp(create_clear_chunk_hash_table_compute_pass(device, shader_manager.clear_chunk_hash_table_cs)),
 
         // PBR
         equirect_to_cubemap_cp(create_equirect_to_cubemap_compute_pass(device, shader_manager.equirect_to_cubemap_cs)),
@@ -613,6 +614,18 @@ ComputePass ComputePassManager::create_hash_table_conditional_dispatch_adapter_c
 
     builder.add_push_constantsf(sizeof(HashTableConditionalDispatchAdapterPushConstants), ShaderStages::compute);
 
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_clear_chunk_hash_table_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // ChunkHashTable
+
+    builder.add_push_constantsf(sizeof(ClearChunkHashTablePushConstants), ShaderStages::compute);
+    
     return create_pass(device, compute_shader_module, builder);
 }
 
