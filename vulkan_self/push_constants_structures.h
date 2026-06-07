@@ -152,3 +152,7 @@ struct EvictBucketsBuildPushConstants {
 
     float f_eviction_bucket_shell_thickness;
 };
+
+struct EvictLowPriorityDispatchAdapterPushConstants {
+    uint32_t u_min_free;
+};
