@@ -124,6 +124,51 @@ VoxelGrid::VoxelGrid(
     submit_compute_commands();
 }
 
+void VoxelGrid::conditional_prepare_rebuild(VulkanCommandBuffer& command_buffer, VulkanBuffer& clear_dispatch_args, VulkanBuffer& fill_dispatch_args) {
+    LOG_METHOD();
+
+    m_pass_instances.hash_table_conditional_dispatch_adapter_pw.set_storage_buffer(0, m_buffers.chunk_hash_table);
+    m_pass_instances.hash_table_conditional_dispatch_adapter_pw.set_storage_buffer(1, clear_dispatch_args);
+    m_pass_instances.hash_table_conditional_dispatch_adapter_pw.set_storage_buffer(2, fill_dispatch_args);
+
+    m_pass_instances.hash_table_conditional_dispatch_adapter_pw.bind(command_buffer);
+
+    m_pass_instances.hash_table_conditional_dispatch_adapter_pw.push_constants(command_buffer, HashTableConditionalDispatchAdapterPushConstants{
+        .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
+        .u_max_chunks = m_params.count_active_chunks,
+        .u_tombs_to_rebuild = static_cast<uint32_t>(m_params.tomb_fraction_to_rebuild * m_params.chunk_hash_table_size)
+    });
+
+    command_buffer.dispatch(1, 1, 1);
+
+    m_buffers.chunk_hash_table.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+
+    clear_dispatch_args.memory_barrier(
+        command_buffer,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+        VK_ACCESS_INDIRECT_COMMAND_READ_BIT
+    );
+
+    fill_dispatch_args.memory_barrier(
+        command_buffer,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+        VK_ACCESS_INDIRECT_COMMAND_READ_BIT
+    );
+}
+
+void VoxelGrid::rebuild_chunk_hash_table(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, uint32_t pack_offset) {
+    LOG_METHOD();
+
+    conditional_prepare_rebuild(command_buffer, m_buffers.dispatch_args, m_buffers.dispatch_args_additional);
+
+    // clear_chunk_hash_table(dispatch_args);
+    // fill_chunk_hash_table(dispatch_args_additional, pack_bits, pack_offset);
+}
+
 void VoxelGrid::reset_heads(VulkanCommandBuffer& command_buffer) {
     LOG_METHOD();
 
@@ -297,10 +342,10 @@ void VoxelGrid::ensure_free_chunks_gpu(VulkanCommandBuffer& command_buffer, glm:
 
     reset_evicted_list_and_buckets(command_buffer);
 
-    // prepare_return_free_alloc_nodes(dispatch_args);
-    // return_free_alloc_nodes(dispatch_args);
+    prepare_return_free_alloc_nodes(command_buffer, m_buffers.dispatch_args);
+    return_free_alloc_nodes(command_buffer, m_buffers.dispatch_args);
 
-    // rebuild_chunk_hash_table(pack_bits, pack_offset);
+    rebuild_chunk_hash_table(command_buffer, pack_bits, pack_offset);
 }
 
 void VoxelGrid::mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args) {
@@ -708,7 +753,8 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(VulkanDevice&
         .evict_low_priority_dispatch_adapter_pw = PassWriter(device, compute_pass_manager.evict_low_priority_dispatch_adapter_cp),
         .evict_low_priority_pi = PassInstance(compute_pass_manager.evict_low_priority_cp, dp),
         .free_evicted_chunks_mesh_pi = PassInstance(compute_pass_manager.free_evicted_chunks_mesh_cp, dp),
-        .reset_evicted_list_and_buckets_pi = PassInstance(compute_pass_manager.reset_evicted_list_and_buckets_cp, dp)
+        .reset_evicted_list_and_buckets_pi = PassInstance(compute_pass_manager.reset_evicted_list_and_buckets_cp, dp),
+        .hash_table_conditional_dispatch_adapter_pw = PassWriter(device, compute_pass_manager.hash_table_conditional_dispatch_adapter_cp)
     };
 }
 
@@ -909,6 +955,7 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         .mesh_pool_seed_uniform = VulkanBuffer::create_host_visible_uniform_buffer(physical_device, device, sizeof(MeshPoolSeedUniform)),
 
         .dispatch_args = VulkanBuffer::create_host_visible_indirect_storage_buffer(physical_device, device, dispatch_args_size),
+        .dispatch_args_additional = VulkanBuffer::create_host_visible_indirect_storage_buffer(physical_device, device, dispatch_args_size),
         
         .dirty_quad_count = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, dirty_quad_count_size),
         .emit_counters = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, emit_counters_size),
