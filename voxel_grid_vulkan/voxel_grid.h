@@ -148,6 +148,7 @@ public:
         PassWriter add_voxel_write_list_counters_together_pw;
         PassInstance mark_write_chunks_to_generate_pi;
         PassInstance stream_generate_terrain_pi;
+        PassInstance write_voxels_to_grid_pi;
     };
 
     struct VoxelGridParams {
@@ -228,6 +229,7 @@ private:
     void mark_chunk_to_generate(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks);
     void mark_write_chunks_to_generate(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void generate_terrain(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t seed);
+    void write_voxels_to_grid(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void reset_voxel_write_list_counter(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_write_list);
     void stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks, uint32_t seed);
 

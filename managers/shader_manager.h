@@ -56,6 +56,7 @@ public:
     VulkanShaderModule add_voxel_write_list_counters_together_cs;
     VulkanShaderModule mark_write_chunks_to_generate_cs;
     VulkanShaderModule stream_generate_terrain_cs;
+    VulkanShaderModule write_voxels_to_grid_cs;
 
     // PBR
     VulkanShaderModule equirect_to_cubemap_cs;
