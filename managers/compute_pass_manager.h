@@ -54,6 +54,7 @@ public:
     ComputePass write_voxels_to_grid_cp;
     ComputePass evict_buckets_build_cp;
     ComputePass evict_low_priority_dispatch_adapter_cp;
+    ComputePass evict_low_priority_cp;
 
     // PBR
     ComputePass equirect_to_cubemap_cp;
@@ -110,6 +111,7 @@ public:
 
     ComputePass create_evict_buckets_build_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_evict_low_priority_dispatch_adapter_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_evict_low_priority_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
 private:
     DescriptorPool m_pool;

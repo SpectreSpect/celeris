@@ -156,3 +156,8 @@ struct EvictBucketsBuildPushConstants {
 struct EvictLowPriorityDispatchAdapterPushConstants {
     uint32_t u_min_free;
 };
+
+struct EvictLowPriorityPushConstants {
+    uint32_t u_chunk_hash_table_size;
+    uint32_t u_bucket_count;
+};

@@ -44,6 +44,7 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         write_voxels_to_grid_cp(create_write_voxels_to_grid_compute_pass(device, shader_manager.write_voxels_to_grid_cs)),
         evict_buckets_build_cp(create_evict_buckets_build_compute_pass(device, shader_manager.evict_buckets_build_cs)),
         evict_low_priority_dispatch_adapter_cp(create_evict_low_priority_dispatch_adapter_compute_pass(device, shader_manager.evict_low_priority_dispatch_adapter_cs)),
+        evict_low_priority_cp(create_evict_low_priority_compute_pass(device, shader_manager.evict_low_priority_cs)),
 
         // PBR
         equirect_to_cubemap_cp(create_equirect_to_cubemap_compute_pass(device, shader_manager.equirect_to_cubemap_cs)),
@@ -536,6 +537,25 @@ ComputePass ComputePassManager::create_evict_low_priority_dispatch_adapter_compu
     builder.add_storage_buffer(2, ShaderStages::compute); // FreeList
 
     builder.add_push_constantsf(sizeof(EvictLowPriorityDispatchAdapterPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_evict_low_priority_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // ChunkHashTable
+    builder.add_storage_buffer(1, ShaderStages::compute); // FreeList
+    builder.add_storage_buffer(2, ShaderStages::compute); // ChunkMetaBuf
+    builder.add_storage_buffer(3, ShaderStages::compute); // EnqueuedBuf
+    builder.add_storage_buffer(4, ShaderStages::compute); // BucketHeads
+    builder.add_storage_buffer(5, ShaderStages::compute); // BucketNext
+    builder.add_storage_buffer(6, ShaderStages::compute); // ChunkMeshAllocBuf
+    builder.add_storage_buffer(7, ShaderStages::compute); // EvictedChunksList
+
+    builder.add_push_constantsf(sizeof(EvictLowPriorityPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }

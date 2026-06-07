@@ -189,6 +189,37 @@ void VoxelGrid::prepare_evict_lowpriority_chunks(VulkanCommandBuffer& command_bu
     );
 }
 
+void VoxelGrid::evict_lowpriority_chunks(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args) {
+    LOG_METHOD();
+
+    m_pass_instances.evict_low_priority_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+    m_pass_instances.evict_low_priority_pi.set_storage_buffer(1, m_buffers.free_list);
+    m_pass_instances.evict_low_priority_pi.set_storage_buffer(2, m_buffers.chunk_meta);
+    m_pass_instances.evict_low_priority_pi.set_storage_buffer(3, m_buffers.enqueued);
+    m_pass_instances.evict_low_priority_pi.set_storage_buffer(4, m_buffers.bucket_heads);
+    m_pass_instances.evict_low_priority_pi.set_storage_buffer(5, m_buffers.bucket_next);
+    m_pass_instances.evict_low_priority_pi.set_storage_buffer(6, m_buffers.chunk_mesh_alloc);
+    m_pass_instances.evict_low_priority_pi.set_storage_buffer(7, m_buffers.evicted_chunks_list);
+
+    m_pass_instances.evict_low_priority_pi.bind(command_buffer);
+
+    m_pass_instances.evict_low_priority_pi.push_constants(command_buffer, EvictLowPriorityPushConstants{
+        .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
+        .u_bucket_count = m_params.count_evict_buckets
+    });
+
+    command_buffer.dispatch_indirect(dispatch_args);
+
+    m_buffers.chunk_hash_table.memory_barrier_compute_write_to_compute_write_read(m_command_buffer);
+    m_buffers.free_list.memory_barrier_compute_write_to_compute_write_read(m_command_buffer);
+    m_buffers.chunk_meta.memory_barrier_compute_write_to_compute_write_read(m_command_buffer);
+    m_buffers.enqueued.memory_barrier_compute_write_to_compute_write_read(m_command_buffer);
+    m_buffers.bucket_heads.memory_barrier_compute_write_to_compute_write_read(m_command_buffer);
+    m_buffers.bucket_next.memory_barrier_compute_write_to_compute_write_read(m_command_buffer);
+    m_buffers.chunk_mesh_alloc.memory_barrier_compute_write_to_compute_write_read(m_command_buffer);
+    m_buffers.evicted_chunks_list.memory_barrier_compute_write_to_compute_write_read(m_command_buffer);
+}
+
 void VoxelGrid::ensure_free_chunks_gpu(VulkanCommandBuffer& command_buffer, glm::vec3 cam_pos, uint32_t pack_bits, uint32_t pack_offset) {
     LOG_METHOD();
     
@@ -197,7 +228,7 @@ void VoxelGrid::ensure_free_chunks_gpu(VulkanCommandBuffer& command_buffer, glm:
     build_bucket_lists(command_buffer, cam_pos);
     
     prepare_evict_lowpriority_chunks(command_buffer, m_buffers.dispatch_args);
-    // evict_lowpriority_chunks(dispatch_args);
+    evict_lowpriority_chunks(command_buffer, m_buffers.dispatch_args);
     
     // free_evicted_chunks_mesh(dispatch_args); // dispatch_args здесь уже подготовлен
 
@@ -611,7 +642,8 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(VulkanDevice&
         .stream_generate_terrain_pi = PassInstance(compute_pass_manager.stream_generate_terrain_cp, dp),
         .write_voxels_to_grid_pi = PassInstance(compute_pass_manager.write_voxels_to_grid_cp, dp),
         .evict_buckets_build_pi = PassInstance(compute_pass_manager.evict_buckets_build_cp, dp),
-        .evict_low_priority_dispatch_adapter_pw = PassWriter(device, compute_pass_manager.evict_low_priority_dispatch_adapter_cp)
+        .evict_low_priority_dispatch_adapter_pw = PassWriter(device, compute_pass_manager.evict_low_priority_dispatch_adapter_cp),
+        .evict_low_priority_pi = PassInstance(compute_pass_manager.evict_low_priority_cp, dp)
     };
 }
 
