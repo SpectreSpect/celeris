@@ -42,6 +42,7 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         mark_write_chunks_to_generate_cp(create_mark_write_chunks_to_generate_compute_pass(device, shader_manager.mark_write_chunks_to_generate_cs)),
         stream_generate_terrain_cp(create_stream_generate_terrain_compute_pass(device, shader_manager.stream_generate_terrain_cs)),
         write_voxels_to_grid_cp(create_write_voxels_to_grid_compute_pass(device, shader_manager.write_voxels_to_grid_cs)),
+        evict_buckets_build_cp(create_evict_buckets_build_compute_pass(device, shader_manager.evict_buckets_build_cs)),
 
         // PBR
         equirect_to_cubemap_cp(create_equirect_to_cubemap_compute_pass(device, shader_manager.equirect_to_cubemap_cs)),
@@ -502,6 +503,20 @@ ComputePass ComputePassManager::create_write_voxels_to_grid_compute_pass(VulkanD
     builder.add_storage_buffer(6, ShaderStages::compute); // ChunkVoxels
 
     builder.add_push_constantsf(sizeof(WriteVoxelsToGridPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_evict_buckets_build_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // ChunkMetaBuf
+    builder.add_storage_buffer(1, ShaderStages::compute); // BucketHeads
+    builder.add_storage_buffer(2, ShaderStages::compute); // BucketNext
+
+    builder.add_push_constantsf(sizeof(EvictBucketsBuildPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }

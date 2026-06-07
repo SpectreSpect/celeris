@@ -52,6 +52,7 @@ public:
     ComputePass mark_write_chunks_to_generate_cp;
     ComputePass stream_generate_terrain_cp;
     ComputePass write_voxels_to_grid_cp;
+    ComputePass evict_buckets_build_cp;
 
     // PBR
     ComputePass equirect_to_cubemap_cp;
@@ -105,6 +106,8 @@ public:
     ComputePass create_mark_write_chunks_to_generate_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_stream_generate_terrain_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_write_voxels_to_grid_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+
+    ComputePass create_evict_buckets_build_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
 private:
     DescriptorPool m_pool;
