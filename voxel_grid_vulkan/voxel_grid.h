@@ -160,6 +160,7 @@ public:
         PassInstance free_evicted_chunks_mesh_pi;
         PassInstance reset_evicted_list_and_buckets_pi;
         PassWriter hash_table_conditional_dispatch_adapter_pw;
+        PassInstance clear_chunk_hash_table_pi;
     };
 
     struct VoxelGridParams {
@@ -241,8 +242,9 @@ private:
     void write_voxels_to_grid(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void reset_voxel_write_list_counter(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_write_list);
     void stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks, uint32_t seed);
-
+    
     void conditional_prepare_rebuild(VulkanCommandBuffer& command_buffer, VulkanBuffer& clear_dispatch_args, VulkanBuffer& fill_dispatch_args);
+    void clear_chunk_hash_table(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void rebuild_chunk_hash_table(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, uint32_t pack_offset);
 
     void reset_heads(VulkanCommandBuffer& command_buffer); 

@@ -63,6 +63,7 @@ public:
     VulkanShaderModule free_evicted_chunks_mesh_cs;
     VulkanShaderModule reset_evicted_list_and_buckets_cs;
     VulkanShaderModule hash_table_conditional_dispatch_adapter_cs;
+    VulkanShaderModule clear_chunk_hash_table_cs;
 
     // PBR
     VulkanShaderModule equirect_to_cubemap_cs;
