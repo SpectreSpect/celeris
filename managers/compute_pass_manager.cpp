@@ -45,6 +45,7 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         evict_buckets_build_cp(create_evict_buckets_build_compute_pass(device, shader_manager.evict_buckets_build_cs)),
         evict_low_priority_dispatch_adapter_cp(create_evict_low_priority_dispatch_adapter_compute_pass(device, shader_manager.evict_low_priority_dispatch_adapter_cs)),
         evict_low_priority_cp(create_evict_low_priority_compute_pass(device, shader_manager.evict_low_priority_cs)),
+        free_evicted_chunks_mesh_cp(create_free_evicted_chunks_mesh_compute_pass(device, shader_manager.free_evicted_chunks_mesh_cs)),
 
         // PBR
         equirect_to_cubemap_cp(create_equirect_to_cubemap_compute_pass(device, shader_manager.equirect_to_cubemap_cs)),
@@ -556,6 +557,29 @@ ComputePass ComputePassManager::create_evict_low_priority_compute_pass(VulkanDev
     builder.add_storage_buffer(7, ShaderStages::compute); // EvictedChunksList
 
     builder.add_push_constantsf(sizeof(EvictLowPriorityPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_free_evicted_chunks_mesh_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // GlobalChunkMeshAllocBuf
+    builder.add_storage_buffer(1, ShaderStages::compute); // VBHeads
+    builder.add_storage_buffer(2, ShaderStages::compute); // VBState
+    builder.add_storage_buffer(3, ShaderStages::compute); // VBNodes
+    builder.add_storage_buffer(4, ShaderStages::compute); // VBFreeNodesList
+    builder.add_storage_buffer(5, ShaderStages::compute); // VBReturnedNodesList
+    builder.add_storage_buffer(6, ShaderStages::compute); // IBHeads
+    builder.add_storage_buffer(7, ShaderStages::compute); // IBState
+    builder.add_storage_buffer(8, ShaderStages::compute); // IBNodes
+    builder.add_storage_buffer(9, ShaderStages::compute); // IBFreeNodesList
+    builder.add_storage_buffer(10, ShaderStages::compute); // IBReturnedNodesList
+    builder.add_storage_buffer(11, ShaderStages::compute); // EvictedChunksList
+
+    builder.add_push_constantsf(sizeof(FreeEvictedChunksMeshPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }

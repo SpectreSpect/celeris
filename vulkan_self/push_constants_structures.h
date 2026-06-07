@@ -161,3 +161,8 @@ struct EvictLowPriorityPushConstants {
     uint32_t u_chunk_hash_table_size;
     uint32_t u_bucket_count;
 };
+
+struct FreeEvictedChunksMeshPushConstants {
+    uint32_t vb_max_order;
+    uint32_t ib_max_order;
+};
