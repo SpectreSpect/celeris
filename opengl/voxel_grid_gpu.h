@@ -231,7 +231,7 @@ public:
     void rebuild_chunk_hash_table(uint32_t pack_bits, uint32_t pack_offset);
 
     void reset_heads(); 
-    void build_bucket_lists(const glm::vec3& cam_pos); 
+    void build_bucket_lists(const glm::vec3& cam_pos);
     void prepare_evict_lowpriority_chunks(const BufferObject& dispatch_args); 
     void evict_lowpriority_chunks(const BufferObject& dispatch_args); 
     void free_evicted_chunks_mesh(const BufferObject& dispatch_args); 

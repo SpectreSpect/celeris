@@ -86,7 +86,9 @@ public:
         VulkanBuffer local_voxel_write_list;
         VulkanBuffer voxel_write_list;
         VulkanBuffer voxels;
+
         VulkanBuffer bucket_heads;
+        VulkanBuffer bucket_next;
 
         VulkanBuffer global_vertex_buffer;
         VulkanBuffer global_index_buffer;
@@ -149,6 +151,7 @@ public:
         PassInstance mark_write_chunks_to_generate_pi;
         PassInstance stream_generate_terrain_pi;
         PassInstance write_voxels_to_grid_pi;
+        PassInstance evict_buckets_build_pi;
     };
 
     struct VoxelGridParams {
@@ -232,6 +235,7 @@ private:
     void stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks, uint32_t seed);
 
     void reset_heads(VulkanCommandBuffer& command_buffer); 
+    void build_bucket_lists(VulkanCommandBuffer& command_buffer, glm::vec3 cam_pos);
     void ensure_free_chunks_gpu(VulkanCommandBuffer& command_buffer, glm::vec3 cam_pos, uint32_t pack_bits, uint32_t pack_offset); 
 
     void mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);

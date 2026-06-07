@@ -1,0 +1,72 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256) in;
+
+// ----- include -----
+#include "../common/buffer_structures.inc"
+// -------------------
+
+layout(std430, set = 0, binding=0) readonly buffer ChunkMetaBuf { ChunkMeta meta[]; };
+layout(std430, set = 0, binding=1) coherent buffer BucketHeads { BucketHead bucket_heads[]; };
+layout(std430, set = 0, binding=2) coherent buffer BucketNext  { uint bucket_next[]; };
+
+layout(push_constant) uniform EvictBucketsBuildPushConstants {
+    vec4  u_cam_pos;
+    ivec4 u_chunk_dim;
+    vec4  u_voxel_size;
+
+    uint  u_max_chunks;
+    uint  u_bucket_count;
+
+    uint u_pack_bits;
+    int  u_pack_offset;
+
+    float f_eviction_bucket_shell_thickness;
+};
+
+// ----- include -----
+#include "../common/utils.inc"
+// -------------------
+
+void push_bucket(uint b, uint chunkId) {
+    uint old = atomicExchange(bucket_heads[b].id, chunkId);
+    bucket_next[chunkId] = old;
+    atomicAdd(bucket_heads[b].count, 1u);
+
+    // for (;;) {
+    //     uint old = atomicAdd(bucket_heads[b].id, 0u);
+    //     bucket_next[chunkId] = old;
+    //     memoryBarrierBuffer(); // next должен стать видим до публикации head
+    //     uint prev = atomicCompSwap(bucket_heads[b].id, old, chunkId);
+    //     if (prev == old) {
+    //         atomicAdd(bucket_heads[b].count, 1u);
+    //         break;
+    //     }
+    // }
+}
+
+uint bucket_for_coord(ivec3 chunkCoord) {
+    vec3 chunkSize = vec3(u_chunk_dim) * u_voxel_size.xyz;
+    vec3 minP = vec3(chunkCoord * u_chunk_dim.xyz) * u_voxel_size.xyz;
+    vec3 center = minP + 0.5 * chunkSize;
+
+    vec3 d = center - u_cam_pos.xyz;
+    float dist = sqrt(dot(d, d));
+
+    uint b = uint(dist / f_eviction_bucket_shell_thickness);
+    if (b >= u_bucket_count) b = u_bucket_count - 1u;
+    return b;
+}
+
+void main() {
+    uint chunkId = gl_GlobalInvocationID.x;
+    if (chunkId >= u_max_chunks) return;
+    if (meta[chunkId].used == 0u) return;
+
+    uvec2 key2 = uvec2(meta[chunkId].key_lo, meta[chunkId].key_hi);
+    ivec3 cc = unpack_key_to_coord(key2, u_pack_offset, u_pack_bits);
+
+    uint b = bucket_for_coord(cc);
+    push_bucket(b, chunkId);
+}

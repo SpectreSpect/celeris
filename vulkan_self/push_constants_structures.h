@@ -138,3 +138,17 @@ struct WriteVoxelsToGridPushConstants {
     uint32_t u_pack_offset;
     uint32_t u_pack_bits;
 };
+
+struct EvictBucketsBuildPushConstants {
+    glm::vec4 u_cam_pos;
+    glm::ivec4 u_chunk_dim;
+    glm::vec4 u_voxel_size;
+
+    uint32_t u_max_chunks;
+    uint32_t u_bucket_count;
+
+    uint32_t u_pack_bits;
+    int32_t u_pack_offset;
+
+    float f_eviction_bucket_shell_thickness;
+};
