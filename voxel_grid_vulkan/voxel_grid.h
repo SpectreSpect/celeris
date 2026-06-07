@@ -90,6 +90,8 @@ public:
         VulkanBuffer bucket_heads;
         VulkanBuffer bucket_next;
 
+        VulkanBuffer evicted_chunks_list;
+
         VulkanBuffer global_vertex_buffer;
         VulkanBuffer global_index_buffer;
 
@@ -140,7 +142,7 @@ public:
         PassInstance mesh_alloc_vb_pi;
         PassInstance mesh_alloc_ib_pi;
         PassInstance verify_mesh_allocation_pi;
-        PassInstance return_free_alloc_nodes_dispatch_adapter_pi;
+        PassWriter return_free_alloc_nodes_dispatch_adapter_pw;
         PassInstance return_free_alloc_nodes_pi;
         PassInstance mesh_emit_pi;
         PassInstance mesh_finalize_pi;
@@ -152,6 +154,7 @@ public:
         PassInstance stream_generate_terrain_pi;
         PassInstance write_voxels_to_grid_pi;
         PassInstance evict_buckets_build_pi;
+        PassWriter evict_low_priority_dispatch_adapter_pw;
     };
 
     struct VoxelGridParams {
@@ -236,6 +239,7 @@ private:
 
     void reset_heads(VulkanCommandBuffer& command_buffer); 
     void build_bucket_lists(VulkanCommandBuffer& command_buffer, glm::vec3 cam_pos);
+    void prepare_evict_lowpriority_chunks(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args); 
     void ensure_free_chunks_gpu(VulkanCommandBuffer& command_buffer, glm::vec3 cam_pos, uint32_t pack_bits, uint32_t pack_offset); 
 
     void mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);

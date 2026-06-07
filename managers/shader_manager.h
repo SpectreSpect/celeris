@@ -58,6 +58,7 @@ public:
     VulkanShaderModule stream_generate_terrain_cs;
     VulkanShaderModule write_voxels_to_grid_cs;
     VulkanShaderModule evict_buckets_build_cs;
+    VulkanShaderModule evict_low_priority_dispatch_adapter_cs;
 
     // PBR
     VulkanShaderModule equirect_to_cubemap_cs;

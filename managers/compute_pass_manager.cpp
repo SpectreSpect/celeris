@@ -43,6 +43,7 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         stream_generate_terrain_cp(create_stream_generate_terrain_compute_pass(device, shader_manager.stream_generate_terrain_cs)),
         write_voxels_to_grid_cp(create_write_voxels_to_grid_compute_pass(device, shader_manager.write_voxels_to_grid_cs)),
         evict_buckets_build_cp(create_evict_buckets_build_compute_pass(device, shader_manager.evict_buckets_build_cs)),
+        evict_low_priority_dispatch_adapter_cp(create_evict_low_priority_dispatch_adapter_compute_pass(device, shader_manager.evict_low_priority_dispatch_adapter_cs)),
 
         // PBR
         equirect_to_cubemap_cp(create_equirect_to_cubemap_compute_pass(device, shader_manager.equirect_to_cubemap_cs)),
@@ -233,6 +234,8 @@ ComputePass ComputePassManager::create_return_free_alloc_nodes_dispatch_adapter_
     LOG_METHOD();
 
     ComputePassBuilder builder;
+
+    builder.set_descriptor_set_flags(VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
 
     builder.add_storage_buffer(0, ShaderStages::compute); // VBReturnedNodesList
     builder.add_storage_buffer(1, ShaderStages::compute); // IBReturnedNodesList
@@ -517,6 +520,22 @@ ComputePass ComputePassManager::create_evict_buckets_build_compute_pass(VulkanDe
     builder.add_storage_buffer(2, ShaderStages::compute); // BucketNext
 
     builder.add_push_constantsf(sizeof(EvictBucketsBuildPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_evict_low_priority_dispatch_adapter_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.set_descriptor_set_flags(VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // EvictedChunksList
+    builder.add_storage_buffer(1, ShaderStages::compute); // DispatchArgs
+    builder.add_storage_buffer(2, ShaderStages::compute); // FreeList
+
+    builder.add_push_constantsf(sizeof(EvictLowPriorityDispatchAdapterPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }
