@@ -53,6 +53,7 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         evict_buckets_build_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "evict_buckets_build.comp.spv"),
         evict_low_priority_dispatch_adapter_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "evict_low_priority_dispatch_adapter.comp.spv"),
         evict_low_priority_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "evict_low_priority.comp.spv"),
+        build_indirect_cmds_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "build_indirect_cmds.comp.spv"),
         free_evicted_chunks_mesh_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "free_evicted_chunks_mesh.comp.spv"),
         reset_evicted_list_and_buckets_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "reset_evicted_list_and_buckets.comp.spv"),
         hash_table_conditional_dispatch_adapter_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "hash_table_conditional_dispatch_adapter.comp.spv"),

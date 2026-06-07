@@ -45,6 +45,7 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         evict_buckets_build_cp(create_evict_buckets_build_compute_pass(device, shader_manager.evict_buckets_build_cs)),
         evict_low_priority_dispatch_adapter_cp(create_evict_low_priority_dispatch_adapter_compute_pass(device, shader_manager.evict_low_priority_dispatch_adapter_cs)),
         evict_low_priority_cp(create_evict_low_priority_compute_pass(device, shader_manager.evict_low_priority_cs)),
+        build_indirect_cmds_cp(create_build_indirect_cmds_compute_pass(device, shader_manager.build_indirect_cmds_cs)),
         free_evicted_chunks_mesh_cp(create_free_evicted_chunks_mesh_compute_pass(device, shader_manager.free_evicted_chunks_mesh_cs)),
         reset_evicted_list_and_buckets_cp(create_reset_evicted_list_and_buckets_compute_pass(device, shader_manager.reset_evicted_list_and_buckets_cs)),
         hash_table_conditional_dispatch_adapter_cp(create_hash_table_conditional_dispatch_adapter_compute_pass(device, shader_manager.hash_table_conditional_dispatch_adapter_cs)),
@@ -560,6 +561,20 @@ ComputePass ComputePassManager::create_evict_low_priority_compute_pass(VulkanDev
     builder.add_storage_buffer(7, ShaderStages::compute); // EvictedChunksList
 
     builder.add_push_constantsf(sizeof(EvictLowPriorityPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+ComputePass ComputePassManager::create_build_indirect_cmds_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // ChunkMetaBuf
+    builder.add_storage_buffer(1, ShaderStages::compute); // ChunkMeshAllocBuf
+    builder.add_storage_buffer(2, ShaderStages::compute); // IndirectCmdBuf
+    builder.add_uniform_buffer(3, ShaderStages::compute); // UniformBuffer
+
+    builder.add_push_constantsf(sizeof(BuildIndirectCmdsPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }

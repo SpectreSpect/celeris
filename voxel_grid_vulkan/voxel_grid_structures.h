@@ -180,6 +180,23 @@ struct MeshPoolSeedUniform {
     uint32_t pad2;
 };
 
+struct BuildIndirectCmdsUniform {
+    uint32_t  u_max_chunks;
+
+    // для AABB/sphere размеров чанка
+    glm::ivec4 u_chunk_dim;     // (16,16,16)
+    glm::vec4  u_voxel_size;    // (sx,sy,sz)
+
+    // pack/unpack как в C++
+    uint32_t u_pack_bits;
+    int32_t  u_pack_offset;
+
+    uint32_t u_vb_page_verts;
+    uint32_t u_ib_page_inds;
+
+    float render_distance;
+};
+
 // layout(std430, set = 0, binding=7) buffer UniformBuffer  { 
 //     uint u_vb_pages;
 //     uint u_ib_pages;
