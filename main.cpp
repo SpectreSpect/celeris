@@ -56,6 +56,10 @@
 #include "renderer/indirect_render_object.h"
 
 #include <vector>
+#include <random>
+
+static std::mt19937 rng(std::random_device{}());
+static std::uniform_real_distribution<double> dist(0.0, 1.0);
 
 float srgb_to_linear(float c) {
     if (c <= 0.04045f) {
@@ -180,11 +184,47 @@ int main() {
         .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000)
     };
 
-    VoxelGrid voxel_grid(engine.physical_device(), 
-                         engine.device(), engine.compute_queue(), 
-                         compute_pass_manager, material_instance_manager, 
-                         voxel_grid_desc);
+    VoxelGrid voxel_grid(
+        engine.physical_device(),
+        engine.device(),
+        engine.compute_queue(),
+        compute_pass_manager,
+        material_instance_manager,
+        voxel_grid_desc
+    );
 
+    glm::ivec3 block_size = glm::ivec3(10, 20, 30);
+    glm::ivec3 block_origin = glm::ivec3(0, 30, 0);
+    std::vector<VoxelWriteGPU> test_voxel_writes;
+    test_voxel_writes.reserve(static_cast<size_t>(block_size.x * block_size.y * block_size.z));
+
+    for (int x = 0; x < block_size.x; x++)
+        for (int y = 0; y < block_size.y; y++)
+            for (int z = 0; z < block_size.z; z++) {
+                glm::ivec3 base_color{0, 98, 255};
+                glm::ivec3 color = glm::vec3(base_color) * glm::vec3(0.5 + dist(rng) * 0.5);
+
+                test_voxel_writes.push_back(
+                    VoxelWriteGPU{
+                        .world_voxel = glm::ivec4(block_origin, 0) + glm::ivec4(x, y, z, 0),
+                        .voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, color),
+                        .set_flags = OVERWRITE_BIT
+                    }
+                );
+            }
+
+    VulkanBuffer voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + Utils::size_bytes(test_voxel_writes));
+    voxel_write_list.upload_scalar<uint32_t>(test_voxel_writes.size(), 0);
+    voxel_write_list.upload(test_voxel_writes, sizeof(uint32_t) * 4);
+
+    VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
+    {
+        auto scope = compute_command_buffer.begin_scope();
+        voxel_grid.set_voxels(compute_command_buffer, voxel_write_list);
+    }
+    VulkanFence compute_fence(engine.device());
+    engine.compute_submit(compute_command_buffer, &compute_fence);
+    compute_fence.wait();
 
     GICPPass gicp_pass(engine, compute_pass_manager);
     VoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);

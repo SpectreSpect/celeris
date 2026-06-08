@@ -1208,6 +1208,11 @@ void VoxelGrid::merge_voxel_write_lists(VulkanCommandBuffer& command_buffer, con
     add_voxel_write_list_counters_together(command_buffer, voxel_write_list_src, voxel_write_list_dsc);
 }
 
+void VoxelGrid::set_voxels(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src) {
+    LOG_METHOD();
+    merge_voxel_write_lists(command_buffer, voxel_write_list_src, m_buffers.local_voxel_write_list);
+}
+
 void VoxelGrid::world_init_gpu() {
     LOG_METHOD();
 

@@ -162,6 +162,12 @@ public:
         upload(std::span<const T>(data), offset_bytes);
     }
 
+    template<class T>
+    inline void upload_scalar(const T& data, VkDeviceSize offset_bytes = 0) {
+        static_assert(std::is_trivially_copyable_v<T>, "Type T must be trivially copyable");
+        upload(&data, static_cast<VkDeviceSize>(sizeof(T)), offset_bytes);
+    }
+
     void read(void* data, VkDeviceSize size_bytes, VkDeviceSize offset_bytes);
 
     

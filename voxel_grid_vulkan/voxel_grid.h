@@ -76,6 +76,7 @@ public:
     // );
 
     void update(Window& window, Camera& camera);
+    void set_voxels(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src);
 
 public:
     struct VoxelGridBuffers {
@@ -244,7 +245,6 @@ private:
     void init_mesh_pool();
     void submit_compute_commands();
     
-
     void reset_load_list_counter(VulkanCommandBuffer& command_buffer);
     void mark_chunk_to_generate(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks);
     void mark_write_chunks_to_generate(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
@@ -282,8 +282,9 @@ private:
 
     void build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, int pack_offset);
     void build_indirect_draw_commands_frustum(VulkanCommandBuffer& command_buffer, 
-                                              const glm::mat4& viewProj, 
-                                              const glm::vec3& cam_pos,
-                                              uint32_t pack_bits,
-                                              int pack_offset);
+        const glm::mat4& viewProj,
+        const glm::vec3& cam_pos,
+        uint32_t pack_bits,
+        int pack_offset
+    );
 };
