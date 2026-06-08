@@ -170,7 +170,7 @@ int main() {
         .chunk_size = chunk_size,
         .voxel_size = voxel_size,
         .count_active_chunks = 10'000,
-        .max_quads = 3'000'000,
+        .max_quads = 1'000'000,
         .chunk_hash_table_size_factor = 1.0f,
         .count_evict_buckets = 32,
         .min_free_chunks = 4'500,

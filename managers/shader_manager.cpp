@@ -60,6 +60,13 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         clear_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "clear_chunk_hash_table.comp.spv"),
         fill_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "fill_chunk_hash_table.comp.spv"),
 
+        // Voxelizator
+        alloc_active_chunk_triangles_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "alloc_active_chunk_triangles.comp.spv"),
+        fill_triangle_indices_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "fill_triangle_indices.comp.spv"),
+        mark_and_count_active_chunks_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "mark_and_count_active_chunks.comp.spv"),
+        reset_voxelize_pipeline_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "reset_voxelize_pipeline.comp.spv"),
+        voxelize_triangles_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "voxelize_triangles.comp.spv"),
+
         voxel_mesh_vs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_mesh.vert.spv"),
         voxel_mesh_fs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_mesh.frag.spv"),
         voxel_pbr_vs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_pbr.vert.spv"),

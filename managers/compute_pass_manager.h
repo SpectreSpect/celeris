@@ -62,6 +62,13 @@ public:
     ComputePass clear_chunk_hash_table_cp;
     ComputePass fill_chunk_hash_table_cp;
 
+    // Voxelizator
+    ComputePass alloc_active_chunk_triangles_cp;
+    ComputePass fill_triangle_indices_cp;
+    ComputePass mark_and_count_active_chunks_cp;
+    ComputePass reset_voxelize_pipeline_cp;
+    ComputePass voxelize_triangles_cp;
+
     // PBR
     ComputePass equirect_to_cubemap_cp;
     ComputePass brdf_lut_cp;
@@ -125,6 +132,12 @@ public:
     ComputePass create_hash_table_conditional_dispatch_adapter_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_clear_chunk_hash_table_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_fill_chunk_hash_table_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+
+    ComputePass create_alloc_active_chunk_triangles_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_fill_triangle_indices_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_mark_and_count_active_chunks_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_reset_voxelize_pipeline_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_voxelize_triangles_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
 private:
     DescriptorPool m_pool;

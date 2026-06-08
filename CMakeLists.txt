@@ -114,6 +114,7 @@ add_executable(app
   voxel_grid_vulkan/shader_helper/dispatch_arg.cpp
   voxel_grid_vulkan/shader_helper/value_dispatch_arg.cpp
   voxel_grid_vulkan/shader_helper/buffer_dispatch_arg.cpp
+  voxel_grid_vulkan/voxelizator.cpp
   # vulkan_self/buffer_filler.cpp
   renderer/pbr/equirect_to_cubemap_pass.cpp
   renderer/pbr/brdf_lut_pass.cpp

@@ -4,6 +4,7 @@
 #include <optional>
 #include <vector>
 #include <glm/glm.hpp>
+#include <vulkan/vulkan.h>
 
 #include "../vulkan_self/logger/logger_header.h"
 #include "../vulkan_self/vulkan_buffer.h"
@@ -205,7 +206,6 @@ private:
     VulkanFence m_fence;
 
     VulkanQueue* m_queue = nullptr;
-    ComputePassManager* m_compute_pass_manager = nullptr;
 
     VoxelGridParams m_params;
     VoxelGridPassInstances m_pass_instances;
