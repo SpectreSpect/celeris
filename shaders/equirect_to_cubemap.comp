@@ -9,7 +9,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
 } ubo;
 
 layout(set = 0, binding = 1) uniform sampler2D uEquirectangularMap;
-layout(set = 0, binding = 2, rgba8) uniform writeonly imageCube outEnvMap;
+layout(set = 0, binding = 2, rgba32f) uniform writeonly imageCube outEnvMap;
 
 const float PI = 3.14159265358979323846;
 

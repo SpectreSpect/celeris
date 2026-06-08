@@ -111,7 +111,7 @@ int main() {
     FPSCameraController camera_controller(camera);
     camera_controller.speed = 20;
 
-    VulkanResourceLoader resource_loader(engine, 1024 * 1024 * 100); // 1 Мб
+    VulkanResourceLoader resource_loader(engine, 154217728); // 1 Мб
 
     ShaderManager shader_manager(engine.device());
     ComputePassManager compute_pass_manager(engine.device(), shader_manager);

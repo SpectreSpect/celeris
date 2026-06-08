@@ -88,3 +88,53 @@ CpuImage CpuImage::load_rgba8_image(const std::filesystem::path& path, VkFormat 
         format
     );
 }
+
+CpuImage CpuImage::load_rgba32f_image(const std::filesystem::path& path) {
+    LOG_NAMED("CpuImage");
+
+    std::vector<std::uint8_t> file_data = Utils::read_binary_file(path);
+
+    stbi_set_flip_vertically_on_load(true);
+
+    int width, height, channels;
+    float* raw_pixels = stbi_loadf_from_memory(
+        file_data.data(),
+        static_cast<int>(file_data.size()),
+        &width,
+        &height,
+        &channels,
+        STBI_rgb_alpha
+    );
+
+    logger.check(width > 0, "Loaded HDR image width is invalid");
+    logger.check(height > 0, "Loaded HDR image height is invalid");
+
+    const char* failure_reason = stbi_failure_reason();
+    logger.check(raw_pixels != nullptr)
+        << "Failed to load HDR image: "
+        << clr(path.string(), LoggerPalette::blue)
+        << "\nReason: "
+        << clr(failure_reason != nullptr ? failure_reason : "unknown reason", LoggerPalette::red)
+        << "\n";
+
+    VkDeviceSize image_size =
+        static_cast<VkDeviceSize>(width) *
+        static_cast<VkDeviceSize>(height) *
+        4 *
+        sizeof(float);
+
+    std::vector<uint8_t> pixels(static_cast<size_t>(image_size));
+    std::memcpy(pixels.data(), raw_pixels, static_cast<size_t>(image_size));
+
+    stbi_image_free(raw_pixels);
+
+    return CpuImage(
+        pixels,
+        VkExtent3D{
+            static_cast<uint32_t>(width),
+            static_cast<uint32_t>(height),
+            1
+        },
+        VK_FORMAT_R32G32B32A32_SFLOAT
+    );
+}

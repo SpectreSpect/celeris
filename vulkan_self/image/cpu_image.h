@@ -28,6 +28,7 @@ public:
     const std::vector<uint8_t>& image_data() const;
 
     static CpuImage load_rgba8_image(const std::filesystem::path& path, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
+    static CpuImage load_rgba32f_image(const std::filesystem::path& path);
 
 private:
     std::vector<uint8_t> m_image_data;

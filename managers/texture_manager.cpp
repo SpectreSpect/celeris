@@ -12,7 +12,9 @@ constexpr std::array<const char*, TextureManager::max_pbr_cubemap_count> pbr_hdr
     // "ferndale_studio_06_4k.hdr",
     "qwantani_moonrise_puresky_4k.hdr",
     // "citrus_orchard_puresky_4k.hdr",
-    // "moonless_golf_4k.hdr"
+    // "moonless_golf_4k.hdr",
+    // "mud_road_puresky_4k.hdr",
+    // "snowy_field_4k.hdr"
 };
 }
 
@@ -46,7 +48,7 @@ TextureManager::TextureManager(VulkanEngine& engine, VulkanResourceLoader& resou
 {
     hdr_textures.reserve(pbr_hdr_filenames.size());
     for (const char* filename : pbr_hdr_filenames) {
-        hdr_textures.emplace_back(load_rbga8(path_utils::executable_dir() / "assets" / "hdr" / filename));
+        hdr_textures.emplace_back(load_rgba32f(path_utils::executable_dir() / "assets" / "hdr" / filename));
     }
 
     resource_loader.submit();
@@ -78,6 +80,22 @@ VulkanTexture2D TextureManager::load_rbga8(const std::filesystem::path& path) {
     VulkanTexture2D texture(m_engine.physical_device(), m_engine.device(), dirt_cpu_image.extent2d());
 
     m_resource_loader.upload_sampled_texture_2d(dirt_cpu_image, texture);
+    m_resource_loader.submit();
+
+    return texture;
+}
+
+VulkanTexture2D TextureManager::load_rgba32f(const std::filesystem::path& path) {
+    CpuImage cpu_image = CpuImage::load_rgba32f_image(path);
+
+    VulkanTexture2D texture(
+        m_engine.physical_device(),
+        m_engine.device(),
+        cpu_image.extent2d(),
+        cpu_image.format()
+    );
+
+    m_resource_loader.upload_sampled_texture_2d(cpu_image, texture);
     m_resource_loader.submit();
 
     return texture;

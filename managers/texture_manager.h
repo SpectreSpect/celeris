@@ -52,4 +52,5 @@ public:
 
 private:
     VulkanTexture2D load_rbga8(const std::filesystem::path& path);
+    VulkanTexture2D load_rgba32f(const std::filesystem::path& path);
 };

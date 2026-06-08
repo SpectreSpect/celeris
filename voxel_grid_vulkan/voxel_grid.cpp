@@ -40,7 +40,7 @@ VoxelGrid::VoxelGrid(
     m_render_object.set_material_data(PBRMaterialData::with_pbr_maps(
         TextureManager::st_peters_square_night_4k_pbr_map_id,
         0.0f,
-        0.98f,
+        0.95f,
         1.8f,
         glm::vec4(1.0f),
         1.0f

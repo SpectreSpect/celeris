@@ -21,7 +21,7 @@ Cubemap EquirectToCubemapPass::generate(VulkanTexture2D& equirectangular_map, ui
 
     uint32_t mip_levels = Cubemap::calculate_mip_levels({face_size, face_size});
 
-    Cubemap cubemap(m_engine.physical_device(), m_engine.device(), {face_size, face_size}, VK_FORMAT_R8G8B8A8_UNORM, mip_levels);
+    Cubemap cubemap(m_engine.physical_device(), m_engine.device(), {face_size, face_size}, VK_FORMAT_R32G32B32A32_SFLOAT, mip_levels);
 
     static EquirectToCubemapUniform uniform_data{};
     uniform_data.image_width = face_size;
