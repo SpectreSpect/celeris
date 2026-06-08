@@ -97,7 +97,7 @@ struct SimpleStorage {
 
 int main() {
     GlfwContext glfw_context;
-    Window window(glfw_context, 1280, 720, "Vulkan engine");
+    Window window(glfw_context, 1280, 720, "Celeris");
 
     QueueRequest queue_request;
     queue_request.graphics_count = 2;
