@@ -18,6 +18,7 @@ MaterialManager::MaterialManager(VulkanEngine& engine, ShaderManager& shader_man
     point_mp(create_point_pass(engine, frame_resources, shader_manager.point_vs, shader_manager.point_fs)),
     skybox_mp(create_skybox_pass(engine, frame_resources, shader_manager.skybox_vs, shader_manager.skybox_fs)),
     pbr_mp(create_pbr_pass(engine, frame_resources, shader_manager.pbr_vs, shader_manager.pbr_fs)),
+    voxel_mesh_mp(create_voxel_mesh_pass(engine, frame_resources, shader_manager.voxel_mesh_vs, shader_manager.voxel_mesh_fs)),
     m_pool(engine.device(), m_pool_builder) {}
 
 MaterialPass MaterialManager::create_pass(VulkanEngine& engine, MaterialPassBuilder& builder, 
@@ -174,6 +175,47 @@ MaterialPass MaterialManager::create_pbr_pass(VulkanEngine& engine, FrameResourc
     builder.add_vertex_attribute(1, 0, Formats::vec4, offsetof(PBRVertex, normal));
     builder.add_vertex_attribute(2, 0, Formats::vec2, offsetof(PBRVertex, uv));
     builder.add_vertex_attribute(3, 0, Formats::vec4, offsetof(PBRVertex, tangent));
+
+    return create_pass(engine, builder, vs, fs);
+}
+
+MaterialPass MaterialManager::create_voxel_mesh_pass(VulkanEngine& engine, FrameResources& frame_resources, 
+                                                const VulkanShaderModule& vs, const VulkanShaderModule& fs) {
+    LOG_METHOD();
+
+    // struct MeshVoxelVertex {
+    //     glm::vec4 position;
+    //     uint32_t color;
+    //     uint32_t face;
+    // };
+
+    struct alignas(16) MeshVoxelVertex {
+        glm::vec4 position; // offset 0
+        uint32_t color;    // offset 16
+        uint32_t face;     // offset 20
+        uint32_t _pad0;    // offset 24
+        uint32_t _pad1;    // offset 28
+    };
+
+    static_assert(sizeof(MeshVoxelVertex) == 32);
+    static_assert(offsetof(MeshVoxelVertex, position) == 0);
+    static_assert(offsetof(MeshVoxelVertex, color) == 16);
+    static_assert(offsetof(MeshVoxelVertex, face) == 20);
+
+    MaterialPassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::fragment);
+    // builder.add_combined_image_sampler(1, ShaderStages::fragment); // irradianceMap
+    // builder.add_combined_image_sampler(2, ShaderStages::fragment); // prefilterMap
+    // builder.add_combined_image_sampler(3, ShaderStages::fragment); // brdfLUT
+
+    builder.add_push_constants(sizeof(TransformPushConstants), 0);
+    builder.add_descriptor_set_layout(frame_resources.descriptor_layout());
+
+    builder.add_vertex_binding(0, sizeof(MeshVoxelVertex));
+    builder.add_vertex_attribute(0, 0, Formats::vec4, offsetof(MeshVoxelVertex, position));
+    builder.add_vertex_attribute(1, 0, VK_FORMAT_R32_UINT, offsetof(MeshVoxelVertex, color));
+    builder.add_vertex_attribute(2, 0, VK_FORMAT_R32_UINT, offsetof(MeshVoxelVertex, face));
 
     return create_pass(engine, builder, vs, fs);
 }

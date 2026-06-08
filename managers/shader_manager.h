@@ -66,6 +66,9 @@ public:
     VulkanShaderModule hash_table_conditional_dispatch_adapter_cs;
     VulkanShaderModule clear_chunk_hash_table_cs;
     VulkanShaderModule fill_chunk_hash_table_cs;
+    
+    VulkanShaderModule voxel_mesh_vs;
+    VulkanShaderModule voxel_mesh_fs;
 
     // PBR
     VulkanShaderModule equirect_to_cubemap_cs;

@@ -14,8 +14,20 @@ layout(std430, set = 0, binding=3) buffer ChunkMetaBuf { ChunkMeta meta[]; };
 layout(std430, set = 0, binding=4) buffer EnqueuedBuf { uint enqueued[]; };
 layout(std430, set = 0, binding=5) buffer DirtyListBuf { uint dirty_count; uint dirty_list[]; };
 
+// layout(push_constant) uniform StreamGenerateTerrainPushConstants {
+//     ivec3 u_chunk_dim;
+//     uint  u_voxels_per_chunk;
+
+//     uint u_pack_bits;
+//     int  u_pack_offset;
+
+//     uint u_seed;
+
+//     uint u_chunk_hash_table_size;
+// };
+
 layout(push_constant) uniform StreamGenerateTerrainPushConstants {
-    ivec3 u_chunk_dim;
+    ivec4 u_chunk_dim;
     uint  u_voxels_per_chunk;
 
     uint u_pack_bits;
@@ -73,7 +85,7 @@ void main() {
     int lz = int(voxelId / uint(u_chunk_dim.x * u_chunk_dim.y));
     ivec3 local = ivec3(lx, ly, lz);
 
-    ivec3 worldVoxel = chunkCoord * u_chunk_dim + local;
+    ivec3 worldVoxel = chunkCoord * u_chunk_dim.xyz + local;
 
     // // ---- terrain height from fbm(xz) ----
     vec2 xz = vec2(worldVoxel.x, worldVoxel.z) * 0.03; // частота

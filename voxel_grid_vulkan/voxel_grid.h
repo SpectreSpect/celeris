@@ -16,6 +16,7 @@
 #include "shader_helper/shader_helper.h"
 
 #include "../renderer/render_object.h"
+#include "../renderer/indirect_render_object.h"
 #include "../renderer/mesh_view.h"
 
 class VulkanPhysicalDevice;
@@ -65,6 +66,8 @@ public:
 
     VoxelGrid(VoxelGrid&&) noexcept = default;
     VoxelGrid& operator=(VoxelGrid&&) noexcept = default;
+
+    IndirectRenderObject& render_object();
 
     // void apply_writes_to_world_gpu(uint32_t write_count);
     // void apply_writes_to_world_from_cpu(
@@ -207,7 +210,7 @@ private:
     VoxelGridBuffers m_buffers;
 
     MeshView m_mesh_view;
-    RenderObject m_render_object;
+    IndirectRenderObject m_render_object;
 
     ShaderHelper m_shader_helper;
     

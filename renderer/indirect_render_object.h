@@ -11,6 +11,7 @@ public:
     _XCHILD_NAME(InstancedRenderObject);
 
     IndirectRenderObject(Mesh& mesh, SlotPassInstance& material, VulkanBuffer& indirect_buffer, uint32_t max_draw_count);
+    IndirectRenderObject(MeshView& mesh_view, SlotPassInstance& material, VulkanBuffer& indirect_buffer, uint32_t max_draw_count);
     
     virtual void render(Renderer& renderer, VulkanCommandBuffer& command_buffer, const glm::mat4& world_transform);
 

@@ -382,11 +382,13 @@ int main() {
         lighting_system.set_light_source(0, light_source0);
         lighting_system.set_light_source(1, light_source1);
 
-        voxel_grid.update(window, camera);
+        
         
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), window, camera);
         lighting_system.update(engine.current_frame(), window, camera);
+
+        voxel_grid.update(window, camera);
 
         // sphere.transform.position.y = sin(timer) * 2;
         // two_spheres.transform.position.x = cos(timer) * 10;
@@ -446,6 +448,8 @@ int main() {
                 engine.swapchain_resources().swapchain, clear_color);
                 // rgba(37, 150, 190)
                 renderer.render(command_buffer, scene);
+
+                renderer.render(command_buffer, voxel_grid.render_object());
 
                 // renderer.render_indirect(command_buffer, two_spheres, indirect_command_buffer, sizeof(uint32_t), 0, 2);
 

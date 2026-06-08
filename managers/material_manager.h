@@ -30,6 +30,7 @@ public:
     MaterialPass point_mp;
     MaterialPass skybox_mp;
     MaterialPass pbr_mp;
+    MaterialPass voxel_mesh_mp;
 
     MaterialManager(VulkanEngine& engine, ShaderManager& shader_manager, FrameResources& frame_resources);
 
@@ -53,6 +54,8 @@ public:
     MaterialPass create_skybox_pass(VulkanEngine& engine, FrameResources& frame_resources, 
                                    const VulkanShaderModule& vs, const VulkanShaderModule& fs);
     MaterialPass create_pbr_pass(VulkanEngine& engine, FrameResources& frame_resources, 
+                                   const VulkanShaderModule& vs, const VulkanShaderModule& fs);
+    MaterialPass create_voxel_mesh_pass(VulkanEngine& engine, FrameResources& frame_resources, 
                                    const VulkanShaderModule& vs, const VulkanShaderModule& fs);
         
     SlotPassInstance create_blinn_phong_material(VulkanEngine& engine, VulkanTexture2D& albedo);

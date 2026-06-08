@@ -6,6 +6,11 @@ IndirectRenderObject::IndirectRenderObject(Mesh& mesh, SlotPassInstance& materia
         m_max_draw_count(max_draw_count),
         m_indirect_buffer_view(indirect_buffer) {}
 
+IndirectRenderObject::IndirectRenderObject(MeshView& mesh_view, SlotPassInstance& material, VulkanBuffer& indirect_buffer, uint32_t max_draw_count)
+    :   RenderObject(mesh_view, material), 
+        m_max_draw_count(max_draw_count),
+        m_indirect_buffer_view(indirect_buffer) {}
+
 void IndirectRenderObject::render(Renderer& renderer, VulkanCommandBuffer& command_buffer, const glm::mat4& world_transform) {
     sync_material();
     renderer.render(command_buffer, *this, world_transform);
