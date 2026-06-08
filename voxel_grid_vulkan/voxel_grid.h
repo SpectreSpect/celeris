@@ -150,7 +150,8 @@ public:
         PassInstance mesh_alloc_ib_pi;
         PassInstance verify_mesh_allocation_pi;
         PassWriter return_free_alloc_nodes_dispatch_adapter_pw;
-        PassInstance return_free_alloc_nodes_pi;
+        // PassInstance return_free_alloc_nodes_pi;
+        PassWriter return_free_alloc_nodes_pw;
         PassInstance mesh_emit_pi;
         PassInstance mesh_finalize_pi;
         PassInstance reset_dirty_count_pi;

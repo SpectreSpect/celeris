@@ -11,21 +11,24 @@ layout(std430, set = 0, binding=0) readonly buffer ChunkMetaBuf { ChunkMeta meta
 layout(std430, set = 0, binding=1) buffer ChunkMeshAllocBuf { ChunkMeshAlloc chunk_mesh_alloc[]; }; 
 layout(std430, set = 0, binding=2) buffer IndirectCmdBuf { uint cmd_count; DrawElementsIndirectCommand cmds[]; };
 
-layout(std140, set = 0, binding=3) uniform UniformBuffer  { 
+layout(std140, set = 0, binding = 3) uniform UniformBuffer {
     uint  u_max_chunks;
+    uint  _pad0;
+    uint  _pad1;
+    uint  _pad2;
 
-    // для AABB/sphere размеров чанка
-    ivec4 u_chunk_dim;     // (16,16,16)
-    vec4  u_voxel_size;    // (sx,sy,sz)
+    ivec4 u_chunk_dim;
+    vec4  u_voxel_size;
 
-    // pack/unpack как в C++
-    uint u_pack_bits;
-    int  u_pack_offset;
-
-    uint u_vb_page_verts;
-    uint u_ib_page_inds;
+    uint  u_pack_bits;
+    int   u_pack_offset;
+    uint  u_vb_page_verts;
+    uint  u_ib_page_inds;
 
     float render_distance;
+    uint  _pad3;
+    uint  _pad4;
+    uint  _pad5;
 } ubo;
 
 layout(push_constant) uniform BuildIndirectCmdsPushConstants {

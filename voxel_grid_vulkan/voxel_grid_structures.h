@@ -180,22 +180,35 @@ struct MeshPoolSeedUniform {
     uint32_t pad2;
 };
 
-struct BuildIndirectCmdsUniform {
-    uint32_t  u_max_chunks;
+struct alignas(16) BuildIndirectCmdsUniform {
+    uint32_t u_max_chunks;
+    uint32_t _pad0;
+    uint32_t _pad1;
+    uint32_t _pad2;
 
-    // для AABB/sphere размеров чанка
-    glm::ivec4 u_chunk_dim;     // (16,16,16)
-    glm::vec4  u_voxel_size;    // (sx,sy,sz)
+    glm::ivec4 u_chunk_dim;
+    glm::vec4  u_voxel_size;
 
-    // pack/unpack как в C++
     uint32_t u_pack_bits;
     int32_t  u_pack_offset;
-
     uint32_t u_vb_page_verts;
     uint32_t u_ib_page_inds;
 
     float render_distance;
+    uint32_t _pad3;
+    uint32_t _pad4;
+    uint32_t _pad5;
 };
+
+static_assert(offsetof(BuildIndirectCmdsUniform, u_max_chunks) == 0);
+static_assert(offsetof(BuildIndirectCmdsUniform, u_chunk_dim) == 16);
+static_assert(offsetof(BuildIndirectCmdsUniform, u_voxel_size) == 32);
+static_assert(offsetof(BuildIndirectCmdsUniform, u_pack_bits) == 48);
+static_assert(offsetof(BuildIndirectCmdsUniform, u_pack_offset) == 52);
+static_assert(offsetof(BuildIndirectCmdsUniform, u_vb_page_verts) == 56);
+static_assert(offsetof(BuildIndirectCmdsUniform, u_ib_page_inds) == 60);
+static_assert(offsetof(BuildIndirectCmdsUniform, render_distance) == 64);
+static_assert(sizeof(BuildIndirectCmdsUniform) == 80);
 
 // layout(std430, set = 0, binding=7) buffer UniformBuffer  { 
 //     uint u_vb_pages;

@@ -256,6 +256,8 @@ ComputePass ComputePassManager::create_return_free_alloc_nodes_compute_pass(Vulk
 
     ComputePassBuilder builder;
 
+    builder.set_descriptor_set_flags(VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+
     builder.add_storage_buffer(0, ShaderStages::compute); // VBFreeNodesList
     builder.add_storage_buffer(1, ShaderStages::compute); // VBReturnedNodesList
     builder.add_storage_buffer(2, ShaderStages::compute); // IBFreeNodesList

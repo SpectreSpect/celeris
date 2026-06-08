@@ -294,14 +294,14 @@ void VoxelGrid::evict_lowpriority_chunks(VulkanCommandBuffer& command_buffer, co
 
     command_buffer.dispatch_indirect(dispatch_args);
 
-    m_buffers.chunk_hash_table.memory_barrier_compute_write_to_compute_write_read(m_command_buffer);
-    m_buffers.free_list.memory_barrier_compute_write_to_compute_write_read(m_command_buffer);
-    m_buffers.chunk_meta.memory_barrier_compute_write_to_compute_write_read(m_command_buffer);
-    m_buffers.enqueued.memory_barrier_compute_write_to_compute_write_read(m_command_buffer);
-    m_buffers.bucket_heads.memory_barrier_compute_write_to_compute_write_read(m_command_buffer);
-    m_buffers.bucket_next.memory_barrier_compute_write_to_compute_write_read(m_command_buffer);
-    m_buffers.chunk_mesh_alloc.memory_barrier_compute_write_to_compute_write_read(m_command_buffer);
-    m_buffers.evicted_chunks_list.memory_barrier_compute_write_to_compute_write_read(m_command_buffer);
+    m_buffers.chunk_hash_table.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.free_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.chunk_meta.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.enqueued.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.bucket_heads.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.bucket_next.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.chunk_mesh_alloc.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.evicted_chunks_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
 void VoxelGrid::free_evicted_chunks_mesh(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args) {
@@ -578,17 +578,17 @@ void VoxelGrid::prepare_return_free_alloc_nodes(VulkanCommandBuffer& command_buf
 }
 
 void VoxelGrid::return_free_alloc_nodes(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args) {
-    m_pass_instances.return_free_alloc_nodes_pi.set_storage_buffer(0, m_buffers.vb_free_nodes_list);
-    m_pass_instances.return_free_alloc_nodes_pi.set_storage_buffer(1, m_buffers.vb_returned_nodes_list);
+    m_pass_instances.return_free_alloc_nodes_pw.set_storage_buffer(0, m_buffers.vb_free_nodes_list);
+    m_pass_instances.return_free_alloc_nodes_pw.set_storage_buffer(1, m_buffers.vb_returned_nodes_list);
 
-    m_pass_instances.return_free_alloc_nodes_pi.set_storage_buffer(2, m_buffers.ib_free_nodes_list);
-    m_pass_instances.return_free_alloc_nodes_pi.set_storage_buffer(3, m_buffers.ib_returned_nodes_list);
+    m_pass_instances.return_free_alloc_nodes_pw.set_storage_buffer(2, m_buffers.ib_free_nodes_list);
+    m_pass_instances.return_free_alloc_nodes_pw.set_storage_buffer(3, m_buffers.ib_returned_nodes_list);
 
-    m_pass_instances.return_free_alloc_nodes_pi.push_constants(m_command_buffer, ReturnFreeAllocNodesPushConstants{
+    m_pass_instances.return_free_alloc_nodes_pw.push_constants(m_command_buffer, ReturnFreeAllocNodesPushConstants{
         .u3_chunk_size = glm::uvec4(m_params.chunk_size, 0)
     });
 
-    m_pass_instances.return_free_alloc_nodes_pi.bind(command_buffer);
+    m_pass_instances.return_free_alloc_nodes_pw.bind(command_buffer);
 
     command_buffer.dispatch_indirect(dispatch_args);
 
@@ -634,8 +634,24 @@ void VoxelGrid::mesh_emit(VulkanCommandBuffer& command_buffer, VulkanBuffer& dis
     m_buffers.mesh_buffers_status.memory_barrier_compute_write_to_compute_write_read(command_buffer);
     m_buffers.emit_counters.memory_barrier_compute_write_to_compute_write_read(command_buffer);
     m_buffers.chunk_mesh_alloc.memory_barrier_compute_write_to_compute_write_read(command_buffer);
-    m_buffers.global_vertex_buffer.memory_barrier_compute_write_to_compute_write_read(command_buffer);
-    m_buffers.global_index_buffer.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    // m_buffers.global_vertex_buffer.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    // m_buffers.global_index_buffer.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+
+    m_buffers.global_vertex_buffer.memory_barrier(
+        command_buffer,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+        VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT
+    );
+
+    m_buffers.global_index_buffer.memory_barrier(
+        command_buffer,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+        VK_ACCESS_INDEX_READ_BIT
+    );
 }
 
 void VoxelGrid::mesh_finalize(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args) {
@@ -682,33 +698,35 @@ void VoxelGrid::reset_cmd_count(VulkanCommandBuffer& command_buffer) {
 
     m_buffers.indirect_cmds.memory_barrier(
         command_buffer,
-        VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-        VK_ACCESS_2_TRANSFER_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT,
-        VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_ACCESS_TRANSFER_WRITE_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
     );
+
+    // m_buffers.indirect_cmds.memory_barrier(
+    //     command_buffer,
+    //     VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+    //     VK_ACCESS_2_TRANSFER_WRITE_BIT,
+    //     VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT,
+    //     VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT
+    // );
 
     // indirect_cmds_.update_subdata_fill<uint32_t>(0u, 0u, sizeof(uint32_t), *shader_manager);
     // glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 }
 
 void VoxelGrid::build_draw_commands(VulkanCommandBuffer& command_buffer, const glm::mat4& view_proj, const glm::vec3& cam_pos, uint32_t pack_bits, int pack_offset) {
-    auto planes = math_utils::extract_frustum_planes(view_proj);
+    std::array<glm::vec4, 6> planes = math_utils::extract_frustum_planes(view_proj);
 
     BuildIndirectCmdsUniform unifrom_data {
         .u_max_chunks = m_params.count_active_chunks,
-
-        // для AABB/sphere размеров чанка
-        .u_chunk_dim = glm::ivec4(m_params.chunk_size, 0),   // (16,16,16)
-        .u_voxel_size = glm::vec4(m_params.voxel_size, 0.0f),    // (sx,sy,sz)
-
-        // pack/unpack как в C++
+        .u_chunk_dim = glm::ivec4(m_params.chunk_size, 0),
+        .u_voxel_size = glm::vec4(m_params.voxel_size, 0.0f),
         .u_pack_bits = pack_bits,
         .u_pack_offset = pack_offset,
-
         .u_vb_page_verts = m_params.vb_page_size,
         .u_ib_page_inds = m_params.ib_page_size,
-
         .render_distance = m_params.render_distance
     };
 
@@ -719,7 +737,15 @@ void VoxelGrid::build_draw_commands(VulkanCommandBuffer& command_buffer, const g
     m_pass_instances.build_indirect_cmds_pi.set_storage_buffer(2, m_buffers.indirect_cmds);
     m_pass_instances.build_indirect_cmds_pi.set_uniform_buffer(3, m_buffers.build_indirect_cmds_uniform);
 
+    BuildIndirectCmdsPushConstants pc{};
+    pc.cam_pos = glm::vec4(cam_pos, 1.0f);
+    std::copy(planes.begin(), planes.end(), pc.u_frustum_planes);
+
+    
+
     m_pass_instances.build_indirect_cmds_pi.bind(command_buffer);
+
+    m_pass_instances.build_indirect_cmds_pi.push_constants(command_buffer, pc);
 
     uint32_t chunk_groups = math_utils::div_up_u32(m_params.count_active_chunks, 256u);
 
@@ -873,7 +899,7 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(VulkanDevice&
         .mesh_alloc_ib_pi = PassInstance(compute_pass_manager.mesh_alloc_cp, dp),
         .verify_mesh_allocation_pi = PassInstance(compute_pass_manager.verify_mesh_allocation_cp, dp),
         .return_free_alloc_nodes_dispatch_adapter_pw = PassWriter(device, compute_pass_manager.return_free_alloc_nodes_dispatch_adapter_cp),
-        .return_free_alloc_nodes_pi = PassInstance(compute_pass_manager.return_free_alloc_nodes_cp, dp),
+        .return_free_alloc_nodes_pw = PassWriter(device, compute_pass_manager.return_free_alloc_nodes_cp),
         .mesh_emit_pi = PassInstance(compute_pass_manager.mesh_emit_cp, dp),
         .mesh_finalize_pi = PassInstance(compute_pass_manager.mesh_finalize_cp, dp),
         .reset_dirty_count_pi = PassInstance(compute_pass_manager.reset_dirty_count_cp, dp),
@@ -1695,7 +1721,7 @@ void VoxelGrid::stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::v
 
     if (radius_chunks < 0) radius_chunks = m_params.generation_distance;
 
-    // ensure_free_chunks_gpu(command_buffer, cam_world_pos, math_utils::BITS, math_utils::OFFSET);
+    ensure_free_chunks_gpu(command_buffer, cam_world_pos, math_utils::BITS, math_utils::OFFSET);
 
     reset_load_list_counter(command_buffer);
 
