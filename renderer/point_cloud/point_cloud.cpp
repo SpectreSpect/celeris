@@ -1,11 +1,11 @@
 #include "point_cloud.h"
 
-#include "../material_instance_manager.h"
-#include "../mesh_manager.h"
+#include "../../managers/material_instance_manager.h"
+#include "../../managers/mesh_manager.h"
 #include "point_instance.h"
 
 
-PointCloud::PointCloud(VulkanEngine& engine, Mesh& mesh, MaterialInstance& material)
+PointCloud::PointCloud(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material)
     :   InstancedRenderObject(engine, mesh, material) {}
 
 PointCloud::PointCloud(VulkanEngine& engine, MeshManager& mesh_manager, MaterialInstanceManager& material_instance_manager)
@@ -15,13 +15,13 @@ PointCloud::PointCloud(ManagerBundle& manager_bundle)
     :   PointCloud(manager_bundle.engine(), manager_bundle.mesh_manager(), 
                    manager_bundle.material_instance_manager()) {}
 
-PointCloud::PointCloud(VulkanEngine& engine, Mesh& mesh, MaterialInstance& material, uint32_t instance_count) 
+PointCloud::PointCloud(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material, uint32_t instance_count)
     :   InstancedRenderObject(engine, mesh, material) {
     m_instance_batch = std::make_unique<InstanceBatch>(engine, instance_count, sizeof(PointInstance));
     set_instance_view(m_instance_batch->get_view());
 }
 
-PointCloud::PointCloud(VulkanEngine& engine, Mesh& mesh, MaterialInstance& material, InstanceBatch instance_batch)
+PointCloud::PointCloud(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material, InstanceBatch instance_batch)
     :   InstancedRenderObject(engine, mesh, material) {
     m_instance_batch = std::make_unique<InstanceBatch>(std::move(instance_batch));
     set_instance_view(m_instance_batch->get_view());
@@ -36,7 +36,7 @@ PointCloud::PointCloud(ManagerBundle& manager_bundle, InstanceBatch instance_bat
     :   PointCloud(manager_bundle.engine(), manager_bundle.mesh_manager(), 
                    manager_bundle.material_instance_manager(), std::move(instance_batch)) {}
 
-PointCloud::PointCloud(VulkanEngine& engine, Mesh& mesh, MaterialInstance& material, 
+PointCloud::PointCloud(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material,
                        VulkanBuffer& instance_buffer, uint32_t instance_count)
     :   InstancedRenderObject(engine, mesh, material) {
     set_instance_view(InstanceBufferView(instance_buffer, instance_count, sizeof(PointInstance)));

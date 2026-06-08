@@ -32,7 +32,7 @@ void main() {
     // if (hdr_color.x < 1.0 || hdr_color.y < 1.0 || hdr_color.z < 1.0)
     //     hdr_color = vec3(0, 0, 0);
 
-    // mapped = pow(mapped, vec3(1.0 / 2.2));
+    mapped = pow(mapped, vec3(1.0 / 2.2));
 
     outFragColor = vec4(mapped, 1.0);
     // outFragColor = vec4(1, 0, 0, 1.0);

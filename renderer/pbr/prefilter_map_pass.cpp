@@ -3,7 +3,7 @@
 #include <algorithm>
 
 #include "../../vulkan_self/vulkan_engine.h"
-#include "../compute_pass_manager.h"
+#include "../../managers/compute_pass_manager.h"
 #include "../../vulkan_self/image/cubemap.h"
 #include "../../vulkan_self/image/cubemap_array.h"
 #include "../../vulkan_self/image/vulkan_image_view.h"
@@ -14,7 +14,7 @@ PrefilterPass::PrefilterPass(
     ComputePassManager& compute_pass_manager)
     :   m_engine(engine),
         uniform_buffer(VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(PrefilterMapGeneratorUniform))),
-        m_prefilter_pass(compute_pass_manager.descriptor_pool(), compute_pass_manager.prefilter_map_cp),
+        m_prefilter_pass(compute_pass_manager.prefilter_map_cp, compute_pass_manager.descriptor_pool()),
         m_compute_command_buffer(engine.device(), engine.compute_command_pool()),
         m_compute_fence(engine.device()) {}
 

@@ -42,6 +42,7 @@ add_executable(app
   vulkan_self/vulkan_semaphore.cpp
   vulkan_self/vulkan_shader_module.cpp
   vulkan_self/vulkan_buffer.cpp
+  vulkan_self/vulkan_buffer_view.cpp
   vulkan_self/vertex_layout_builder.cpp
   vulkan_self/vulkan_memory.cpp
   vulkan_self/vulkan_resource_loader.cpp
@@ -50,6 +51,7 @@ add_executable(app
   vulkan_self/descriptor_set/descriptor_pool_builder.cpp
   vulkan_self/descriptor_set/descriptor_pool.cpp
   vulkan_self/descriptor_set/descriptor_set.cpp
+  vulkan_self/descriptor_set/descripter_set_writer.cpp
   vulkan_self/image/cpu_image.cpp
   vulkan_self/image/vulkan_image_view.cpp
   vulkan_self/image/vulkan_image.cpp
@@ -57,42 +59,43 @@ add_executable(app
   vulkan_self/image/vulkan_texture_2d.cpp
   vulkan_self/image/cubemap.cpp
   vulkan_self/image/cubemap_array.cpp
-  vulkan_self/pipeline/vulkan_pipeline_layout.cpp
   vulkan_self/pipeline/pipeline.cpp
-  vulkan_self/pipeline/pipeline_pass.cpp
-  vulkan_self/pipeline/pipeline_pass_builder.cpp
+  vulkan_self/pipeline/vulkan_pipeline_layout.cpp
   vulkan_self/pipeline/graphics_pipeline/graphics_pipeline_builder.cpp
   vulkan_self/pipeline/graphics_pipeline/graphics_pipeline.cpp
   vulkan_self/pipeline/compute_pipeline/compute_pipeline.cpp
-  vulkan_self/material/material_system.cpp
-  vulkan_self/material/blin_phong_material_layout.cpp
-  vulkan_self/material/material_layout.cpp
-  vulkan_self/material/material_instance_temp.cpp
-  vulkan_self/material/blinn_phong_material_instance.cpp
-  vulkan_self/material/unlit_material_instance.cpp
-  vulkan_self/material/material_pass.cpp
-  vulkan_self/material/material_pass_builder.cpp
-  vulkan_self/compute/compute_pass.cpp
-  vulkan_self/compute/compute_pass_builder.cpp
   renderer/resources/frame_resources.cpp
   camera/camera.cpp
   camera/controllers/fps_camera_controller.cpp
   vulkan_self/vulkan_image_temp.cpp
   renderer/transform.cpp
   renderer/mesh.cpp
+  renderer/mesh_view.cpp
   renderer/render_object.cpp
-  renderer/shader_manager.cpp
-  renderer/material_manager.cpp
-  renderer/compute_pass_manager.cpp
-  renderer/compute_pass_instance.cpp
+  renderer/indirect_render_object.cpp
+  managers/compute_pass_manager.cpp
+  managers/manager_bundle.cpp
+  managers/material_instance_manager.cpp
+  managers/material_manager.cpp
+  managers/mesh_manager.cpp
+  managers/shader_manager.cpp
+  managers/texture_manager.cpp
+  
+  vulkan_self/pass/compute_pass/compute_pass.cpp
+  vulkan_self/pass/compute_pass/compute_pass_builder.cpp
+  vulkan_self/pass/instance/pass_object.cpp
+  vulkan_self/pass/instance/pass_instance.cpp
+  vulkan_self/pass/instance/pass_writer.cpp
+  vulkan_self/pass/material_pass/material_pass.cpp
+  vulkan_self/pass/material_pass/material_pass_builder.cpp
+  vulkan_self/pass/pipeline_pass.cpp
+  vulkan_self/pass/pipeline_pass_builder.cpp
+  vulkan_self/pass/instance/slot_pass_object.cpp
+  vulkan_self/pass/instance/slot_pass_instance.cpp
   renderer/instanced_render_object.cpp
   renderer/instance_batch.cpp
   renderer/instance_buffer_view.cpp
-  renderer/texture_manager.cpp
-  renderer/material_instance_manager.cpp
   renderer/renderer.cpp
-  renderer/mesh_manager.cpp
-  renderer/manager_bundle.cpp
   renderer/point_cloud/point_cloud.cpp
   renderer/scene.cpp
   renderer/scene_object.cpp
@@ -106,6 +109,12 @@ add_executable(app
   renderer/point_cloud/gicp/gicp_reductor.cpp
   imgui_layer.cpp
   renderer/lighting_system/lighting_system.cpp
+  voxel_grid_vulkan/voxel_grid.cpp
+  voxel_grid_vulkan/shader_helper/shader_helper.cpp
+  voxel_grid_vulkan/shader_helper/dispatch_arg.cpp
+  voxel_grid_vulkan/shader_helper/value_dispatch_arg.cpp
+  voxel_grid_vulkan/shader_helper/buffer_dispatch_arg.cpp
+  # vulkan_self/buffer_filler.cpp
   renderer/pbr/equirect_to_cubemap_pass.cpp
   renderer/pbr/brdf_lut_pass.cpp
   renderer/pbr/prefilter_map_pass.cpp
@@ -113,7 +122,6 @@ add_executable(app
   renderer/pbr/pbr_maps.cpp
   renderer/pbr/pbr_map_generator.cpp
 )
-
 
 target_compile_features(app PRIVATE cxx_std_20)
 
@@ -129,6 +137,7 @@ FetchContent_Declare(
 )
 
 FetchContent_GetProperties(imgui)
+
 if(NOT imgui_POPULATED)
   FetchContent_MakeAvailable(imgui)
 endif()
@@ -189,39 +198,48 @@ message(STATUS "Vulkan shader compiler kind: ${VULKAN_SHADER_COMPILER_KIND}")
 set(SHADERS_SRC_DIR "${CMAKE_SOURCE_DIR}/shaders")
 set(SHADERS_BUILD_DIR "${CMAKE_BINARY_DIR}/shaders")
 
-file(GLOB SHADER_SOURCES CONFIGURE_DEPENDS
+file(GLOB_RECURSE SHADER_SOURCES CONFIGURE_DEPENDS
   "${SHADERS_SRC_DIR}/*.vert"
   "${SHADERS_SRC_DIR}/*.frag"
   "${SHADERS_SRC_DIR}/*.comp"
 )
 
+file(GLOB_RECURSE SHADER_INCLUDE_FILES CONFIGURE_DEPENDS
+  "${SHADERS_SRC_DIR}/*.inc"
+)
+
 set(SPIRV_OUTPUTS)
 
 foreach(SHADER ${SHADER_SOURCES})
-  get_filename_component(SHADER_NAME "${SHADER}" NAME)
-  set(SPIRV_OUTPUT "${SHADERS_BUILD_DIR}/${SHADER_NAME}.spv")
+  file(RELATIVE_PATH SHADER_REL_PATH "${SHADERS_SRC_DIR}" "${SHADER}")
+
+  set(SPIRV_OUTPUT "${SHADERS_BUILD_DIR}/${SHADER_REL_PATH}.spv")
+
+  get_filename_component(SPIRV_OUTPUT_DIR "${SPIRV_OUTPUT}" DIRECTORY)
 
   if(VULKAN_SHADER_COMPILER_KIND STREQUAL "glslc")
     add_custom_command(
       OUTPUT "${SPIRV_OUTPUT}"
-      COMMAND ${CMAKE_COMMAND} -E make_directory "${SHADERS_BUILD_DIR}"
+      COMMAND ${CMAKE_COMMAND} -E make_directory "${SPIRV_OUTPUT_DIR}"
       COMMAND "${VULKAN_SHADER_COMPILER}"
+              "-I${SHADERS_SRC_DIR}"
               "${SHADER}"
               -o "${SPIRV_OUTPUT}"
-      DEPENDS "${SHADER}"
-      COMMENT "Compiling shader ${SHADER_NAME}"
+      DEPENDS "${SHADER}" ${SHADER_INCLUDE_FILES}
+      COMMENT "Compiling shader ${SHADER_REL_PATH}"
       VERBATIM
     )
   else()
     add_custom_command(
       OUTPUT "${SPIRV_OUTPUT}"
-      COMMAND ${CMAKE_COMMAND} -E make_directory "${SHADERS_BUILD_DIR}"
+      COMMAND ${CMAKE_COMMAND} -E make_directory "${SPIRV_OUTPUT_DIR}"
       COMMAND "${VULKAN_SHADER_COMPILER}"
               -V
+              "-I${SHADERS_SRC_DIR}"
               "${SHADER}"
               -o "${SPIRV_OUTPUT}"
-      DEPENDS "${SHADER}"
-      COMMENT "Compiling shader ${SHADER_NAME}"
+      DEPENDS "${SHADER}" ${SHADER_INCLUDE_FILES}
+      COMMENT "Compiling shader ${SHADER_REL_PATH}"
       VERBATIM
     )
   endif()

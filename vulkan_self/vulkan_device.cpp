@@ -52,18 +52,27 @@ VulkanDevice::VulkanDevice(const VulkanPhysicalDevice& physical_device) {
         "Physical device does not support imageCubeArray"
     );
 
-
     VkPhysicalDeviceFeatures device_features{};
     device_features.shaderFloat64 = VK_TRUE;
     device_features.imageCubeArray = VK_TRUE;
 
+    VkPhysicalDeviceVulkan12Features vulkan12_features{};
+    vulkan12_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    vulkan12_features.drawIndirectCount = VK_TRUE;
+
     VkDeviceCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    create_info.pNext = &vulkan12_features;
+
     create_info.queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size());
     create_info.pQueueCreateInfos = queue_create_infos.data();
+
     create_info.pEnabledFeatures = &device_features;
-    create_info.enabledExtensionCount = static_cast<uint32_t>(VulkanPhysicalDevice::device_extensions.size());
-    create_info.ppEnabledExtensionNames = VulkanPhysicalDevice::device_extensions.data();
+
+    create_info.enabledExtensionCount =
+        static_cast<uint32_t>(VulkanPhysicalDevice::device_extensions.size());
+    create_info.ppEnabledExtensionNames =
+        VulkanPhysicalDevice::device_extensions.data();
 
     VkResult result = vkCreateDevice(
         physical_device.handle(),
@@ -73,6 +82,8 @@ VulkanDevice::VulkanDevice(const VulkanPhysicalDevice& physical_device) {
     );
 
     logger.check(result == VK_SUCCESS, "Failed to create logical device");
+
+    load_device_functions();
 
     retrieve_queues(queue_allocation);
 }
@@ -88,6 +99,8 @@ void VulkanDevice::destroy() {
         m_device = VK_NULL_HANDLE;
     }
 
+    m_vkCmdPushDescriptorSetKHR = nullptr;
+
     m_graphics_queues.clear();
     m_present_queues.clear();
     m_compute_queues.clear();
@@ -96,6 +109,7 @@ void VulkanDevice::destroy() {
 
 VulkanDevice::VulkanDevice(VulkanDevice&& other) noexcept
     :   m_device(std::exchange(other.m_device, VK_NULL_HANDLE)),
+        m_vkCmdPushDescriptorSetKHR(std::exchange(other.m_vkCmdPushDescriptorSetKHR, nullptr)),
         m_graphics_queues(std::move(other.m_graphics_queues)),
         m_present_queues(std::move(other.m_present_queues)),
         m_compute_queues(std::move(other.m_compute_queues)),
@@ -106,6 +120,7 @@ VulkanDevice& VulkanDevice::operator=(VulkanDevice&& other) noexcept {
         destroy();
 
         m_device = std::exchange(other.m_device, VK_NULL_HANDLE);
+        m_vkCmdPushDescriptorSetKHR = std::exchange(other.m_vkCmdPushDescriptorSetKHR, nullptr);
         m_graphics_queues = std::move(other.m_graphics_queues);
         m_present_queues = std::move(other.m_present_queues);
         m_compute_queues = std::move(other.m_compute_queues);
@@ -162,6 +177,22 @@ const VulkanQueue& VulkanDevice::transfer_queue(uint32_t index) const {
 
 VulkanQueue& VulkanDevice::transfer_queue(uint32_t index) {
     return const_cast<VulkanQueue&>(std::as_const(*this).transfer_queue(index));
+}
+
+PFN_vkCmdPushDescriptorSetKHR VulkanDevice::cmd_push_descriptor_set_khr() const noexcept {
+    return m_vkCmdPushDescriptorSetKHR;
+}
+
+void VulkanDevice::load_device_functions() {
+    m_vkCmdPushDescriptorSetKHR =
+        reinterpret_cast<PFN_vkCmdPushDescriptorSetKHR>(
+            vkGetDeviceProcAddr(m_device, "vkCmdPushDescriptorSetKHR")
+        );
+
+    logger.check(
+        m_vkCmdPushDescriptorSetKHR != nullptr,
+        "Failed to load vkCmdPushDescriptorSetKHR"
+    );
 }
 
 void VulkanDevice::retrieve_queues(const QueueAllocation& queue_allocation) {

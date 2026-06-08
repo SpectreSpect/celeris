@@ -1,11 +1,11 @@
 #pragma once
 
-#include "../compute_pass_instance.h"
+#include "../../vulkan_self/pass/instance/pass_instance.h"
 #include "../../vulkan_self/vulkan_buffer.h"
 #include "../../vulkan_self/vulkan_fence.h"
 #include "../../vulkan_self/vulkan_command_buffer.h"
 
-#include "../../../vulkan_self/logger/logger.h"
+#include "../../vulkan_self/logger/logger.h"
 
 class VulkanEngine;
 class ComputePassManager;
@@ -33,7 +33,7 @@ private:
 
     VulkanBuffer uniform_buffer;
 
-    ComputePassInstance m_prefilter_pass;
+    PassInstance m_prefilter_pass;
     VulkanCommandBuffer m_compute_command_buffer;
     VulkanFence m_compute_fence;
 };

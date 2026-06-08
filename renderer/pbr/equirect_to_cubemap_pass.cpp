@@ -1,7 +1,7 @@
 #include "equirect_to_cubemap_pass.h"
 
 #include "../../vulkan_self/vulkan_engine.h"
-#include "../compute_pass_manager.h"
+#include "../../managers/compute_pass_manager.h"
 #include "../../vulkan_self/image/vulkan_texture_2d.h"
 #include "../../vulkan_self/image/cubemap.h"
 #include "../../math_utils.h"
@@ -9,7 +9,7 @@
 EquirectToCubemapPass::EquirectToCubemapPass(VulkanEngine& engine, ComputePassManager& compute_pass_manager)
     :   m_engine(engine),
         uniform_buffer(VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(EquirectToCubemapUniform))),
-        m_equirect_to_cubemap_pass(compute_pass_manager.descriptor_pool(), compute_pass_manager.equirect_to_cubemap_cp),
+        m_equirect_to_cubemap_pass(compute_pass_manager.equirect_to_cubemap_cp, compute_pass_manager.descriptor_pool()),
         m_compute_command_buffer(engine.device(), engine.compute_command_pool()),
         m_compute_fence(engine.device()){
 }
@@ -21,7 +21,7 @@ Cubemap EquirectToCubemapPass::generate(VulkanTexture2D& equirectangular_map, ui
 
     uint32_t mip_levels = Cubemap::calculate_mip_levels({face_size, face_size});
 
-    Cubemap cubemap(m_engine.physical_device(), m_engine.device(), {face_size, face_size}, VK_FORMAT_R8G8B8A8_UNORM, mip_levels);
+    Cubemap cubemap(m_engine.physical_device(), m_engine.device(), {face_size, face_size}, VK_FORMAT_R32G32B32A32_SFLOAT, mip_levels);
 
     static EquirectToCubemapUniform uniform_data{};
     uniform_data.image_width = face_size;

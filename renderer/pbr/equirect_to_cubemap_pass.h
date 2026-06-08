@@ -1,12 +1,13 @@
 #pragma once
 
-#include "../compute_pass_instance.h"
+#include "../../vulkan_self/pass/instance/pass_instance.h"
 #include "../../vulkan_self/vulkan_buffer.h"
 #include "../../vulkan_self/vulkan_fence.h"
 #include "../../vulkan_self/vulkan_command_buffer.h"
 
-#include "../../../vulkan_self/logger/logger.h"
+#include "../../vulkan_self/logger/logger.h"
 
+class VulkanEngine;
 class VulkanTexture2D;
 class ComputePassManager;
 class Cubemap;
@@ -35,7 +36,7 @@ private:
 
     VulkanBuffer uniform_buffer;
 
-    ComputePassInstance m_equirect_to_cubemap_pass;
+    PassInstance m_equirect_to_cubemap_pass;
     VulkanCommandBuffer m_compute_command_buffer;
     VulkanFence m_compute_fence;
 };

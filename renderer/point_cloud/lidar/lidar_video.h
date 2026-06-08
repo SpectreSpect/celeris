@@ -5,7 +5,7 @@
 
 #include "../../scene_object.h"
 #include "../../../path_utils.h"
-#include "../../manager_bundle.h"
+#include "../../../managers/manager_bundle.h"
 #include "../../../vulkan_self/logger/logger.h"
 
 #include "lidar_scan.h"

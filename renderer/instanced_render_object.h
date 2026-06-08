@@ -10,9 +10,9 @@ class InstancedRenderObject : public RenderObject {
 public:
     _XCHILD_NAME(InstancedRenderObject);
 
-    InstancedRenderObject(VulkanEngine& engine, Mesh& mesh, MaterialInstance& material);
-    InstancedRenderObject(VulkanEngine& engine, Mesh& mesh, MaterialInstance& material, InstanceBatch& instance_batch);
-    InstancedRenderObject(VulkanEngine& engine, Mesh& mesh, MaterialInstance& material, 
+    InstancedRenderObject(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material);
+    InstancedRenderObject(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material, InstanceBatch& instance_batch);
+    InstancedRenderObject(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material,
         VulkanBuffer& instance_buffer, uint32_t instance_count, uint32_t instance_size);
     virtual void render(Renderer& renderer, VulkanCommandBuffer& command_buffer, const glm::mat4& world_transform);
 

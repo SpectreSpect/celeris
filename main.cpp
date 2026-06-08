@@ -10,14 +10,12 @@
 #include "vulkan_self/pipeline/vulkan_pipeline_layout.h"
 #include "vulkan_self/pipeline/graphics_pipeline/graphics_pipeline.h"
 #include "vulkan_self/pipeline/compute_pipeline/compute_pipeline.h"
-#include "vulkan_self/pipeline/pipeline_pass_builder.h"
-#include "vulkan_self/compute/compute_pass.h"
+#include "vulkan_self/pass/pipeline_pass_builder.h"
+#include "vulkan_self/pass/compute_pass/compute_pass.h"
 #include "vulkan_self/image/vulkan_image.h"
 #include "vulkan_self/image/cpu_image.h"
 #include "vulkan_self/image/vulkan_texture_2d.h"
 #include "path_utils.h"
-#include "vulkan_self/material/material_system.h"
-#include "vulkan_self/material/material_instance.h"
 #include "renderer/resources/frame_resources.h"
 #include "camera/camera.h"
 #include "camera/controllers/fps_camera_controller.h"
@@ -25,25 +23,18 @@
 #include "renderer/mesh.h"
 #include "renderer/render_object.h"
 #include "renderer/transform_push_constants.h"
-#include "vulkan_self/material/blin_phong_material_pass.h"
-#include "vulkan_self/material/material_instance_temp.h"
-#include "vulkan_self/material/blinn_phong_material_instance.h"
-#include "vulkan_self/material/unlit_material_instance.h"
-#include "vulkan_self/material/material_instance.h"
-#include "renderer/shader_manager.h"
-#include "renderer/material_manager.h"
-#include "vulkan_self/compute/compute_pass_builder.h"
-#include "renderer/compute_pass_manager.h"
-#include "renderer/compute_pass_instance.h"
-#include "vulkan_self/material/material_buffer.h"
+#include "managers/shader_manager.h"
+#include "managers/material_manager.h"
+#include "vulkan_self/pass/compute_pass/compute_pass_builder.h"
+#include "managers/compute_pass_manager.h"
 #include "renderer/instanced_render_object.h"
 #include "renderer/instance_batch.h"
-#include "renderer/texture_manager.h"
-#include "renderer/material_instance_manager.h"
+#include "managers/texture_manager.h"
+#include "managers/material_instance_manager.h"
 #include "renderer/point_cloud/point_instance.h"
 #include "renderer/renderer.h"
-#include "renderer/mesh_manager.h"
-#include "renderer/manager_bundle.h"
+#include "managers/mesh_manager.h"
+#include "managers/manager_bundle.h"
 #include "renderer/point_cloud/point_cloud.h"
 #include "renderer/scene.h"
 #include "renderer/skybox.h"
@@ -60,6 +51,9 @@
 #include "renderer/pbr/prefilter_map_pass.h"
 #include "renderer/pbr/irradiance_map_pass.h"
 #include "vulkan_self/image/cubemap_array.h"
+#include "voxel_grid_vulkan/voxel_grid.h"
+#include "renderer/static_mesh_data.h"
+#include "renderer/indirect_render_object.h"
 
 #include <vector>
 
@@ -93,9 +87,17 @@ struct SimpleStorage {
     glm::vec4 color2;
 };
 
+// struct DrawElementsIndirectCommand {
+//     uint32_t count;
+//     uint32_t instanceCount;
+//     uint32_t firstIndex;
+//     int32_t  baseVertex;
+//     uint32_t baseInstance;
+// };
+
 int main() {
     GlfwContext glfw_context;
-    Window window(glfw_context, 1280, 720, "Vulkan engine");
+    Window window(glfw_context, 1280, 720, "Celeris");
 
     QueueRequest queue_request;
     queue_request.graphics_count = 2;
@@ -109,7 +111,7 @@ int main() {
     FPSCameraController camera_controller(camera);
     camera_controller.speed = 20;
 
-    VulkanResourceLoader resource_loader(engine, 1024 * 1024 * 100); // 1 Мб
+    VulkanResourceLoader resource_loader(engine, 154217728); // 1 Мб
 
     ShaderManager shader_manager(engine.device());
     ComputePassManager compute_pass_manager(engine.device(), shader_manager);
@@ -125,7 +127,7 @@ int main() {
     MeshManager mesh_manager(engine, resource_loader);
     ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
 
-    CubemapArray cubemaps(engine.physical_device(), engine.device(), VkExtent2D{512, 512}, VK_FORMAT_R8G8B8A8_UNORM, 16, CubemapArray::StorageImageUsage::Enabled);
+    // CubemapArray cubemaps(engine.physical_device(), engine.device(), VkExtent2D{512, 512}, VK_FORMAT_R8G8B8A8_UNORM, 16, CubemapArray::StorageImageUsage::Enabled);
 
     // EquirectToCubemapPass equirect_to_cubemap_pass(engine, compute_pass_manager);
 
@@ -142,20 +144,105 @@ int main() {
 
     // Cubemap dirt_cubemap = equirect_to_cubemap_pass.generate(texture_manager.dirt_texture, 100);
 
+
+        // float voxel_size = 1.0f;
+        // uint32_t chunk_size = 16u;
+        // glm::ivec3(chunk_size), // chunk_size
+        // glm::vec3(voxel_size), // voxel_size
+        // 10'000, // count_active_chunks
+        // 1'000'000, // max_quads
+        // 4, // chunk_hash_table_size_factor
+        // 4096, // count_evict_buckets
+        // 5'000, // min_free_chunks
+        // 0.2f, // tomb_fraction_to_rebuild
+        // chunk_size * voxel_size * 1, // eviction_bucket_shell_thickness
+        // 10, // vb_page_size_order_of_two
+        // 10, // ib_page_size_order_of_two
+        // 1.0, // buddy_allocator_nodes_factor
+
+    glm::vec3 voxel_size(1.0f);
+    glm::ivec3 chunk_size(16);
+    VoxelGrid::VoxelGridDesc voxel_grid_desc {
+        .chunk_size = chunk_size,
+        .voxel_size = voxel_size,
+        .count_active_chunks = 10'000,
+        .max_quads = 3'000'000,
+        .chunk_hash_table_size_factor = 1.0f,
+        .count_evict_buckets = 32,
+        .min_free_chunks = 4'500,
+        .tomb_fraction_to_rebuild = 0.2f,
+        .eviction_bucket_shell_thickness = chunk_size.x * voxel_size.x * 1,
+        .vb_page_size_order_of_two = 10,
+        .ib_page_size_order_of_two = 10,
+        .buddy_allocator_nodes_factor = 1.0,
+        .render_distance = chunk_size.x * voxel_size.x * 30,
+        .generation_distance = 10,
+        .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000)
+    };
+
+    VoxelGrid voxel_grid(engine.physical_device(), 
+                         engine.device(), engine.compute_queue(), 
+                         compute_pass_manager, material_instance_manager, 
+                         voxel_grid_desc);
+
+
     GICPPass gicp_pass(engine, compute_pass_manager);
     VoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);
     VoxelMapPointReseter voxel_map_reseter(engine, compute_pass_manager);
 
     Renderer renderer(engine, frame_resources);
+    
+    VulkanBuffer indirect_command_buffer = VulkanBuffer::create_host_visible_indirect_storage_buffer(engine, sizeof(uint32_t) + sizeof(DrawElementsIndirectCommand) * 2);
+    
+    RenderObject sphere(mesh_manager.sphere, material_instance_manager.pbr);
 
-    RenderObject sphere(mesh_manager.sphere, material_instance_manager.studio_kominka_02_4k_pbr);
+    
+    
+    // uint32_t indirect_command_count = 1;
+    // DrawElementsIndirectCommand commands {
+    //     .count = sphere.mesh_view().index_count(), 
+    //     .instanceCount = 1,
+    //     .firstIndex = 0,
+    //     .baseVertex = 0,
+    //     .baseInstance = 0
+    // };
 
-    RenderObject unlit_cube(mesh_manager.cube, material_instance_manager.studio_kominka_02_4k_pbr);
+    // indirect_command_buffer.upload(&indirect_command_count, sizeof(uint32_t), 0);
+    // indirect_command_buffer.upload(&commands, sizeof(DrawElementsIndirectCommand), sizeof(uint32_t));
+
+
+    uint32_t draw_count = 2;
+
+    VkDrawIndexedIndirectCommand commands[2] = {
+        {
+            .indexCount    = StaticMeshData::two_sphere_inidirect_test.sphere_index_count,
+            .instanceCount = 1,
+            .firstIndex    = StaticMeshData::two_sphere_inidirect_test.first_sphere_first_index,
+            .vertexOffset  = StaticMeshData::two_sphere_inidirect_test.first_sphere_base_vertex,
+            .firstInstance = 0
+        },
+        {
+            .indexCount    = StaticMeshData::two_sphere_inidirect_test.sphere_index_count,
+            .instanceCount = 1,
+            .firstIndex    = StaticMeshData::two_sphere_inidirect_test.second_sphere_first_index,
+            .vertexOffset  = StaticMeshData::two_sphere_inidirect_test.second_sphere_base_vertex,
+            .firstInstance = 0
+        }
+    };
+
+    indirect_command_buffer.upload(&draw_count, sizeof(uint32_t), 0);
+    indirect_command_buffer.upload(&commands, sizeof(DrawElementsIndirectCommand) * 2, sizeof(uint32_t));
+
+
+    IndirectRenderObject two_spheres(mesh_manager.two_sphere_indirect_test, material_instance_manager.pbr, indirect_command_buffer, 2);
+
+    RenderObject unlit_cube(mesh_manager.cube, material_instance_manager.pbr);
     RenderObject unlit_cube2(mesh_manager.cube, material_instance_manager.dirt_blinn_phong);
     RenderObject unlit_cube3(mesh_manager.cube, material_instance_manager.rock_blinn_phong);
     RenderObject unlit_cube4(mesh_manager.cube, material_instance_manager.unlit);
 
     const float skybox_exposure = 1.8f;
+    // const float skybox_exposure = 2.2f;
 
     Skybox skybox(
         mesh_manager.skybox_cube,
@@ -222,14 +309,15 @@ int main() {
     // unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube.set_material_data<PBRMaterialData>(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
     sphere.set_material_data(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
+    two_spheres.set_material_data(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
 
     unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube3.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube4.set_material_data<UnlitMaterialData>({glm::vec4(0, 1, 1, 1)});
 
-    material_instance_manager.unlit.material_buffer.sync();
-    material_instance_manager.rock_blinn_phong.material_buffer.sync();
-    material_instance_manager.dirt_blinn_phong.material_buffer.sync();
+    material_instance_manager.unlit.sync();
+    material_instance_manager.rock_blinn_phong.sync();
+    material_instance_manager.dirt_blinn_phong.sync();
 
     unlit_cube.transform.position = glm::vec4(0, 0, 0, 1);
 
@@ -250,9 +338,12 @@ int main() {
 
     // scene.add(voxel_map_point_cloud);
 
+    sphere.add_child(two_spheres);
+
     // scene.add(unlit_cube);
     scene.add(sphere);
     scene.add(skybox);
+    
 
     skybox.update(scene);
 
@@ -295,6 +386,12 @@ int main() {
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), window, camera);
         lighting_system.update(engine.current_frame(), window, camera);
+
+        voxel_grid.update(window, camera);
+
+        // sphere.transform.position.y = sin(timer) * 2;
+        // two_spheres.transform.position.x = cos(timer) * 10;
+        
 
         // if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
         //     g_pressed = true;
@@ -351,15 +448,19 @@ int main() {
                 // rgba(37, 150, 190)
                 renderer.render(command_buffer, scene);
 
+                renderer.render(command_buffer, voxel_grid.render_object());
+
+                // renderer.render_indirect(command_buffer, two_spheres, indirect_command_buffer, sizeof(uint32_t), 0, 2);
+
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
 
                 ImGui::Begin("Debug");
 
-                if (ImGui::Button("Previous frame")) {
-                    pending_skybox_environment_map_id = TextureManager::studio_kominka_02_4k_pbr_map_id;
-                    skybox_environment_update_pending = true;
-                }
+                // if (ImGui::Button("Previous frame")) {
+                //     pending_skybox_environment_map_id = TextureManager::studio_kominka_02_4k_pbr_map_id;
+                //     skybox_environment_update_pending = true;
+                // }
 
                 ImGui::End();
                 

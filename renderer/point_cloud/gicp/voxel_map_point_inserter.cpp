@@ -1,7 +1,7 @@
 #include "voxel_map_point_inserter.h"
 
 #include "../../../vulkan_self/vulkan_engine.h"
-#include "../../compute_pass_manager.h"
+#include "../../../managers/compute_pass_manager.h"
 #include "../point_cloud.h"
 #include "voxel_point_map.h"
 #include "../point_instance.h"
@@ -9,7 +9,7 @@
 
 VoxelMapPointInserter::VoxelMapPointInserter(VulkanEngine& engine, ComputePassManager& compute_pass_manager) 
     :   engine(engine),
-        insert_pass(compute_pass_manager.descriptor_pool(), compute_pass_manager.point_voxel_map_insert_cp),
+        insert_pass(compute_pass_manager.point_voxel_map_insert_cp, compute_pass_manager.descriptor_pool()),
         uniform_buffer(VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(InserterUniform))),
         compute_command_buffer(engine.device(), engine.compute_command_pool()),
         compute_fence(engine.device()){

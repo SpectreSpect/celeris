@@ -4,7 +4,7 @@
 #include <random>
 
 #include "../point_instance.h"
-#include "../../manager_bundle.h"
+#include "../../../managers/manager_bundle.h"
 
 
 LidarScan::LidarScan(ManagerBundle& manager_bundle, const std::filesystem::path& path) 

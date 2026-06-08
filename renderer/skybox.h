@@ -9,6 +9,7 @@ class MaterialPass;
 class Scene;
 class SceneObject;
 class TextureManager;
+class SlotPassInstance;
 
 class Skybox : public RenderObject {
 public:
@@ -16,7 +17,7 @@ public:
 
     Skybox(
         Mesh& mesh,
-        MaterialInstance& material,
+        SlotPassInstance& material,
         TextureManager& texture_manager,
         MaterialPass& pbr_material_pass,
         uint32_t environment_map_id,

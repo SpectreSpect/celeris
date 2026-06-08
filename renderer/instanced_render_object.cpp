@@ -4,19 +4,19 @@
 #include "instance_batch.h"
 
 
-InstancedRenderObject::InstancedRenderObject(VulkanEngine& engine, Mesh& mesh, MaterialInstance& material)
+InstancedRenderObject::InstancedRenderObject(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material)
     :   RenderObject(mesh, material) {}
 
-InstancedRenderObject::InstancedRenderObject(VulkanEngine& engine, Mesh& mesh, MaterialInstance& material, InstanceBatch& instance_batch)
+InstancedRenderObject::InstancedRenderObject(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material, InstanceBatch& instance_batch)
     :   RenderObject(mesh, material),
         m_instance_buffer_view(instance_batch.get_view()) {}
 
-InstancedRenderObject::InstancedRenderObject(VulkanEngine& engine, Mesh& mesh, MaterialInstance& material, 
+InstancedRenderObject::InstancedRenderObject(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material,
         VulkanBuffer& instance_buffer, uint32_t instance_count, uint32_t instance_size)
     :   RenderObject(mesh, material),
         m_instance_buffer_view(instance_buffer, instance_count, instance_size) {}
 
-// InstancedRenderObject::InstancedRenderObject(VulkanEngine& engine, Mesh& mesh, MaterialInstance& material, 
+// InstancedRenderObject::InstancedRenderObject(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material,
 //                                              uint32_t instance_count, uint32_t instance_size_bytes) 
 //     :   RenderObject(mesh, material),
 //         instance_data(engine, instance_count, instance_size_bytes){

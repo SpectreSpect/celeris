@@ -1,11 +1,12 @@
 #include "vulkan_buffer.h"
 
-#include <utility>
-
-#include "vulkan_physical_device.h"
-#include "vulkan_device.h"
 #include "vulkan_command_buffer.h"
 #include "vulkan_engine.h"
+#include "../vulkan_self/pass/instance/pass_writer.h"
+#include "utils.h"
+#include "../math_utils.h"
+#include "push_constants_structures.h"
+#include "vulkan_buffer_view.h"
 
 VulkanBuffer::VulkanBuffer(
     const VulkanPhysicalDevice& physical_device,
@@ -13,13 +14,96 @@ VulkanBuffer::VulkanBuffer(
     VkDeviceSize size_bytes,
     VkBufferUsageFlags usage,
     VkMemoryPropertyFlags memory_properties)
-        :   m_device(device.handle()),
-            m_size(size_bytes),
-            m_usage(usage)
 {
     LOG_METHOD();
 
     logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(size_bytes != 0, "Attempt to create a buffer with zero size");
+
+    realloc(physical_device, device, size_bytes, usage, memory_properties);
+}
+
+VulkanBuffer::~VulkanBuffer() noexcept {
+    destroy();
+}
+
+void VulkanBuffer::destroy_buffer() noexcept {
+    vkDestroyBuffer(
+        m_device,
+        m_buffer,
+        nullptr
+    );
+}
+
+void VulkanBuffer::set_to_default_fields(bool except_memory) noexcept {
+    m_physical_device = VK_NULL_HANDLE;
+    m_device = VK_NULL_HANDLE;
+    m_buffer = VK_NULL_HANDLE;
+    m_size = 0;
+    m_usage = 0;
+
+    if (!except_memory)
+        m_memory.reset();
+}
+
+void VulkanBuffer::destroy() noexcept {
+    if (m_device != VK_NULL_HANDLE && m_buffer != VK_NULL_HANDLE) {
+        destroy_buffer();
+    }
+
+    set_to_default_fields();    
+}
+
+VulkanBuffer::VulkanBuffer(VulkanBuffer&& other) noexcept
+    :   m_physical_device(std::exchange(other.m_physical_device, VK_NULL_HANDLE)),
+        m_device(std::exchange(other.m_device, VK_NULL_HANDLE)),
+        m_buffer(std::exchange(other.m_buffer, VK_NULL_HANDLE)),
+        m_memory(std::move(other.m_memory)),
+        m_size(std::exchange(other.m_size, 0)),
+        m_usage(std::exchange(other.m_usage, 0)) {}
+
+VulkanBuffer& VulkanBuffer::operator=(VulkanBuffer&& other) noexcept
+{
+    if (this != &other) {
+        destroy();
+
+        m_physical_device = std::exchange(other.m_physical_device, VK_NULL_HANDLE);
+        m_device = std::exchange(other.m_device, VK_NULL_HANDLE);
+        m_buffer = std::exchange(other.m_buffer, VK_NULL_HANDLE);
+        m_memory = std::move(other.m_memory);
+        m_size = std::exchange(other.m_size, 0);
+        m_usage = std::exchange(other.m_usage, 0);
+    }
+
+    return *this;
+} 
+
+VkBuffer VulkanBuffer::handle() const noexcept {
+    return m_buffer;
+}
+
+VkDeviceSize VulkanBuffer::size() const noexcept {
+    return m_size;
+}
+
+void VulkanBuffer::realloc(
+    VkPhysicalDevice physical_device,
+    VkDevice device,
+    VkDeviceSize size_bytes,
+    VkBufferUsageFlags usage,
+    VkMemoryPropertyFlags memory_properties)
+{
+    LOG_METHOD();
+
+    destroy();
+
+    m_physical_device = physical_device;
+    m_device = device;
+    m_size = size_bytes;
+    m_usage = usage;
+
+    logger.check(m_physical_device != VK_NULL_HANDLE, "Physical device is not initialized");
     logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
     logger.check(size_bytes != 0, "Attempt to create a buffer with zero size");
 
@@ -47,8 +131,8 @@ VulkanBuffer::VulkanBuffer(
         );
 
         m_memory.emplace(
-            physical_device,
-            device,
+            m_physical_device,
+            m_device,
             memory_requirements.memoryTypeBits,
             memory_properties,
             memory_requirements.size
@@ -56,38 +140,55 @@ VulkanBuffer::VulkanBuffer(
 
         m_memory->bind_to_buffer(*this);
     } catch (...) {
-        vkDestroyBuffer(m_device, m_buffer, nullptr);
-        m_buffer = VK_NULL_HANDLE;
-        m_device = VK_NULL_HANDLE;
-        m_size = 0;
-        m_usage = 0;
+        destroy_buffer();
+        set_to_default_fields(true);
         throw;
     }
 }
 
-VulkanBuffer::~VulkanBuffer() noexcept {
-    destroy();
+void VulkanBuffer::realloc(    
+    const VulkanPhysicalDevice& physical_device,
+    const VulkanDevice& device,
+    VkDeviceSize size_bytes,
+    VkBufferUsageFlags usage,
+    VkMemoryPropertyFlags memory_properties)
+{
+    realloc(
+        physical_device.handle(),
+        device.handle(),
+        size_bytes,
+        usage,
+        memory_properties
+    );
 }
 
-void VulkanBuffer::destroy() noexcept {
-    if (m_device != VK_NULL_HANDLE && m_buffer != VK_NULL_HANDLE) {
-        vkDestroyBuffer(
-            m_device,
-            m_buffer,
-            nullptr
-        );
+void VulkanBuffer::realloc(    
+    VkDeviceSize size_bytes,
+    VkBufferUsageFlags usage,
+    VkMemoryPropertyFlags memory_properties) 
+{
+    realloc(m_physical_device, m_device, size_bytes, usage, memory_properties);
+}
+
+void VulkanBuffer::ensure_capacity(VkDeviceSize size_bytes) {
+    LOG_METHOD();
+
+    logger.check(m_physical_device != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(m_memory.has_value(), "Buffer memory is not initialized");
+
+    if (m_size < size_bytes) {
+        realloc(m_physical_device, m_device, size_bytes, m_usage, m_memory->properties());
     }
-
-    m_buffer = VK_NULL_HANDLE;
-    m_device = VK_NULL_HANDLE;
-    m_size = 0;
-    m_usage = 0;
-
-    m_memory.reset();
 }
 
 void VulkanBuffer::fill(VulkanCommandBuffer& command_buffer, uint32_t data) {
     LOG_METHOD();
+
+    logger.check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
+    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+    logger.check(has_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT),
+                 "Buffer must have VK_BUFFER_USAGE_TRANSFER_DST_BIT for vkCmdFillBuffer");
 
     vkCmdFillBuffer(command_buffer.handle(), m_buffer, 0, m_size, data);
 }
@@ -95,40 +196,113 @@ void VulkanBuffer::fill(VulkanCommandBuffer& command_buffer, uint32_t data) {
 void VulkanBuffer::fill(VulkanCommandBuffer& command_buffer, uint32_t data, VkDeviceSize size_bytes, VkDeviceSize offset) {
     LOG_METHOD();
 
+    logger.check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
+    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+
+    logger.check(has_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT),
+                "Buffer must have VK_BUFFER_USAGE_TRANSFER_DST_BIT for vkCmdFillBuffer");
+
     logger.check(size_bytes > 0, "Size bytes should be greater than 0");
-    logger.check(offset > size_bytes, "Offset was out of bounds");
+    logger.check(offset <= m_size, "Offset was out of bounds");
+    logger.check(size_bytes <= m_size - offset, "Fill range was out of bounds");
+
+    logger.check((offset & 3ull) == 0, "vkCmdFillBuffer offset must be 4-byte aligned");
+    logger.check((size_bytes & 3ull) == 0, "vkCmdFillBuffer size must be 4-byte aligned");
 
     vkCmdFillBuffer(command_buffer.handle(), m_buffer, offset, size_bytes, data);
 }
 
-VulkanBuffer::VulkanBuffer(VulkanBuffer&& other) noexcept
-    :   m_device(std::exchange(other.m_device, VK_NULL_HANDLE)),
-        m_buffer(std::exchange(other.m_buffer, VK_NULL_HANDLE)),
-        m_memory(std::move(other.m_memory)),
-        m_size(std::exchange(other.m_size, 0)),
-        m_usage(std::exchange(other.m_usage, 0)) {}
-
-VulkanBuffer& VulkanBuffer::operator=(VulkanBuffer&& other) noexcept
+VulkanBuffer& VulkanBuffer::fill(
+    VulkanCommandBuffer& command_buffer,
+    PassWriter& fill_pass_writer,
+    const void* prefab,
+    uint32_t prifab_size_bytes,
+    uint32_t fillable_area_size_bytes,
+    uint32_t fillable_area_offset,
+    uint32_t invocation_stride) &
 {
-    if (this != &other) {
-        destroy();
+    LOG_METHOD();
 
-        m_device = std::exchange(other.m_device, VK_NULL_HANDLE);
-        m_buffer = std::exchange(other.m_buffer, VK_NULL_HANDLE);
-        m_memory = std::move(other.m_memory);
-        m_size = std::exchange(other.m_size, 0);
-        m_usage = std::exchange(other.m_usage, 0);
+    if (fillable_area_size_bytes == 0) {
+        return *this;
     }
 
-    return *this;
-} 
+    logger.check(prefab != nullptr, "prifab must not be nullptr");
+    logger.check(prifab_size_bytes != 0, "prifab_size_bytes must not be 0");
+    logger.check(prifab_size_bytes <= PREFAB_MAX_UINTS * static_cast<uint32_t>(sizeof(uint32_t)), "The maximum size of the prefab has been exceeded");
+    logger.check(invocation_stride != 0u, "invocation_stride must not be 0");
+    logger.check(fillable_area_offset <= m_size, "Fillable area offset is out of bounds");
+    logger.check(fillable_area_size_bytes <= m_size - fillable_area_offset, "Fill area exceeded the buffer size");
+    logger.check(has_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), "Destination buffer must have VK_BUFFER_USAGE_STORAGE_BUFFER_BIT");
 
-VkBuffer VulkanBuffer::handle() const noexcept {
-    return m_buffer;
+    const uint32_t total_count_invocations = math_utils::div_up_u32(fillable_area_size_bytes, invocation_stride);
+
+    uint32_t count_invocations_x = 0;
+    uint32_t count_invocations_y = 0;
+    uint32_t count_invocations_z = 0;
+
+    if (total_count_invocations > 0u) {
+        count_invocations_x = static_cast<uint32_t>(
+            std::ceil(std::cbrt(static_cast<double>(total_count_invocations)))
+        );
+
+        const uint32_t count_invocations_yz = math_utils::div_up_u32(total_count_invocations, count_invocations_x);
+
+        count_invocations_y = static_cast<uint32_t>(
+            std::ceil(std::sqrt(static_cast<double>(count_invocations_yz)))
+        );
+
+        count_invocations_z = math_utils::div_up_u32(count_invocations_yz, count_invocations_y);
+    }
+
+    const uint32_t groups_x = math_utils::div_up_u32(count_invocations_x, FILL_LOCAL_SIZE_X);
+    const uint32_t groups_y = math_utils::div_up_u32(count_invocations_y, FILL_LOCAL_SIZE_Y);
+    const uint32_t groups_z = math_utils::div_up_u32(count_invocations_z, FILL_LOCAL_SIZE_Z);
+
+    FillBufferPushConstants pc{
+        .prefab_data_bytes = prifab_size_bytes,
+        .clearable_data_bytes = fillable_area_size_bytes,
+
+        .clearable_data_offset_bytes = fillable_area_offset,
+
+        .count_invocations_x = count_invocations_x,
+        .count_invocations_y = count_invocations_y,
+        .count_invocations_z = count_invocations_z,
+
+        .invocation_stride_bytes = invocation_stride
+    };
+
+    std::memcpy(pc.prefab_data, prefab, prifab_size_bytes);
+
+    fill_pass_writer.set_storage_buffer(0, *this);
+    fill_pass_writer.bind(command_buffer);
+    fill_pass_writer.push_constants(command_buffer, pc);
+
+    command_buffer.dispatch(groups_x, groups_y, groups_z);
+
+    return *this;
 }
 
-VkDeviceSize VulkanBuffer::size() const noexcept {
-    return m_size;
+VulkanBuffer&& VulkanBuffer::fill(
+    VulkanCommandBuffer& command_buffer,
+    PassWriter& fill_pass_writer,
+    const void* prefab,
+    uint32_t prifab_size_bytes,
+    uint32_t fillable_area_size_bytes,
+    uint32_t fillable_area_offset,
+    uint32_t invocation_stride) &&
+{
+    static_cast<VulkanBuffer&>(*this).fill(
+        command_buffer,
+        fill_pass_writer,
+        prefab,
+        prifab_size_bytes,
+        fillable_area_size_bytes,
+        fillable_area_offset,
+        invocation_stride
+    );
+
+    return std::move(*this);
 }
 
 void VulkanBuffer::upload(const void* data, VkDeviceSize size_bytes, VkDeviceSize offset_bytes) {
@@ -159,6 +333,10 @@ void VulkanBuffer::read(void* data, VkDeviceSize size_bytes, VkDeviceSize offset
 
 bool VulkanBuffer::has_usage(VkBufferUsageFlags usage) const noexcept {
     return (m_usage & usage) == usage;
+}
+
+bool VulkanBuffer::has_memory_property(VkMemoryPropertyFlags properties) const noexcept {
+    return (m_memory->properties() & properties) == properties;
 }
 
 void VulkanBuffer::memory_barrier(
@@ -206,6 +384,16 @@ void VulkanBuffer::memory_barrier(
         &barrier,
         0,
         nullptr
+    );
+}
+
+void VulkanBuffer::memory_barrier_compute_write_to_compute_write_read(VulkanCommandBuffer& command_buffer) const {
+    memory_barrier(
+        command_buffer,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
     );
 }
 
@@ -354,7 +542,6 @@ void VulkanBuffer::bind_as_vertex_buffer(
 
 void VulkanBuffer::bind_as_index_buffer(
     VulkanCommandBuffer& command_buffer,
-    uint32_t buffer_binding,
     VkDeviceSize offset,
     VkIndexType index_type) const
 {
@@ -368,7 +555,7 @@ void VulkanBuffer::bind_as_index_buffer(
     logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
 
     // Позже сделать возможность использовать несколько биндингов. #TODO
-    vkCmdBindIndexBuffer(command_buffer.handle(), m_buffer, offset, VK_INDEX_TYPE_UINT32);
+    vkCmdBindIndexBuffer(command_buffer.handle(), m_buffer, offset, index_type);
 }
 
 VulkanBuffer VulkanBuffer::create_vertex_buffer(
@@ -464,6 +651,37 @@ VulkanBuffer VulkanBuffer::create_index_buffer(
     );
 }
 
+VulkanBuffer VulkanBuffer::create_host_visible_storage_index_buffer(
+    const VulkanPhysicalDevice& physical_device,
+    const VulkanDevice& device,
+    VkDeviceSize size_bytes)
+{
+    LOG_NAMED("VulkanBuffer");
+
+    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(size_bytes != 0, "Attempt to create buffer with zero size");
+
+    return VulkanBuffer(
+        physical_device,
+        device,
+        size_bytes,
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    );
+}
+
+VulkanBuffer VulkanBuffer::create_host_visible_storage_index_buffer(
+    const VulkanEngine& engine,
+    VkDeviceSize size_bytes)
+{
+    return create_host_visible_storage_index_buffer(
+        engine.physical_device(),
+        engine.device(),
+        size_bytes
+    );
+}
 
 VulkanBuffer VulkanBuffer::create_storage_buffer(
     const VulkanPhysicalDevice& physical_device,
@@ -480,7 +698,7 @@ VulkanBuffer VulkanBuffer::create_storage_buffer(
         physical_device, 
         device,
         size_bytes,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     );
 }
@@ -552,6 +770,50 @@ VulkanBuffer VulkanBuffer::create_host_visible_storage_buffer(
     return create_host_visible_storage_buffer(
         engine.physical_device(), 
         engine.device(), 
+        size_bytes
+    );
+}
+
+VulkanBuffer VulkanBuffer::create_host_visible_indirect_storage_buffer(
+    const VulkanPhysicalDevice& physical_device,
+    const VulkanDevice& device,
+    VkDeviceSize size_bytes
+) {
+    LOG_NAMED("VulkanBuffer");
+
+    logger.check(
+        physical_device.handle() != VK_NULL_HANDLE,
+        "Physical device is not initialized"
+    );
+
+    logger.check(
+        device.handle() != VK_NULL_HANDLE,
+        "Device is not initialized"
+    );
+
+    logger.check(
+        size_bytes != 0,
+        "Attempt to create buffer with zero size"
+    );
+
+    return VulkanBuffer(
+        physical_device,
+        device,
+        size_bytes,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+        VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    );
+}
+
+VulkanBuffer VulkanBuffer::create_host_visible_indirect_storage_buffer(
+    const VulkanEngine& engine,
+    VkDeviceSize size_bytes
+) {
+    return create_host_visible_indirect_storage_buffer(
+        engine.physical_device(),
+        engine.device(),
         size_bytes
     );
 }
@@ -630,4 +892,41 @@ VulkanBuffer VulkanBuffer::create_host_visible_vertex_buffer(
         engine.device(),
         size_bytes
     );
+}
+
+// .cpp
+VulkanBuffer VulkanBuffer::create_host_visible_storage_vertex_buffer(
+    const VulkanPhysicalDevice& physical_device,
+    const VulkanDevice& device,
+    VkDeviceSize size_bytes)
+{
+    LOG_NAMED("VulkanBuffer");
+
+    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(size_bytes != 0, "Attempt to create buffer with zero size");
+
+    return VulkanBuffer(
+        physical_device,
+        device,
+        size_bytes,
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    );
+}
+
+VulkanBuffer VulkanBuffer::create_host_visible_storage_vertex_buffer(
+    const VulkanEngine& engine,
+    VkDeviceSize size_bytes)
+{
+    return create_host_visible_storage_vertex_buffer(
+        engine.physical_device(),
+        engine.device(),
+        size_bytes
+    );
+}
+
+VulkanBufferView VulkanBuffer::get_view() noexcept {
+    return VulkanBufferView(*this);
 }

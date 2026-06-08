@@ -12,11 +12,24 @@
 #include "../vulkan_self/utils.h"
 #include "../vulkan_self/vulkan_resource_loader.h"
 
+#include "mesh_view.h"
+
 #include "../vulkan_self/logger/logger_header.h"
+
+class VulkanPhysicalDevice;
+class VulkanDevice;
+class MeshView;
+
+// const VulkanPhysicalDevice& physical_device,
+// const VulkanDevice& device,
 
 class Mesh {
 public:
     _XCLASS_NAME(Mesh);
+
+    Mesh(VulkanPhysicalDevice& physical_device, VulkanDevice& device, VulkanResourceLoader& resource_loader, 
+            void* vertex_data, uint32_t vertex_data_size_bytes, 
+            unsigned int* index_data, uint32_t index_data_size_bytes);
 
     Mesh(VulkanEngine& engine, VulkanResourceLoader& resource_loader, 
          void* vertex_data, uint32_t vertex_data_size_bytes, 
@@ -25,6 +38,8 @@ public:
     uint32_t index_count() const noexcept;
     void bind_vertex_buffer(VulkanCommandBuffer& command_buffer, uint32_t buffer_binding = 0, VkDeviceSize offset = 0);
     void bind_index_buffer(VulkanCommandBuffer& command_buffer, uint32_t buffer_binding = 0, VkDeviceSize offset = 0);
+
+    MeshView get_view();
 
 private:
     VulkanBuffer m_vertex_buffer;

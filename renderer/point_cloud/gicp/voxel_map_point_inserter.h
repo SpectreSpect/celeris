@@ -5,7 +5,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
-#include "../../compute_pass_instance.h"
+#include "../../../vulkan_self/pass/instance/pass_instance.h"
 #include "../../../vulkan_self/vulkan_fence.h"
 #include "../../../vulkan_self/vulkan_command_buffer.h"
 
@@ -39,7 +39,7 @@ public:
 
 private:
     VulkanEngine& engine;
-    ComputePassInstance insert_pass;
+    PassInstance insert_pass;
     VulkanBuffer uniform_buffer;
 
     VulkanCommandBuffer compute_command_buffer;

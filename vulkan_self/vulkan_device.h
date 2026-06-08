@@ -40,6 +40,7 @@ public:
     const VulkanQueue& transfer_queue(uint32_t index = 0) const;
     VulkanQueue& transfer_queue(uint32_t index = 0);
     
+    PFN_vkCmdPushDescriptorSetKHR cmd_push_descriptor_set_khr() const noexcept;
 
 private:
     VkDevice m_device = VK_NULL_HANDLE;
@@ -50,6 +51,8 @@ private:
     std::vector<std::unique_ptr<VulkanQueue>> m_transfer_queues;
 
 private:
+    PFN_vkCmdPushDescriptorSetKHR m_vkCmdPushDescriptorSetKHR = nullptr;
+    void load_device_functions();
     void retrieve_queues(const QueueAllocation& queue_allocation);
     
     const VulkanQueue& get_queue(

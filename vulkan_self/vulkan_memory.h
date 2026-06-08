@@ -24,6 +24,7 @@ public:
         uint32_t memory_type_index,
         VkDeviceSize size_bytes
     );
+    
     explicit VulkanMemory(
         const VulkanPhysicalDevice& physical_device,
         const VulkanDevice& device,
@@ -31,10 +32,16 @@ public:
         VkMemoryPropertyFlags required_properties,
         VkDeviceSize size_bytes
     );
-    ~VulkanMemory() noexcept;
 
-private:
-    void destroy() noexcept;
+    explicit VulkanMemory(
+        VkPhysicalDevice physical_device,
+        VkDevice device,
+        uint32_t memory_type_filter,
+        VkMemoryPropertyFlags required_properties,
+        VkDeviceSize size_bytes
+    );
+    
+    ~VulkanMemory() noexcept;
 
 public:
     VulkanMemory(const VulkanMemory&) = delete;
@@ -130,6 +137,15 @@ private:
     VkDeviceSize m_non_coherent_atom_size = 1;
 
 private:
+    void destroy() noexcept;
+
+    void allocate(
+        VkPhysicalDevice physical_device,
+        VkDevice device,
+        uint32_t memory_type_index,
+        VkDeviceSize size_bytes
+    );
+
     void allocate(
         const VulkanPhysicalDevice& physical_device,
         const VulkanDevice& device,
@@ -138,9 +154,22 @@ private:
     );
 
     static uint32_t find_memory_type(
+        VkPhysicalDevice physical_device,
+        uint32_t type_filter,
+        VkMemoryPropertyFlags required_properties,
+        VkDeviceSize allocation_size
+    );
+
+    static uint32_t find_memory_type(
         const VulkanPhysicalDevice& physical_device,
         uint32_t type_filter,
-        VkMemoryPropertyFlags properties
+        VkMemoryPropertyFlags required_properties,
+        VkDeviceSize allocation_size
+    );
+
+    static VkMemoryPropertyFlags get_memory_type_properties(
+        VkPhysicalDevice physical_device,
+        uint32_t memory_type_index
     );
 
     static VkMemoryPropertyFlags get_memory_type_properties(

@@ -1,11 +1,11 @@
 #include "gicp_reductor.h"
-#include "../../compute_pass_manager.h"
+#include "../../../managers/compute_pass_manager.h"
 #include "../../../vulkan_self/vulkan_engine.h"
 #include "../../../math_utils.h"
 
 GICPReductor::GICPReductor(VulkanEngine& engine, ComputePassManager& compute_pass_manager) 
     :   engine(engine),
-        gicp_reduce_pass(compute_pass_manager.descriptor_pool(), compute_pass_manager.gicp_reduce_cp),
+        gicp_reduce_pass(compute_pass_manager.gicp_reduce_cp, compute_pass_manager.descriptor_pool()),
         uniform_buffer(VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(GICPReductorUniform))),
         compute_command_buffer(engine.device(), engine.compute_command_pool()),
         compute_fence(engine.device()) {}

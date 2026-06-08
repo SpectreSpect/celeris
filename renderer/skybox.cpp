@@ -1,15 +1,15 @@
 #include "skybox.h"
 
-#include "../vulkan_self/material/material_instance.h"
-#include "../vulkan_self/material/material_pass.h"
+#include "../managers/texture_manager.h"
+#include "../vulkan_self/pass/material_pass/material_pass.h"
+#include "../vulkan_self/pass/instance/slot_pass_instance.h"
 #include "material_data_types.h"
 #include "scene.h"
 #include "scene_object.h"
-#include "texture_manager.h"
 
 Skybox::Skybox(
     Mesh& mesh,
-    MaterialInstance& material,
+    SlotPassInstance& material,
     TextureManager& texture_manager,
     MaterialPass& pbr_material_pass,
     uint32_t environment_map_id,
@@ -62,9 +62,8 @@ void Skybox::update_skybox_material() {
 
     logger.check(m_texture_manager != nullptr, "Texture manager pointer is null");
     logger.check(m_environment_map_id < m_texture_manager->hdr_env_maps.size(), "Skybox environment map id is out of range");
-    logger.check(m_material != nullptr, "Skybox has no material");
 
-    m_material->descriptor_set.write_cubemap(
+    material().descripter_set().write_cubemap(
         1,
         m_texture_manager->hdr_env_maps[m_environment_map_id]
     );
@@ -75,8 +74,7 @@ void Skybox::update_skybox_material() {
 void Skybox::update_object(SceneObject& scene_object) {
     if (RenderObject* render_object = dynamic_cast<RenderObject*>(&scene_object)) {
         if (
-            render_object->m_material != nullptr &&
-            &render_object->m_material->m_pass == m_pbr_material_pass
+            &render_object->material().pipepline_pass() == m_pbr_material_pass
         ) {
             render_object->edit_material_data<PBRMaterialData>(
                 [&](PBRMaterialData& data) {

@@ -1,5 +1,11 @@
 #include "descriptor_set_layout_builder.h"
 
+DescriptorSetLayoutBuilder& DescriptorSetLayoutBuilder::set_flags(VkDescriptorSetLayoutCreateFlags flags) noexcept {
+    m_flags = flags;
+
+    return *this;
+}
+
 DescriptorSetLayoutBuilder& DescriptorSetLayoutBuilder::add(uint32_t binding, VkDescriptorType type, 
                                                             VkShaderStageFlags shader_stage_flags, uint32_t descriptor_count) {
     LOG_METHOD();
@@ -46,6 +52,10 @@ DescriptorSetLayoutBuilder& DescriptorSetLayoutBuilder::add_storage_image(uint32
     return *this;
 }
 
-std::span<const VkDescriptorSetLayoutBinding> DescriptorSetLayoutBuilder::get_bindings() const noexcept{
+std::span<const VkDescriptorSetLayoutBinding> DescriptorSetLayoutBuilder::get_bindings() const noexcept {
     return m_bindings;
+}
+
+VkDescriptorSetLayoutCreateFlags DescriptorSetLayoutBuilder::flags() const noexcept {
+    return m_flags;
 }

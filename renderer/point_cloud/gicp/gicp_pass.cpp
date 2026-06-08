@@ -1,7 +1,7 @@
 #include "gicp_pass.h"
 
 #include "../../../vulkan_self/vulkan_engine.h"
-#include "../../compute_pass_manager.h"
+#include "../../../managers/compute_pass_manager.h"
 #include "../point_cloud.h"
 #include "voxel_point_map.h"
 #include "../../../math_utils.h"
@@ -9,7 +9,7 @@
 
 GICPPass::GICPPass(VulkanEngine& engine, ComputePassManager& compute_pass_manager)
     :   engine(engine),
-        gicp_step_pass(compute_pass_manager.descriptor_pool(), compute_pass_manager.gicp_cp),
+        gicp_step_pass(compute_pass_manager.gicp_cp, compute_pass_manager.descriptor_pool()),
         reductor(engine, compute_pass_manager),
         uniform_buffer(VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(GICPPassUniform))),
         output_buffer(VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(OutputBuffer))),

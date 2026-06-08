@@ -31,7 +31,23 @@ VulkanMemory::VulkanMemory(
     allocate(
         physical_device, 
         device, 
-        find_memory_type(physical_device, memory_type_filter, required_properties), 
+        find_memory_type(physical_device, memory_type_filter, required_properties, size_bytes), 
+        size_bytes
+    );
+}
+
+VulkanMemory::VulkanMemory(
+    VkPhysicalDevice physical_device,
+    VkDevice device,
+    uint32_t memory_type_filter,
+    VkMemoryPropertyFlags required_properties,
+    VkDeviceSize size_bytes)
+{
+    LOG_METHOD();
+    allocate(
+        physical_device, 
+        device, 
+        find_memory_type(physical_device, memory_type_filter, required_properties, size_bytes), 
         size_bytes
     );
 }
@@ -320,27 +336,36 @@ void VulkanMemory::bind_to_image(VkImage image, VkDeviceSize memory_offset) cons
 }
 
 void VulkanMemory::allocate(
-    const VulkanPhysicalDevice& physical_device,
-    const VulkanDevice& device,
+    VkPhysicalDevice physical_device,
+    VkDevice device,
     uint32_t memory_type_index,
     VkDeviceSize size_bytes)
 {
     LOG_METHOD();
 
-    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(physical_device != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger.check(device != VK_NULL_HANDLE, "Device is not initialized");
     logger.check(size_bytes != 0, "Attempt to allocate zero-sized Vulkan memory");
 
-    m_device = device.handle();
+    m_device = device;
     m_size = size_bytes;
     m_memory_type_index = memory_type_index;
     m_memory_properties = get_memory_type_properties(physical_device, memory_type_index);
 
     VkPhysicalDeviceProperties properties{};
     vkGetPhysicalDeviceProperties(
-        physical_device.handle(),
+        physical_device,
         &properties
     );
+
+    VkPhysicalDeviceMemoryProperties memory_properties{};
+    vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
+    
+    // logger.log() << "Allocated " 
+    //     << clr(std::to_string(size_bytes), LoggerPalette::orange) 
+    //     << " in heap "
+    //     << clr(std::to_string(memory_properties.memoryTypes[m_memory_type_index].heapIndex), LoggerPalette::blue)
+    //     << "\n";
 
     m_non_coherent_atom_size = properties.limits.nonCoherentAtomSize;
 
@@ -359,47 +384,101 @@ void VulkanMemory::allocate(
     logger.check(result == VK_SUCCESS, "Failed to allocate Vulkan memory");
 }
 
-uint32_t VulkanMemory::find_memory_type(
+void VulkanMemory::allocate(
     const VulkanPhysicalDevice& physical_device,
-    uint32_t type_filter,
-    VkMemoryPropertyFlags properties)
+    const VulkanDevice& device,
+    uint32_t memory_type_index,
+    VkDeviceSize size_bytes)
 {
-    LOG_NAMED("VulkanMemory");
+    allocate(physical_device.handle(), device.handle(), memory_type_index, size_bytes);
+}
 
-    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+/*
+    В будущем нужно будет немного поменять принцип выбора памяти.
+    Сейчас память выбиратся так, чтобы все требуемые свойтсва памяти присутсвовали,
+    и было минимальное количество лишних свойств.
 
+    Но суть в том, что иногда лишние свойства могут быть полезны. Это нужно будет пофиксить
+    и учесть позже. #TODO
+*/
+uint32_t VulkanMemory::find_memory_type(
+    VkPhysicalDevice physical_device,
+    uint32_t type_filter,
+    VkMemoryPropertyFlags required_properties,
+    VkDeviceSize allocation_size)
+{
     VkPhysicalDeviceMemoryProperties memory_properties{};
-    vkGetPhysicalDeviceMemoryProperties(
-        physical_device.handle(),
-        &memory_properties
-    );
+    vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
+
+    uint32_t best_type = UINT32_MAX;
+    uint32_t best_extra_flags_count = UINT32_MAX;
+    VkDeviceSize best_heap_size = 0;
 
     for (uint32_t i = 0; i < memory_properties.memoryTypeCount; i++) {
-        bool type_supported = type_filter & (1u << i);
+        const VkMemoryType& memory_type = memory_properties.memoryTypes[i];
+        const VkMemoryHeap& memory_heap =
+            memory_properties.memoryHeaps[memory_type.heapIndex];
+
+        bool type_supported =
+            (type_filter & (1u << i)) != 0;
 
         bool has_required_properties =
-            (memory_properties.memoryTypes[i].propertyFlags & properties) == properties;
+            (memory_type.propertyFlags & required_properties) == required_properties;
 
-        if (type_supported && has_required_properties) {
-            return i;
+        if (!type_supported || !has_required_properties) {
+            continue;
+        }
+
+        if (allocation_size > 0 && memory_heap.size < allocation_size) {
+            continue;
+        }
+
+        VkMemoryPropertyFlags extra_flags =
+            memory_type.propertyFlags & ~required_properties;
+
+        uint32_t extra_flags_count =
+            Utils::count_bits(static_cast<uint32_t>(extra_flags));
+
+        bool better =
+            best_type == UINT32_MAX ||
+            extra_flags_count < best_extra_flags_count ||
+            (
+                extra_flags_count == best_extra_flags_count &&
+                memory_heap.size > best_heap_size
+            );
+
+        if (better) {
+            best_type = i;
+            best_extra_flags_count = extra_flags_count;
+            best_heap_size = memory_heap.size;
         }
     }
 
-    logger.throw_error("Failed to find suitable memory type");
-    return 0;
+    logger.check(best_type != UINT32_MAX, "Failed to find suitable Vulkan memory type");
+
+    return best_type;
+}
+
+uint32_t VulkanMemory::find_memory_type(
+    const VulkanPhysicalDevice& physical_device,
+    uint32_t type_filter,
+    VkMemoryPropertyFlags required_properties,
+    VkDeviceSize allocation_size)
+{
+    return find_memory_type(physical_device.handle(), type_filter, required_properties, allocation_size);
 }
 
 VkMemoryPropertyFlags VulkanMemory::get_memory_type_properties(
-    const VulkanPhysicalDevice& physical_device,
-    uint32_t memory_type_index) 
+    VkPhysicalDevice physical_device,
+    uint32_t memory_type_index)
 {
     LOG_NAMED("VulkanMemory");
 
-    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger.check(physical_device != VK_NULL_HANDLE, "Physical device is not initialized");
 
     VkPhysicalDeviceMemoryProperties memory_properties{};
     vkGetPhysicalDeviceMemoryProperties(
-        physical_device.handle(),
+        physical_device,
         &memory_properties
     );
 
@@ -408,4 +487,11 @@ VkMemoryPropertyFlags VulkanMemory::get_memory_type_properties(
         << clr(std::to_string(memory_properties.memoryTypeCount), LoggerPalette::blue) << ")\n";
     
     return memory_properties.memoryTypes[memory_type_index].propertyFlags;
+}
+
+VkMemoryPropertyFlags VulkanMemory::get_memory_type_properties(
+    const VulkanPhysicalDevice& physical_device,
+    uint32_t memory_type_index) 
+{
+    return get_memory_type_properties(physical_device.handle(), memory_type_index);
 }

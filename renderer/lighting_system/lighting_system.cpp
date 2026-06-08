@@ -2,7 +2,7 @@
 
 
 #include "light_source.h"
-#include "../compute_pass_manager.h"
+#include "../../managers/compute_pass_manager.h"
 #include "../../vulkan_self/vulkan_engine.h"
 #include "../../camera/camera.h"
 #include "../../vulkan_self/window.h"
@@ -13,7 +13,7 @@
 LightingSystem::LightingSystem(VulkanEngine& engine, ComputePassManager& compute_pass_manager)
     :   m_engine(engine),
         // m_frame_resources(m_frame_resources),
-        m_build_cluster_light_lists_pass(compute_pass_manager.descriptor_pool(), compute_pass_manager.build_cluster_light_lists_cp),
+        m_build_cluster_light_lists_pass(compute_pass_manager.build_cluster_light_lists_cp, compute_pass_manager.descriptor_pool()),
     
         m_light_sources(m_max_num_light_sources, {glm::vec4(0.0f), glm::vec4(0.0f)}),
         m_lights_in_clusters(m_total_clusters_count),
