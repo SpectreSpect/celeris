@@ -24,6 +24,7 @@ public:
     SlotPassInstance dirt_pbr;
     SlotPassInstance pbr;
     SlotPassInstance voxel_mesh;
+    SlotPassInstance voxel_pbr;
 
     VulkanBuffer point_cloud_ubo;
 

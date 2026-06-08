@@ -62,6 +62,8 @@ ShaderManager::ShaderManager(VulkanDevice& device)
 
         voxel_mesh_vs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_mesh.vert.spv"),
         voxel_mesh_fs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_mesh.frag.spv"),
+        voxel_pbr_vs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_pbr.vert.spv"),
+        voxel_pbr_fs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_pbr.frag.spv"),
         
         // PBR
         equirect_to_cubemap_cs(device, path_utils::executable_dir() / "shaders" / "equirect_to_cubemap.comp.spv"),

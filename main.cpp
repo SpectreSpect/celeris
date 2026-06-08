@@ -242,6 +242,7 @@ int main() {
     RenderObject unlit_cube4(mesh_manager.cube, material_instance_manager.unlit);
 
     const float skybox_exposure = 1.8f;
+    // const float skybox_exposure = 2.2f;
 
     Skybox skybox(
         mesh_manager.skybox_cube,
@@ -382,8 +383,6 @@ int main() {
         lighting_system.set_light_source(0, light_source0);
         lighting_system.set_light_source(1, light_source1);
 
-        
-        
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), window, camera);
         lighting_system.update(engine.current_frame(), window, camera);

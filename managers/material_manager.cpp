@@ -19,6 +19,7 @@ MaterialManager::MaterialManager(VulkanEngine& engine, ShaderManager& shader_man
     skybox_mp(create_skybox_pass(engine, frame_resources, shader_manager.skybox_vs, shader_manager.skybox_fs)),
     pbr_mp(create_pbr_pass(engine, frame_resources, shader_manager.pbr_vs, shader_manager.pbr_fs)),
     voxel_mesh_mp(create_voxel_mesh_pass(engine, frame_resources, shader_manager.voxel_mesh_vs, shader_manager.voxel_mesh_fs)),
+    voxel_pbr_mp(create_voxel_pbr_pass(engine, frame_resources, shader_manager.voxel_pbr_vs, shader_manager.voxel_pbr_fs)),
     m_pool(engine.device(), m_pool_builder) {}
 
 MaterialPass MaterialManager::create_pass(VulkanEngine& engine, MaterialPassBuilder& builder, 
@@ -220,6 +221,41 @@ MaterialPass MaterialManager::create_voxel_mesh_pass(VulkanEngine& engine, Frame
     return create_pass(engine, builder, vs, fs);
 }
 
+MaterialPass MaterialManager::create_voxel_pbr_pass(VulkanEngine& engine, FrameResources& frame_resources, 
+                                                const VulkanShaderModule& vs, const VulkanShaderModule& fs) {
+    LOG_METHOD();
+
+    struct alignas(16) MeshVoxelVertex {
+        glm::vec4 position;
+        uint32_t color;
+        uint32_t face;
+        uint32_t _pad0;
+        uint32_t _pad1;
+    };
+
+    static_assert(sizeof(MeshVoxelVertex) == 32);
+    static_assert(offsetof(MeshVoxelVertex, position) == 0);
+    static_assert(offsetof(MeshVoxelVertex, color) == 16);
+    static_assert(offsetof(MeshVoxelVertex, face) == 20);
+
+    MaterialPassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::fragment);
+    builder.add_combined_image_sampler(1, ShaderStages::fragment);
+    builder.add_combined_image_sampler(2, ShaderStages::fragment);
+    builder.add_combined_image_sampler(3, ShaderStages::fragment);
+
+    builder.add_push_constants(sizeof(TransformPushConstants), 0);
+    builder.add_descriptor_set_layout(frame_resources.descriptor_layout());
+
+    builder.add_vertex_binding(0, sizeof(MeshVoxelVertex));
+    builder.add_vertex_attribute(0, 0, Formats::vec4, offsetof(MeshVoxelVertex, position));
+    builder.add_vertex_attribute(1, 0, VK_FORMAT_R32_UINT, offsetof(MeshVoxelVertex, color));
+    builder.add_vertex_attribute(2, 0, VK_FORMAT_R32_UINT, offsetof(MeshVoxelVertex, face));
+
+    return create_pass(engine, builder, vs, fs);
+}
+
 SlotPassInstance MaterialManager::create_blinn_phong_material(VulkanEngine& engine, VulkanTexture2D& albedo){
     SlotPassInstance material(engine, m_pool, blin_phong_mp, sizeof(BlinPhongMaterialData));
     
@@ -238,6 +274,16 @@ SlotPassInstance MaterialManager::create_skybox_material(VulkanEngine& engine, C
 
 SlotPassInstance MaterialManager::create_pbr_material(VulkanEngine& engine, CubemapArray& irradiance_maps, CubemapArray& prefilter_maps, VulkanTexture2D& brdf_lut) {
     SlotPassInstance material(engine, m_pool, pbr_mp, sizeof(PBRMaterialData));
+
+    material.descripter_set().write_cubemap_array(1, irradiance_maps);
+    material.descripter_set().write_cubemap_array(2, prefilter_maps);
+    material.set_texture(3, brdf_lut);
+
+    return material;
+}
+
+SlotPassInstance MaterialManager::create_voxel_pbr_material(VulkanEngine& engine, CubemapArray& irradiance_maps, CubemapArray& prefilter_maps, VulkanTexture2D& brdf_lut) {
+    SlotPassInstance material(engine, m_pool, voxel_pbr_mp, sizeof(PBRMaterialData));
 
     material.descripter_set().write_cubemap_array(1, irradiance_maps);
     material.descripter_set().write_cubemap_array(2, prefilter_maps);

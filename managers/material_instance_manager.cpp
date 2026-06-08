@@ -15,6 +15,7 @@ MaterialInstanceManager::MaterialInstanceManager(VulkanEngine& engine, MaterialM
         dirt_pbr(material_manager.create_pbr_material(engine, texture_manager.irradiance_maps, texture_manager.prefilter_maps, texture_manager.brdf_lut)),
         pbr(material_manager.create_pbr_material(engine, texture_manager.irradiance_maps, texture_manager.prefilter_maps, texture_manager.brdf_lut)),
         voxel_mesh(create_mi(material_manager.voxel_mesh_mp, sizeof(UnlitMaterialData))),
+        voxel_pbr(material_manager.create_voxel_pbr_material(engine, texture_manager.irradiance_maps, texture_manager.prefilter_maps, texture_manager.brdf_lut)),
         point_cloud_ubo(VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(PointUniform))){
 
     PointUniform point_uniform{2, 0.005, 1, 0};

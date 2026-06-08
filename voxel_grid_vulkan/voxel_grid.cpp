@@ -6,6 +6,7 @@
 #include "../math_utils.h"
 #include "../managers/compute_pass_manager.h"
 #include "../managers/material_instance_manager.h"
+#include "../managers/texture_manager.h"
 #include "voxel_grid_structures.h"
 #include "../vulkan_self/vulkan_physical_device.h"
 #include "../vulkan_self/vulkan_device.h"
@@ -32,10 +33,18 @@ VoxelGrid::VoxelGrid(
         m_pass_instances(create_pass_instances(device, compute_pass_manager)),
         m_buffers(create_buffers(physical_device, device, m_command_buffer)),
         m_mesh_view(m_buffers.global_vertex_buffer.get_view(), m_buffers.global_index_buffer.get_view(), m_params.max_mesh_indices),
-        m_render_object(m_mesh_view, material_instance_manager.voxel_mesh, m_buffers.indirect_cmds, m_params.count_active_chunks),
+        m_render_object(m_mesh_view, material_instance_manager.voxel_pbr, m_buffers.indirect_cmds, m_params.count_active_chunks),
         m_shader_helper(device, compute_pass_manager)
 {
     LOG_METHOD();
+    m_render_object.set_material_data(PBRMaterialData::with_pbr_maps(
+        TextureManager::st_peters_square_night_4k_pbr_map_id,
+        0.0f,
+        0.98f,
+        1.8f,
+        glm::vec4(1.0f),
+        1.0f
+    ));
 
     // init_programs(*shader_manager); #TODO
 

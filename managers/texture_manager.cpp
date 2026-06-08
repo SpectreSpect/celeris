@@ -7,10 +7,10 @@
 
 namespace {
 constexpr std::array<const char*, TextureManager::max_pbr_cubemap_count> pbr_hdr_filenames = {
-    // "studio_kominka_02_4k.hdr",
-    "st_peters_square_night_4k.hdr"
+    // "studio_kominka_02_4k.hdr"
+    // "st_peters_square_night_4k.hdr"
     // "ferndale_studio_06_4k.hdr",
-    // "qwantani_moonrise_puresky_4k.hdr",
+    "qwantani_moonrise_puresky_4k.hdr",
     // "citrus_orchard_puresky_4k.hdr",
     // "moonless_golf_4k.hdr"
 };

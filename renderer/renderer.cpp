@@ -14,6 +14,8 @@ Renderer::Renderer(VulkanEngine& engine, FrameResources& frame_resources) {
 }
 
 void Renderer::render(VulkanCommandBuffer& command_buffer, RenderObject& render_object, glm::mat4 transform) {
+    render_object.sync_material();
+
     logger.check(render_object.mesh_view().valid(), "Mesh view was invalid");
 
     static TransformPushConstants pc;
@@ -38,6 +40,8 @@ void Renderer::render(VulkanCommandBuffer& command_buffer, RenderObject& render_
 }
 
 void Renderer::render(VulkanCommandBuffer& command_buffer, InstancedRenderObject& instanced_render_object, glm::mat4 transform) {
+        instanced_render_object.sync_material();
+
         logger.check(instanced_render_object.mesh_view().valid(), "Mesh view was invalid");
 
         if (!instanced_render_object.instance_buffer_view_valid())
@@ -72,6 +76,8 @@ void Renderer::render(VulkanCommandBuffer& command_buffer, InstancedRenderObject
 
 
 void Renderer::render(VulkanCommandBuffer& command_buffer, IndirectRenderObject& indirect_render_object, glm::mat4 transform) {
+        indirect_render_object.sync_material();
+
         logger.check(indirect_render_object.mesh_view().valid(), "Mesh view was invalid");
 
         if (!indirect_render_object.indirect_buffer_view_valid())

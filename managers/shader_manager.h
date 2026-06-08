@@ -69,6 +69,8 @@ public:
     
     VulkanShaderModule voxel_mesh_vs;
     VulkanShaderModule voxel_mesh_fs;
+    VulkanShaderModule voxel_pbr_vs;
+    VulkanShaderModule voxel_pbr_fs;
 
     // PBR
     VulkanShaderModule equirect_to_cubemap_cs;
