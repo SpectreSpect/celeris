@@ -90,9 +90,9 @@ int main() {
     Window window(glfw_context, 1280, 720, "Vulkan engine");
 
     QueueRequest queue_request;
-    queue_request.graphics_count = 2;
+    queue_request.graphics_count = 1; // 2
     queue_request.present_count = 1;
-    queue_request.compute_count = 1;
+    queue_request.compute_count = 0;
 
     VulkanEngine engine(glfw_context, window, queue_request);
 
@@ -189,6 +189,8 @@ int main() {
     RenderObject unlit_cube3(mesh_manager.cube, material_instance_manager.rock_blinn_phong);
     RenderObject unlit_cube4(mesh_manager.cube, material_instance_manager.unlit);
 
+    RenderObject text(mesh_manager.text, material_instance_manager.unlit);
+
     const float skybox_exposure = 1.8f;
 
     Skybox skybox(
@@ -261,6 +263,8 @@ int main() {
     unlit_cube3.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube4.set_material_data<UnlitMaterialData>({glm::vec4(0, 1, 1, 1)});
 
+    text.set_material_data<UnlitMaterialData>({glm::vec4(1, 1, 1, 1)});
+
     material_instance_manager.unlit.sync();
     material_instance_manager.rock_blinn_phong.sync();
     material_instance_manager.dirt_blinn_phong.sync();
@@ -285,7 +289,8 @@ int main() {
     // scene.add(voxel_map_point_cloud);
 
     // scene.add(unlit_cube);
-    scene.add(sphere);
+    // scene.add(sphere);
+    scene.add(text);
     scene.add(skybox);
 
     skybox.update(scene);

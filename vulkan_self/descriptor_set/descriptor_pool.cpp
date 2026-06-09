@@ -1,6 +1,6 @@
 #include "descriptor_pool.h"
 
-#include <vulkan/vk_enum_string_helper.h>
+// #include <vulkan/vk_enum_string_helper.h>
 
 #include "../vulkan_device.h"
 #include "descriptor_pool_builder.h"
@@ -27,7 +27,10 @@ DescriptorPool::DescriptorPool(
 
     VkResult result = vkCreateDescriptorPool(device.handle(), &pool_info, nullptr, &m_pool);
 
-    logger.check(result == VK_SUCCESS) << "Failed to create descriptor pool: " << clr(string_VkResult(result), LoggerPalette::blue) << "\n";
+    // logger.check(result == VK_SUCCESS) << "Failed to create descriptor pool: " << clr(string_VkResult(result), LoggerPalette::blue) << "\n";
+
+    logger.check(result == VK_SUCCESS) << "Failed to create descriptor pool: " 
+        << clr(std::to_string(static_cast<int>(result)), LoggerPalette::blue) << "\n";
 }
 
 DescriptorPool::DescriptorPool(const VulkanDevice& device, const DescriptorPoolBuilder& builder) 
@@ -82,7 +85,10 @@ std::vector<DescriptorSet> DescriptorPool::allocate_sets(const DescriptorSetLayo
 
     VkResult result = vkAllocateDescriptorSets(m_device, &allocInfo, descriptor_set_handles.data());
     
-    logger.check(result == VK_SUCCESS) << "Failed to create descriptor sets: " << clr(string_VkResult(result), LoggerPalette::blue) << "\n";
+    // logger.check(result == VK_SUCCESS) << "Failed to create descriptor sets: " << clr(string_VkResult(result), LoggerPalette::blue) << "\n";
+
+    logger.check(result == VK_SUCCESS) << "Failed to create descriptor sets: " 
+        << clr(std::to_string(static_cast<int>(result)), LoggerPalette::blue) << "\n";
 
     std::vector<DescriptorSet> descriptor_sets;
     descriptor_sets.reserve(set_count);

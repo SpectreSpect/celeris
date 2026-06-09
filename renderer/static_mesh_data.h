@@ -188,6 +188,172 @@ namespace StaticMeshData{
         22, 23, 20
     };
 
+    inline void append_vertex(
+        std::vector<float>& v,
+        float x, float y, float z)
+    {
+        // Позиция
+        v.push_back(x);
+        v.push_back(y);
+        v.push_back(z);
+        v.push_back(1.0f);
+
+        // Нормаль
+        v.push_back(0.0f);
+        v.push_back(0.0f);
+        v.push_back(1.0f);
+        v.push_back(0.0f);
+
+        // Текстурные координаты
+        v.push_back(0.0f);
+        v.push_back(0.0f);
+
+        // Касательный вектор
+        v.push_back(1.0f);
+        v.push_back(0.0f);
+        v.push_back(0.0f);
+        v.push_back(1.0f);
+    }
+
+    inline void append_box(
+        MeshData& mesh,
+        float x0,
+        float y0,
+        float x1,
+        float y1,
+        float z0 = -0.1f,
+        float z1 =  0.1f)
+    {
+        const uint32_t base = static_cast<uint32_t>(mesh.vertices.size() / 14);
+
+        append_vertex(mesh.vertices, x0, y0, z1); // 0
+        append_vertex(mesh.vertices, x1, y0, z1); // 1
+        append_vertex(mesh.vertices, x1, y1, z1); // 2
+        append_vertex(mesh.vertices, x0, y1, z1); // 3
+        append_vertex(mesh.vertices, x0, y0, z0); // 4
+        append_vertex(mesh.vertices, x1, y0, z0); // 5
+        append_vertex(mesh.vertices, x1, y1, z0); // 6
+        append_vertex(mesh.vertices, x0, y1, z0); // 7
+
+        uint32_t indices[] = {
+            // Перед
+            0,1,2, 2,3,0,
+            // Зад
+            5,4,7, 7,6,5,
+            // Лево
+            4,0,3, 3,7,4,
+            // Право
+            1,5,6, 6,2,1,
+            // Верх
+            3,2,6, 6,7,3,
+            // Низ
+            4,5,1, 1,0,4
+        };
+
+        for(uint32_t index : indices)
+            mesh.indices.push_back(base + index);
+    }
+
+    inline MeshData make_C_letter() {
+        MeshData mesh{};
+
+        append_box(mesh, -0.8f,  0.6f,  0.8f,  0.8f);
+        append_box(mesh, -0.8f, -0.8f, -0.6f,  0.8f);
+        append_box(mesh, -0.8f, -0.8f,  0.8f, -0.6f);
+
+        return mesh;
+    }
+    inline MeshData make_E_letter() {
+        MeshData mesh{};
+
+        append_box(mesh, -0.8f,  0.6f,  0.8f,  0.8f);
+        append_box(mesh, -0.8f, -0.8f, -0.6f,  0.8f);
+        append_box(mesh, -0.8f, -0.1f,  0.4f,  0.1f);
+        append_box(mesh, -0.8f, -0.8f,  0.8f, -0.6f);
+
+        return mesh;
+    }
+    inline MeshData make_L_letter() {
+        MeshData mesh{};
+
+        append_box(mesh, -0.8f, -0.8f, -0.6f,  0.8f);
+        append_box(mesh, -0.8f, -0.8f,  0.8f, -0.6f);
+
+        return mesh;
+    }
+    inline MeshData make_I_letter() {
+        MeshData mesh{};
+
+        append_box(mesh, -0.8f,  0.6f, 0.8f,  0.8f);
+        append_box(mesh, -0.1f, -0.8f, 0.1f,  0.8f);
+        append_box(mesh, -0.8f, -0.8f, 0.8f, -0.6f);
+
+        return mesh;
+    }
+    inline MeshData make_R_letter() {
+        MeshData mesh{};
+
+        append_box(mesh, -0.8f, -0.8f, -0.6f,  0.8f);
+        append_box(mesh, -0.8f,  0.6f,  0.6f,  0.8f);
+        append_box(mesh,  0.4f,  0.1f,  0.6f,  0.8f);
+        append_box(mesh, -0.8f, -0.1f,  0.6f,  0.1f);
+        append_box(mesh,  0.0f, -0.8f,  0.2f,  0.1f);
+        append_box(mesh,  0.2f, -0.8f,  0.6f, -0.6f);
+
+        return mesh;
+    }
+    inline MeshData make_S_letter() {
+        MeshData mesh{};
+
+        append_box(mesh, -0.8f,  0.6f,  0.8f,  0.8f);
+        append_box(mesh, -0.8f,  0.1f, -0.6f,  0.8f);
+        append_box(mesh, -0.8f, -0.1f,  0.8f,  0.1f);
+        append_box(mesh,  0.6f, -0.8f,  0.8f, -0.1f);
+        append_box(mesh, -0.8f, -0.8f,  0.8f, -0.6f);
+
+        return mesh;
+    }
+
+    inline void append_mesh(
+        MeshData &dst,
+        const MeshData &src,
+        float offset_x)
+    {
+        uint32_t base = static_cast<uint32_t>(dst.vertices.size() / 14);
+
+        for(uint32_t i = 0; i < src.vertices.size(); i += 14) {
+            dst.vertices.push_back(src.vertices[i + 0] + offset_x);
+            dst.vertices.push_back(src.vertices[i + 1]);
+            dst.vertices.push_back(src.vertices[i + 2]);
+            dst.vertices.push_back(src.vertices[i + 3]);
+
+            for(int j = 4; j < 14; ++j)
+                dst.vertices.push_back(src.vertices[i + j]);
+        }
+
+        for(uint32_t index : src.indices)
+            dst.indices.push_back(base + index);
+    }
+
+    inline MeshData generate_celeris_text() {
+        MeshData mesh{};
+
+        append_mesh(mesh, make_C_letter(), -7.0f);
+        append_mesh(mesh, make_E_letter(), -4.5f);
+        append_mesh(mesh, make_L_letter(), -2.0f);
+        append_mesh(mesh, make_E_letter(),  0.5f);
+        append_mesh(mesh, make_R_letter(),  3.0f);
+        append_mesh(mesh, make_I_letter(),  5.5f);
+        append_mesh(mesh, make_S_letter(),  8.0f);
+
+        return mesh;
+    }
+
+    inline MeshData celeris_mesh_data = generate_celeris_text();
+
+    inline std::vector<float> text_vertices = celeris_mesh_data.vertices;
+    inline std::vector<uint32_t> text_indices = celeris_mesh_data.indices;
+
     std::vector<float> point_cloud_quad_corners = { // vertex buffer
         -1.0f, -1.0f,  // v0
         -1.0f, +1.0f,  // v1

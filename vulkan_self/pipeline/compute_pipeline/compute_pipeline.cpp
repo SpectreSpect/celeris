@@ -1,6 +1,6 @@
 #include "compute_pipeline.h"
 
-#include <vulkan/vk_enum_string_helper.h>
+// #include <vulkan/vk_enum_string_helper.h>
 #include <string>
 
 #include "../vulkan_pipeline_layout.h"
@@ -35,9 +35,12 @@ ComputePipeline::ComputePipeline(
     VkPipeline pipeline = VK_NULL_HANDLE;
 
     VkResult result = vkCreateComputePipelines(device.handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline);
-    logger.check(result == VK_SUCCESS) 
-        << "Failed to create compute pipeline: " 
-        << clr(string_VkResult(result), LoggerPalette::blue) << "\n";
+    // logger.check(result == VK_SUCCESS) 
+    //     << "Failed to create compute pipeline: " 
+    //     << clr(string_VkResult(result), LoggerPalette::blue) << "\n";
+
+    logger.check(result == VK_SUCCESS) << "Failed to create compute pipeline: " 
+        << clr(std::to_string(static_cast<int>(result)), LoggerPalette::blue) << "\n";
 
     set_pipeline(device.handle(), pipeline, pipeline_layout.handle());
 }

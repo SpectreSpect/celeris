@@ -137,6 +137,9 @@ bool VulkanPhysicalDevice::find_queue_families(
                 queue_request.graphics_count,
                 queue_allocation->graphics
             );
+
+            if (supports_compute)
+                queue_allocation->compute = queue_allocation->graphics;
         }
 
         if (queue_allocation->present.empty() && supports_present) {
@@ -147,13 +150,13 @@ bool VulkanPhysicalDevice::find_queue_families(
             );
         }
 
-        if (queue_allocation->compute.empty() && supports_compute) {
-            try_allocate_queues(
-                family_index,
-                queue_request.compute_count,
-                queue_allocation->compute
-            );
-        }
+        // if (queue_allocation->compute.empty() && supports_compute) {
+        //     try_allocate_queues(
+        //         family_index,
+        //         queue_request.compute_count,
+        //         queue_allocation->compute
+        //     );
+        // }
 
         if (queue_allocation->transfer.empty() && supports_transfer) {
             try_allocate_queues(

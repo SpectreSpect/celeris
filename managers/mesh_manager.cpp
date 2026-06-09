@@ -9,6 +9,8 @@ MeshManager::MeshManager(VulkanEngine& engine, VulkanResourceLoader& resource_lo
                                         StaticMeshData::sphere_indices.data(), Utils::size_bytes(StaticMeshData::sphere_indices)),
         cube(engine, resource_loader, StaticMeshData::cube_vertices.data(), Utils::size_bytes(StaticMeshData::cube_vertices), 
                                        StaticMeshData::cube_indices.data(), Utils::size_bytes(StaticMeshData::cube_indices)),
+        text(engine, resource_loader, StaticMeshData::text_vertices.data(), Utils::size_bytes(StaticMeshData::text_vertices), 
+                                       StaticMeshData::text_indices.data(), Utils::size_bytes(StaticMeshData::text_indices)),
         point_cloud_quad(engine, resource_loader, StaticMeshData::point_cloud_quad_corners.data(), Utils::size_bytes(StaticMeshData::point_cloud_quad_corners), 
                                        StaticMeshData::point_cloud_quad_indices.data(), Utils::size_bytes(StaticMeshData::point_cloud_quad_indices)),
         skybox_cube(engine, resource_loader, StaticMeshData::skybox_cube_vertices.data(), Utils::size_bytes(StaticMeshData::skybox_cube_vertices),

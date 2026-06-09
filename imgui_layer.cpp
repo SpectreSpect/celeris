@@ -9,7 +9,7 @@
 #include "vulkan_self/vulkan_command_buffer.h"
 #include "vulkan_self/descriptor_set/descriptor_pool_builder.h"
 
-#include <vulkan/vk_enum_string_helper.h>
+// #include <vulkan/vk_enum_string_helper.h>
 
 UI::UI(Window& window, VulkanEngine& engine, const VulkanInitInfo& info) : m_descriptor_pool(create_descriptor_pool(engine))
 {
@@ -91,7 +91,8 @@ UI::VulkanInitInfo UI::get_default_vulkan_init_info(VulkanEngine& engine, Descri
 void UI::check_vk_result(VkResult err) {
     LOG_NAMED("UI");
 
-    logger.check(err == VK_SUCCESS) << clr(string_VkResult(err), LoggerPalette::blue) << "\n";
+    // logger.check(err == VK_SUCCESS) << clr(string_VkResult(err), LoggerPalette::blue) << "\n";
+    logger.check(err == VK_SUCCESS) << clr(std::to_string(static_cast<int>(err)), LoggerPalette::blue) << "\n";
 
     if (err < 0)
         std::abort();

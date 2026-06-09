@@ -6,7 +6,7 @@
 
 #include "transform.h"
 
-#include "../../../vulkan_self/logger/logger.h"
+#include "../vulkan_self/logger/logger.h"
 
 class Renderer;
 class VulkanCommandBuffer;
