@@ -1,0 +1,211 @@
+#version 460
+layout(local_size_x = 256) in;
+
+// struct TestOutput {
+//     dvec4 out_val;
+// };
+
+// layout(std430, binding=0) coherent buffer TestOutputTemp {
+//     TestOutput test_output;
+// };
+
+layout(set = 0, binding = 0) uniform UniformBufferObject {
+    vec4 input_val;
+    uint image_width;
+    uint image_height;
+    uint num_layers;
+} ubo;
+
+layout(set = 0, binding = 1) coherent buffer OutputStorageBuffer {
+    dvec4 out_val;
+} output_ssbo;
+
+layout(set = 0, binding = 2, rgba8) uniform writeonly image2D outImage;
+layout(set = 0, binding = 3, rgba8) uniform writeonly imageCube outEnvMap;
+layout(set = 0, binding = 4) uniform sampler2D uEquirectangularMap;
+
+
+bool solve_6x6(in double H_in[6][6], in double g_in[6], out double delta_out[6])
+{
+    const double EPS = double(1.0e-12);
+
+    // Augmented matrix [H | g], size 6 x 7
+    double a[6][7];
+
+    for (int r = 0; r < 6; r++) {
+        for (int c = 0; c < 6; c++) {
+            a[r][c] = H_in[r][c];
+        }
+        a[r][6] = g_in[r];
+    }
+
+    // Forward elimination with partial pivoting
+    for (int col = 0; col < 6; col++) {
+        // Find pivot row
+        int pivot_row = col;
+        double max_abs = abs(a[col][col]);
+
+        for (int r = col + 1; r < 6; r++) {
+            double v = abs(a[r][col]);
+            if (v > max_abs) {
+                max_abs = v;
+                pivot_row = r;
+            }
+        }
+
+        // Singular / degenerate check
+        if (max_abs < EPS) {
+            return false;
+        }
+
+        // Swap rows if needed
+        if (pivot_row != col) {
+            for (int c = col; c < 7; c++) {
+                double tmp = a[col][c];
+                a[col][c] = a[pivot_row][c];
+                a[pivot_row][c] = tmp;
+            }
+        }
+
+        // Eliminate rows below
+        for (int r = col + 1; r < 6; r++) {
+            double factor = a[r][col] / a[col][col];
+
+            for (int c = col; c < 7; c++) {
+                a[r][c] -= factor * a[col][c];
+            }
+        }
+    }
+
+    // Back substitution
+    for (int r = 5; r >= 0; r--) {
+        double sum = a[r][6];
+
+        for (int c = r + 1; c < 6; c++) {
+            sum -= a[r][c] * delta_out[c];
+        }
+
+        if (abs(a[r][r]) < EPS) {
+            return false;
+        }
+
+        delta_out[r] = sum / a[r][r];
+    }
+
+    return true;
+}
+
+const float PI = 3.14159265358979323846;
+
+vec3 cubemap_texel_to_direction(uint id_x, uint id_y, uint id_face, uint face_size)
+{
+    // map texel center to [-1, 1]
+    float a = 2.0 * ((float(id_x) + 0.5) / float(face_size)) - 1.0;
+    float b = 2.0 * ((float(id_y) + 0.5) / float(face_size)) - 1.0;
+
+    vec3 dir;
+
+    if (id_face == 0u) {         // +X
+        dir = vec3( 1.0, -b, -a );
+    } else if (id_face == 1u) {  // -X
+        dir = vec3( -1.0, -b,  a );
+    } else if (id_face == 2u) {  // +Y
+        dir = vec3(  a,  1.0,  b );
+    } else if (id_face == 3u) {  // -Y
+        dir = vec3(  a, -1.0, -b );
+    } else if (id_face == 4u) {  // +Z
+        dir = vec3(  a, -b,  1.0 );
+    } else {                     // -Z
+        dir = vec3( -a, -b, -1.0 );
+    }
+
+    return normalize(dir);
+}
+
+vec2 direction_to_equirect_uv(vec3 dir) {
+    dir = normalize(dir);
+
+    float u = atan(dir.z, dir.x) / (2.0 * PI) + 0.5;
+    float v = asin(clamp(dir.y, -1.0, 1.0)) / PI + 0.5;
+
+    return vec2(u, v);
+}
+
+void main() {
+    uint x_id = gl_GlobalInvocationID.x;
+    uint y_id = gl_GlobalInvocationID.y;
+    
+    if (x_id >= ubo.image_width) return;
+    if (y_id >= ubo.image_height) return;
+
+    float x_val = float(x_id) / float(ubo.image_width);
+    float y_val = float(y_id) / float(ubo.image_height);
+
+    // vec4 c = texture(uEquirectangularMap, vec2(x_val, y_val));
+
+    // imageStore(outImage, ivec2(x_id, y_id), c);
+    // imageStore(outImage, ivec2(x_id, y_id),  vec4(c.xyz, 1.0));
+
+    // uint face = 1;
+    for (int i = 0; i < 6; i++) {
+        vec3 dir = cubemap_texel_to_direction(x_id, y_id, uint(i), uint(ubo.image_width));
+        vec2 uv = direction_to_equirect_uv(dir);
+
+        // imageStore(outEnvMap, ivec3(x_id, y_id, i), vec4(1.0, 0.0, 0.0, 1.0));
+
+        
+        vec4 c = texture(uEquirectangularMap, uv);
+        // vec4 c = vec4(x_val, y_val, 0.0, 1.0f);
+        
+        imageStore(outEnvMap, ivec3(x_id, y_id, i), vec4(c.xyz, 1.0));
+    }
+        
+    
+
+
+
+    // vec4 color = vec4(1, 0, 0, 1);
+    // for (int x = 0; x < 10; x++)
+    //     for (int y = 0; y < 10; y++) {
+    //         float x_val = x / 10.0f;
+    //         float y_val = y / 10.0f;
+
+    //         imageStore(outImage, ivec2(x, y), vec4(x_val, y_val, 0, 1));
+    //     }
+
+    // double test_H[6][6] = double[6][6](
+    //     double[6](5.00506440208984372e+02LF, -5.00000000000000000e-01LF, -5.00006439208984375e+02LF, 0.0LF, -5.00006439208984375e+02LF, 5.00000000000000000e-01LF),
+    //     double[6](-5.00000000000000000e-01LF, 1.00000099999999992e+00LF, -5.00000000000000000e-01LF, 5.00000000000000000e-01LF, 0.0LF, -5.00000000000000000e-01LF),
+    //     double[6](-5.00006439208984375e+02LF, -5.00000000000000000e-01LF, 5.00506440208984372e+02LF, -5.00000000000000000e-01LF, 5.00006439208984375e+02LF, 0.0LF),
+    //     double[6](0.0LF, 5.00000000000000000e-01LF, -5.00000000000000000e-01LF, 5.00001000000000029e-01LF, 0.0LF, 0.0LF),
+    //     double[6](-5.00006439208984375e+02LF, 0.0LF, 5.00006439208984375e+02LF, 0.0LF, 5.00006440208984372e+02LF, 0.0LF),
+    //     double[6](5.00000000000000000e-01LF, -5.00000000000000000e-01LF, 0.0LF, 0.0LF, 0.0LF, 5.00001000000000029e-01LF)
+    // );
+
+    // double test_g[6] = double[6](
+    //     4.99506439208984375e+02LF,
+    //     0.0LF,
+    //     -4.99506439208984375e+02LF,
+    //     -5.00000000000000000e-01LF,
+    //     -5.00006439208984375e+02LF,
+    //     -5.00000000000000000e-01LF
+    // );
+
+    // double test_delta_out[6] = {0.0LF, 0.0LF, 0.0LF, 0.0LF, 0.0LF, 0.0LF};
+
+    // bool ok = solve_6x6(test_H, test_g, test_delta_out);
+    
+    // // ----------------C++ output----------------
+    // // bool ok = 1
+    // // double delta[6] = {4.9227622343639727e-07, -3.2940920091484633e-09, -5.0213826444111244e-07, -0.99999849884717473, -0.99999900358553995, -0.99999849557332432};
+    // // ------------------------------------------
+
+    // output_ssbo.out_val.x = test_delta_out[3];
+    // output_ssbo.out_val.y = test_delta_out[4];
+    // output_ssbo.out_val.z = test_delta_out[5];
+
+    output_ssbo.out_val.x = ubo.image_width;
+    output_ssbo.out_val.y = ubo.image_height;
+    output_ssbo.out_val.z = 3;
+    output_ssbo.out_val.w = 4;
+}

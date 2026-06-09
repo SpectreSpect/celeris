@@ -24,6 +24,7 @@ void VoxelEditor::update_and_schedule() {
                 // glm::ivec3 local_voxel_pos = unpack_local_id(local_voxel_key, voxel_grid->chunk_size);
 
                 // int id = Chunk::idx(local_voxel_pos, voxel_grid->chunk_size);
+                // std::cout << "A" << std::endl;
 
                 voxels[local_voxel_key] = voxel_it->second;
             }

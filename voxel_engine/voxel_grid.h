@@ -12,6 +12,8 @@
 #include <utility>
 #include "../window.h"
 #include "voxel_editor.h"
+#include <algorithm> 
+#include "../grid_3d.h"
 #include "../gridable.h"
 #include "../math_utils.h"
 
@@ -48,9 +50,13 @@ struct GenResult {
     std::shared_ptr<const std::vector<Voxel>> voxels;
 };
 
-class VoxelGrid;
+// class VoxelGrid;
 
-class VoxelGrid : public Drawable, public Gridable, public Transformable  {
+<<<<<<< HEAD
+class VoxelGrid : public Drawable, public IGridable, public Transformable  {
+=======
+class VoxelGrid : public Grid3D, public Gridable, public Drawable {
+>>>>>>> origin/cloud-to-mesh
 public:
     // int chunk_render_distance = 8;
     glm::ivec3 chunk_render_size;
@@ -63,6 +69,7 @@ public:
     VoxelGrid(glm::ivec3 chunk_size, float voxel_size, glm::ivec3 chunk_render_size = {16, 6, 16});
     ~VoxelGrid();
 
+    bool is_solid(glm::ivec3 pos) override;
     bool is_voxel_free(glm::ivec3 pos);
 
     // std::thread mesh_updating_thread;
@@ -81,7 +88,6 @@ public:
 
         voxel_editor.update_and_schedule();
     }
-
     template<class F>
     void edit_chunk(glm::ivec3 chunk_pos, Chunk* chunk, F&& apply_edits) {
         uint64_t key = math_utils::pack_key(chunk_pos.x, chunk_pos.y, chunk_pos.z);   
@@ -123,6 +129,8 @@ public:
         uint32_t seed = ux * 0x8da6b343u ^ uy * 0xd8163841u; // big odd constants
         return hash32(seed);
     }
+
+    Voxel get_voxel(glm::ivec3 pos);
 
     bool enqueue_mesh_job(uint64_t key, glm::ivec3 cpos, Chunk* chunk);
     void mesh_worker_loop();

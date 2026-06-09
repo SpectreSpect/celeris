@@ -1,13 +1,24 @@
-#version 330 core
+#version 460
 
-in vec3 vNormal;
-in vec3 vFragPos;
-in vec3 vColor;
-in float vAO;
+layout(location = 0) in vec3 vNormal;
+layout(location = 1) in vec3 vFragPos;
+layout(location = 2) in vec3 vColor;
+layout(location = 3) in float vAO;
 
-out vec4 FragColor;
+layout(location = 0) out vec4 FragColor;
 
-uniform vec3 uViewPos;
+// uniform vec3 uViewPos;
+
+layout(set = 1, binding = 0) uniform CameraUniform {
+    mat4 view;
+    mat4 proj;
+    vec4 viewPos;
+} camera_uniform;
+
+layout(push_constant) uniform PushConstants {
+    mat4 model;
+    uint material_data_id;
+} pc;
 
 void main() {
     vec3 light_dir = normalize(vec3(1, 1.5, 1.3));
@@ -29,7 +40,7 @@ void main() {
     vec3 diffuse = diff * albedo * aoD;
 
     // Specular
-    vec3 view_dir = normalize(uViewPos - vFragPos);
+    vec3 view_dir = normalize(camera_uniform.viewPos.xyz - vFragPos);
     vec3 halfway_dir = normalize(light_dir + view_dir);
     float spec = pow(max(dot(normal, halfway_dir), 0.0), 70.0);
     vec3 specular = vec3(0.7) * spec;

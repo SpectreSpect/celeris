@@ -1,0 +1,66 @@
+#include "descriptor_pool_builder.h"
+#include "descriptor_set_layout_builder.h"
+
+DescriptorPoolBuilder& DescriptorPoolBuilder::add_descriptors(VkDescriptorType type, uint32_t descriptor_count) {
+    LOG_METHOD();
+
+    logger.check(descriptor_count > 0, "descriptor_count must be greater than 0");
+
+    for (VkDescriptorPoolSize& pool_size : m_pool_sizes) {
+        if (pool_size.type == type) {
+            pool_size.descriptorCount += descriptor_count;
+            return *this;
+        }
+    }
+
+    VkDescriptorPoolSize pool_size{};
+    pool_size.type = type;
+    pool_size.descriptorCount = descriptor_count;
+
+    m_pool_sizes.push_back(pool_size);
+
+    return *this;
+}
+
+DescriptorPoolBuilder& DescriptorPoolBuilder::add_layout(const DescriptorSetLayoutBuilder& layout_builder, uint32_t set_count) {
+    LOG_METHOD();
+
+    logger.check(set_count > 0, "set_count must be greater than 0");
+
+    std::span<const VkDescriptorSetLayoutBinding> bindings = layout_builder.get_bindings();
+
+    logger.check(!bindings.empty(), "DescriptorSetLayout has no bindings. Did you forget to add bindings to DescriptorSetLayoutBuilder?");
+    logger.check(bindings.data() != nullptr, "DescriptorPoolBuilder received a non-empty bindings span with nullptr data");
+
+    for (const VkDescriptorSetLayoutBinding binding : bindings) {
+        add_descriptors(binding.descriptorType, binding.descriptorCount * set_count);
+    }
+
+    m_max_sets += set_count;
+
+    return *this;
+}
+
+DescriptorPoolBuilder& DescriptorPoolBuilder::set_max_sets(uint32_t max_sets) noexcept {
+    m_max_sets = max_sets;
+    return *this;
+}
+
+DescriptorPoolBuilder& DescriptorPoolBuilder::set_flags(VkDescriptorPoolCreateFlags flags) noexcept {
+    m_create_flags = flags;
+    return *this;
+}
+
+std::span<const VkDescriptorPoolSize> DescriptorPoolBuilder::pool_sizes() const noexcept {
+    return m_pool_sizes;
+}
+
+
+
+uint32_t DescriptorPoolBuilder::max_sets() const noexcept {
+    return m_max_sets;
+}
+
+VkDescriptorPoolCreateFlags DescriptorPoolBuilder::flags() const noexcept {
+    return m_create_flags;
+}

@@ -1,0 +1,31 @@
+#pragma once
+
+#include <vector>
+#include <span>
+
+#include <vulkan/vulkan.h>
+#include "../logger/logger_header.h"
+#include "../shader_stages.h"
+
+class DescriptorSetLayoutBuilder {
+public:
+    _XCLASS_NAME(DescriptorSetLayout);
+    VkDescriptorSetLayoutCreateFlags m_flags = 0;
+
+    DescriptorSetLayoutBuilder() = default;
+
+    DescriptorSetLayoutBuilder& set_flags(VkDescriptorSetLayoutCreateFlags flags) noexcept;
+
+    DescriptorSetLayoutBuilder& add(uint32_t binding, VkDescriptorType type, VkShaderStageFlags shader_stage_flags, uint32_t descriptor_count = 1);
+    DescriptorSetLayoutBuilder& add_uniform_buffer(uint32_t binding, VkShaderStageFlags shader_stage_flags);
+    DescriptorSetLayoutBuilder& add_storage_buffer(uint32_t binding, VkShaderStageFlags shader_stage_flags);
+    DescriptorSetLayoutBuilder& add_combined_image_sampler(uint32_t binding, VkShaderStageFlags shader_stage_flags);
+    DescriptorSetLayoutBuilder& add_storage_image(uint32_t binding, VkShaderStageFlags shader_stage_flags);
+
+    std::span<const VkDescriptorSetLayoutBinding> get_bindings() const noexcept;
+    VkDescriptorSetLayoutCreateFlags flags() const noexcept;
+
+private:
+    std::vector<VkDescriptorSetLayoutBinding> m_bindings;
+
+};

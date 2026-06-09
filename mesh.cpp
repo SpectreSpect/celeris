@@ -1,51 +1,40 @@
 #include "mesh.h"
+#include "vulkan/renderer.h"
 
-Mesh::Mesh(const std::vector<float>& vertices, const std::vector<unsigned int>& indices, VertexLayout* vertex_layout) {
-    vao = new VAO();
-    vbo = new BufferObject(vertices.size() * sizeof(float), GL_STATIC_DRAW, vertices.data());
-    ebo = new BufferObject(indices.size() * sizeof(unsigned int), GL_STATIC_DRAW, indices.data());
-    this->vertex_layout = vertex_layout;
+Mesh::Mesh(
+    VulkanEngine* engine,
+    std::vector<std::byte> vertex_data,
+    std::vector<uint32_t> index_data,
+    VideoBuffer& staging_buffer)
+{
+    staging_buffer.ensure_capacity(std::max(vertex_data.size(), index_data.size() * sizeof(uint32_t)));
 
-    vao->setup(*vbo, *ebo, *vertex_layout);
+    vertex_buffer = VideoBuffer(
+        engine,
+        engine->physicalDevice,
+        vertex_data.size(),
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    );
+
+    index_buffer =  VideoBuffer(
+        engine,
+        engine->physicalDevice,
+        index_data.size() * sizeof(uint32_t),
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    );
+
+    staging_buffer.update_data(vertex_data.data(), vertex_data.size());
+
+    VideoBuffer::copy_buffer();
+
+    index_buffer.update_data(index_data, index_data_size_bytes);
+
+    num_indices = index_data_size_bytes / sizeof(unsigned int);
 }
 
-Mesh::~Mesh() {
-    delete vao;
-    delete vbo;
-    delete ebo;
-}
-
-void Mesh::update(const std::vector<float>& vertices, const std::vector<unsigned int>& indices, GLenum usage) {
-    if (vbo)
-        vbo->update_subdata(0, vertices.size() * sizeof(float), vertices.data());
-    
-    if (ebo)
-        ebo->update_subdata(0, indices.size() * sizeof(unsigned int), indices.data());
-}
-
-void Mesh::update(const void* vertex_data, size_t vertex_data_size, const void* index_data, size_t index_data_size, GLenum usage) {
-    if (vbo)
-        vbo->update_subdata(0, vertex_data_size, vertex_data);
-    
-    if (ebo)
-        ebo->update_subdata(0, index_data_size, index_data);
-}
 
 void Mesh::draw(RenderState state) {
-    glm::mat4 model = get_model_matrix();
-    glm::mat4 world = state.transform * model;
-    glm::mat4 mvp = state.vp * world;
-
-    Program* prog = state.program;
-    prog->use();
-    prog->set_mat4("uModel", world);
-    prog->set_mat4("uMVP", mvp);
-
-    if (state.camera) {
-        prog->set_vec3("uViewPos", state.camera->position);
-    }
-
-    vao->bind();
-    glDrawElements(GL_TRIANGLES, ebo->size_bytes() / sizeof(uint32_t), GL_UNSIGNED_INT, 0);
-    vao->unbind();
+    state.renderer->render_mesh(*this, state);
 }

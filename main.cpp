@@ -1,106 +1,420 @@
-#define ALLOW_LOCK_BufferObject
-
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
-
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
-#include <iostream>
-
-#include "engine3d.h"
+#include "vulkan_self/vulkan_engine.h"
+#include "vulkan_self/vulkan_shader_module.h"
+#include "vulkan_self/vulkan_buffer.h"
+#include "vulkan_self/vulkan_resource_loader.h"
+#include "vulkan_self/descriptor_set/descriptor_set_layout_builder.h"
+#include "vulkan_self/descriptor_set/descriptor_set_layout.h"
+#include "vulkan_self/descriptor_set/descriptor_pool_builder.h"
+#include "vulkan_self/descriptor_set/descriptor_pool.h"
+#include "vulkan_self/descriptor_set/descriptor_set.h"
+#include "vulkan_self/pipeline/vulkan_pipeline_layout.h"
+#include "vulkan_self/pipeline/graphics_pipeline/graphics_pipeline.h"
+#include "vulkan_self/pipeline/compute_pipeline/compute_pipeline.h"
+#include "vulkan_self/pass/pipeline_pass_builder.h"
+#include "vulkan_self/pass/compute_pass/compute_pass.h"
+#include "vulkan_self/image/vulkan_image.h"
+#include "vulkan_self/image/cpu_image.h"
+#include "vulkan_self/image/vulkan_texture_2d.h"
+#include "path_utils.h"
+#include "renderer/resources/frame_resources.h"
+#include "camera/camera.h"
+#include "camera/controllers/fps_camera_controller.h"
+#include "renderer/transform.h"
+#include "renderer/mesh.h"
+#include "renderer/render_object.h"
+#include "renderer/transform_push_constants.h"
+#include "managers/shader_manager.h"
+#include "managers/material_manager.h"
+#include "vulkan_self/pass/compute_pass/compute_pass_builder.h"
+#include "managers/compute_pass_manager.h"
+#include "renderer/instanced_render_object.h"
+#include "renderer/instance_batch.h"
+#include "managers/texture_manager.h"
+#include "managers/material_instance_manager.h"
+#include "renderer/point_cloud/point_instance.h"
+#include "renderer/renderer.h"
+#include "managers/mesh_manager.h"
+#include "managers/manager_bundle.h"
+#include "renderer/point_cloud/point_cloud.h"
+#include "renderer/scene.h"
+#include "renderer/skybox.h"
+#include "renderer/point_cloud/lidar/lidar_scan.h"
+#include "renderer/point_cloud/lidar/lidar_video.h"
+#include "renderer/point_cloud/gicp/gicp_pass.h"
+#include "renderer/point_cloud/gicp/voxel_point_map.h"
+#include "renderer/point_cloud/gicp/voxel_map_point_inserter.h"
+#include "renderer/point_cloud/gicp/voxel_map_point_reseter.h"
 #include "imgui_layer.h"
-#include "fps_camera_controller.h"
-#include "voxel_grid_gpu.h"
-#include "voxel_grid_gpu_debugger.h"
+#include "renderer/lighting_system/lighting_system.h"
+#include "renderer/pbr/equirect_to_cubemap_pass.h"
+#include "renderer/pbr/brdf_lut_pass.h"
+#include "renderer/pbr/prefilter_map_pass.h"
+#include "renderer/pbr/irradiance_map_pass.h"
+#include "vulkan_self/image/cubemap_array.h"
+#include "voxel_grid_vulkan/voxel_grid.h"
+#include "renderer/static_mesh_data.h"
+#include "renderer/indirect_render_object.h"
+#include "voxel_grid_vulkan/voxelizator.h"
+#include "math_utils.h"
+#include <queue>
 
-float clear_col[4] = {0.776470588f, 0.988235294f, 1.0f, 1.0f};
+#include <vector>
+#include <random>
+
+// static std::mt19937 rng(std::random_device{}());
+// static std::uniform_real_distribution<double> dist(0.0, 1.0);
+
+VkClearValue clear_color = {0.05f, 0.05f, 0.05f, 1.0f};
 
 int main() {
-    Engine3D engine = Engine3D();
-    std::shared_ptr<Window> window = std::make_shared<Window>(&engine, 1280, 720, "3D visualization");
-    engine.set_window(window.get());
-    ui::init(window->window);
-    
-    window->disable_cursor();
+    GlfwContext glfw_context;
+    Window window(glfw_context, 1280, 720, "Celeris");
 
-    std::vector<std::filesystem::path> shaders_inlude_directories = {}; // Искать относительно executable_dir()
-    ShaderManager shader_manager = ShaderManager(executable_dir(), shaders_inlude_directories);
+    QueueRequest queue_request;
+    queue_request.graphics_count = 2;
+    queue_request.present_count = 1;
+    queue_request.compute_count = 1;
 
+    VulkanEngine engine(glfw_context, window, queue_request);
+
+    UI ui(window, engine);
     Camera camera;
-    window->set_camera(&camera);
+    FPSCameraController camera_controller(camera);
+    camera_controller.speed = 20;
 
-    FPSCameraController camera_controller = FPSCameraController(&camera);
-    camera_controller.speed = 100;
+    VulkanResourceLoader resource_loader(engine, 154217728); // 1 Мб
 
-    float voxel_size = 1.0f;
-    uint32_t chunk_size = 16u;
-    std::shared_ptr<VoxelGridGPU> voxel_grid_gpu = std::make_shared<VoxelGridGPU>(
-        glm::ivec3(chunk_size), // chunk_size
-        glm::vec3(voxel_size), // voxel_size
-        30'000, // count_active_chunks
-        3'000'000, // max_quads
-        4, // chunk_hash_table_size_factor
-        4096, // count_evict_buckets
-        10'000, // min_free_chunks
-        0.2f, // tomb_fraction_to_rebuild
-        chunk_size * voxel_size * 1, // eviction_bucket_shell_thickness
-        10, // vb_page_size_order_of_two
-        10, // ib_page_size_order_of_two
-        1.0, // buddy_allocator_nodes_factor
-        chunk_size * voxel_size * 30,
-        shader_manager
+    ShaderManager shader_manager(engine.device());
+    ComputePassManager compute_pass_manager(engine.device(), shader_manager);
+    TextureManager texture_manager(engine, resource_loader, compute_pass_manager);
+    
+    LightingSystem lighting_system(engine, compute_pass_manager);
+    FrameResources frame_resources(engine, lighting_system, engine.num_frames_in_flight());
+
+    lighting_system.set_frame_resources(frame_resources);
+
+    MaterialManager material_manager(engine, shader_manager, frame_resources);
+    MaterialInstanceManager material_instance_manager(engine, material_manager, texture_manager);
+    MeshManager mesh_manager(engine, resource_loader);
+    ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
+
+    glm::vec3 voxel_size(1.0f);
+    glm::ivec3 chunk_size(16);
+    VoxelGrid::VoxelGridDesc voxel_grid_desc {
+        .chunk_size = chunk_size,
+        .voxel_size = voxel_size,
+        .count_active_chunks = 10'000,
+        .max_quads = 1'000'000,
+        .chunk_hash_table_size_factor = 1.0f,
+        .count_evict_buckets = 32,
+        .min_free_chunks = 4'500,
+        .tomb_fraction_to_rebuild = 0.2f,
+        .eviction_bucket_shell_thickness = chunk_size.x * voxel_size.x * 1,
+        .vb_page_size_order_of_two = 10,
+        .ib_page_size_order_of_two = 10,
+        .buddy_allocator_nodes_factor = 1.0,
+        .render_distance = chunk_size.x * voxel_size.x * 30,
+        .generation_distance = 10,
+        .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000)
+    };
+
+    VoxelGrid voxel_grid(
+        engine.physical_device(),
+        engine.device(),
+        engine.compute_queue(),
+        compute_pass_manager,
+        material_instance_manager,
+        voxel_grid_desc
     );
 
-    VoxelGridGPUDebugger voxel_grid_debugger(voxel_grid_gpu, window);
+    Voxelizator::VoxelizatorDesc voxelizator_desc {
+        .chunk_size = chunk_size,
+        .voxel_size = voxel_size,
+        .counter_hash_table_size = 10'000,
+        .count_voxel_writes = 0 // Будут использоваться те, что внутри voxel_grid
+    };
 
-    glm::vec3 prev_cam_pos = camera_controller.camera->position;
+    Voxelizator voxelizator(
+        engine.physical_device(),
+        engine.device(),
+        engine.compute_queue(),
+        compute_pass_manager,
+        voxelizator_desc
+    );
 
+    glm::ivec3 block_size = glm::ivec3(10, 20, 30);
+    glm::ivec3 block_origin = glm::ivec3(0, 30, 0);
+    std::vector<VoxelWriteGPU> test_voxel_writes;
+    test_voxel_writes.reserve(static_cast<size_t>(block_size.x * block_size.y * block_size.z));
 
-    std::filesystem::path state_dumps_dir = executable_dir() / "voxel_grid" / "state_dumps";
-    std::filesystem::path dumps_dir = executable_dir() / "voxel_grid" / "dumps";
-    std::filesystem::path base_dump_path = dumps_dir / "base_dump";
-    std::filesystem::path dump_animations_path = dumps_dir / "dump_animations";
-    std::filesystem::path frames_path_to_load = dump_animations_path / "to_load";
+    for (int x = 0; x < block_size.x; x++)
+        for (int y = 0; y < block_size.y; y++)
+            for (int z = 0; z < block_size.z; z++) {
+                glm::ivec3 base_color{0, 98, 255};
+                glm::ivec3 color = glm::vec3(base_color) * glm::vec3(0.5 + math_utils::dist(math_utils::rng) * 0.5);
 
-    int selected_frame_id = 0;
-    int offset_verify_stack = 0;
-    int count_elements_verify_stack = -1;
-    int dirty_count_to_set = 0;
-    bool use_verify_stack = false;
+                test_voxel_writes.push_back(
+                    VoxelWriteGPU{
+                        .world_voxel = glm::ivec4(block_origin, 0) + glm::ivec4(x, y, z, 0),
+                        .voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, color),
+                        .set_flags = OVERWRITE_BIT
+                    }
+                );
+            }
 
-    float timer = 0;
-    float lastFrame = 0;
-    while(window->is_open()) {
-        float currentFrame = (float)glfwGetTime();
-        float delta_time = currentFrame - lastFrame;
-        timer += delta_time;
-        lastFrame = currentFrame;   
+    VulkanBuffer box_voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + Utils::size_bytes(test_voxel_writes));
+    box_voxel_write_list.upload_scalar<uint32_t>(test_voxel_writes.size(), 0);
+    box_voxel_write_list.upload(test_voxel_writes, sizeof(uint32_t) * 4);
 
-        ui::begin_frame();
-        ui::update_mouse_mode(window.get());
-
-        camera_controller.update(window.get(), delta_time);
-
-        window->clear_color({clear_col[0], clear_col[1], clear_col[2], clear_col[3]});
-
-        // voxel_grid_gpu->stream_chunks_sphere(camera_controller.camera->position, 10, 45345345);
-        window->draw(voxel_grid_gpu.get(), &camera);
-
-        voxel_grid_debugger.dispay_debug_window();
-        voxel_grid_debugger.display_build_cmd_window();
-        voxel_grid_debugger.display_build_from_dirty_window();
-        voxel_grid_debugger.display_chunk_eviction_window();
-        voxel_grid_debugger.display_draw_pipline_window();
-        voxel_grid_debugger.display_stream_chunks_pipeline();
-
-        ui::end_frame();
-
-        window->swap_buffers();
-        engine.poll_events();
-
-        prev_cam_pos = camera_controller.camera->position;
+    VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
+    {
+        auto scope = compute_command_buffer.begin_scope();
+        voxel_grid.set_voxels(compute_command_buffer, box_voxel_write_list);
     }
+    VulkanFence compute_fence(engine.device());
+    engine.compute_submit(compute_command_buffer, &compute_fence);
+    compute_fence.wait();
+
+
+    uint32_t max_write_count = 100000;
+    VulkanBuffer voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * max_write_count);
+
+    GICPPass gicp_pass(engine, compute_pass_manager);
+    VoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);
+    VoxelMapPointReseter voxel_map_reseter(engine, compute_pass_manager);
+
+    Renderer renderer(engine, frame_resources);
     
-    ui::shutdown();
+    RenderObject sphere(mesh_manager.sphere, material_instance_manager.pbr);
+
+    RenderObject vox_box(mesh_manager.cube, material_instance_manager.pbr);
+    vox_box.transform.position = glm::vec3(0.0f, 80.0f, 0.0f);
+    vox_box.transform.scale = glm::vec3(20.0f);
+
+    VoxelWriteGPU blue_voxelize_prefab;
+    blue_voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
+    blue_voxelize_prefab.set_flags = OVERWRITE_BIT;
+
+    VoxelWriteGPU transparent_voxelize_prefab;
+    transparent_voxelize_prefab.voxel_data = VoxelDataGPU(0, 0, glm::ivec3(255));
+    transparent_voxelize_prefab.set_flags = OVERWRITE_BIT;
+
+    const float skybox_exposure = 1.8f;
+
+    Skybox skybox(
+        mesh_manager.skybox_cube,
+        material_instance_manager.st_peters_square_night_4k_hdr,
+        texture_manager,
+        material_manager.pbr_mp,
+        TextureManager::st_peters_square_night_4k_pbr_map_id,
+        skybox_exposure
+    );
+    
+    LidarVideo lidar_video(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 150);
+
+    // Important: save original first frame pose before overwriting it.
+    glm::vec3 first_position = lidar_video.get_scan(0).point_cloud().transform.position;
+    glm::quat first_rotation = glm::normalize(lidar_video.get_scan(0).point_cloud().transform.rotation);
+
+    for (int i = static_cast<int>(lidar_video.get_scan_count()) - 1; i >= 1; --i) {
+        glm::vec3 p_prev = lidar_video.get_scan(i - 1).point_cloud().transform.position;
+        glm::vec3 p_curr = lidar_video.get_scan(i).point_cloud().transform.position;
+
+        glm::quat q_prev = glm::normalize(lidar_video.get_scan(i - 1).point_cloud().transform.rotation);
+        glm::quat q_curr = glm::normalize(lidar_video.get_scan(i).point_cloud().transform.rotation);
+
+        // Optional: avoid quaternion sign discontinuity.
+        // q and -q represent the same rotation.
+        if (glm::dot(q_prev, q_curr) < 0.0f) {
+            q_curr = -q_curr;
+        }
+
+        glm::vec3 delta_position = p_curr - p_prev;
+
+        // Since your update convention is:
+        // q_new = dq * q_old
+        glm::quat delta_rotation = glm::normalize(q_curr * glm::inverse(q_prev));
+
+        lidar_video.get_scan(i).point_cloud().transform.position = delta_position;
+        lidar_video.get_scan(i).point_cloud().transform.rotation = delta_rotation;
+    }
+
+    lidar_video.get_scan(0).point_cloud().transform.position = glm::vec3(0.0f);
+    lidar_video.get_scan(0).point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+
+    VoxelPointMap voxel_point_map(engine, 1500000, 1500000);
+    voxel_map_reseter.reset(voxel_point_map);
+
+    // voxel_map_inserter.insert(voxel_point_map, target_point_cloud, target_normal_buffer);
+    voxel_map_inserter.insert(voxel_point_map, lidar_video.get_scan(0).point_cloud(), lidar_video.get_scan(0).normal_buffer());
+    voxel_point_map.upload_voxels(engine, voxel_grid);
+
+    PointCloud voxel_map_point_cloud(manager_bundle, voxel_point_map.map_point_buffer, voxel_point_map.m_map_point_count);
+
+    sphere.set_material_data(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
+    vox_box.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
+
+    sphere.transform.position = glm::vec4(0, 2, 0, 1);
+
+    Scene scene;
+
+    scene.add(skybox);
+    scene.add(sphere);
+    // scene.add(voxel_map_point_cloud);
+    
+    skybox.update(scene);
+
+    bool g_pressed = false;
+    bool n_pressed = false;
+
+    int step = 0;
+    
+    float last_frame_time = 0.0f;
+    float start_time = (float)glfwGetTime();
+    float timer = 0;
+    uint32_t pending_skybox_environment_map_id = skybox.environment_map_id();
+    bool skybox_environment_update_pending = false;
+    float angular_speed = glm::half_pi<float>() * 0.5f;
+
+    std::vector<glm::mat4> transform_mem(3);
+
+    while (!engine.window().should_close()) {
+        engine.window().poll_events();
+
+        if (skybox_environment_update_pending) {
+            engine.device().wait_idle();
+            skybox.set_environment_map_id(pending_skybox_environment_map_id);
+            skybox.update(scene);
+            skybox_environment_update_pending = false;
+        }
+
+        float current_frame_time = (float)glfwGetTime() - start_time;
+        float delta_time = current_frame_time - last_frame_time;
+        last_frame_time = current_frame_time;
+        timer += delta_time;
+
+        float angle = angular_speed * delta_time;
+        glm::quat rot_x = glm::angleAxis(angle, glm::vec3(1.0f, 0.0f, 0.0f));
+        glm::quat rot_y = glm::angleAxis(angle, glm::vec3(0.0f, 1.0f, 0.0f));
+
+        // for (const glm::mat4 transform : transform_mem) {
+        //     voxelizator.voxelize_and_submit(
+        //         transparent_voxelize_prefab,
+        //         vox_box.mesh_view(),
+        //         offsetof(PBRVertex, position),
+        //         sizeof(PBRVertex),
+        //         transform,
+        //         &voxel_grid.local_voxel_write_list()        
+        //     );
+        // }
+
+        // for (size_t i = 0; i < transform_mem.size(); i++) {
+        //     vox_box.transform.rotation = glm::normalize(
+        //         vox_box.transform.rotation * rot_x * rot_y
+        //     );
+
+        //     voxelizator.voxelize_and_submit(
+        //         blue_voxelize_prefab,
+        //         vox_box.mesh_view(),
+        //         offsetof(PBRVertex, position),
+        //         sizeof(PBRVertex),
+        //         vox_box.transform.get_model_matrix(),
+        //         &voxel_grid.local_voxel_write_list()        
+        //     );
+
+        //     transform_mem[i] = vox_box.transform.get_model_matrix();
+        // }
+
+        uint32_t image_index = 0;
+        if (!engine.aquire_free_resources(image_index)) continue;
+        VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
+
+        camera_controller.update(window, delta_time);
+        frame_resources.update_camera(engine.current_frame(), window, camera);
+        lighting_system.update(engine.current_frame(), window, camera);
+
+        voxel_grid.update(window, camera);
+
+        if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
+            g_pressed = true;
+
+            uint32_t current_frame_id = lidar_video.current_frame_id();
+
+            if (current_frame_id > 0) {
+                LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
+                gicp_pass.step(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
+            }
+
+            step++;
+        }
+
+        if (g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_RELEASE) {
+            g_pressed = false;
+        }
+
+        auto next_frame = [&]() {
+            uint32_t current_frame_id = lidar_video.current_frame_id();
+
+            if (current_frame_id > 0) {
+                LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
+                LidarScan& previous_scan = lidar_video.get_scan(current_frame_id - 1);
+
+                PointCloud& current_point_cloud = current_scan.point_cloud();
+                PointCloud& previous_point_cloud = previous_scan.point_cloud();
+
+                current_point_cloud.transform.position = previous_point_cloud.transform.position + current_point_cloud.transform.position;
+
+                current_point_cloud.transform.rotation = glm::normalize(current_point_cloud.transform.rotation * previous_point_cloud.transform.rotation);
+
+                gicp_pass.fit(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer(), 10);
+
+                voxel_map_inserter.insert(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
+                voxel_grid.voxelize_point_cloud(engine, current_scan.point_cloud(), voxel_write_list, max_write_count);
+                voxel_map_point_cloud.set_instance_view(voxel_point_map.get_map_instance_view());
+            }
+            
+            lidar_video.next_frame();
+        };
+
+        if (!n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_PRESS) {
+            n_pressed = true;
+            
+            next_frame();
+        }
+
+        if (n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_RELEASE) {
+            n_pressed = false;
+        }
+        // Запись команд
+        {auto command_buffer_scope = command_buffer.begin_scope();
+            {auto render_pass_scope = engine.swapchain_resources().render_pass.begin_scope(
+                command_buffer,
+                engine.swapchain_resources().framebuffers[image_index],
+                // engine.swapchain_resources().swapchain, {{0.05f, 0.05f, 0.05f, 1.0f}});
+                engine.swapchain_resources().swapchain, clear_color);
+                // rgba(37, 150, 190)
+                renderer.render(command_buffer, scene);
+
+                renderer.render(command_buffer, voxel_grid.render_object());
+
+                ui.begin_frame();
+                ui.update_mouse_mode(window);
+
+                ImGui::Begin("Debug");
+
+                if (ImGui::Button("Next frame")) {
+                    next_frame();
+                }
+
+                ImGui::End();
+                
+                ui.end_frame(command_buffer);
+            }
+        }
+
+        engine.submit_graphic_commands(image_index);
+        engine.present(image_index);
+    }
+
+    engine.device().wait_idle();
 }

@@ -1,0 +1,73 @@
+#version 460
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+struct AABB {
+    vec4 pmin;
+    vec4 pmax;
+};
+
+
+struct LightSource {
+    vec4 position;
+    vec4 color;
+};
+// layout(std430, binding=5) buffer LightSources { LightSource light_sources[]; };
+// layout(std430, binding=6) buffer NumLightsInClusters { uint num_lights_in_clusters[]; };
+// layout(std430, binding=7) buffer OutIndices { uint out_indices[]; };
+
+
+layout(std430, binding=4) buffer ClusterAABBs { AABB cluster_aabbs[]; };
+layout(std430, binding=5) buffer LightSources { LightSource light_sources[]; };
+layout(std430, binding=6) buffer NumLightsInClusters { uint num_lights_in_clusters[]; };
+layout(std430, binding=7) buffer OutIndices { uint out_indices[]; };
+
+// uniform uint num_clusters;
+// uniform uint max_lights_per_cluster;
+// uniform mat4 view_matrix;
+
+layout(set = 0, binding = 0) uniform UniformBufferObject {
+    uint num_clusters;
+    uint max_lights_per_cluster;
+    uint pad0;
+    uint pad1;
+    mat4 view_matrix;
+} ubo;
+
+
+bool sphereIntersectsAABB_ViewSpace(uint light_source_id, uint cluster_id) {
+    float radius = light_sources[light_source_id].position.w;
+
+    if (radius <= 0)
+        return false;
+
+    vec3 centerVS = vec3(ubo.view_matrix * vec4(light_sources[light_source_id].position.xyz, 1.0));
+    AABB aabb = cluster_aabbs[cluster_id];
+
+    float d2 = 0.0f;
+    if (centerVS.x < aabb.pmin.x) { float d = aabb.pmin.x - centerVS.x; d2 += d*d; }
+    else if (centerVS.x > aabb.pmax.x) { float d = centerVS.x - aabb.pmax.x; d2 += d*d; }
+    if (centerVS.y < aabb.pmin.y) { float d = aabb.pmin.y - centerVS.y; d2 += d*d; }
+    else if (centerVS.y > aabb.pmax.y) { float d = centerVS.y - aabb.pmax.y; d2 += d*d; }
+    if (centerVS.z < aabb.pmin.z) { float d = aabb.pmin.z - centerVS.z; d2 += d*d; }
+    else if (centerVS.z > aabb.pmax.z) { float d = centerVS.z - aabb.pmax.z; d2 += d*d; }
+    return d2 <= radius * radius;
+}
+
+void main(){
+    uint cluster_id = gl_GlobalInvocationID.x;
+    uint light_id = gl_GlobalInvocationID.y;
+
+    if (cluster_id >= ubo.num_clusters) return;
+
+    if (!sphereIntersectsAABB_ViewSpace(light_id, cluster_id))
+        return;
+
+    uint slot = atomicAdd(num_lights_in_clusters[cluster_id], 1u);
+
+    if (slot < ubo.max_lights_per_cluster) {
+        uint base = cluster_id * ubo.max_lights_per_cluster;
+        out_indices[base + slot] = light_id;
+    } else {
+        // atomicAdd(num_lights_in_clusters[cluster_id], uint(-1));
+    }
+}

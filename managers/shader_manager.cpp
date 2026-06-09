@@ -1,0 +1,81 @@
+#include "shader_manager.h"
+#include "../path_utils.h"
+
+ShaderManager::ShaderManager(VulkanDevice& device) 
+    :   blinn_phong_vs(device, path_utils::executable_dir() / "shaders" / "triangle.vert.spv"),
+        blinn_phong_fs(device, path_utils::executable_dir() / "shaders" / "triangle.frag.spv"),
+
+        unlit_vs(device, path_utils::executable_dir() / "shaders" / "unlit.vert.spv"),
+        unlit_fs(device, path_utils::executable_dir() / "shaders" / "unlit.frag.spv"),
+
+        point_vs(device, path_utils::executable_dir() / "shaders" / "point_cloud.vert.spv"),
+        point_fs(device, path_utils::executable_dir() / "shaders" / "point_cloud.frag.spv"),
+
+        skybox_vs(device, path_utils::executable_dir() / "shaders" / "skybox.vert.spv"),
+        skybox_fs(device, path_utils::executable_dir() / "shaders" / "skybox.frag.spv"),
+        pbr_vs(device, path_utils::executable_dir() / "shaders" / "pbr.vert.spv"),
+        pbr_fs(device, path_utils::executable_dir() / "shaders" / "pbr.frag.spv"),
+
+        // Compute shaders
+        // General
+        fill_buffer_cs(device, path_utils::executable_dir() / "shaders" / "fill_buffer.comp.spv"),
+
+        // GICP
+        gicp_step_cs(device, path_utils::executable_dir() / "shaders" / "gicp_step.comp.spv"),
+        insert_points_into_voxel_map_cs(device, path_utils::executable_dir() / "shaders" / "insert_points_into_voxel_map.comp.spv"),
+        reset_point_voxel_map_cs(device, path_utils::executable_dir() / "shaders" / "reset_voxel_point_map.comp.spv"),
+        gicp_reduce_cs(device, path_utils::executable_dir() / "shaders" / "gicp_reduce.comp.spv"),
+
+        // Lights
+        build_cluster_light_lists_cs(device, path_utils::executable_dir() / "shaders" / "build_cluster_light_lists.comp.spv"),
+        
+        // Voxel grid
+        world_init_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "world_init.comp.spv"),
+        // apply_writes_to_world_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "apply_writes_to_world.comp.spv"),
+        mesh_pool_clear_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_pool_clear.comp.spv"),
+        mesh_pool_seed_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_pool_seed.comp.spv"),
+        dispatch_adapter_cs(device, path_utils::executable_dir() / "shaders" / "dispatch_adapter.comp.spv"),
+        mesh_reset_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_reset.comp.spv"),
+        mesh_count_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_count.comp.spv"),
+        mesh_alloc_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_alloc.comp.spv"),
+        verify_mesh_allocation_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "verify_mesh_allocation.comp.spv"),
+        return_free_alloc_nodes_dispatch_adapter_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "return_free_alloc_nodes_dispatch_adapter.comp.spv"),
+        return_free_alloc_nodes_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "return_free_alloc_nodes.comp.spv"),
+        mesh_emit_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_emit.comp.spv"),
+        mesh_finalize_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_finalize.comp.spv"),
+        reset_dirty_count_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "reset_dirty_count.comp.spv"),
+        stream_select_chunks_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "stream_select_chunks.comp.spv"),
+        insert_elements_to_voxel_write_list_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "insert_elements_to_voxel_write_list.comp.spv"),
+        add_voxel_write_list_counters_together_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "add_voxel_write_list_counters_together.comp.spv"),
+        mark_write_chunks_to_generate_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mark_write_chunks_to_generate.comp.spv"),
+        stream_generate_terrain_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "stream_generate_terrain.comp.spv"),
+        write_voxels_to_grid_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "write_voxels_to_grid.comp.spv"),
+        evict_buckets_build_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "evict_buckets_build.comp.spv"),
+        evict_low_priority_dispatch_adapter_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "evict_low_priority_dispatch_adapter.comp.spv"),
+        evict_low_priority_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "evict_low_priority.comp.spv"),
+        build_indirect_cmds_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "build_indirect_cmds.comp.spv"),
+        free_evicted_chunks_mesh_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "free_evicted_chunks_mesh.comp.spv"),
+        reset_evicted_list_and_buckets_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "reset_evicted_list_and_buckets.comp.spv"),
+        hash_table_conditional_dispatch_adapter_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "hash_table_conditional_dispatch_adapter.comp.spv"),
+        clear_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "clear_chunk_hash_table.comp.spv"),
+        fill_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "fill_chunk_hash_table.comp.spv"),
+
+        voxel_writes_from_point_cloud_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_writes_from_point_cloud.comp.spv"),
+
+        // Voxelizator
+        alloc_active_chunk_triangles_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "alloc_active_chunk_triangles.comp.spv"),
+        fill_triangle_indices_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "fill_triangle_indices.comp.spv"),
+        mark_and_count_active_chunks_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "mark_and_count_active_chunks.comp.spv"),
+        reset_voxelize_pipeline_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "reset_voxelize_pipeline.comp.spv"),
+        voxelize_triangles_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "voxelize_triangles.comp.spv"),
+
+        voxel_mesh_vs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_mesh.vert.spv"),
+        voxel_mesh_fs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_mesh.frag.spv"),
+        voxel_pbr_vs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_pbr.vert.spv"),
+        voxel_pbr_fs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_pbr.frag.spv"),
+        
+        // PBR
+        equirect_to_cubemap_cs(device, path_utils::executable_dir() / "shaders" / "equirect_to_cubemap.comp.spv"),
+        brdf_lut_cs(device, path_utils::executable_dir() / "shaders" / "brdf_lut.comp.spv"),
+        generate_prefilter_map_cs(device, path_utils::executable_dir() / "shaders" / "generate_prefilter_map.comp.spv"),
+        generate_irradiance_map_cs(device, path_utils::executable_dir() / "shaders" / "generate_irradiance_map.comp.spv") {}

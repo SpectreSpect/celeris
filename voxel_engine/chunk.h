@@ -14,7 +14,7 @@ enum class Face {Left, Right, Back, Front, Top, Bottom};
 
 class VoxelGrid;
 
-class Chunk : public Drawable, public Gridable, public Transformable {
+class Chunk : public Drawable, public IGridable, public Transformable {
 public:
     glm::ivec3 size;
     glm::vec3 voxel_size;

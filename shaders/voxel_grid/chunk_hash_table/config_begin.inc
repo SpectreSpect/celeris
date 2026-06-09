@@ -1,0 +1,11 @@
+#define HT_PREFIX chunk_hash_table
+#define SLOT_VALUE_TYPE uint
+#define SLOT_KEY_TYPE uvec2
+#define SLOT_TYPE ChunkHashTableSlot
+#define TABLE_COUNTERS chunk_hash_table_counters
+#define SLOTS_BUFFER chunk_hash_table_slots
+#define HASH_TABLE_SIZE u_chunk_hash_table_size
+#define KEY_HASH_FUNC hash_uvec2
+#define KEY_COMP_FUNC chunk_key_comp
+#define VALUE_INIT_FUNC pop_free_chunk_id
+#define INIT_SLOT_CALLBACK init_chunk_meta

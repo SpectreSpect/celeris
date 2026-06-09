@@ -1,0 +1,447 @@
+#version 460
+layout(local_size_x = 256) in;
+
+struct PointInstance {
+    vec4 position;
+    vec4 color;
+};
+
+layout(std140, set = 0, binding = 0) uniform ParamsBuffer {
+    uint source_point_count;
+    uint max_map_point_count;
+    uint num_hash_table_slots;
+    mat4 source_model;
+    vec4 color;
+} params;
+
+layout(std430, set = 0, binding = 1) readonly buffer SourcePointBuffer {
+    PointInstance points[];
+} source_point_buffer;
+
+layout(std430, set = 0, binding = 2) readonly buffer SourceNormalBuffer {
+    vec4 normals[];
+} source_normal_buffer;
+
+layout(std430, set = 0, binding = 3) buffer MapPointCountBuffer {
+    uint count;
+} map_point_count_buffer;
+
+// points[id].position.xyz = mean position of voxel
+// points[id].position.w   = number of points accumulated in voxel
+// points[id].color        = averaged color, optional
+layout(std430, set = 0, binding = 4) buffer MapPointBuffer {
+    PointInstance points[];
+} map_point_buffer;
+
+// normals[id].xyz = accumulated normal sum
+// normals[id].w   = unused
+//
+// When reading for GICP, use normalize(normals[id].xyz)
+layout(std430, set = 0, binding = 5) buffer MapNormalBuffer {
+    vec4 normals[];
+} map_normal_buffer;
+
+#ifndef VOXEL_MAX_PROBES
+#define VOXEL_MAX_PROBES 128u
+#endif
+
+#define VOXEL_INVALID_ID     0xFFFFFFFFu
+#define VOXEL_SLOT_EMPTY     0xFFFFFFFFu
+#define VOXEL_SLOT_LOCKED    0xFFFFFFFEu
+#define VOXEL_SLOT_OCCUPIED  0xFFFFFFFCu
+
+const float MIN_NORMAL_LEN = 0.00001;
+
+// ------------------------------------------------------------
+// Validity helpers
+// ------------------------------------------------------------
+
+bool valid_float(float x)
+{
+    return !isnan(x) && !isinf(x);
+}
+
+bool valid_vec2(vec2 v)
+{
+    return valid_float(v.x) &&
+           valid_float(v.y);
+}
+
+bool valid_vec3(vec3 v)
+{
+    return valid_float(v.x) &&
+           valid_float(v.y) &&
+           valid_float(v.z);
+}
+
+bool valid_vec4(vec4 v)
+{
+    return valid_float(v.x) &&
+           valid_float(v.y) &&
+           valid_float(v.z) &&
+           valid_float(v.w);
+}
+
+bool valid_normal(vec3 n)
+{
+    if (!valid_vec3(n))
+        return false;
+
+    float len2 = dot(n, n);
+
+    if (!valid_float(len2))
+        return false;
+
+    return len2 > MIN_NORMAL_LEN * MIN_NORMAL_LEN;
+}
+
+// ------------------------------------------------------------
+// Voxel helpers
+// ------------------------------------------------------------
+
+ivec3 voxel_key_from_world_pos(vec3 world_pos, float voxel_size)
+{
+    return ivec3(floor(world_pos / voxel_size));
+}
+
+uint hash_voxel_key(ivec3 key)
+{
+    uvec3 k = uvec3(key);
+
+    uint h = 2166136261u;
+    h = (h ^ k.x) * 16777619u;
+    h = (h ^ k.y) * 16777619u;
+    h = (h ^ k.z) * 16777619u;
+
+    h ^= h >> 16;
+    h *= 0x7feb352du;
+    h ^= h >> 15;
+    h *= 0x846ca68bu;
+    h ^= h >> 16;
+
+    return h;
+}
+
+bool voxel_key_equal(ivec4 stored_key, ivec3 query_key)
+{
+    return all(equal(stored_key.xyz, query_key));
+}
+
+struct VoxelHashSlot {
+    uint  state;
+    ivec4 key;
+    uint  value;
+};
+
+layout(std430, set = 0, binding = 6) coherent buffer VoxelHashTableBuffer {
+    VoxelHashSlot slots[];
+} voxel_table;
+
+// ------------------------------------------------------------
+// Surfel update
+// ------------------------------------------------------------
+
+void update_voxel_surfel(
+    uint surfel_id,
+    vec3 world_position,
+    vec3 world_normal,
+    vec4 color
+) {
+    // Defensive checks.
+    // This function should only receive valid data, but this prevents
+    // accidental corruption if it is called incorrectly.
+    if (!valid_vec3(world_position))
+        return;
+
+    if (!valid_normal(world_normal))
+        return;
+
+    if (!valid_vec4(color))
+        return;
+
+    world_normal = normalize(world_normal);
+
+    vec4 old_mean_count = map_point_buffer.points[surfel_id].position;
+
+    vec3 old_mean = old_mean_count.xyz;
+    float old_count = old_mean_count.w;
+
+    if (!valid_vec3(old_mean))
+        return;
+
+    if (!valid_float(old_count) || old_count < 0.0)
+        return;
+
+    float new_count = old_count + 1.0;
+
+    if (!valid_float(new_count) || new_count <= 0.0)
+        return;
+
+    // Running mean:
+    //
+    // new_mean = old_mean + (x - old_mean) / new_count
+    vec3 new_mean = old_mean + (world_position - old_mean) / new_count;
+
+    if (!valid_vec3(new_mean))
+        return;
+
+    // Optional running average color.
+    vec4 old_color = map_point_buffer.points[surfel_id].color;
+    vec4 new_color = old_color + (color - old_color) / new_count;
+
+    if (!valid_vec4(new_color))
+        return;
+
+    vec3 normal_sum = map_normal_buffer.normals[surfel_id].xyz;
+
+    if (!valid_vec3(normal_sum))
+        return;
+
+    vec3 n = world_normal;
+
+    // If normals are inconsistently oriented, this avoids cancellation.
+    //
+    // Example:
+    //     +Z + -Z = 0
+    //
+    // This flips incoming normal to agree with accumulated direction.
+    if (dot(normal_sum, normal_sum) > 1e-12 && dot(normal_sum, n) < 0.0) {
+        n = -n;
+    }
+
+    normal_sum += n;
+
+    if (!valid_vec3(normal_sum))
+        return;
+
+    map_point_buffer.points[surfel_id].position = vec4(new_mean, new_count);
+    map_point_buffer.points[surfel_id].color = new_color;
+    map_normal_buffer.normals[surfel_id] = vec4(normal_sum, 0.0);
+}
+
+// ------------------------------------------------------------
+// Insert point into voxel hash table
+// ------------------------------------------------------------
+
+bool voxel_insert_point_and_normal(
+    ivec3 key,
+    vec4 world_position4,
+    vec4 world_normal4,
+    vec4 color
+) {
+    uint slot_count = params.num_hash_table_slots;
+    if (slot_count == 0u)
+        return false;
+
+    vec3 world_position = world_position4.xyz;
+    vec3 raw_world_normal = world_normal4.xyz;
+
+    // Defensive invalid-data rejection.
+    if (!valid_vec3(world_position))
+        return false;
+
+    if (!valid_normal(raw_world_normal))
+        return false;
+
+    if (!valid_vec4(color))
+        return false;
+
+    vec3 world_normal = normalize(raw_world_normal);
+
+    if (!valid_normal(world_normal))
+        return false;
+
+    uint max_probes = min(slot_count, VOXEL_MAX_PROBES);
+    uint idx = hash_voxel_key(key) % slot_count;
+
+    uint probes = 0u;
+
+    while (probes < max_probes) {
+        uint state = atomicAdd(voxel_table.slots[idx].state, 0u);
+
+        if (state == VOXEL_SLOT_OCCUPIED) {
+            memoryBarrierBuffer();
+
+            if (voxel_key_equal(voxel_table.slots[idx].key, key)) {
+                // Lock this occupied slot so only one thread updates the mean/count.
+                uint prev = atomicCompSwap(
+                    voxel_table.slots[idx].state,
+                    VOXEL_SLOT_OCCUPIED,
+                    VOXEL_SLOT_LOCKED
+                );
+
+                if (prev == VOXEL_SLOT_OCCUPIED) {
+                    uint surfel_id = voxel_table.slots[idx].value;
+
+                    update_voxel_surfel(
+                        surfel_id,
+                        world_position,
+                        world_normal,
+                        color
+                    );
+
+                    memoryBarrierBuffer();
+
+                    atomicExchange(
+                        voxel_table.slots[idx].state,
+                        VOXEL_SLOT_OCCUPIED
+                    );
+
+                    return true;
+                }
+
+                // Somebody else locked it before us.
+                // Retry the same slot, do not move to the next one.
+                continue;
+            }
+
+            idx = (idx + 1u) % slot_count;
+            probes++;
+            continue;
+        }
+
+        if (state == VOXEL_SLOT_EMPTY) {
+            uint prev = atomicCompSwap(
+                voxel_table.slots[idx].state,
+                VOXEL_SLOT_EMPTY,
+                VOXEL_SLOT_LOCKED
+            );
+
+            if (prev == VOXEL_SLOT_EMPTY) {
+                uint surfel_id = atomicAdd(map_point_count_buffer.count, 1u);
+
+                if (surfel_id >= params.max_map_point_count) {
+                    // Undo count increment.
+                    atomicAdd(map_point_count_buffer.count, 0xFFFFFFFFu);
+
+                    atomicExchange(
+                        voxel_table.slots[idx].state,
+                        VOXEL_SLOT_EMPTY
+                    );
+
+                    return false;
+                }
+
+                voxel_table.slots[idx].key = ivec4(key, 0);
+                voxel_table.slots[idx].value = surfel_id;
+
+                // First point in this voxel.
+                // position.w stores count = 1.
+                map_point_buffer.points[surfel_id].position =
+                    vec4(world_position, 1.0);
+
+                map_point_buffer.points[surfel_id].color = color;
+
+                // Store normal sum, not normalized final normal.
+                map_normal_buffer.normals[surfel_id] =
+                    vec4(world_normal, 0.0);
+
+                memoryBarrierBuffer();
+
+                atomicExchange(
+                    voxel_table.slots[idx].state,
+                    VOXEL_SLOT_OCCUPIED
+                );
+
+                return true;
+            }
+
+            // Someone changed this slot.
+            // Retry the same slot.
+            continue;
+        }
+
+        if (state == VOXEL_SLOT_LOCKED) {
+            uint spin_count = 0u;
+
+            while (spin_count < 1024u) {
+                uint s = atomicAdd(voxel_table.slots[idx].state, 0u);
+
+                if (s != VOXEL_SLOT_LOCKED)
+                    break;
+
+                spin_count++;
+            }
+
+            // Important:
+            // Do NOT move to the next slot here.
+            // The slot may now contain exactly our key.
+            continue;
+        }
+
+        idx = (idx + 1u) % slot_count;
+        probes++;
+    }
+
+    return false;
+}
+
+// ------------------------------------------------------------
+// Main
+// ------------------------------------------------------------
+
+void main()
+{
+    uint source_point_id = gl_GlobalInvocationID.x;
+
+    if (source_point_id >= params.source_point_count)
+        return;
+
+    PointInstance src_point = source_point_buffer.points[source_point_id];
+    vec4 src_normal4 = source_normal_buffer.normals[source_point_id];
+
+    // Reject invalid color first.
+    // This also catches NaN/Inf colors before they poison running averages.
+    if (!valid_vec4(src_point.color))
+        return;
+
+    // Skip missed rays / invalid generated points.
+    if (src_point.color.a <= 0.001)
+        return;
+
+    vec3 p_local = src_point.position.xyz;
+    vec3 n_local = src_normal4.xyz;
+
+    // Reject NaN/Inf positions.
+    if (!valid_vec3(p_local))
+        return;
+
+    // Reject NaN/Inf/zero normals.
+    if (!valid_normal(n_local))
+        return;
+
+    float n_len = length(n_local);
+
+    if (!valid_float(n_len) || n_len <= MIN_NORMAL_LEN)
+        return;
+
+    float voxel_size = 0.5;
+
+    vec3 p_world = (params.source_model * vec4(p_local, 1.0)).xyz;
+
+    // Reject bad transformed positions before hashing.
+    // Very important: do not compute voxel key from NaN/Inf.
+    if (!valid_vec3(p_world))
+        return;
+
+    mat3 normal_matrix = transpose(inverse(mat3(params.source_model)));
+
+    vec3 n_world_raw = normal_matrix * (n_local / n_len);
+
+    if (!valid_normal(n_world_raw))
+        return;
+
+    vec3 n_world = normalize(n_world_raw);
+
+    if (!valid_normal(n_world))
+        return;
+
+    ivec3 key = voxel_key_from_world_pos(p_world, voxel_size);
+
+    voxel_insert_point_and_normal(
+        key,
+        vec4(p_world, 1.0),
+        vec4(n_world, 0.0),
+        src_point.color
+    );
+}

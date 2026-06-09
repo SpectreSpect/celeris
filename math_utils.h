@@ -1,8 +1,5 @@
 #pragma once
 
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
-
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -15,6 +12,7 @@
 #include <type_traits>
 #include <sstream>
 #include <iomanip>
+#include <random>
 
 #if __has_include(<bit>) && (__cplusplus >= 202002L || (defined(_MSVC_LANG) && _MSVC_LANG >= 202002L))
   #include <bit>
@@ -31,6 +29,9 @@ namespace math_utils {
     static constexpr uint32_t BITS = 21;
     static constexpr uint64_t MASK = (uint64_t(1) << BITS) - 1;
     static constexpr int64_t OFFSET = int64_t(1) << (BITS - 1);
+
+    static std::mt19937 rng(std::random_device{}());
+    static std::uniform_real_distribution<double> dist(0.0, 1.0);
 
     static glm::vec3 bary_coords(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, const glm::vec3& p) {
         glm::vec3 v0 = b - a;
@@ -171,7 +172,7 @@ namespace math_utils {
         return log2_floor_u32(x);
     }
     
-    static glm::uvec2 split_u64(uint64_t k) {
+    static glm::ivec2 split_u64(uint64_t k) {
         return glm::uvec2(uint32_t(k & 0xFFFFFFFFull), uint32_t(k >> 32));
     }
 

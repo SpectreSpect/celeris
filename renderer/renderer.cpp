@@ -1,0 +1,174 @@
+#include "renderer.h"
+#include "transform_push_constants.h"
+#include "render_object.h"
+#include "instanced_render_object.h"
+#include "indirect_render_object.h"
+#include "../vulkan_self/vulkan_command_buffer.h"
+#include "../vulkan_self/pass/material_pass/material_pass.h"
+#include "resources/frame_resources.h"
+#include "scene.h"
+
+Renderer::Renderer(VulkanEngine& engine, FrameResources& frame_resources) {
+    m_engine = &engine;
+    m_frame_resources = &frame_resources;
+}
+
+void Renderer::render(VulkanCommandBuffer& command_buffer, RenderObject& render_object, glm::mat4 transform) {
+    render_object.sync_material();
+
+    logger.check(render_object.mesh_view().valid(), "Mesh view was invalid");
+
+    static TransformPushConstants pc;
+    pc.model = transform;
+    pc.material_data_id = render_object.material_data_id();
+
+    SlotPassInstance& material = render_object.material();
+    auto& pass = static_cast<MaterialPass&>(material.pipepline_pass());
+
+    material.bind(command_buffer);
+    m_frame_resources->bind(m_engine->current_frame(), command_buffer, pass.pipeline(), 1);
+
+    pass.pipeline().set_y_up_viewport(command_buffer, *m_engine);
+    pass.pipeline().set_scissor(command_buffer, *m_engine);
+
+    render_object.mesh_view().bind_vertex_buffer(command_buffer);
+    render_object.mesh_view().bind_index_buffer(command_buffer);
+
+    pass.pipeline_layout().push_constants(command_buffer, pc);
+    
+    command_buffer.draw_indexed(render_object.mesh_view().index_count());
+}
+
+void Renderer::render(VulkanCommandBuffer& command_buffer, InstancedRenderObject& instanced_render_object, glm::mat4 transform) {
+        instanced_render_object.sync_material();
+
+        logger.check(instanced_render_object.mesh_view().valid(), "Mesh view was invalid");
+
+        if (!instanced_render_object.instance_buffer_view_valid())
+            return;
+    
+        static TransformPushConstants pc;
+        pc.model = transform;
+        pc.material_data_id = instanced_render_object.material_data_id();
+
+        // blinn_phong_material_instance.bind(command_buffer);
+        SlotPassInstance& material = instanced_render_object.material();
+        material.bind(command_buffer);
+        auto& pass = static_cast<MaterialPass&>(material.pipepline_pass());
+
+        m_frame_resources->bind(m_engine->current_frame(), command_buffer, pass.pipeline(), 1);
+
+        pass.pipeline().set_y_up_viewport(command_buffer, *m_engine);
+        pass.pipeline().set_scissor(command_buffer, *m_engine);
+
+        instanced_render_object.mesh_view().bind_vertex_buffer(command_buffer, 0);
+        // if (render_object.instance_data.external_buffer)
+        //     render_object.instance_data.external_buffer->bind_as_vertex_buffer(command_buffer, 1);
+        // else
+        instanced_render_object.instance_buffer()->bind_as_vertex_buffer(command_buffer, 1);
+
+        instanced_render_object.mesh_view().bind_index_buffer(command_buffer);
+
+        pass.pipeline_layout().push_constants(command_buffer, pc);
+
+        command_buffer.draw_indexed(instanced_render_object.mesh_view().index_count(), instanced_render_object.instance_count());
+};
+
+
+void Renderer::render(VulkanCommandBuffer& command_buffer, IndirectRenderObject& indirect_render_object, glm::mat4 transform) {
+        indirect_render_object.sync_material();
+
+        logger.check(indirect_render_object.mesh_view().valid(), "Mesh view was invalid");
+
+        if (!indirect_render_object.indirect_buffer_view_valid())
+            return;
+    
+        static TransformPushConstants pc;
+        pc.model = transform;
+        pc.material_data_id = indirect_render_object.material_data_id();
+
+        SlotPassInstance& material = indirect_render_object.material();
+        material.bind(command_buffer);
+        auto& pass = static_cast<MaterialPass&>(material.pipepline_pass());
+
+        m_frame_resources->bind(m_engine->current_frame(), command_buffer, pass.pipeline(), 1);
+
+        pass.pipeline().set_y_up_viewport(command_buffer, *m_engine);
+        pass.pipeline().set_scissor(command_buffer, *m_engine);
+
+        indirect_render_object.mesh_view().bind_vertex_buffer(command_buffer, 0);
+        // if (render_object.instance_data.external_buffer)
+        //     render_object.instance_data.external_buffer->bind_as_vertex_buffer(command_buffer, 1);
+        // else
+
+        indirect_render_object.mesh_view().bind_index_buffer(command_buffer);
+
+        pass.pipeline_layout().push_constants(command_buffer, pc);
+
+        VulkanBuffer& indirect_buffer = *indirect_render_object.indirect_buffer();
+
+        vkCmdDrawIndexedIndirectCount(
+            command_buffer.handle(),
+            indirect_buffer.handle(), // draw commands buffer
+            sizeof(uint32_t),             // commands start after cmd_count
+            indirect_buffer.handle(), // count buffer, same VkBuffer is okay
+            0,                // cmd_count is at byte 0
+            indirect_render_object.max_draw_count(),
+            sizeof(VkDrawIndexedIndirectCommand)
+        );
+};
+
+void Renderer::render(VulkanCommandBuffer& command_buffer, std::vector<SceneObject*> scene_objects, glm::mat4 transform) {
+    for (SceneObject* scene_object : scene_objects) {
+        glm::mat4 local_transform = scene_object->transform.get_model_matrix();
+        glm::mat4 world_transform = transform * local_transform;
+
+        scene_object->render(*this, command_buffer, world_transform);
+        
+        render(command_buffer, scene_object->children, world_transform);
+    }
+}
+
+void Renderer::render(VulkanCommandBuffer& command_buffer, Scene& scene) {
+    render(command_buffer , scene.scene_objects);
+}
+
+void Renderer::render_indirect(VulkanCommandBuffer& command_buffer, RenderObject& render_object, VulkanBuffer& indirect_commands, 
+                     uint32_t indirect_offset, uint32_t count_offset, uint32_t max_draws) {
+        
+    render_object.sync_material();
+    
+    logger.check(render_object.mesh_view().valid(), "Mesh view was invalid");
+
+    static TransformPushConstants pc;
+    pc.model = render_object.transform.get_model_matrix(); // TEMPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP
+    pc.material_data_id = render_object.material_data_id();
+
+    SlotPassInstance& material = render_object.material();
+    auto& pass = static_cast<MaterialPass&>(material.pipepline_pass());
+
+    material.bind(command_buffer);
+    m_frame_resources->bind(m_engine->current_frame(), command_buffer, pass.pipeline(), 1);
+
+    pass.pipeline().set_y_up_viewport(command_buffer, *m_engine);
+    pass.pipeline().set_scissor(command_buffer, *m_engine);
+
+    render_object.mesh_view().bind_vertex_buffer(command_buffer);
+    render_object.mesh_view().bind_index_buffer(command_buffer);
+
+    pass.pipeline_layout().push_constants(command_buffer, pc);
+    
+    // command_buffer.draw_indexed(render_object.mesh_view().index_count());
+
+    uint32_t stride = sizeof(VkDrawIndexedIndirectCommand); // 20 bytes
+
+    vkCmdDrawIndexedIndirectCount(
+        command_buffer.handle(),
+        indirect_commands.handle(), // draw commands buffer
+        indirect_offset,             // commands start after cmd_count
+        indirect_commands.handle(), // count buffer, same VkBuffer is okay
+        count_offset,                // cmd_count is at byte 0
+        max_draws,
+        stride
+    );
+}

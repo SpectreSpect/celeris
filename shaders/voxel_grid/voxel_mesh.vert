@@ -1,16 +1,27 @@
-#version 330 core
+#version 460
 
 layout(location = 0) in vec4 aPos;      // из vb[].pos (vec4)
 layout(location = 1) in uint aColor;    // из vb[].color (RGBA8)
 layout(location = 2) in uint aFace;     // из vb[].face (0..5)
 
-uniform mat4 uWorld;
-uniform mat4 uProjView;
+// uniform mat4 uWorld;
+// uniform mat4 uProjView;
 
-out vec3 vNormal;
-out vec3 vFragPos;
-out vec3 vColor;
-out float vAO;
+layout(set = 1, binding = 0) uniform CameraUniform {
+    mat4 view;
+    mat4 proj;
+    vec4 viewPos;
+} camera_uniform;
+
+layout(push_constant) uniform PushConstants {
+    mat4 model;
+    uint material_data_id;
+} pc;
+
+layout(location = 0) out vec3 vNormal;
+layout(location = 1) out vec3 vFragPos;
+layout(location = 2) out vec3 vColor;
+layout(location = 3) out float vAO;
 
 vec3 face_normal(uint f) {
     // face: 0=+X,1=-X,2=+Y,3=-Y,4=+Z,5=-Z
@@ -30,14 +41,16 @@ vec3 unpack_rgb(uint rgba8) {
 }
 
 void main() {
-    vec4 worldPos4 = uWorld * aPos;
+    mat4 proj_view = camera_uniform.proj * camera_uniform.view;
+
+    vec4 worldPos4 = pc.model * aPos;
     vFragPos = worldPos4.xyz;
 
-    mat3 normalMat = mat3(transpose(inverse(uWorld)));
+    mat3 normalMat = mat3(transpose(inverse(pc.model)));
     vNormal = normalize(normalMat * face_normal(aFace));
 
     vColor = unpack_rgb(aColor);
     vAO = float(aColor & 0xFFu) / 255.0;
 
-    gl_Position = uProjView * worldPos4;
+    gl_Position = proj_view * worldPos4;
 }

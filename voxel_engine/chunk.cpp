@@ -215,7 +215,7 @@ void Chunk::upload_mesh_gpu(MeshData& mesh_data) {
     empty_mesh = false;
         
     if (!mesh)
-        this->mesh = new Mesh(mesh_data.vertices, mesh_data.indices, vertex_layout);
+        this->mesh = new Mesh(mesh_data.vertices, mesh_data.indices, *vertex_layout);
     else
         this->mesh->update(mesh_data.vertices, mesh_data.indices);
 }

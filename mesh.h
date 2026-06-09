@@ -1,25 +1,31 @@
 #pragma once
-#include "vao.h"
-#include "buffer_object.h"
-#include "vertex_layout.h"
-#include "program.h"
+#include <vector>
+#include <string>
+#include <iostream>
+#include <stdexcept>
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+#include "vulkan_engine.h"
 #include "drawable.h"
 #include "transformable.h"
-
+#include "vulkan/video_buffer.h"
+#include "vulkan/vulkan_vertex_layout.h"
 
 class Mesh : public Drawable, public Transformable {
 public:
-    VAO* vao;
-    BufferObject* vbo;
-    BufferObject* ebo;
-    VertexLayout* vertex_layout;
+    VideoBuffer vertex_buffer;
+    VideoBuffer index_buffer;
+    uint32_t num_indices = 0;
     
-    
-    Mesh(const std::vector<float>& vertices, const std::vector<unsigned int>& indices, VertexLayout* vertex_layout);
-    ~Mesh();
-    // Mesh(const void* vertex_data, size_t vertex_data_size, const void* index_data, size_t index_data_size, VertexLayout* vertex_layout);
-    void update(const std::vector<float>& vertices, const std::vector<unsigned int>& indices, GLenum usage = GL_DYNAMIC_DRAW);
-    void update(const void* vertex_data, size_t vertex_data_size, const void* index_data, size_t index_data_size, GLenum usage = GL_DYNAMIC_DRAW);
-    // Mesh(float* vertices, unsigned int* indices, int vertices_size, int indices_size, Program* shader, VertexLayout* vertex_layout);
+    Mesh() = default;
+    Mesh(
+        VulkanEngine* engine,
+        std::vector<std::byte> vertex_data,
+        std::vector<uint32_t> index_data,
+        VideoBuffer& staging_buffer
+    );
+
     void draw(RenderState state) override;
 };
