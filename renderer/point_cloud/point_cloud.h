@@ -33,6 +33,7 @@ public:
     PointCloud(ManagerBundle& manager_bundle, const std::vector<PointInstance>& points);
 
     void set_points(const std::vector<PointInstance>& points);
+    uint32_t point_count() const noexcept;
 
     // bool has_owned_instance_batch() const;
 

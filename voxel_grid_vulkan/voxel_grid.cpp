@@ -14,6 +14,9 @@
 #include "../vulkan_self/vulkan_queue.h"
 #include "../vulkan_self/push_constants_structures.h"
 #include "../camera/camera.h"
+#include "../renderer/point_cloud/point_cloud.h"
+#include "../renderer/point_cloud/point_instance.h"
+#include "../math_utils.h"
 
 #include "shader_helper/buffer_dispatch_arg.h"
 
@@ -1541,6 +1544,58 @@ IndirectRenderObject& VoxelGrid::render_object() {
 
 VulkanBuffer& VoxelGrid::local_voxel_write_list() noexcept {
     return m_buffers.local_voxel_write_list;
+}
+
+glm::uvec3 VoxelGrid::voxel_size() {
+    return m_params.voxel_size;
+}
+void VoxelGrid::voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud) {
+    std::vector<PointInstance> points(point_cloud.point_count());
+
+    point_cloud.instance_buffer()->read(points.data(), sizeof(PointInstance) * point_cloud.point_count(), 0);
+
+    std::vector<VoxelWriteGPU> voxel_writes;
+    voxel_writes.reserve(point_cloud.point_count());
+
+    glm::mat4 point_cloud_model = point_cloud.transform.get_model_matrix();
+
+    for (int i = 0; i < points.size(); i++) {
+        glm::ivec3 base_color{0, 98, 255};
+        glm::ivec3 color = glm::vec3(base_color) * glm::vec3(0.5 + math_utils::dist(math_utils::rng) * 0.5);
+
+        glm::vec3 world_pos = point_cloud_model * points[i].pos;
+
+        glm::vec3 local = glm::vec3(world_pos) / glm::vec3(m_params.voxel_size);
+        
+        glm::ivec4 voxel_pos = glm::ivec4(glm::floor(local.x),
+                                          glm::floor(local.y),
+                                          glm::floor(local.z),
+                                          1);
+
+        voxel_writes.push_back(
+            VoxelWriteGPU{
+                .world_voxel = voxel_pos,
+                .voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, color),
+                .set_flags = OVERWRITE_BIT
+            }
+        ); 
+    }
+
+    VulkanBuffer voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + Utils::size_bytes(voxel_writes));
+    voxel_write_list.upload_scalar<uint32_t>(voxel_writes.size(), 0);
+    voxel_write_list.upload(voxel_writes, sizeof(uint32_t) * 4);
+
+    // VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
+
+    {
+        auto scope = m_command_buffer.begin_scope();
+        set_voxels(m_command_buffer, voxel_write_list);
+    }
+    submit_compute_commands();
+    // VulkanFence compute_fence(engine.device());
+    // compute_fence.reset();
+    // engine.compute_submit(compute_command_buffer, &compute_fence);
+    // compute_fence.wait();
 }
 
 void VoxelGrid::update(Window& window, Camera& camera) {

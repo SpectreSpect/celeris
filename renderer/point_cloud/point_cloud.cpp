@@ -76,6 +76,10 @@ void PointCloud::set_points(const std::vector<PointInstance>& points) {
     set_instance_view(m_instance_batch->get_view());
 }
 
+uint32_t PointCloud::point_count() const noexcept {
+    return m_instance_batch->instance_count();
+}
+
 // bool PointCloud::has_owned_instance_batch() const {
 //     return m_instance_batch != nullptr;
 // }
