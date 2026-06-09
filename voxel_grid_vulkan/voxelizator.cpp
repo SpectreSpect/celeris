@@ -56,7 +56,7 @@ Voxelizator::VoxelizatorBuffers Voxelizator::create_buffers(
     submit_compute_commands();
 
     return VoxelizatorBuffers{
-        .dispatch_args = VulkanBuffer::create_storage_buffer(physical_device, device, dispatch_args_size),
+        .dispatch_args = VulkanBuffer::create_host_visible_indirect_storage_buffer(physical_device, device, dispatch_args_size),
         .counter_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, counter_hash_table_size),
         .active_chunk_keys_list = VulkanBuffer::create_storage_buffer(physical_device, device, active_chunk_keys_list_size),
         .triangle_indices_list = std::move(triangle_indices_list),
@@ -92,7 +92,7 @@ void Voxelizator::submit_compute_commands() {
     m_command_buffer.reset();
 }
 
-void Voxelizator::rasterize(
+void Voxelizator::voxelize(
     VulkanCommandBuffer& command_buffer,
     const VoxelWriteGPU& prifab,
     MeshView mesh,
@@ -140,6 +140,32 @@ void Voxelizator::rasterize(
         //     //TODO
         // }
     }
+}
+
+void Voxelizator::voxelize_and_submit(
+    const VoxelWriteGPU& prifab,
+    MeshView mesh,
+    uint32_t position_attribute_offset,
+    uint32_t vertex_stride,
+    glm::mat4 transform,
+    VulkanBuffer* out_voxel_writes)
+{
+    LOG_METHOD();
+
+    {
+        auto scope = m_command_buffer.begin_scope();
+        voxelize(
+            m_command_buffer,
+            prifab,
+            mesh,
+            position_attribute_offset,
+            vertex_stride,
+            transform,
+            out_voxel_writes
+        );
+    }
+
+    submit_compute_commands();
 }
 
 void Voxelizator::reset_voxelize_pipline(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_writes, bool reset_voxel_write_list) {

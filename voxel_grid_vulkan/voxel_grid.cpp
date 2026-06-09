@@ -1539,6 +1539,10 @@ IndirectRenderObject& VoxelGrid::render_object() {
     return m_render_object;
 }
 
+VulkanBuffer& VoxelGrid::local_voxel_write_list() noexcept {
+    return m_buffers.local_voxel_write_list;
+}
+
 void VoxelGrid::update(Window& window, Camera& camera) {
     float aspect = float(window.width()) / float(window.height());
     glm::mat4 vp = camera.get_projection_matrix(aspect) * camera.get_view_matrix();

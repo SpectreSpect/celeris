@@ -47,8 +47,17 @@ public:
     Voxelizator(Voxelizator&&) noexcept = default;
     Voxelizator& operator=(Voxelizator&&) noexcept = default;
 
-    void rasterize(
+    void voxelize(
         VulkanCommandBuffer& command_buffer,
+        const VoxelWriteGPU& prifab,
+        MeshView mesh,
+        uint32_t position_attribute_offset,
+        uint32_t vertex_stride,
+        glm::mat4 transform = glm::identity<glm::mat4>(),
+        VulkanBuffer* out_voxel_writes = nullptr
+    );
+
+    void voxelize_and_submit(
         const VoxelWriteGPU& prifab,
         MeshView mesh,
         uint32_t position_attribute_offset,

@@ -69,6 +69,7 @@ public:
     VoxelGrid& operator=(VoxelGrid&&) noexcept = default;
 
     IndirectRenderObject& render_object();
+    VulkanBuffer& local_voxel_write_list() noexcept;
 
     // void apply_writes_to_world_gpu(uint32_t write_count);
     // void apply_writes_to_world_from_cpu(
