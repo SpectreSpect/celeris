@@ -5,8 +5,20 @@
 Mesh::Mesh(VulkanPhysicalDevice& physical_device, VulkanDevice& device, VulkanResourceLoader& resource_loader, 
            void* vertex_data, uint32_t vertex_data_size_bytes, 
            unsigned int* index_data, uint32_t index_data_size_bytes) 
-    :   m_vertex_buffer(VulkanBuffer::create_vertex_buffer(physical_device, device, vertex_data_size_bytes)),
-        m_index_buffer(VulkanBuffer::create_index_buffer(physical_device, device, index_data_size_bytes)) {
+    :   m_vertex_buffer(
+            physical_device, 
+            device,
+            vertex_data_size_bytes,
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        ),
+        m_index_buffer(
+            physical_device, 
+            device,
+            index_data_size_bytes,
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        ) {
     LOG_METHOD();
 
     logger.check(vertex_data != nullptr, "Failed to create mesh: vertex data is null");

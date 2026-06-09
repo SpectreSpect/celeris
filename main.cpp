@@ -54,8 +54,14 @@
 #include "voxel_grid_vulkan/voxel_grid.h"
 #include "renderer/static_mesh_data.h"
 #include "renderer/indirect_render_object.h"
+#include "voxel_grid_vulkan/voxelizator.h"
+#include <queue>
 
 #include <vector>
+#include <random>
+
+static std::mt19937 rng(std::random_device{}());
+static std::uniform_real_distribution<double> dist(0.0, 1.0);
 
 float srgb_to_linear(float c) {
     if (c <= 0.04045f) {
@@ -166,7 +172,7 @@ int main() {
         .chunk_size = chunk_size,
         .voxel_size = voxel_size,
         .count_active_chunks = 10'000,
-        .max_quads = 3'000'000,
+        .max_quads = 1'000'000,
         .chunk_hash_table_size_factor = 1.0f,
         .count_evict_buckets = 32,
         .min_free_chunks = 4'500,
@@ -180,11 +186,62 @@ int main() {
         .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000)
     };
 
-    VoxelGrid voxel_grid(engine.physical_device(), 
-                         engine.device(), engine.compute_queue(), 
-                         compute_pass_manager, material_instance_manager, 
-                         voxel_grid_desc);
+    VoxelGrid voxel_grid(
+        engine.physical_device(),
+        engine.device(),
+        engine.compute_queue(),
+        compute_pass_manager,
+        material_instance_manager,
+        voxel_grid_desc
+    );
 
+    Voxelizator::VoxelizatorDesc voxelizator_desc {
+        .chunk_size = chunk_size,
+        .voxel_size = voxel_size,
+        .counter_hash_table_size = 10'000,
+        .count_voxel_writes = 0 // Будут использоваться те, что внутри voxel_grid
+    };
+
+    Voxelizator voxelizator(
+        engine.physical_device(),
+        engine.device(),
+        engine.compute_queue(),
+        compute_pass_manager,
+        voxelizator_desc
+    );
+
+    glm::ivec3 block_size = glm::ivec3(10, 20, 30);
+    glm::ivec3 block_origin = glm::ivec3(0, 30, 0);
+    std::vector<VoxelWriteGPU> test_voxel_writes;
+    test_voxel_writes.reserve(static_cast<size_t>(block_size.x * block_size.y * block_size.z));
+
+    for (int x = 0; x < block_size.x; x++)
+        for (int y = 0; y < block_size.y; y++)
+            for (int z = 0; z < block_size.z; z++) {
+                glm::ivec3 base_color{0, 98, 255};
+                glm::ivec3 color = glm::vec3(base_color) * glm::vec3(0.5 + dist(rng) * 0.5);
+
+                test_voxel_writes.push_back(
+                    VoxelWriteGPU{
+                        .world_voxel = glm::ivec4(block_origin, 0) + glm::ivec4(x, y, z, 0),
+                        .voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, color),
+                        .set_flags = OVERWRITE_BIT
+                    }
+                );
+            }
+
+    VulkanBuffer voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + Utils::size_bytes(test_voxel_writes));
+    voxel_write_list.upload_scalar<uint32_t>(test_voxel_writes.size(), 0);
+    voxel_write_list.upload(test_voxel_writes, sizeof(uint32_t) * 4);
+
+    VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
+    {
+        auto scope = compute_command_buffer.begin_scope();
+        voxel_grid.set_voxels(compute_command_buffer, voxel_write_list);
+    }
+    VulkanFence compute_fence(engine.device());
+    engine.compute_submit(compute_command_buffer, &compute_fence);
+    compute_fence.wait();
 
     GICPPass gicp_pass(engine, compute_pass_manager);
     VoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);
@@ -196,8 +253,18 @@ int main() {
     
     RenderObject sphere(mesh_manager.sphere, material_instance_manager.pbr);
 
-    
-    
+    RenderObject vox_box(mesh_manager.cube, material_instance_manager.pbr);
+    vox_box.transform.position = glm::vec3(0.0f, 80.0f, 0.0f);
+    vox_box.transform.scale = glm::vec3(20.0f);
+
+    VoxelWriteGPU blue_voxelize_prefab;
+    blue_voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
+    blue_voxelize_prefab.set_flags = OVERWRITE_BIT;
+
+    VoxelWriteGPU transparent_voxelize_prefab;
+    transparent_voxelize_prefab.voxel_data = VoxelDataGPU(0, 0, glm::ivec3(255));
+    transparent_voxelize_prefab.set_flags = OVERWRITE_BIT;
+
     // uint32_t indirect_command_count = 1;
     // DrawElementsIndirectCommand commands {
     //     .count = sphere.mesh_view().index_count(), 
@@ -309,6 +376,8 @@ int main() {
     // unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube.set_material_data<PBRMaterialData>(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
     sphere.set_material_data(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
+    vox_box.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
+
     two_spheres.set_material_data(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
 
     unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
@@ -343,6 +412,7 @@ int main() {
     // scene.add(unlit_cube);
     scene.add(sphere);
     scene.add(skybox);
+    // scene.add(vox_box);
     
 
     skybox.update(scene);
@@ -357,6 +427,9 @@ int main() {
     float timer = 0;
     uint32_t pending_skybox_environment_map_id = skybox.environment_map_id();
     bool skybox_environment_update_pending = false;
+    float angular_speed = glm::half_pi<float>() * 0.5f;
+
+    std::vector<glm::mat4> transform_mem(3);
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
@@ -372,7 +445,40 @@ int main() {
         float delta_time = current_frame_time - last_frame_time;
         last_frame_time = current_frame_time;
         timer += delta_time;
-        
+
+        float angle = angular_speed * delta_time;
+        glm::quat rot_x = glm::angleAxis(angle, glm::vec3(1.0f, 0.0f, 0.0f));
+        glm::quat rot_y = glm::angleAxis(angle, glm::vec3(0.0f, 1.0f, 0.0f));
+
+        // for (const glm::mat4 transform : transform_mem) {
+        //     voxelizator.voxelize_and_submit(
+        //         transparent_voxelize_prefab,
+        //         vox_box.mesh_view(),
+        //         offsetof(PBRVertex, position),
+        //         sizeof(PBRVertex),
+        //         transform,
+        //         &voxel_grid.local_voxel_write_list()        
+        //     );
+        // }
+
+        // for (size_t i = 0; i < transform_mem.size(); i++) {
+        //     vox_box.transform.rotation = glm::normalize(
+        //         vox_box.transform.rotation * rot_x * rot_y
+        //     );
+
+        //     voxelizator.voxelize_and_submit(
+        //         blue_voxelize_prefab,
+        //         vox_box.mesh_view(),
+        //         offsetof(PBRVertex, position),
+        //         sizeof(PBRVertex),
+        //         vox_box.transform.get_model_matrix(),
+        //         &voxel_grid.local_voxel_write_list()        
+        //     );
+
+        //     transform_mem[i] = vox_box.transform.get_model_matrix();
+        // }
+
+            
         uint32_t image_index = 0;
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();

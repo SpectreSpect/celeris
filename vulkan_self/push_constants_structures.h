@@ -193,3 +193,64 @@ struct FillChunkHashTablePushConstants {
     uint32_t u_pack_bits;
     int32_t u_pack_offset;
 };
+
+struct AllocActiveChunkTrianglesPushConstants {
+    uint32_t u_counter_hash_table_size;
+};
+
+struct FillTriangleIndicesPushConstants {
+    glm::vec4 u_voxel_size;
+    glm::uvec4 u_chunk_size;
+    glm::mat4 u_transform;
+
+    uint32_t u_count_mesh_triangles;
+    uint32_t u_counter_hash_table_size;
+
+    uint32_t u_vertex_stride_bytes;
+    uint32_t u_vertex_position_offset_bytes;
+
+    uint32_t u_pack_offset;
+    uint32_t u_pack_bits;
+};
+
+struct MarkAndCountActiveChunksPushConstants {
+    glm::vec4 u_voxel_size;
+    glm::uvec4 u_chunk_size;
+    glm::mat4 u_transform;
+
+    uint32_t u_count_mesh_triangles;
+
+    uint32_t u_counter_hash_table_size;
+
+    uint32_t u_vertex_stride_bytes;
+    uint32_t u_vertex_position_offset_bytes;
+
+    uint32_t u_pack_offset;
+    uint32_t u_pack_bits;
+};
+
+struct ResetVoxelizePipelinePushConstants {
+    uint32_t u_counter_hash_table_size;
+    uint32_t u_reset_voxel_write_list;
+};
+
+
+struct VoxelizeTrianglesPushConstants {
+    glm::uvec4 u_chunk_dim;
+    glm::vec4 u_voxel_size;
+
+    glm::mat4 u_transform;
+
+    uint32_t u_counter_hash_table_size;
+    uint32_t u_count_voxels_in_chunk;
+
+    uint32_t u_vertex_stride_bytes;
+    uint32_t u_vertex_position_offset_bytes;
+
+    uint32_t u_pack_offset;
+    uint32_t u_pack_bits;
+
+    uint32_t voxel_type_flags;
+    uint32_t voxel_color;
+    uint32_t voxel_set_flags;
+};

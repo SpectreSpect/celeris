@@ -17,6 +17,13 @@ class VulkanTexture2D;
 class Cubemap;
 class CubemapArray;
 
+struct PBRVertex {
+    glm::vec4 position;
+    glm::vec4 normal;
+    glm::vec2 uv;
+    glm::vec4 tangent;
+};
+
 class MaterialManager {
 public:
     _XCLASS_NAME(MaterialManager);

@@ -4,6 +4,7 @@
 #include <optional>
 #include <vector>
 #include <glm/glm.hpp>
+#include <vulkan/vulkan.h>
 
 #include "../vulkan_self/logger/logger_header.h"
 #include "../vulkan_self/vulkan_buffer.h"
@@ -68,6 +69,7 @@ public:
     VoxelGrid& operator=(VoxelGrid&&) noexcept = default;
 
     IndirectRenderObject& render_object();
+    VulkanBuffer& local_voxel_write_list() noexcept;
 
     // void apply_writes_to_world_gpu(uint32_t write_count);
     // void apply_writes_to_world_from_cpu(
@@ -76,6 +78,7 @@ public:
     // );
 
     void update(Window& window, Camera& camera);
+    void set_voxels(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src);
 
 public:
     struct VoxelGridBuffers {
@@ -204,7 +207,6 @@ private:
     VulkanFence m_fence;
 
     VulkanQueue* m_queue = nullptr;
-    ComputePassManager* m_compute_pass_manager = nullptr;
 
     VoxelGridParams m_params;
     VoxelGridPassInstances m_pass_instances;
@@ -244,7 +246,6 @@ private:
     void init_mesh_pool();
     void submit_compute_commands();
     
-
     void reset_load_list_counter(VulkanCommandBuffer& command_buffer);
     void mark_chunk_to_generate(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks);
     void mark_write_chunks_to_generate(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
@@ -282,8 +283,9 @@ private:
 
     void build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint32_t pack_bits, int pack_offset);
     void build_indirect_draw_commands_frustum(VulkanCommandBuffer& command_buffer, 
-                                              const glm::mat4& viewProj, 
-                                              const glm::vec3& cam_pos,
-                                              uint32_t pack_bits,
-                                              int pack_offset);
+        const glm::mat4& viewProj,
+        const glm::vec3& cam_pos,
+        uint32_t pack_bits,
+        int pack_offset
+    );
 };

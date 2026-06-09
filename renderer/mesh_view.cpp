@@ -6,6 +6,22 @@ MeshView::MeshView(VulkanBufferView vertex_buffer_view, VulkanBufferView index_b
     m_index_count = index_count;
 }
 
+VulkanBufferView& MeshView::vertex_buffer_view() noexcept {
+    return m_vertex_buffer_view;
+}
+
+const VulkanBufferView& MeshView::vertex_buffer_view() const noexcept {
+    return m_vertex_buffer_view;
+}
+
+VulkanBufferView& MeshView::index_buffer_view() noexcept {
+    return m_index_buffer_view;
+}
+
+const VulkanBufferView& MeshView::index_buffer_view() const noexcept {
+    return m_index_buffer_view;
+}
+
 uint32_t MeshView::index_count() const noexcept {
     return m_index_count;
 }

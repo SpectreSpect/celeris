@@ -52,6 +52,13 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         clear_chunk_hash_table_cp(create_clear_chunk_hash_table_compute_pass(device, shader_manager.clear_chunk_hash_table_cs)),
         fill_chunk_hash_table_cp(create_fill_chunk_hash_table_compute_pass(device, shader_manager.fill_chunk_hash_table_cs)),
 
+        // Voxelizator
+        alloc_active_chunk_triangles_cp(create_alloc_active_chunk_triangles_compute_pass(device, shader_manager.alloc_active_chunk_triangles_cs)),
+        fill_triangle_indices_cp(create_fill_triangle_indices_compute_pass(device, shader_manager.fill_triangle_indices_cs)),
+        mark_and_count_active_chunks_cp(create_mark_and_count_active_chunks_compute_pass(device, shader_manager.mark_and_count_active_chunks_cs)),
+        reset_voxelize_pipeline_cp(create_reset_voxelize_pipeline_compute_pass(device, shader_manager.reset_voxelize_pipeline_cs)),
+        voxelize_triangles_cp(create_voxelize_triangles_compute_pass(device, shader_manager.voxelize_triangles_cs)),
+
         // PBR
         equirect_to_cubemap_cp(create_equirect_to_cubemap_compute_pass(device, shader_manager.equirect_to_cubemap_cs)),
         brdf_lut_cp(create_brdf_lut_pass(device, shader_manager.brdf_lut_cs)),
@@ -657,6 +664,82 @@ ComputePass ComputePassManager::create_fill_chunk_hash_table_compute_pass(Vulkan
     builder.add_storage_buffer(2, ShaderStages::compute); // EnqueuedBuf
 
     builder.add_push_constantsf(sizeof(FillChunkHashTablePushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_alloc_active_chunk_triangles_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // CounterHashTable
+    builder.add_storage_buffer(1, ShaderStages::compute); // ActiveChunkKeysList
+    builder.add_storage_buffer(2, ShaderStages::compute); // TriangleIndicesList
+
+    builder.add_push_constantsf(sizeof(AllocActiveChunkTrianglesPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_fill_triangle_indices_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // CounterHashTable
+    builder.add_storage_buffer(1, ShaderStages::compute); // TriangleIndicesList
+    builder.add_storage_buffer(2, ShaderStages::compute); // VBO
+    builder.add_storage_buffer(3, ShaderStages::compute); // EBO
+
+    builder.add_push_constantsf(sizeof(FillTriangleIndicesPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_mark_and_count_active_chunks_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // CounterHashTable
+    builder.add_storage_buffer(1, ShaderStages::compute); // ActiveChunkKeysList
+    builder.add_storage_buffer(2, ShaderStages::compute); // VBO
+    builder.add_storage_buffer(3, ShaderStages::compute); // EBO
+
+    builder.add_push_constantsf(sizeof(MarkAndCountActiveChunksPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_reset_voxelize_pipeline_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // CounterHashTable
+    builder.add_storage_buffer(1, ShaderStages::compute); // ActiveChunkKeysList
+    builder.add_storage_buffer(2, ShaderStages::compute); // TriangleIndicesList
+    builder.add_storage_buffer(3, ShaderStages::compute); // VoxelsWriteData
+
+    builder.add_push_constantsf(sizeof(ResetVoxelizePipelinePushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_voxelize_triangles_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // CounterHashTable   
+    builder.add_storage_buffer(1, ShaderStages::compute); // ActiveChunkKeysList
+    builder.add_storage_buffer(2, ShaderStages::compute); // TriangleIndicesList
+    builder.add_storage_buffer(3, ShaderStages::compute); // VBO
+    builder.add_storage_buffer(4, ShaderStages::compute); // EBO
+    builder.add_storage_buffer(5, ShaderStages::compute); // VoxelsWriteData
+
+    builder.add_push_constantsf(sizeof(VoxelizeTrianglesPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }

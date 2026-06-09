@@ -37,7 +37,14 @@ public:
     //      void* vertex_data, uint32_t vertex_data_size_bytes, 
     //      unsigned int* index_data, uint32_t index_data_size_bytes);
 
+    VulkanBufferView& vertex_buffer_view() noexcept;
+    const VulkanBufferView& vertex_buffer_view() const noexcept;
+
+    VulkanBufferView& index_buffer_view() noexcept;
+    const VulkanBufferView& index_buffer_view() const noexcept;
+
     uint32_t index_count() const noexcept;
+
     void bind_vertex_buffer(VulkanCommandBuffer& command_buffer, uint32_t buffer_binding = 0, VkDeviceSize offset = 0);
     void bind_index_buffer(VulkanCommandBuffer& command_buffer, uint32_t buffer_binding = 0, VkDeviceSize offset = 0);
     

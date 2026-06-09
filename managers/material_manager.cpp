@@ -154,13 +154,6 @@ MaterialPass MaterialManager::create_pbr_pass(VulkanEngine& engine, FrameResourc
                                                 const VulkanShaderModule& vs, const VulkanShaderModule& fs) {
     LOG_METHOD();
 
-    struct PBRVertex {
-        glm::vec4 position;
-        glm::vec4 normal;
-        glm::vec2 uv;
-        glm::vec4 tangent;
-    };
-
     MaterialPassBuilder builder;
 
     builder.add_storage_buffer(0, ShaderStages::fragment);
