@@ -162,18 +162,22 @@ int main() {
                 );
             }
 
-    VulkanBuffer voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + Utils::size_bytes(test_voxel_writes));
-    voxel_write_list.upload_scalar<uint32_t>(test_voxel_writes.size(), 0);
-    voxel_write_list.upload(test_voxel_writes, sizeof(uint32_t) * 4);
+    VulkanBuffer box_voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + Utils::size_bytes(test_voxel_writes));
+    box_voxel_write_list.upload_scalar<uint32_t>(test_voxel_writes.size(), 0);
+    box_voxel_write_list.upload(test_voxel_writes, sizeof(uint32_t) * 4);
 
     VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
     {
         auto scope = compute_command_buffer.begin_scope();
-        voxel_grid.set_voxels(compute_command_buffer, voxel_write_list);
+        voxel_grid.set_voxels(compute_command_buffer, box_voxel_write_list);
     }
     VulkanFence compute_fence(engine.device());
     engine.compute_submit(compute_command_buffer, &compute_fence);
     compute_fence.wait();
+
+
+    uint32_t max_write_count = 100000;
+    VulkanBuffer voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * max_write_count);
 
     GICPPass gicp_pass(engine, compute_pass_manager);
     VoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);
@@ -365,7 +369,7 @@ int main() {
                 gicp_pass.fit(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer(), 10);
 
                 voxel_map_inserter.insert(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
-                voxel_grid.voxelize_point_cloud(engine, current_scan.point_cloud());
+                voxel_grid.voxelize_point_cloud(engine, current_scan.point_cloud(), voxel_write_list, max_write_count);
                 voxel_map_point_cloud.set_instance_view(voxel_point_map.get_map_instance_view());
             }
             

@@ -60,6 +60,8 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         clear_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "clear_chunk_hash_table.comp.spv"),
         fill_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "fill_chunk_hash_table.comp.spv"),
 
+        voxel_writes_from_point_cloud_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_writes_from_point_cloud.comp.spv"),
+
         // Voxelizator
         alloc_active_chunk_triangles_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "alloc_active_chunk_triangles.comp.spv"),
         fill_triangle_indices_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "fill_triangle_indices.comp.spv"),

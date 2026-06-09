@@ -928,7 +928,9 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(VulkanDevice&
         .reset_evicted_list_and_buckets_pi = PassInstance(compute_pass_manager.reset_evicted_list_and_buckets_cp, dp),
         .hash_table_conditional_dispatch_adapter_pw = PassWriter(device, compute_pass_manager.hash_table_conditional_dispatch_adapter_cp),
         .clear_chunk_hash_table_pi = PassInstance(compute_pass_manager.clear_chunk_hash_table_cp, dp),
-        .fill_chunk_hash_table_pi = PassInstance(compute_pass_manager.fill_chunk_hash_table_cp, dp)
+        .fill_chunk_hash_table_pi = PassInstance(compute_pass_manager.fill_chunk_hash_table_cp, dp),
+
+        .voxel_writes_from_point_cloud_pi = PassInstance(compute_pass_manager.voxel_writes_from_point_cloud_cp, dp)
     };
 }
 
@@ -1549,53 +1551,43 @@ VulkanBuffer& VoxelGrid::local_voxel_write_list() noexcept {
 glm::uvec3 VoxelGrid::voxel_size() {
     return m_params.voxel_size;
 }
-void VoxelGrid::voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud) {
-    std::vector<PointInstance> points(point_cloud.point_count());
 
-    point_cloud.instance_buffer()->read(points.data(), sizeof(PointInstance) * point_cloud.point_count(), 0);
+void VoxelGrid::voxelize_point_cloud(VulkanCommandBuffer& command_buffer, VulkanEngine& engine, 
+                                     PointCloud& point_cloud, VulkanBuffer& voxel_writes, uint32_t max_write_count) {
+    LOG_METHOD();
 
-    std::vector<VoxelWriteGPU> voxel_writes;
-    voxel_writes.reserve(point_cloud.point_count());
+    logger.check(point_cloud.point_count() < max_write_count, "Point count was greater than max write count");
 
-    glm::mat4 point_cloud_model = point_cloud.transform.get_model_matrix();
+    m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(0, *point_cloud.instance_buffer());
+    m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(1, voxel_writes);
 
-    for (int i = 0; i < points.size(); i++) {
-        glm::ivec3 base_color{0, 98, 255};
-        glm::ivec3 color = glm::vec3(base_color) * glm::vec3(0.5 + math_utils::dist(math_utils::rng) * 0.5);
+    m_pass_instances.voxel_writes_from_point_cloud_pi.push_constants(command_buffer, 
+    VoxelListFromPointCloudPushConstants{
+        .source_point_cloud_model = point_cloud.transform.get_model_matrix(),
+        .voxel_size = glm::vec4(m_params.voxel_size, 1.0f),
+        .point_count = point_cloud.point_count(),
+        .max_write_count = max_write_count
+    });
+    
+    m_pass_instances.voxel_writes_from_point_cloud_pi.bind(command_buffer);
 
-        glm::vec3 world_pos = point_cloud_model * points[i].pos;
+    uint32_t x_groups = math_utils::div_up_u32(point_cloud.point_count(), 256);
 
-        glm::vec3 local = glm::vec3(world_pos) / glm::vec3(m_params.voxel_size);
-        
-        glm::ivec4 voxel_pos = glm::ivec4(glm::floor(local.x),
-                                          glm::floor(local.y),
-                                          glm::floor(local.z),
-                                          1);
+    command_buffer.dispatch(x_groups, 1, 1);
 
-        voxel_writes.push_back(
-            VoxelWriteGPU{
-                .world_voxel = voxel_pos,
-                .voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, color),
-                .set_flags = OVERWRITE_BIT
-            }
-        ); 
-    }
+    voxel_writes.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 
-    VulkanBuffer voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + Utils::size_bytes(voxel_writes));
-    voxel_write_list.upload_scalar<uint32_t>(voxel_writes.size(), 0);
-    voxel_write_list.upload(voxel_writes, sizeof(uint32_t) * 4);
+    set_voxels(command_buffer, voxel_writes);
+}
 
-    // VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
-
+void VoxelGrid::voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud, 
+                                     VulkanBuffer& voxel_writes, uint32_t max_write_count) {
+    LOG_METHOD();
     {
         auto scope = m_command_buffer.begin_scope();
-        set_voxels(m_command_buffer, voxel_write_list);
+        voxelize_point_cloud(m_command_buffer, engine, point_cloud, voxel_writes, max_write_count);
     }
     submit_compute_commands();
-    // VulkanFence compute_fence(engine.device());
-    // compute_fence.reset();
-    // engine.compute_submit(compute_command_buffer, &compute_fence);
-    // compute_fence.wait();
 }
 
 void VoxelGrid::update(Window& window, Camera& camera) {
