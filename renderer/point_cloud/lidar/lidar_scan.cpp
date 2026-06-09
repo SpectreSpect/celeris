@@ -109,8 +109,7 @@ PointCloud LidarScan::load_from_file(ManagerBundle& manager_bundle, const std::f
 
         if (!s.valid) {
             m_points[i].pos = glm::vec4(INF, INF, INF, 1.0f);
-            // points[i].color = glm::vec4(0, 0, 1, 1);
-            m_points[i].color = glm::vec4(1, 1, 1, 1);
+            m_points[i].color = glm::vec4(0, 0, 0, 1);
             continue;
         }
 
@@ -132,8 +131,7 @@ PointCloud LidarScan::load_from_file(ManagerBundle& manager_bundle, const std::f
         const glm::vec3 p_ref_eng = ros_pos_to_engine(p_ref_ros);
 
         m_points[i].pos = glm::vec4(p_ref_eng, 1.0f);
-        // points[i].color = glm::vec4(0, 0, 1, 1);
-        m_points[i].color = glm::vec4(1, 1, 1, 1);
+        m_points[i].color = glm::vec4(0, 0, 0, 1);
     }
 
     get_normals(m_points, m_normals);

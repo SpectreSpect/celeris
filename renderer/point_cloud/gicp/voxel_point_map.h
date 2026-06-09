@@ -8,6 +8,7 @@
 #include <glm/gtc/quaternion.hpp>
 
 class InstanceBufferView;
+class VoxelGrid;
 
 class VoxelPointMap {
 public:
@@ -36,6 +37,8 @@ public:
     VoxelPointMap(VulkanEngine& engine, uint32_t num_hash_table_slots, uint32_t max_map_point_count);
 
     InstanceBufferView get_map_instance_view();
+
+    void upload_voxels(VulkanEngine& engine, VoxelGrid& voxel_grid);
 
     // VoxelPointMap() = default;
     // void create(VulkanBuffer& engine, uint32_t num_hash_table_slots, uint32_t max_map_point_count);

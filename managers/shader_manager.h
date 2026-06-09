@@ -67,6 +67,8 @@ public:
     VulkanShaderModule clear_chunk_hash_table_cs;
     VulkanShaderModule fill_chunk_hash_table_cs;
 
+    VulkanShaderModule voxel_writes_from_point_cloud_cs;
+
     // Voxelizator
     VulkanShaderModule alloc_active_chunk_triangles_cs;
     VulkanShaderModule fill_triangle_indices_cs;

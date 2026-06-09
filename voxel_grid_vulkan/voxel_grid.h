@@ -27,6 +27,7 @@ class MaterialInstanceManager;
 class VulkanQueue;
 class Camera;
 class Window;
+class PointCloud;
 
 
 class VoxelGrid {
@@ -77,8 +78,16 @@ public:
     //     const std::vector<VoxelDataGPU>& voxels
     // );
 
+    glm::uvec3 voxel_size();
+    // void voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud);
+    void voxelize_point_cloud(VulkanCommandBuffer& command_buffer, VulkanEngine& engine, 
+                              PointCloud& point_cloud, VulkanBuffer& voxel_writes, uint32_t max_write_count);
+    void voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud, 
+                              VulkanBuffer& voxel_writes, uint32_t max_write_count);
+    
     void update(Window& window, Camera& camera);
     void set_voxels(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src);
+    
 
 public:
     struct VoxelGridBuffers {
@@ -173,6 +182,8 @@ public:
         PassWriter hash_table_conditional_dispatch_adapter_pw;
         PassInstance clear_chunk_hash_table_pi;
         PassInstance fill_chunk_hash_table_pi;
+        
+        PassInstance voxel_writes_from_point_cloud_pi;
     };
 
     struct VoxelGridParams {

@@ -62,6 +62,8 @@ public:
     ComputePass clear_chunk_hash_table_cp;
     ComputePass fill_chunk_hash_table_cp;
 
+    ComputePass voxel_writes_from_point_cloud_cp;
+
     // Voxelizator
     ComputePass alloc_active_chunk_triangles_cp;
     ComputePass fill_triangle_indices_cp;
@@ -132,6 +134,8 @@ public:
     ComputePass create_hash_table_conditional_dispatch_adapter_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_clear_chunk_hash_table_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_fill_chunk_hash_table_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+
+    ComputePass create_voxel_writes_from_point_cloud_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
     ComputePass create_alloc_active_chunk_triangles_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_fill_triangle_indices_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);

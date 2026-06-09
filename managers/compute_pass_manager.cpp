@@ -52,6 +52,8 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         clear_chunk_hash_table_cp(create_clear_chunk_hash_table_compute_pass(device, shader_manager.clear_chunk_hash_table_cs)),
         fill_chunk_hash_table_cp(create_fill_chunk_hash_table_compute_pass(device, shader_manager.fill_chunk_hash_table_cs)),
 
+        voxel_writes_from_point_cloud_cp(create_voxel_writes_from_point_cloud_compute_pass(device, shader_manager.voxel_writes_from_point_cloud_cs)),
+
         // Voxelizator
         alloc_active_chunk_triangles_cp(create_alloc_active_chunk_triangles_compute_pass(device, shader_manager.alloc_active_chunk_triangles_cs)),
         fill_triangle_indices_cp(create_fill_triangle_indices_compute_pass(device, shader_manager.fill_triangle_indices_cs)),
@@ -664,6 +666,20 @@ ComputePass ComputePassManager::create_fill_chunk_hash_table_compute_pass(Vulkan
     builder.add_storage_buffer(2, ShaderStages::compute); // EnqueuedBuf
 
     builder.add_push_constantsf(sizeof(FillChunkHashTablePushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_voxel_writes_from_point_cloud_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // SourcePointBuffer
+    builder.add_storage_buffer(1, ShaderStages::compute); // TargetVoxelWrites
+    // builder.add_storage_buffer(2, ShaderStages::compute); // EnqueuedBuf
+
+    builder.add_push_constantsf(sizeof(VoxelListFromPointCloudPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }

@@ -194,6 +194,18 @@ struct FillChunkHashTablePushConstants {
     int32_t u_pack_offset;
 };
 
+struct VoxelListFromPointCloudPushConstants {
+    glm::mat4 source_point_cloud_model;
+    glm::vec4 voxel_size;
+    uint32_t point_count;
+    uint32_t max_write_count;
+};
+
+static_assert(offsetof(VoxelListFromPointCloudPushConstants, source_point_cloud_model) == 0);
+static_assert(offsetof(VoxelListFromPointCloudPushConstants, voxel_size) == 64);
+static_assert(offsetof(VoxelListFromPointCloudPushConstants, point_count) == 80);
+static_assert(offsetof(VoxelListFromPointCloudPushConstants, max_write_count) == 84);
+
 struct AllocActiveChunkTrianglesPushConstants {
     uint32_t u_counter_hash_table_size;
 };
