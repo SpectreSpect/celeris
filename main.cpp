@@ -55,6 +55,7 @@
 #include "renderer/static_mesh_data.h"
 #include "renderer/indirect_render_object.h"
 #include "voxel_grid_vulkan/voxelizator.h"
+#include <queue>
 
 #include <vector>
 #include <random>
@@ -256,18 +257,13 @@ int main() {
     vox_box.transform.position = glm::vec3(0.0f, 80.0f, 0.0f);
     vox_box.transform.scale = glm::vec3(20.0f);
 
-    VoxelWriteGPU voxelize_prefab;
-    voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
-    voxelize_prefab.set_flags = OVERWRITE_BIT;
-    voxelizator.voxelize_and_submit(
-        voxelize_prefab,
-        vox_box.mesh_view(),
-        offsetof(PBRVertex, position),
-        sizeof(PBRVertex),
-        vox_box.transform.get_model_matrix(),
-        &voxel_grid.local_voxel_write_list()        
-    );
+    VoxelWriteGPU blue_voxelize_prefab;
+    blue_voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
+    blue_voxelize_prefab.set_flags = OVERWRITE_BIT;
 
+    VoxelWriteGPU transparent_voxelize_prefab;
+    transparent_voxelize_prefab.voxel_data = VoxelDataGPU(0, 0, glm::ivec3(255));
+    transparent_voxelize_prefab.set_flags = OVERWRITE_BIT;
 
     // uint32_t indirect_command_count = 1;
     // DrawElementsIndirectCommand commands {
@@ -416,7 +412,7 @@ int main() {
     // scene.add(unlit_cube);
     scene.add(sphere);
     scene.add(skybox);
-    scene.add(vox_box);
+    // scene.add(vox_box);
     
 
     skybox.update(scene);
@@ -432,6 +428,8 @@ int main() {
     uint32_t pending_skybox_environment_map_id = skybox.environment_map_id();
     bool skybox_environment_update_pending = false;
     float angular_speed = glm::half_pi<float>() * 0.5f;
+
+    std::vector<glm::mat4> transform_mem(3);
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
@@ -452,10 +450,35 @@ int main() {
         glm::quat rot_x = glm::angleAxis(angle, glm::vec3(1.0f, 0.0f, 0.0f));
         glm::quat rot_y = glm::angleAxis(angle, glm::vec3(0.0f, 1.0f, 0.0f));
 
-        vox_box.transform.rotation = glm::normalize(
-            vox_box.transform.rotation * rot_x * rot_y
-        );
-        
+        for (const glm::mat4 transform : transform_mem) {
+            voxelizator.voxelize_and_submit(
+                transparent_voxelize_prefab,
+                vox_box.mesh_view(),
+                offsetof(PBRVertex, position),
+                sizeof(PBRVertex),
+                transform,
+                &voxel_grid.local_voxel_write_list()        
+            );
+        }
+
+        for (size_t i = 0; i < transform_mem.size(); i++) {
+            vox_box.transform.rotation = glm::normalize(
+                vox_box.transform.rotation * rot_x * rot_y
+            );
+
+            voxelizator.voxelize_and_submit(
+                blue_voxelize_prefab,
+                vox_box.mesh_view(),
+                offsetof(PBRVertex, position),
+                sizeof(PBRVertex),
+                vox_box.transform.get_model_matrix(),
+                &voxel_grid.local_voxel_write_list()        
+            );
+
+            transform_mem[i] = vox_box.transform.get_model_matrix();
+        }
+
+            
         uint32_t image_index = 0;
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
