@@ -450,33 +450,33 @@ int main() {
         glm::quat rot_x = glm::angleAxis(angle, glm::vec3(1.0f, 0.0f, 0.0f));
         glm::quat rot_y = glm::angleAxis(angle, glm::vec3(0.0f, 1.0f, 0.0f));
 
-        for (const glm::mat4 transform : transform_mem) {
-            voxelizator.voxelize_and_submit(
-                transparent_voxelize_prefab,
-                vox_box.mesh_view(),
-                offsetof(PBRVertex, position),
-                sizeof(PBRVertex),
-                transform,
-                &voxel_grid.local_voxel_write_list()        
-            );
-        }
+        // for (const glm::mat4 transform : transform_mem) {
+        //     voxelizator.voxelize_and_submit(
+        //         transparent_voxelize_prefab,
+        //         vox_box.mesh_view(),
+        //         offsetof(PBRVertex, position),
+        //         sizeof(PBRVertex),
+        //         transform,
+        //         &voxel_grid.local_voxel_write_list()        
+        //     );
+        // }
 
-        for (size_t i = 0; i < transform_mem.size(); i++) {
-            vox_box.transform.rotation = glm::normalize(
-                vox_box.transform.rotation * rot_x * rot_y
-            );
+        // for (size_t i = 0; i < transform_mem.size(); i++) {
+        //     vox_box.transform.rotation = glm::normalize(
+        //         vox_box.transform.rotation * rot_x * rot_y
+        //     );
 
-            voxelizator.voxelize_and_submit(
-                blue_voxelize_prefab,
-                vox_box.mesh_view(),
-                offsetof(PBRVertex, position),
-                sizeof(PBRVertex),
-                vox_box.transform.get_model_matrix(),
-                &voxel_grid.local_voxel_write_list()        
-            );
+        //     voxelizator.voxelize_and_submit(
+        //         blue_voxelize_prefab,
+        //         vox_box.mesh_view(),
+        //         offsetof(PBRVertex, position),
+        //         sizeof(PBRVertex),
+        //         vox_box.transform.get_model_matrix(),
+        //         &voxel_grid.local_voxel_write_list()        
+        //     );
 
-            transform_mem[i] = vox_box.transform.get_model_matrix();
-        }
+        //     transform_mem[i] = vox_box.transform.get_model_matrix();
+        // }
 
             
         uint32_t image_index = 0;
