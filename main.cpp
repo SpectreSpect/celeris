@@ -63,43 +63,7 @@
 static std::mt19937 rng(std::random_device{}());
 static std::uniform_real_distribution<double> dist(0.0, 1.0);
 
-float srgb_to_linear(float c) {
-    if (c <= 0.04045f) {
-        return c / 12.92f;
-    }
-
-    return std::pow((c + 0.055f) / 1.055f, 2.4f);
-}
-
-VkClearValue make_clear_color_srgb(glm::vec4 color) {
-    VkClearValue clear_color{};
-
-    clear_color.color.float32[0] = srgb_to_linear(color.r);
-    clear_color.color.float32[1] = srgb_to_linear(color.g);
-    clear_color.color.float32[2] = srgb_to_linear(color.b);
-    clear_color.color.float32[3] = color.a;
-
-    return clear_color;
-}
-
 VkClearValue clear_color = {0.05f, 0.05f, 0.05f, 1.0f};
-
-struct SimpleUniform {
-    glm::vec4 color;
-};
-
-struct SimpleStorage {
-    glm::vec4 color1;
-    glm::vec4 color2;
-};
-
-// struct DrawElementsIndirectCommand {
-//     uint32_t count;
-//     uint32_t instanceCount;
-//     uint32_t firstIndex;
-//     int32_t  baseVertex;
-//     uint32_t baseInstance;
-// };
 
 int main() {
     GlfwContext glfw_context;
@@ -132,39 +96,6 @@ int main() {
     MaterialInstanceManager material_instance_manager(engine, material_manager, texture_manager);
     MeshManager mesh_manager(engine, resource_loader);
     ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
-
-    // CubemapArray cubemaps(engine.physical_device(), engine.device(), VkExtent2D{512, 512}, VK_FORMAT_R8G8B8A8_UNORM, 16, CubemapArray::StorageImageUsage::Enabled);
-
-    // EquirectToCubemapPass equirect_to_cubemap_pass(engine, compute_pass_manager);
-
-    // BrdfLutPass brdf_lut_generator(engine, compute_pass_manager);
-    // VulkanTexture2D brdf_lut_texture = brdf_lut_generator.generate(256, 256);
-
-    // PrefilterPass prefilter_pass(engine, compute_pass_manager);
-    // Cubemap prefilter_map = prefilter_pass.generate(*texture_manager.st_peters_square_night_4k_hdr_env_map, 32);
-
-    // Cubemap dirt_cubemap = equirect_to_cubemap_pass.generate(texture_manager.dirt_texture, 100);
-
-    // IrradiancePass irradiance_pass(engine, compute_pass_manager);
-    // Cubemap irradiance_map = irradiance_pass.generate(*texture_manager.st_peters_square_night_4k_hdr_env_map, 32);
-
-    // Cubemap dirt_cubemap = equirect_to_cubemap_pass.generate(texture_manager.dirt_texture, 100);
-
-
-        // float voxel_size = 1.0f;
-        // uint32_t chunk_size = 16u;
-        // glm::ivec3(chunk_size), // chunk_size
-        // glm::vec3(voxel_size), // voxel_size
-        // 10'000, // count_active_chunks
-        // 1'000'000, // max_quads
-        // 4, // chunk_hash_table_size_factor
-        // 4096, // count_evict_buckets
-        // 5'000, // min_free_chunks
-        // 0.2f, // tomb_fraction_to_rebuild
-        // chunk_size * voxel_size * 1, // eviction_bucket_shell_thickness
-        // 10, // vb_page_size_order_of_two
-        // 10, // ib_page_size_order_of_two
-        // 1.0, // buddy_allocator_nodes_factor
 
     glm::vec3 voxel_size(1.0f);
     glm::ivec3 chunk_size(16);
@@ -265,51 +196,7 @@ int main() {
     transparent_voxelize_prefab.voxel_data = VoxelDataGPU(0, 0, glm::ivec3(255));
     transparent_voxelize_prefab.set_flags = OVERWRITE_BIT;
 
-    // uint32_t indirect_command_count = 1;
-    // DrawElementsIndirectCommand commands {
-    //     .count = sphere.mesh_view().index_count(), 
-    //     .instanceCount = 1,
-    //     .firstIndex = 0,
-    //     .baseVertex = 0,
-    //     .baseInstance = 0
-    // };
-
-    // indirect_command_buffer.upload(&indirect_command_count, sizeof(uint32_t), 0);
-    // indirect_command_buffer.upload(&commands, sizeof(DrawElementsIndirectCommand), sizeof(uint32_t));
-
-
-    uint32_t draw_count = 2;
-
-    VkDrawIndexedIndirectCommand commands[2] = {
-        {
-            .indexCount    = StaticMeshData::two_sphere_inidirect_test.sphere_index_count,
-            .instanceCount = 1,
-            .firstIndex    = StaticMeshData::two_sphere_inidirect_test.first_sphere_first_index,
-            .vertexOffset  = StaticMeshData::two_sphere_inidirect_test.first_sphere_base_vertex,
-            .firstInstance = 0
-        },
-        {
-            .indexCount    = StaticMeshData::two_sphere_inidirect_test.sphere_index_count,
-            .instanceCount = 1,
-            .firstIndex    = StaticMeshData::two_sphere_inidirect_test.second_sphere_first_index,
-            .vertexOffset  = StaticMeshData::two_sphere_inidirect_test.second_sphere_base_vertex,
-            .firstInstance = 0
-        }
-    };
-
-    indirect_command_buffer.upload(&draw_count, sizeof(uint32_t), 0);
-    indirect_command_buffer.upload(&commands, sizeof(DrawElementsIndirectCommand) * 2, sizeof(uint32_t));
-
-
-    IndirectRenderObject two_spheres(mesh_manager.two_sphere_indirect_test, material_instance_manager.pbr, indirect_command_buffer, 2);
-
-    RenderObject unlit_cube(mesh_manager.cube, material_instance_manager.pbr);
-    RenderObject unlit_cube2(mesh_manager.cube, material_instance_manager.dirt_blinn_phong);
-    RenderObject unlit_cube3(mesh_manager.cube, material_instance_manager.rock_blinn_phong);
-    RenderObject unlit_cube4(mesh_manager.cube, material_instance_manager.unlit);
-
     const float skybox_exposure = 1.8f;
-    // const float skybox_exposure = 2.2f;
 
     Skybox skybox(
         mesh_manager.skybox_cube,
@@ -319,102 +206,58 @@ int main() {
         TextureManager::st_peters_square_night_4k_pbr_map_id,
         skybox_exposure
     );
-
-    // LightSource light_source{};
-    // light_source.color = glm::vec4(1, 1, 1, 1);
-    // light_source.position = glm::vec4(1, 1, 1, 5);
-
-    LightSource light_source0 = {glm::vec4(1, 1, 1, 5), glm::vec4(0, 1, 0, 1)};
-    LightSource light_source1 = {glm::vec4(2, 1, 0, 5), glm::vec4(1, 0, 0, 1)};
     
+    LidarVideo lidar_video(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 10);
 
-    // lighting_system.set_light_source(0, {glm::vec4(1, 1, 1, 5), glm::vec4(0, 1, 0, 1)});
-    // lighting_system.set_light_source(1, {glm::vec4(2, 1, 0, 5), glm::vec4(1, 0, 0, 1)});
-    // lighting_system.set_light_source(2, {glm::vec4(0, 1, 2, 5), glm::vec4(0, 1, 0, 1)});
-    // lighting_system.set_light_source(3, {glm::vec4(-2, 1, 0, 5), glm::vec4(0, 0, 1, 1)});
-    
-    // LidarVideo lidar_video(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 10);
+    // Important: save original first frame pose before overwriting it.
+    glm::vec3 first_position = lidar_video.get_scan(0).point_cloud().transform.position;
+    glm::quat first_rotation = glm::normalize(lidar_video.get_scan(0).point_cloud().transform.rotation);
 
-    // // Important: save original first frame pose before overwriting it.
-    // glm::vec3 first_position = lidar_video.get_scan(0).point_cloud().transform.position;
-    // glm::quat first_rotation = glm::normalize(lidar_video.get_scan(0).point_cloud().transform.rotation);
+    for (int i = static_cast<int>(lidar_video.get_scan_count()) - 1; i >= 1; --i) {
+        glm::vec3 p_prev = lidar_video.get_scan(i - 1).point_cloud().transform.position;
+        glm::vec3 p_curr = lidar_video.get_scan(i).point_cloud().transform.position;
 
-    // for (int i = static_cast<int>(lidar_video.get_scan_count()) - 1; i >= 1; --i) {
-    //     glm::vec3 p_prev = lidar_video.get_scan(i - 1).point_cloud().transform.position;
-    //     glm::vec3 p_curr = lidar_video.get_scan(i).point_cloud().transform.position;
+        glm::quat q_prev = glm::normalize(lidar_video.get_scan(i - 1).point_cloud().transform.rotation);
+        glm::quat q_curr = glm::normalize(lidar_video.get_scan(i).point_cloud().transform.rotation);
 
-    //     glm::quat q_prev = glm::normalize(lidar_video.get_scan(i - 1).point_cloud().transform.rotation);
-    //     glm::quat q_curr = glm::normalize(lidar_video.get_scan(i).point_cloud().transform.rotation);
+        // Optional: avoid quaternion sign discontinuity.
+        // q and -q represent the same rotation.
+        if (glm::dot(q_prev, q_curr) < 0.0f) {
+            q_curr = -q_curr;
+        }
 
-    //     // Optional: avoid quaternion sign discontinuity.
-    //     // q and -q represent the same rotation.
-    //     if (glm::dot(q_prev, q_curr) < 0.0f) {
-    //         q_curr = -q_curr;
-    //     }
+        glm::vec3 delta_position = p_curr - p_prev;
 
-    //     glm::vec3 delta_position = p_curr - p_prev;
+        // Since your update convention is:
+        // q_new = dq * q_old
+        glm::quat delta_rotation = glm::normalize(q_curr * glm::inverse(q_prev));
 
-    //     // Since your update convention is:
-    //     // q_new = dq * q_old
-    //     glm::quat delta_rotation = glm::normalize(q_curr * glm::inverse(q_prev));
+        lidar_video.get_scan(i).point_cloud().transform.position = delta_position;
+        lidar_video.get_scan(i).point_cloud().transform.rotation = delta_rotation;
+    }
 
-    //     lidar_video.get_scan(i).point_cloud().transform.position = delta_position;
-    //     lidar_video.get_scan(i).point_cloud().transform.rotation = delta_rotation;
-    // }
+    lidar_video.get_scan(0).point_cloud().transform.position = glm::vec3(0.0f);
+    lidar_video.get_scan(0).point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
-    // lidar_video.get_scan(0).point_cloud().transform.position = glm::vec3(0.0f);
-    // lidar_video.get_scan(0).point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    VoxelPointMap voxel_point_map(engine, 1500000, 1500000);
+    voxel_map_reseter.reset(voxel_point_map);
 
-    // VoxelPointMap voxel_point_map(engine, 1500000, 1500000);
-    // voxel_map_reseter.reset(voxel_point_map);
+    // voxel_map_inserter.insert(voxel_point_map, target_point_cloud, target_normal_buffer);
+    voxel_map_inserter.insert(voxel_point_map, lidar_video.get_scan(0).point_cloud(), lidar_video.get_scan(0).normal_buffer());
 
-    // // voxel_map_inserter.insert(voxel_point_map, target_point_cloud, target_normal_buffer);
-    // voxel_map_inserter.insert(voxel_point_map, lidar_video.get_scan(0).point_cloud(), lidar_video.get_scan(0).normal_buffer());
+    PointCloud voxel_map_point_cloud(manager_bundle, voxel_point_map.map_point_buffer, voxel_point_map.m_map_point_count);
 
-    // PointCloud voxel_map_point_cloud(manager_bundle, voxel_point_map.map_point_buffer, voxel_point_map.m_map_point_count);
-
-    // unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
-    unlit_cube.set_material_data<PBRMaterialData>(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
     sphere.set_material_data(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
     vox_box.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
 
-    two_spheres.set_material_data(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
-
-    unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
-    unlit_cube3.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
-    unlit_cube4.set_material_data<UnlitMaterialData>({glm::vec4(0, 1, 1, 1)});
-
-    material_instance_manager.unlit.sync();
-    material_instance_manager.rock_blinn_phong.sync();
-    material_instance_manager.dirt_blinn_phong.sync();
-
-    unlit_cube.transform.position = glm::vec4(0, 0, 0, 1);
-
-    unlit_cube.transform.scale = glm::vec3(50, 1, 50);
     sphere.transform.position = glm::vec4(0, 2, 0, 1);
-
-    // unlit_cube.transform.position.x = 0;
-    unlit_cube2.transform.position.x = 2;
-    unlit_cube3.transform.position.x = 4;
-    unlit_cube4.transform.position.x = 6;
-
-    // unlit_cube.add_child(unlit_cube2);
-    // unlit_cube2.add_child(unlit_cube3);
-    // unlit_cube3.add_child(unlit_cube4);
-    // unlit_cube4.add_child(point_cloud);
 
     Scene scene;
 
-    // scene.add(voxel_map_point_cloud);
-
-    sphere.add_child(two_spheres);
-
-    // scene.add(unlit_cube);
-    scene.add(sphere);
     scene.add(skybox);
-    // scene.add(vox_box);
+    scene.add(sphere);
+    scene.add(voxel_map_point_cloud);
     
-
     skybox.update(scene);
 
     bool g_pressed = false;
@@ -478,26 +321,15 @@ int main() {
         //     transform_mem[i] = vox_box.transform.get_model_matrix();
         // }
 
-            
         uint32_t image_index = 0;
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
-
-        light_source0.position.x = cos(timer) * 10;
-        light_source1.position.x = sin(timer) * 10;
-
-        lighting_system.set_light_source(0, light_source0);
-        lighting_system.set_light_source(1, light_source1);
 
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), window, camera);
         lighting_system.update(engine.current_frame(), window, camera);
 
         voxel_grid.update(window, camera);
-
-        // sphere.transform.position.y = sin(timer) * 2;
-        // two_spheres.transform.position.x = cos(timer) * 10;
-        
 
         // if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
         //     g_pressed = true;
