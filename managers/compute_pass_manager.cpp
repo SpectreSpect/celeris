@@ -64,6 +64,10 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         reset_voxelize_pipeline_cp(create_reset_voxelize_pipeline_compute_pass(device, shader_manager.reset_voxelize_pipeline_cs)),
         voxelize_triangles_cp(create_voxelize_triangles_compute_pass(device, shader_manager.voxelize_triangles_cs)),
 
+        // Point cloud
+        normals_from_webots_lidar_point_cloud_cp(create_normals_from_webots_lidar_point_cloud_compute_pass(device, shader_manager.normals_from_webots_lidar_point_cloud_cs)),
+        remove_near_origin_lidar_points_cp(create_remove_near_origin_lidar_points_compute_pass(device, shader_manager.remove_near_origin_lidar_points_cs)),
+
         // PBR
         equirect_to_cubemap_cp(create_equirect_to_cubemap_compute_pass(device, shader_manager.equirect_to_cubemap_cs)),
         brdf_lut_cp(create_brdf_lut_pass(device, shader_manager.brdf_lut_cs)),
@@ -773,6 +777,33 @@ ComputePass ComputePassManager::create_voxelize_triangles_compute_pass(VulkanDev
     builder.add_storage_buffer(5, ShaderStages::compute); // VoxelsWriteData
 
     builder.add_push_constantsf(sizeof(VoxelizeTrianglesPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_normals_from_webots_lidar_point_cloud_compute_pass(
+                        VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // SourcePointBuffer   
+    builder.add_storage_buffer(1, ShaderStages::compute); // OutputNormalBuffer
+
+    builder.add_push_constantsf(sizeof(NormalsFromWebotsLidarPointCloudPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_remove_near_origin_lidar_points_compute_pass(
+                        VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // PointBuffer
+
+    builder.add_push_constantsf(sizeof(RemoveNearOriginLidarPointsPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }

@@ -278,3 +278,14 @@ struct GenerateMeshPushConstants {
     uint32_t vertex_normal_offset_bytes;
     uint32_t vertex_color_offset_bytes;
 };
+
+struct NormalsFromWebotsLidarPointCloudPushConstants {
+    uint32_t point_count;
+    uint32_t ring_count;
+    uint32_t ring_width;
+};
+
+struct RemoveNearOriginLidarPointsPushConstants {
+    uint32_t point_count;
+    float min_distance;
+};
