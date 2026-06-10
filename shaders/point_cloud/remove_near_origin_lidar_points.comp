@@ -1,0 +1,44 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256) in;
+
+struct PointInstance {
+    vec4 position;
+    vec4 color;
+};
+
+layout(std430, set = 0, binding = 0) buffer PointBuffer {
+    PointInstance points[];
+} point_buffer;
+
+layout(push_constant) uniform RemoveNearOriginLidarPointsPushConstants {
+    uint point_count;
+    float min_distance;
+};
+
+bool is_point_valid(PointInstance p) {
+    vec3 v = p.position.xyz;
+    return !any(isnan(v)) && !any(isinf(v));
+}
+
+void main() {
+    uint point_id = gl_GlobalInvocationID.x;
+    if (point_id >= point_count) {
+        return;
+    }
+
+    PointInstance point = point_buffer.points[point_id];
+    if (!is_point_valid(point)) {
+        return;
+    }
+
+    float dist_sq = dot(point.position.xyz, point.position.xyz);
+    float min_distance_sq = min_distance * min_distance;
+
+    if (dist_sq < min_distance_sq) {
+        point.position = vec4(0.0 / 0.0);
+        point.color = vec4(0.0);
+        point_buffer.points[point_id] = point;
+    }
+}

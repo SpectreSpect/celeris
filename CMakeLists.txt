@@ -16,6 +16,7 @@ find_package(GLEW REQUIRED)
 find_package(glfw3 3.3 REQUIRED)
 find_package(glm REQUIRED)
 find_package(Vulkan REQUIRED)
+find_package(Threads REQUIRED)
 
 add_executable(app
   main.cpp
@@ -101,6 +102,7 @@ add_executable(app
   renderer/scene_object.cpp
   renderer/skybox.cpp
   renderer/point_cloud/lidar/lidar_scan.cpp
+  renderer/point_cloud/lidar/lidar_scan_receiver.cpp
   renderer/point_cloud/lidar/lidar_video.cpp
   renderer/point_cloud/gicp/gicp_pass.cpp
   renderer/point_cloud/gicp/voxel_point_map.cpp
@@ -122,6 +124,7 @@ add_executable(app
   renderer/pbr/irradiance_map_pass.cpp
   renderer/pbr/pbr_maps.cpp
   renderer/pbr/pbr_map_generator.cpp
+  renderer/point_cloud/point_cloud_preprocessor.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
@@ -286,6 +289,7 @@ target_link_libraries(app PRIVATE
   glm::glm
   OpenGL::GL
   Vulkan::Vulkan
+  Threads::Threads
 )
 
 if(WIN32)
