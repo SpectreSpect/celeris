@@ -131,7 +131,7 @@ int main() {
     Voxelizator::VoxelizatorDesc voxelizator_desc {
         .chunk_size = chunk_size,
         .voxel_size = voxel_size,
-        .counter_hash_table_size = 10'000,
+        .counter_hash_table_size = 1'000'000,
         .count_voxel_writes = 0 // Будут использоваться те, что внутри voxel_grid
     };
 
@@ -174,6 +174,14 @@ int main() {
     RenderObject scan_object(scan_mesh_view, material_instance_manager.pbr);
     scan_object.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
 
+    VoxelWriteGPU blue_voxelize_prefab;
+    blue_voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
+    blue_voxelize_prefab.set_flags = OVERWRITE_BIT;
+
+    VoxelWriteGPU transparent_voxelize_prefab;
+    transparent_voxelize_prefab.voxel_data = VoxelDataGPU(0, 0, glm::ivec3(255));
+    transparent_voxelize_prefab.set_flags = OVERWRITE_BIT;
+
     PointCloudMesher mesher(
         engine.device(),
         engine.compute_queue(),
@@ -191,6 +199,17 @@ int main() {
         sizeof(PBRVertex),
         offsetof(PBRVertex, position),
         offsetof(PBRVertex, normal)
+    );
+
+    scan_object.transform.scale = glm::vec3(5.0f);
+
+    voxelizator.voxelize_and_submit(
+        blue_voxelize_prefab,
+        scan_object.mesh_view(),
+        offsetof(PBRVertex, position),
+        sizeof(PBRVertex),
+        scan_object.transform.get_model_matrix(),
+        &voxel_grid.local_voxel_write_list()
     );
 
     glm::ivec3 block_size = glm::ivec3(10, 20, 30);
@@ -241,14 +260,6 @@ int main() {
     RenderObject vox_box(mesh_manager.cube, material_instance_manager.pbr);
     vox_box.transform.position = glm::vec3(0.0f, 80.0f, 0.0f);
     vox_box.transform.scale = glm::vec3(20.0f);
-
-    VoxelWriteGPU blue_voxelize_prefab;
-    blue_voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
-    blue_voxelize_prefab.set_flags = OVERWRITE_BIT;
-
-    VoxelWriteGPU transparent_voxelize_prefab;
-    transparent_voxelize_prefab.voxel_data = VoxelDataGPU(0, 0, glm::ivec3(255));
-    transparent_voxelize_prefab.set_flags = OVERWRITE_BIT;
 
     const float skybox_exposure = 1.8f;
 
