@@ -4,13 +4,17 @@
 #include <algorithm>
 
 #include "../point_instance.h"
+#include "../point_cloud_preprocessor.h"
 
-
-LidarVideo::LidarVideo(ManagerBundle& manager_bundle, const std::filesystem::path& csv_path, int first_frame, int last_frame){
-    load_from_file(manager_bundle, csv_path, first_frame, last_frame);
+LidarVideo::LidarVideo(ManagerBundle& manager_bundle, 
+                       PointCloudPreprocessor& point_cloud_preprocessor, 
+                       const std::filesystem::path& csv_path, int first_frame, int last_frame){
+    load_from_file(manager_bundle, point_cloud_preprocessor, csv_path, first_frame, last_frame);
 }
 
-void LidarVideo::load_from_file(ManagerBundle& manager_bundle, const std::filesystem::path& csv_path, int first_frame, int last_frame) {
+void LidarVideo::load_from_file(ManagerBundle& manager_bundle, 
+                                PointCloudPreprocessor& point_cloud_preprocessor, 
+                                const std::filesystem::path& csv_path, int first_frame, int last_frame) {
     std::ifstream in(csv_path);
     if (!in) throw std::runtime_error("Failed to open: " + csv_path.string());
 
@@ -84,7 +88,7 @@ void LidarVideo::load_from_file(ManagerBundle& manager_bundle, const std::filesy
     for (const auto& e : entries) {
         // LidarScan* lidar_scan = new LidarScan(manager_bundle, video_dir_path / e.filename);
 
-        m_scans.emplace_back(manager_bundle, video_dir_path / e.filename);
+        m_scans.emplace_back(manager_bundle, point_cloud_preprocessor, video_dir_path / e.filename);
 
         m_scans.back().set_timestamp_ns(e.timestamp_ns);
         m_frame_timestamps_ns.push_back(e.timestamp_ns);

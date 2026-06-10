@@ -56,6 +56,7 @@
 #include "renderer/static_mesh_data.h"
 #include "renderer/indirect_render_object.h"
 #include "voxel_grid_vulkan/voxelizator.h"
+#include "renderer/point_cloud/point_cloud_preprocessor.h"
 #include "math_utils.h"
 #include <queue>
 
@@ -99,7 +100,11 @@ int main() {
     MeshManager mesh_manager(engine, resource_loader);
     ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
 
-    LidarScanReceiver scan_receiver(5000);
+    PointCloudPreprocessor point_cloud_preprocessor(engine.device(), 
+                                                engine.compute_queue(),
+                                                compute_pass_manager);
+
+    LidarScanReceiver scan_receiver(point_cloud_preprocessor, 5000);
     scan_receiver.start();
 
     std::unique_ptr<LidarScan> network_scan;
@@ -216,8 +221,12 @@ int main() {
         TextureManager::st_peters_square_night_4k_pbr_map_id,
         skybox_exposure
     );
+
     
-    LidarVideo lidar_video(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 1);
+    
+    LidarVideo lidar_video(manager_bundle, 
+                           point_cloud_preprocessor,
+                           "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 1);
 
     // Important: save original first frame pose before overwriting it.
     glm::vec3 first_position = lidar_video.get_scan(0).point_cloud().transform.position;
@@ -248,6 +257,13 @@ int main() {
 
     lidar_video.get_scan(0).point_cloud().transform.position = glm::vec3(0.0f);
     lidar_video.get_scan(0).point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+
+
+        
+    // point_cloud_preprocessor.get_normals_from_webots_lidar_point_cloud(
+    //     *lidar_video.get_scan(0).point_cloud().instance_buffer(), 
+    //     lidar_video.get_scan(0).normal_buffer(), 
+    //     lidar_video.get_scan(0).point_cloud().point_count());
 
     VoxelPointMap voxel_point_map(engine, 1500000, 1500000);
     voxel_map_reseter.reset(voxel_point_map);
@@ -367,7 +383,6 @@ int main() {
 
             network_scan = std::move(scan);
             std::cout << "Received scan #" << received_scan_count << std::endl;
-            
 
             while (retired_network_scans.size() > engine.num_frames_in_flight()) {
                 retired_network_scans.pop_front();

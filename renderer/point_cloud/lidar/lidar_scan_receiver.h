@@ -11,10 +11,12 @@
 #include <thread>
 
 class ManagerBundle;
+class PointCloudPreprocessor;
 
 class LidarScanReceiver {
 public:
-    explicit LidarScanReceiver(uint16_t port = 5000, size_t max_queued_frames = 3);
+    explicit LidarScanReceiver(PointCloudPreprocessor& point_cloud_preprocessor, 
+                               uint16_t port = 5000, size_t max_queued_frames = 3);
     ~LidarScanReceiver();
 
     LidarScanReceiver(const LidarScanReceiver&) = delete;
@@ -31,6 +33,7 @@ public:
 private:
     uint16_t m_port = 0;
     size_t m_max_queued_frames = 0;
+    PointCloudPreprocessor* m_point_cloud_preprocessor = nullptr;
     std::atomic<bool> m_running{false};
     int m_listen_socket = -1;
     std::atomic<int> m_client_socket{-1};

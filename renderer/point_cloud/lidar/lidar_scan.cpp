@@ -8,19 +8,30 @@
 
 #include "../point_instance.h"
 #include "../../../managers/manager_bundle.h"
+#include "../point_cloud_preprocessor.h"
 
-
-LidarScan::LidarScan(ManagerBundle& manager_bundle, const std::filesystem::path& path) 
+LidarScan::LidarScan(ManagerBundle& manager_bundle, 
+                     PointCloudPreprocessor& point_cloud_preprocessor, 
+                     const std::filesystem::path& path) 
     :   m_point_cloud(load_from_file(manager_bundle, path)),
-        m_normal_buffer(VulkanBuffer::create_host_visible_storage_buffer(manager_bundle.engine(), m_normals.size() * sizeof(glm::vec4))) {
-    m_normal_buffer.upload(m_normals);
+        m_normal_buffer(VulkanBuffer::create_host_visible_storage_buffer(manager_bundle.engine(), 
+                                                                         m_point_cloud.point_count() * sizeof(glm::vec4))) {
+    // m_normal_buffer.upload(m_normals);
+    point_cloud_preprocessor.get_normals_from_webots_lidar_point_cloud(*m_point_cloud.instance_buffer(), 
+                                                                       m_normal_buffer, 
+                                                                       m_point_cloud.point_count());
     add_child(m_point_cloud);
 }
 
-LidarScan::LidarScan(ManagerBundle& manager_bundle, const FrameData& frame)
-    :   m_point_cloud(load_from_frame(manager_bundle, frame)),
-        m_normal_buffer(VulkanBuffer::create_host_visible_storage_buffer(manager_bundle.engine(), m_normals.size() * sizeof(glm::vec4))) {
-    m_normal_buffer.upload(m_normals);
+LidarScan::LidarScan(ManagerBundle& manager_bundle, 
+                     PointCloudPreprocessor& point_cloud_preprocessor, 
+                     FrameData&& frame)
+    :   m_point_cloud(load_from_frame(manager_bundle, std::move(frame))),
+        m_normal_buffer(VulkanBuffer::create_host_visible_storage_buffer(manager_bundle.engine(), 
+                                                                         m_point_cloud.point_count() * sizeof(glm::vec4))) {
+    point_cloud_preprocessor.get_normals_from_webots_lidar_point_cloud(*m_point_cloud.instance_buffer(), 
+                                                                       m_normal_buffer, 
+                                                                       m_point_cloud.point_count());
     add_child(m_point_cloud);
 }
 
@@ -77,6 +88,8 @@ LidarScan::FrameData LidarScan::read_frame_from_file(const std::filesystem::path
         frame.samples[i].valid = std::isfinite(x) && std::isfinite(y) && std::isfinite(z);
     }
 
+    build_points_for_frame(frame);
+
     return frame;
 }
 
@@ -84,15 +97,24 @@ PointCloud LidarScan::load_from_file(ManagerBundle& manager_bundle, const std::f
     return load_from_frame(manager_bundle, read_frame_from_file(path));
 }
 
-PointCloud LidarScan::load_from_frame(ManagerBundle& manager_bundle, const FrameData& frame) {
+PointCloud LidarScan::load_from_frame(ManagerBundle& manager_bundle, FrameData&& frame) {
     m_timestamp_ns = frame.timestamp_ns;
 
-    const uint32_t count = static_cast<uint32_t>(frame.samples.size());
-    if (count == 0) {
+    if (frame.points.empty()) {
         throw std::runtime_error("LidarScan frame had no points");
     }
 
-    const float INF = std::numeric_limits<float>::infinity();
+    m_points = std::move(frame.points);
+
+    return PointCloud(manager_bundle, m_points);
+}
+
+void LidarScan::build_points_for_frame(FrameData& frame) {
+    const uint32_t count = static_cast<uint32_t>(frame.samples.size());
+    if (count == 0) {
+        frame.points.clear();
+        return;
+    }
 
     float min_time = std::numeric_limits<float>::infinity();
     size_t ref_idx = 0;
@@ -104,8 +126,10 @@ PointCloud LidarScan::load_from_frame(ManagerBundle& manager_bundle, const Frame
         }
     }
 
-    m_points.clear();
-    m_points.resize(count);
+    frame.points.clear();
+    frame.points.resize(count);
+
+    const float INF = std::numeric_limits<float>::infinity();
 
     // If your saved pose is base_link pose and LiDAR is offset from base_link,
     // put the real extrinsics here. If pose already describes the LiDAR frame,
@@ -133,8 +157,8 @@ PointCloud LidarScan::load_from_frame(ManagerBundle& manager_bundle, const Frame
         const TimedPointSample& s = frame.samples[i];
 
         if (!s.valid) {
-            m_points[i].pos = glm::vec4(INF, INF, INF, 1.0f);
-            m_points[i].color = glm::vec4(0, 0, 0, 1);
+            frame.points[i].pos = glm::vec4(INF, INF, INF, 1.0f);
+            frame.points[i].color = glm::vec4(0, 0, 0, 1);
             continue;
         }
 
@@ -155,22 +179,9 @@ PointCloud LidarScan::load_from_frame(ManagerBundle& manager_bundle, const Frame
         // Convert reference-frame point to engine coords
         const glm::vec3 p_ref_eng = ros_pos_to_engine(p_ref_ros);
 
-        m_points[i].pos = glm::vec4(p_ref_eng, 1.0f);
-        m_points[i].color = glm::vec4(0, 0, 0, 1);
+        frame.points[i].pos = glm::vec4(p_ref_eng, 1.0f);
+        frame.points[i].color = glm::vec4(0, 0, 0, 1);
     }
-
-    get_normals(m_points, m_normals);
-    remove_invalid_points_and_normals(m_points, m_normals);
-    drop_out_points_and_normals(m_points, m_normals, 10000);
-    remove_points_near_origin(m_points, m_normals, 3);
-
-    // point_cloud.create(engine);
-    // point_cloud.set_points(std::move(points));
-
-    // normal_buffer.create(engine, normals.size() * sizeof(glm::vec4));
-    // normal_buffer.update_data(normals.data(), normals.size() * sizeof(glm::vec4));
-
-    return PointCloud(manager_bundle, m_points);
 }
 
 std::vector<glm::vec4> LidarScan::calculate_normals(std::vector<PointInstance> points) {

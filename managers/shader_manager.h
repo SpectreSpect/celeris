@@ -81,6 +81,9 @@ public:
     VulkanShaderModule voxel_pbr_vs;
     VulkanShaderModule voxel_pbr_fs;
 
+    // Point cloud
+    VulkanShaderModule normals_from_webots_lidar_point_cloud_cs;
+
     // PBR
     VulkanShaderModule equirect_to_cubemap_cs;
     VulkanShaderModule brdf_lut_cs;

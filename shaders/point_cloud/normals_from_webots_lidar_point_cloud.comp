@@ -1,0 +1,212 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256) in;
+
+struct PointInstance {
+    vec4 position;
+    vec4 color;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer SourcePointBuffer {
+    PointInstance points[];
+} source_point_buffer;
+
+layout(std430, set = 0, binding = 1) buffer OutputNormalBuffer {
+    vec4 normals[];
+} output_normal_buffer;
+
+layout(push_constant) uniform NormalsFromWebotsLidarPointCloudPushConstants {
+    uint point_count;
+    uint ring_count;
+    uint ring_width;
+};
+
+bool is_point_valid(PointInstance p) {
+    vec3 v = p.position.xyz;
+    return !any(isnan(v)) && !any(isinf(v));
+}
+
+uint xy_id(uint x, uint y) {
+    return x + y * ring_width;
+}
+
+float radial_distance(PointInstance p) {
+    return length(p.position.xyz);
+}
+
+bool is_same_object(
+    PointInstance p0,
+    PointInstance p1,
+    float rel_thresh,
+    bool more_permissive_with_distance,
+    float abs_thresh)
+{
+    if (!is_point_valid(p0) || !is_point_valid(p1)) {
+        return false;
+    }
+
+    float r0 = radial_distance(p0);
+    float r1 = radial_distance(p1);
+
+    if (isnan(r0) || isinf(r0) || isnan(r1) || isinf(r1)) {
+        return false;
+    }
+
+    float allowed = 0.0;
+    float dr = abs(r0 - r1);
+
+    if (more_permissive_with_distance) {
+        float permission_factor = 1.5;
+        allowed = rel_thresh * pow(
+            min(r0, r1) / pow(permission_factor, 1.5),
+            permission_factor
+        );
+    } else {
+        allowed = max(rel_thresh, abs_thresh);
+    }
+
+    return dr <= allowed;
+}
+
+bool is_same_object(PointInstance p0, PointInstance p1, float rel_thresh) {
+    return is_same_object(p0, p1, rel_thresh, true, 0.12);
+}
+
+vec3 triangle_normal(PointInstance a, PointInstance b, PointInstance c) {
+    vec3 u = b.position.xyz - a.position.xyz;
+    vec3 v = c.position.xyz - a.position.xyz;
+    vec3 n = cross(u, v);
+    float len2 = dot(n, n);
+
+    if (len2 < 1e-12) {
+        return vec3(0.0);
+    }
+
+    return normalize(n);
+}
+
+void accumulate_triangle_normal(
+    inout vec3 normal_sum,
+    uint point_id,
+    uint ia,
+    uint ib,
+    uint ic)
+{
+    if (point_id != ia && point_id != ib && point_id != ic) {
+        return;
+    }
+
+    PointInstance a = source_point_buffer.points[ia];
+    PointInstance b = source_point_buffer.points[ib];
+    PointInstance c = source_point_buffer.points[ic];
+
+    if (!is_point_valid(a) || !is_point_valid(b) || !is_point_valid(c)) {
+        return;
+    }
+
+    vec3 n = triangle_normal(a, b, c);
+
+    if (dot(n, n) < 1e-12) {
+        return;
+    }
+
+    if (dot(n, vec3(0.0, 1.0, 0.0)) < 0.0) {
+        n = -n;
+    }
+
+    normal_sum += n;
+}
+
+void accumulate_cell_normal(inout vec3 normal_sum, uint point_id, uint x, uint y) {
+    uint id1 = xy_id(x,     y);
+    uint id2 = xy_id(x,     y + 1u);
+    uint id3 = xy_id(x + 1u, y + 1u);
+    uint id5 = xy_id(x + 1u, y);
+
+    PointInstance p0 = source_point_buffer.points[id1];
+    PointInstance p1 = source_point_buffer.points[id2];
+    PointInstance p2 = source_point_buffer.points[id3];
+    PointInstance p3 = source_point_buffer.points[id5];
+
+    bool tri1_ok = false;
+    bool tri2_ok = false;
+
+    if (is_point_valid(p0) && is_point_valid(p1) && is_point_valid(p2)) {
+        if (is_same_object(p0, p1, 1.0) &&
+            is_same_object(p1, p2, 1.5, false, 0.12))
+        {
+            tri1_ok = true;
+        }
+    }
+
+    if (is_point_valid(p2) && is_point_valid(p3) && is_point_valid(p0)) {
+        if (is_same_object(p3, p2, 1.0) &&
+            is_same_object(p3, p0, 1.5, false, 0.12))
+        {
+            tri2_ok = true;
+        }
+    }
+
+    if (tri1_ok) {
+        accumulate_triangle_normal(normal_sum, point_id, id3, id1, id2);
+    }
+
+    if (tri2_ok) {
+        accumulate_triangle_normal(normal_sum, point_id, id1, id3, id5);
+    }
+}
+
+void main() {
+    uint point_id = gl_GlobalInvocationID.x;
+    if (point_id >= point_count) return;
+
+    output_normal_buffer.normals[point_id] = vec4(0.0);
+
+    if (point_count == 0u || ring_count == 0u || ring_width < 2u) {
+        return;
+    }
+
+    if (point_count < ring_count) {
+        return;
+    }
+
+    uint covered_point_count = ring_count * ring_width;
+    if (point_id >= covered_point_count) {
+        return;
+    }
+
+    PointInstance point = source_point_buffer.points[point_id];
+    if (!is_point_valid(point)) {
+        return;
+    }
+
+    uint px = point_id % ring_width;
+    uint py = point_id / ring_width;
+
+    vec3 normal_sum = vec3(0.0);
+
+    for (int oy = -1; oy <= 0; ++oy) {
+        for (int ox = -1; ox <= 0; ++ox) {
+            int cell_x = int(px) + ox;
+            int cell_y = int(py) + oy;
+
+            if (cell_x < 0 || cell_y < 0) {
+                continue;
+            }
+
+            if (uint(cell_x) >= ring_width - 1u ||
+                uint(cell_y) >= ring_count - 1u)
+            {
+                continue;
+            }
+
+            accumulate_cell_normal(normal_sum, point_id, uint(cell_x), uint(cell_y));
+        }
+    }
+
+    float len2 = dot(normal_sum, normal_sum);
+    if (len2 >= 1e-12) {
+        output_normal_buffer.normals[point_id] = vec4(normalize(normal_sum), 0.0);
+    }
+}

@@ -124,6 +124,7 @@ add_executable(app
   renderer/pbr/irradiance_map_pass.cpp
   renderer/pbr/pbr_maps.cpp
   renderer/pbr/pbr_map_generator.cpp
+  renderer/point_cloud/point_cloud_preprocessor.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

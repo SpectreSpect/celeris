@@ -71,6 +71,9 @@ public:
     ComputePass reset_voxelize_pipeline_cp;
     ComputePass voxelize_triangles_cp;
 
+    // Point cloud
+    ComputePass normals_from_webots_lidar_point_cloud_cp;
+
     // PBR
     ComputePass equirect_to_cubemap_cp;
     ComputePass brdf_lut_cp;
@@ -142,6 +145,9 @@ public:
     ComputePass create_mark_and_count_active_chunks_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_reset_voxelize_pipeline_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_voxelize_triangles_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+
+    // Point cloud
+    ComputePass create_normals_from_webots_lidar_point_cloud_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
 private:
     DescriptorPool m_pool;

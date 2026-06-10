@@ -26,8 +26,11 @@ glm::mat3 ros_basis_to_engine_basis() {
 }
 }
 
-LidarScanReceiver::LidarScanReceiver(uint16_t port, size_t max_queued_frames)
-    : m_port(port), m_max_queued_frames(max_queued_frames) {}
+LidarScanReceiver::LidarScanReceiver(PointCloudPreprocessor& point_cloud_preprocessor, 
+                                     uint16_t port, size_t max_queued_frames)
+    :   m_point_cloud_preprocessor(&point_cloud_preprocessor), 
+        m_port(port), 
+        m_max_queued_frames(max_queued_frames) {}
 
 LidarScanReceiver::~LidarScanReceiver() {
     stop();
@@ -72,21 +75,29 @@ bool LidarScanReceiver::try_pop_frame(LidarScan::FrameData& frame) {
 
 std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_scan(ManagerBundle& manager_bundle) {
     LidarScan::FrameData frame;
-
-    if (!try_pop_frame(frame)) {
+    
+    if (!try_pop_frame(frame))
         return nullptr;
-    }
 
-    std::unique_ptr<LidarScan> scan = std::make_unique<LidarScan>(manager_bundle, frame);
+    if (!m_point_cloud_preprocessor)
+        return nullptr;
 
     const auto& sample = frame.samples.front();
+    const glm::vec3 base_pos_ros = sample.base_pos_ros;
+    const glm::vec3 base_rpy_ros = sample.base_rpy_ros;
 
-    scan->point_cloud().transform.position = LidarScan::ros_pos_to_engine(sample.base_pos_ros);
+    std::unique_ptr<LidarScan> scan = std::make_unique<LidarScan>(
+        manager_bundle,
+        *m_point_cloud_preprocessor,
+        std::move(frame)
+    );
+
+    scan->point_cloud().transform.position = LidarScan::ros_pos_to_engine(base_pos_ros);
 
     glm::mat3 rotation_ros = LidarScan::rpy_to_mat3_zyx(
-        sample.base_rpy_ros.x,
-        sample.base_rpy_ros.y,
-        sample.base_rpy_ros.z
+        base_rpy_ros.x,
+        base_rpy_ros.y,
+        base_rpy_ros.z
     );
     glm::mat3 basis = ros_basis_to_engine_basis();
     glm::mat3 rotation_engine = basis * rotation_ros * glm::transpose(basis);
@@ -187,6 +198,7 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
         frame.samples.resize(point_count);
         const uint8_t* p = payload.data();
 
+        uint32_t valid_count = 0;
         for (uint32_t i = 0; i < point_count; ++i) {
             float x, y, z;
             float time;
@@ -209,9 +221,15 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
             frame.samples[i].base_pos_ros = glm::vec3(px, py, pz);
             frame.samples[i].base_rpy_ros = glm::vec3(roll, pitch, yaw);
             frame.samples[i].valid = std::isfinite(x) && std::isfinite(y) && std::isfinite(z);
+
+            if (frame.samples[i].valid)
+                valid_count++;
         }
 
-        push_frame(std::move(frame));
+        LidarScan::build_points_for_frame(frame);
+
+        if (valid_count > 0 && !frame.points.empty())
+            push_frame(std::move(frame));
     }
 
     return true;

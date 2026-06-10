@@ -73,6 +73,9 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         voxel_mesh_fs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_mesh.frag.spv"),
         voxel_pbr_vs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_pbr.vert.spv"),
         voxel_pbr_fs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_pbr.frag.spv"),
+
+        // Point cloud
+        normals_from_webots_lidar_point_cloud_cs(device, path_utils::executable_dir() / "shaders" / "point_cloud" / "normals_from_webots_lidar_point_cloud.comp.spv"),
         
         // PBR
         equirect_to_cubemap_cs(device, path_utils::executable_dir() / "shaders" / "equirect_to_cubemap.comp.spv"),

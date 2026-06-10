@@ -266,3 +266,9 @@ struct VoxelizeTrianglesPushConstants {
     uint32_t voxel_color;
     uint32_t voxel_set_flags;
 };
+
+struct NormalsFromWebotsLidarPointCloudPushConstants {
+    uint32_t point_count;
+    uint32_t ring_count;
+    uint32_t ring_width;
+};
