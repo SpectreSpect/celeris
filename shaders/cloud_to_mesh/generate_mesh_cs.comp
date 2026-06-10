@@ -1,0 +1,179 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+#define DONT_SET_COLOR 0xFFFFFFFFu
+
+layout(local_size_x = 256) in;
+
+layout(std430, set = 0, binding=0) readonly buffer PointCloud { uint cloud_points[]; };
+layout(std430, set = 0, binding=1) buffer VertciesOut { float vertices_out[]; };
+layout(std430, set = 0, binding=2) buffer IndicesOut { uint indices_out[]; };
+
+layout(push_constant) uniform GenerateMeshPushConstants {
+    uint count_triangles_in_lidar_ring;
+
+    uint point_stride_bytes;
+    uint point_position_offset_bytes;
+    
+    uint vertex_stride_bytes;
+    uint vertex_position_offset_bytes;
+    uint vertex_normal_offset_bytes;
+    uint vertex_color_offset_bytes;
+};
+
+vec3 point_position(uint point_id) {
+    uint float_id = (point_id * point_stride_bytes + point_position_offset_bytes) / 4;
+    return vec3(
+        cloud_points[float_id + 0u],
+        cloud_points[float_id + 1u],
+        cloud_points[float_id + 2u]
+    );
+}
+
+void set_vertex_position(uint vertex_id, vec3 position) {
+    uint float_id = (vertex_id * vertex_stride_bytes + vertex_position_offset_bytes) / 4;
+    vertices_out[float_id + 0u] = position.x;
+    vertices_out[float_id + 1u] = position.y;
+    vertices_out[float_id + 2u] = position.z;
+}
+
+void set_vertex_normal(uint vertex_id, vec3 normal) {
+    uint float_id = (vertex_id * vertex_stride_bytes + vertex_normal_offset_bytes) / 4;
+    vertices_out[float_id + 0u] = normal.x;
+    vertices_out[float_id + 1u] = normal.y;
+    vertices_out[float_id + 2u] = normal.z;
+}
+
+void set_vertex_color(uint vertex_id, vec4 color) {
+    if (vertex_color_offset_bytes == DONT_SET_COLOR)
+        return;
+
+    uint float_id = (vertex_id * vertex_stride_bytes + vertex_color_offset_bytes) / 4;
+    vertices_out[float_id + 0u] = color.x;
+    vertices_out[float_id + 1u] = color.y;
+    vertices_out[float_id + 2u] = color.z;
+    vertices_out[float_id + 3u] = color.w;
+}
+
+
+vec3 triangle_normal(vec3 a, vec3 b, vec3 c) {
+    vec3 av = vec3(a.x, a.y, a.z);
+    vec3 bv = vec3(b.x, b.y, b.z);
+    vec3 cv = vec3(c.x, c.y, c.z);
+
+    vec3 u = bv - av;
+    vec3 v = cv - av;
+    vec3 n = cross(u, v);
+    return normalize(n);
+}
+
+bool is_point_valid(vec3 p) {
+    if (p.x > 100 || p.y > 100 || p.z > 100)
+        return false;
+    if (p.x < -100 || p.y < -2 || p.z < -100)
+        return false;
+    return true;
+}
+
+float radial_distance(vec3 p) {
+    return length(p);
+}
+
+
+bool is_same_object(vec3 p0, vec3 p1, float rel_thresh, bool more_permissive_with_distance, float abs_thresh) {
+    if (!is_point_valid(p0) || !is_point_valid(p1))
+        return false;
+
+    float r0 = radial_distance(p0);
+    float r1 = radial_distance(p1);
+
+    if (isnan(r0) || isinf(r0) || isnan(r1) || isinf(r1))
+        return false;
+
+    float allowed = 0;
+    float dr = abs(r0 - r1);
+
+
+    if (more_permissive_with_distance) {
+        float permission_factor = 1.5;
+        allowed = rel_thresh * pow((min(r0, r1) / pow(permission_factor, 1.5)), permission_factor);
+    }
+    else {
+        allowed = max(rel_thresh, abs_thresh);
+    }
+    return dr <= allowed;
+}
+
+
+void main(){
+    uint triangle_id = gl_GlobalInvocationID.x;
+    uint ring_id = gl_GlobalInvocationID.y;
+
+    if (triangle_id >= count_triangles_in_lidar_ring) return;
+
+    uint first_vertex_id = triangle_id * 3 + ring_id * count_triangles_in_lidar_ring * 3;
+    uint left_bottom_point_id = triangle_id / 2;
+    bool is_triangle_0 = triangle_id % 2 == 0;
+    
+    uint ring_size = count_triangles_in_lidar_ring / 2;
+
+    uint p0_id = left_bottom_point_id + ring_id * ring_size;
+    uint p1_id = left_bottom_point_id + (ring_id + 1) * ring_size;
+    uint p2_id = (left_bottom_point_id + 1) + (ring_id + 1) * ring_size;
+    uint p3_id = (left_bottom_point_id+1) + ring_id * ring_size;
+
+    vec3 p0_position = point_position(p0_id);
+    vec3 p1_position = point_position(p1_id);
+    vec3 p2_position = point_position(p2_id);
+    vec3 p3_position = point_position(p3_id);
+
+    vec3 normal = vec3(0.0);
+
+    float rel_thresh = 1.5;
+    float abs_thresh = 0.12;
+
+    if (is_triangle_0) {
+        bool ok = false;
+        if (is_point_valid(p0_position) && is_point_valid(p1_position) && is_point_valid(p1_position)) {
+            if (is_same_object(p0_position, p1_position, rel_thresh, true, abs_thresh) && is_same_object(p1_position, p2_position, rel_thresh, false, abs_thresh))
+                ok = true;
+        }
+
+        if (!ok)
+            return;
+        
+        set_vertex_position(first_vertex_id, p0_position);
+        set_vertex_position(first_vertex_id + 1, p1_position);
+        set_vertex_position(first_vertex_id + 2, p2_position);
+
+        normal = triangle_normal(p0_position, p1_position, p2_position);
+    }
+    else {
+        bool ok = false;
+        if (is_point_valid(p2_position) && is_point_valid(p3_position) && is_point_valid(p0_position)) {
+            if (is_same_object(p3_position, p2_position, rel_thresh, true, abs_thresh) && is_same_object(p3_position, p0_position, rel_thresh, false, abs_thresh))
+                ok = true;
+        }
+
+        if (!ok)
+            return;
+        
+        set_vertex_position(first_vertex_id, p2_position);
+        set_vertex_position(first_vertex_id + 1, p3_position);
+        set_vertex_position(first_vertex_id + 2, p0_position);
+
+        normal = triangle_normal(p2_position, p3_position, p0_position);
+    }
+    
+    vec4 color = vec4(1, 1, 1, 1.0);
+
+    for (uint i = 0; i < 3; i++) {
+        uint vertex_id = first_vertex_id + i;
+        set_vertex_normal(vertex_id, normal);
+        set_vertex_color(vertex_id, color);
+    }
+
+    indices_out[first_vertex_id] = first_vertex_id;
+    indices_out[first_vertex_id + 1] = first_vertex_id + 1;
+    indices_out[first_vertex_id + 2] = first_vertex_id + 2;
+}

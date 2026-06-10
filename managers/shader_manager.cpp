@@ -26,6 +26,9 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         reset_point_voxel_map_cs(device, path_utils::executable_dir() / "shaders" / "reset_voxel_point_map.comp.spv"),
         gicp_reduce_cs(device, path_utils::executable_dir() / "shaders" / "gicp_reduce.comp.spv"),
 
+        // Cloud to mesh
+        generate_mesh_cs(device, path_utils::executable_dir() / "shaders" / "cloud_to_mesh" / "generate_mesh_cs.comp.spv"),
+
         // Lights
         build_cluster_light_lists_cs(device, path_utils::executable_dir() / "shaders" / "build_cluster_light_lists.comp.spv"),
         

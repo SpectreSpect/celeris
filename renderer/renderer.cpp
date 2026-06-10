@@ -65,7 +65,7 @@ void Renderer::render(VulkanCommandBuffer& command_buffer, InstancedRenderObject
         // if (render_object.instance_data.external_buffer)
         //     render_object.instance_data.external_buffer->bind_as_vertex_buffer(command_buffer, 1);
         // else
-        instanced_render_object.instance_buffer()->bind_as_vertex_buffer(command_buffer, 1);
+        instanced_render_object.instance_buffer().bind_as_vertex_buffer(command_buffer, 1);
 
         instanced_render_object.mesh_view().bind_index_buffer(command_buffer);
 

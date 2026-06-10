@@ -266,3 +266,15 @@ struct VoxelizeTrianglesPushConstants {
     uint32_t voxel_color;
     uint32_t voxel_set_flags;
 };
+
+struct GenerateMeshPushConstants {
+    uint32_t count_triangles_in_lidar_ring;
+
+    uint32_t point_stride_bytes;
+    uint32_t point_position_offset_bytes;
+    
+    uint32_t vertex_stride_bytes;
+    uint32_t vertex_position_offset_bytes;
+    uint32_t vertex_normal_offset_bytes;
+    uint32_t vertex_color_offset_bytes;
+};

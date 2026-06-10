@@ -47,6 +47,14 @@ InstanceBufferView InstancedRenderObject::get_instance_view() const {
     return m_instance_buffer_view;
 }
 
-VulkanBuffer* InstancedRenderObject::instance_buffer() {
+const VulkanBuffer& InstancedRenderObject::instance_buffer() const {
+    LOG_METHOD();
+
+    return m_instance_buffer_view.buffer();
+}
+
+VulkanBuffer& InstancedRenderObject::instance_buffer() {
+    LOG_METHOD();
+
     return m_instance_buffer_view.buffer();
 }

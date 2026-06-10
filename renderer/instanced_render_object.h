@@ -21,7 +21,10 @@ public:
     uint32_t instance_count() const;
     uint32_t instance_size() const;
     InstanceBufferView get_instance_view() const;
-    VulkanBuffer* instance_buffer();
+
+    const VulkanBuffer& instance_buffer() const;
+    VulkanBuffer& instance_buffer();
+    
 
 private:
     // InstanceBatch instance_data;

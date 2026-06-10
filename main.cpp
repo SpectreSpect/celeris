@@ -55,6 +55,7 @@
 #include "renderer/static_mesh_data.h"
 #include "renderer/indirect_render_object.h"
 #include "voxel_grid_vulkan/voxelizator.h"
+#include "renderer/point_cloud/point_cloud_mesher.h"
 #include "math_utils.h"
 #include <queue>
 
@@ -141,6 +142,15 @@ int main() {
         compute_pass_manager,
         voxelizator_desc
     );
+
+    PointCloudMesher mesher(
+        engine.device(),
+        engine.compute_queue(),
+        compute_pass_manager
+    );
+
+    LidarScan lidar_scan(manager_bundle, path_utils::executable_dir() / "assets" / "lidar_scans" / "frame_000000.bin");
+
 
     glm::ivec3 block_size = glm::ivec3(10, 20, 30);
     glm::ivec3 block_origin = glm::ivec3(0, 30, 0);
@@ -260,6 +270,7 @@ int main() {
 
     scene.add(skybox);
     scene.add(sphere);
+    scene.add(lidar_scan);
     // scene.add(voxel_map_point_cloud);
     
     skybox.update(scene);

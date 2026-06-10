@@ -107,6 +107,7 @@ add_executable(app
   renderer/point_cloud/gicp/voxel_map_point_inserter.cpp
   renderer/point_cloud/gicp/voxel_map_point_reseter.cpp
   renderer/point_cloud/gicp/gicp_reductor.cpp
+  renderer/point_cloud/point_cloud_mesher.cpp
   imgui_layer.cpp
   renderer/lighting_system/lighting_system.cpp
   voxel_grid_vulkan/voxel_grid.cpp
