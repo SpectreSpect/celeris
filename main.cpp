@@ -253,8 +253,8 @@ int main() {
     voxel_map_reseter.reset(voxel_point_map);
 
     // voxel_map_inserter.insert(voxel_point_map, target_point_cloud, target_normal_buffer);
-    voxel_map_inserter.insert(voxel_point_map, lidar_video.get_scan(0).point_cloud(), lidar_video.get_scan(0).normal_buffer());
-    voxel_point_map.upload_voxels(engine, voxel_grid);
+    // voxel_map_inserter.insert(voxel_point_map, lidar_video.get_scan(0).point_cloud(), lidar_video.get_scan(0).normal_buffer());
+    // voxel_point_map.upload_voxels(engine, voxel_grid);
 
     PointCloud voxel_map_point_cloud(manager_bundle, voxel_point_map.map_point_buffer, voxel_point_map.m_map_point_count);
 
@@ -367,18 +367,26 @@ int main() {
 
             network_scan = std::move(scan);
             std::cout << "Received scan #" << received_scan_count << std::endl;
-            received_scan_count++;
+            
 
             while (retired_network_scans.size() > engine.num_frames_in_flight()) {
                 retired_network_scans.pop_front();
             }
+
+            if (received_scan_count > 0)
+                gicp_pass.fit(voxel_point_map, network_scan->point_cloud(), network_scan->normal_buffer(), 10);
+            
+            voxel_map_inserter.insert(voxel_point_map, network_scan->point_cloud(), network_scan->normal_buffer());
+            voxel_grid.voxelize_point_cloud(engine, network_scan->point_cloud(), voxel_write_list, max_write_count);
+
+            received_scan_count++;
         }
 
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), window, camera);
         lighting_system.update(engine.current_frame(), window, camera);
 
-        // voxel_grid.update(window, camera);
+        voxel_grid.update(window, camera);
 
         if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
             g_pressed = true;
@@ -411,11 +419,11 @@ int main() {
 
                 current_point_cloud.transform.rotation = glm::normalize(current_point_cloud.transform.rotation * previous_point_cloud.transform.rotation);
 
-                gicp_pass.fit(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer(), 10);
+                // gicp_pass.fit(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer(), 10);
 
                 voxel_map_inserter.insert(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
                 voxel_grid.voxelize_point_cloud(engine, current_scan.point_cloud(), voxel_write_list, max_write_count);
-                voxel_map_point_cloud.set_instance_view(voxel_point_map.get_map_instance_view());
+                // voxel_map_point_cloud.set_instance_view(voxel_point_map.get_map_instance_view());
             }
             
             lidar_video.next_frame();
@@ -440,10 +448,10 @@ int main() {
                 // rgba(37, 150, 190)
                 renderer.render(command_buffer, scene);
 
-                if (network_scan)
-                    renderer.render(command_buffer, network_scan->point_cloud());
+                // if (network_scan)
+                //     renderer.render(command_buffer, network_scan->point_cloud(), network_scan->point_cloud().transform.get_model_matrix());
 
-                // renderer.render(command_buffer, voxel_grid.render_object());
+                renderer.render(command_buffer, voxel_grid.render_object());
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);

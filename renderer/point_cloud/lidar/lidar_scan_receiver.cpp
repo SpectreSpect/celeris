@@ -16,6 +16,14 @@
 namespace {
 constexpr size_t bytes_per_scan_point = 10 * sizeof(float);
 constexpr uint32_t max_points_per_frame = 2'000'000;
+
+glm::mat3 ros_basis_to_engine_basis() {
+    glm::mat3 m(1.0f);
+    m[0] = glm::vec3(-1.0f, 0.0f, 0.0f);
+    m[1] = glm::vec3( 0.0f, 0.0f, 1.0f);
+    m[2] = glm::vec3( 0.0f, 1.0f, 0.0f);
+    return m;
+}
 }
 
 LidarScanReceiver::LidarScanReceiver(uint16_t port, size_t max_queued_frames)
@@ -69,7 +77,23 @@ std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_scan(ManagerBundle& manage
         return nullptr;
     }
 
-    return std::make_unique<LidarScan>(manager_bundle, std::move(frame));
+    std::unique_ptr<LidarScan> scan = std::make_unique<LidarScan>(manager_bundle, frame);
+
+    const auto& sample = frame.samples.front();
+
+    scan->point_cloud().transform.position = LidarScan::ros_pos_to_engine(sample.base_pos_ros);
+
+    glm::mat3 rotation_ros = LidarScan::rpy_to_mat3_zyx(
+        sample.base_rpy_ros.x,
+        sample.base_rpy_ros.y,
+        sample.base_rpy_ros.z
+    );
+    glm::mat3 basis = ros_basis_to_engine_basis();
+    glm::mat3 rotation_engine = basis * rotation_ros * glm::transpose(basis);
+
+    scan->point_cloud().transform.rotation = glm::quat_cast(rotation_engine);
+
+    return scan;
 }
 
 bool LidarScanReceiver::is_running() const noexcept {
