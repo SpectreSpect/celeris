@@ -224,39 +224,39 @@ int main() {
 
     
     
-    LidarVideo lidar_video(manager_bundle, 
-                           point_cloud_preprocessor,
-                           "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 1);
+    // LidarVideo lidar_video(manager_bundle, 
+    //                        point_cloud_preprocessor,
+    //                        "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 1);
 
     // Important: save original first frame pose before overwriting it.
-    glm::vec3 first_position = lidar_video.get_scan(0).point_cloud().transform.position;
-    glm::quat first_rotation = glm::normalize(lidar_video.get_scan(0).point_cloud().transform.rotation);
+    // glm::vec3 first_position = lidar_video.get_scan(0).point_cloud().transform.position;
+    // glm::quat first_rotation = glm::normalize(lidar_video.get_scan(0).point_cloud().transform.rotation);
 
-    for (int i = static_cast<int>(lidar_video.get_scan_count()) - 1; i >= 1; --i) {
-        glm::vec3 p_prev = lidar_video.get_scan(i - 1).point_cloud().transform.position;
-        glm::vec3 p_curr = lidar_video.get_scan(i).point_cloud().transform.position;
+    // for (int i = static_cast<int>(lidar_video.get_scan_count()) - 1; i >= 1; --i) {
+    //     glm::vec3 p_prev = lidar_video.get_scan(i - 1).point_cloud().transform.position;
+    //     glm::vec3 p_curr = lidar_video.get_scan(i).point_cloud().transform.position;
 
-        glm::quat q_prev = glm::normalize(lidar_video.get_scan(i - 1).point_cloud().transform.rotation);
-        glm::quat q_curr = glm::normalize(lidar_video.get_scan(i).point_cloud().transform.rotation);
+    //     glm::quat q_prev = glm::normalize(lidar_video.get_scan(i - 1).point_cloud().transform.rotation);
+    //     glm::quat q_curr = glm::normalize(lidar_video.get_scan(i).point_cloud().transform.rotation);
 
-        // Optional: avoid quaternion sign discontinuity.
-        // q and -q represent the same rotation.
-        if (glm::dot(q_prev, q_curr) < 0.0f) {
-            q_curr = -q_curr;
-        }
+    //     // Optional: avoid quaternion sign discontinuity.
+    //     // q and -q represent the same rotation.
+    //     if (glm::dot(q_prev, q_curr) < 0.0f) {
+    //         q_curr = -q_curr;
+    //     }
 
-        glm::vec3 delta_position = p_curr - p_prev;
+    //     glm::vec3 delta_position = p_curr - p_prev;
 
-        // Since your update convention is:
-        // q_new = dq * q_old
-        glm::quat delta_rotation = glm::normalize(q_curr * glm::inverse(q_prev));
+    //     // Since your update convention is:
+    //     // q_new = dq * q_old
+    //     glm::quat delta_rotation = glm::normalize(q_curr * glm::inverse(q_prev));
 
-        lidar_video.get_scan(i).point_cloud().transform.position = delta_position;
-        lidar_video.get_scan(i).point_cloud().transform.rotation = delta_rotation;
-    }
+    //     lidar_video.get_scan(i).point_cloud().transform.position = delta_position;
+    //     lidar_video.get_scan(i).point_cloud().transform.rotation = delta_rotation;
+    // }
 
-    lidar_video.get_scan(0).point_cloud().transform.position = glm::vec3(0.0f);
-    lidar_video.get_scan(0).point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    // lidar_video.get_scan(0).point_cloud().transform.position = glm::vec3(0.0f);
+    // lidar_video.get_scan(0).point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
 
         
@@ -406,48 +406,48 @@ int main() {
         if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
             g_pressed = true;
 
-            uint32_t current_frame_id = lidar_video.current_frame_id();
+            // uint32_t current_frame_id = lidar_video.current_frame_id();
 
-            if (current_frame_id > 0) {
-                LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
-                gicp_pass.step(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
-            }
+            // if (current_frame_id > 0) {
+            //     LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
+            //     gicp_pass.step(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
+            // }
 
-            step++;
+            // step++;
         }
 
         if (g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_RELEASE) {
             g_pressed = false;
         }
 
-        auto next_frame = [&]() {
-            uint32_t current_frame_id = lidar_video.current_frame_id();
+        // auto next_frame = [&]() {
+        //     uint32_t current_frame_id = lidar_video.current_frame_id();
 
-            if (current_frame_id > 0) {
-                LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
-                LidarScan& previous_scan = lidar_video.get_scan(current_frame_id - 1);
+        //     if (current_frame_id > 0) {
+        //         LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
+        //         LidarScan& previous_scan = lidar_video.get_scan(current_frame_id - 1);
 
-                PointCloud& current_point_cloud = current_scan.point_cloud();
-                PointCloud& previous_point_cloud = previous_scan.point_cloud();
+        //         PointCloud& current_point_cloud = current_scan.point_cloud();
+        //         PointCloud& previous_point_cloud = previous_scan.point_cloud();
 
-                current_point_cloud.transform.position = previous_point_cloud.transform.position + current_point_cloud.transform.position;
+        //         current_point_cloud.transform.position = previous_point_cloud.transform.position + current_point_cloud.transform.position;
 
-                current_point_cloud.transform.rotation = glm::normalize(current_point_cloud.transform.rotation * previous_point_cloud.transform.rotation);
+        //         current_point_cloud.transform.rotation = glm::normalize(current_point_cloud.transform.rotation * previous_point_cloud.transform.rotation);
 
-                // gicp_pass.fit(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer(), 10);
+        //         // gicp_pass.fit(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer(), 10);
 
-                voxel_map_inserter.insert(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
-                voxel_grid.voxelize_point_cloud(engine, current_scan.point_cloud(), voxel_write_list, max_write_count);
-                // voxel_map_point_cloud.set_instance_view(voxel_point_map.get_map_instance_view());
-            }
+        //         voxel_map_inserter.insert(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
+        //         voxel_grid.voxelize_point_cloud(engine, current_scan.point_cloud(), voxel_write_list, max_write_count);
+        //         // voxel_map_point_cloud.set_instance_view(voxel_point_map.get_map_instance_view());
+        //     }
             
-            lidar_video.next_frame();
-        };
+        //     lidar_video.next_frame();
+        // };
 
         if (!n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_PRESS) {
             n_pressed = true;
             
-            next_frame();
+            // next_frame();
         }
 
         if (n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_RELEASE) {
@@ -474,7 +474,7 @@ int main() {
                 ImGui::Begin("Debug");
 
                 if (ImGui::Button("Next frame")) {
-                    next_frame();
+                    // next_frame();
                 }
 
                 ImGui::End();
