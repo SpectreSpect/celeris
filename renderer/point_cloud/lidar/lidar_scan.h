@@ -1,16 +1,35 @@
 #pragma once
 
 #include "../../scene_object.h"
+#include "../point_instance.h"
 #include "../point_cloud.h"
 #include "../../../path_utils.h"
+
+#include <cstdint>
+#include <vector>
 
 class ManagerBundle;
 
 class LidarScan : public SceneObject {
 public:
-    LidarScan(ManagerBundle& manager_bundle, const std::filesystem::path& path);
+    struct TimedPointSample {
+        glm::vec3 p_local_ros{0.0f};
+        float time = 0.0f;
+        glm::vec3 base_pos_ros{0.0f};
+        glm::vec3 base_rpy_ros{0.0f};
+        bool valid = true;
+    };
 
-    void set_timestamp_ns(uint32_t timestamp_ns);
+    struct FrameData {
+        uint64_t timestamp_ns = 0;
+        std::vector<TimedPointSample> samples;
+    };
+
+    LidarScan(ManagerBundle& manager_bundle, const std::filesystem::path& path);
+    LidarScan(ManagerBundle& manager_bundle, const FrameData& frame);
+
+    void set_timestamp_ns(uint64_t timestamp_ns);
+    uint64_t timestamp_ns() const noexcept;
 
     static glm::mat3 rpy_to_mat3_zyx(float roll, float pitch, float yaw);
     static glm::vec3 ros_pos_to_engine(const glm::vec3& p_ros);
@@ -29,6 +48,8 @@ private:
     
 
     PointCloud load_from_file(ManagerBundle& manager_bundle, const std::filesystem::path& path);
+    PointCloud load_from_frame(ManagerBundle& manager_bundle, const FrameData& frame);
+    static FrameData read_frame_from_file(const std::filesystem::path& path);
 
     std::vector<glm::vec4> calculate_normals(std::vector<PointInstance> points);
 

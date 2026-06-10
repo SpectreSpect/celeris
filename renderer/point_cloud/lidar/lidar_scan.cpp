@@ -1,7 +1,10 @@
 #include "lidar_scan.h"
 
+#include <cstring>
+#include <fstream>
 #include <numeric>
 #include <random>
+#include <stdexcept>
 
 #include "../point_instance.h"
 #include "../../../managers/manager_bundle.h"
@@ -14,27 +17,31 @@ LidarScan::LidarScan(ManagerBundle& manager_bundle, const std::filesystem::path&
     add_child(m_point_cloud);
 }
 
-void LidarScan::set_timestamp_ns(uint32_t timestamp_ns) {
+LidarScan::LidarScan(ManagerBundle& manager_bundle, const FrameData& frame)
+    :   m_point_cloud(load_from_frame(manager_bundle, frame)),
+        m_normal_buffer(VulkanBuffer::create_host_visible_storage_buffer(manager_bundle.engine(), m_normals.size() * sizeof(glm::vec4))) {
+    m_normal_buffer.upload(m_normals);
+    add_child(m_point_cloud);
+}
+
+void LidarScan::set_timestamp_ns(uint64_t timestamp_ns) {
     m_timestamp_ns = timestamp_ns;
 }
 
-PointCloud LidarScan::load_from_file(ManagerBundle& manager_bundle, const std::filesystem::path& path) {
+uint64_t LidarScan::timestamp_ns() const noexcept {
+    return m_timestamp_ns;
+}
+
+LidarScan::FrameData LidarScan::read_frame_from_file(const std::filesystem::path& path) {
     std::ifstream in(path, std::ios::binary);
     if (!in) throw std::runtime_error("Failed to open: " + path.string());
 
+    FrameData frame;
     uint32_t count = 0;
 
-    in.read(reinterpret_cast<char*>(&m_timestamp_ns), sizeof(uint64_t));
+    in.read(reinterpret_cast<char*>(&frame.timestamp_ns), sizeof(uint64_t));
     in.read(reinterpret_cast<char*>(&count), sizeof(uint32_t));
     if (!in) throw std::runtime_error("Bad header in: " + path.string());
-
-    struct TimedPointSample {
-        glm::vec3 p_local_ros{0.0f};   // raw lidar point in lidar frame, ROS coords
-        float time = 0.0f;             // per-point time
-        glm::vec3 base_pos_ros{0.0f};  // interpolated GPS/base pose at point time
-        glm::vec3 base_rpy_ros{0.0f};  // interpolated IMU RPY at point time
-        bool valid = true;
-    };
 
     const size_t bpp = 10 * sizeof(float); // x y z time px py pz roll pitch yaw
 
@@ -42,13 +49,9 @@ PointCloud LidarScan::load_from_file(ManagerBundle& manager_bundle, const std::f
     in.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(buf.size()));
     if (!in) throw std::runtime_error("Unexpected EOF in: " + path.string());
 
-    std::vector<TimedPointSample> samples(count);
+    frame.samples.resize(count);
 
-    const float INF = std::numeric_limits<float>::infinity();
     const uint8_t* p = buf.data();
-
-    float min_time = std::numeric_limits<float>::infinity();
-    size_t ref_idx = 0;
 
     for (uint32_t i = 0; i < count; ++i) {
         float x, y, z;
@@ -67,14 +70,36 @@ PointCloud LidarScan::load_from_file(ManagerBundle& manager_bundle, const std::f
         std::memcpy(&pitch, p, 4); p += 4;
         std::memcpy(&yaw,   p, 4); p += 4;
 
-        samples[i].p_local_ros = glm::vec3(x, y, z);
-        samples[i].time = time;
-        samples[i].base_pos_ros = glm::vec3(px, py, pz);
-        samples[i].base_rpy_ros = glm::vec3(roll, pitch, yaw);
-        samples[i].valid = std::isfinite(x) && std::isfinite(y) && std::isfinite(z);
+        frame.samples[i].p_local_ros = glm::vec3(x, y, z);
+        frame.samples[i].time = time;
+        frame.samples[i].base_pos_ros = glm::vec3(px, py, pz);
+        frame.samples[i].base_rpy_ros = glm::vec3(roll, pitch, yaw);
+        frame.samples[i].valid = std::isfinite(x) && std::isfinite(y) && std::isfinite(z);
+    }
 
-        if (time < min_time) {
-            min_time = time;
+    return frame;
+}
+
+PointCloud LidarScan::load_from_file(ManagerBundle& manager_bundle, const std::filesystem::path& path) {
+    return load_from_frame(manager_bundle, read_frame_from_file(path));
+}
+
+PointCloud LidarScan::load_from_frame(ManagerBundle& manager_bundle, const FrameData& frame) {
+    m_timestamp_ns = frame.timestamp_ns;
+
+    const uint32_t count = static_cast<uint32_t>(frame.samples.size());
+    if (count == 0) {
+        throw std::runtime_error("LidarScan frame had no points");
+    }
+
+    const float INF = std::numeric_limits<float>::infinity();
+
+    float min_time = std::numeric_limits<float>::infinity();
+    size_t ref_idx = 0;
+
+    for (uint32_t i = 0; i < count; ++i) {
+        if (frame.samples[i].time < min_time) {
+            min_time = frame.samples[i].time;
             ref_idx = i;
         }
     }
@@ -94,7 +119,7 @@ PointCloud LidarScan::load_from_file(ManagerBundle& manager_bundle, const std::f
         lidar_rpy_from_base_ros.z
     );
 
-    const TimedPointSample& ref = samples[ref_idx];
+    const TimedPointSample& ref = frame.samples[ref_idx];
 
     const glm::mat3 R_wb_ref = rpy_to_mat3_zyx(
         ref.base_rpy_ros.x,
@@ -105,7 +130,7 @@ PointCloud LidarScan::load_from_file(ManagerBundle& manager_bundle, const std::f
     const glm::vec3 t_wl_ref = ref.base_pos_ros + R_wb_ref * lidar_offset_from_base_ros;
 
     for (uint32_t i = 0; i < count; ++i) {
-        const TimedPointSample& s = samples[i];
+        const TimedPointSample& s = frame.samples[i];
 
         if (!s.valid) {
             m_points[i].pos = glm::vec4(INF, INF, INF, 1.0f);

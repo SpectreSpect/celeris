@@ -44,6 +44,7 @@
 #include "renderer/point_cloud/gicp/voxel_point_map.h"
 #include "renderer/point_cloud/gicp/voxel_map_point_inserter.h"
 #include "renderer/point_cloud/gicp/voxel_map_point_reseter.h"
+#include "renderer/point_cloud/lidar/lidar_scan_receiver.h"
 #include "imgui_layer.h"
 #include "renderer/lighting_system/lighting_system.h"
 #include "renderer/pbr/equirect_to_cubemap_pass.h"
@@ -97,6 +98,12 @@ int main() {
     MaterialInstanceManager material_instance_manager(engine, material_manager, texture_manager);
     MeshManager mesh_manager(engine, resource_loader);
     ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
+
+    LidarScanReceiver scan_receiver(5000);
+    scan_receiver.start();
+
+    std::unique_ptr<LidarScan> network_scan;
+    std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
 
     glm::vec3 voxel_size(1.0f);
     glm::ivec3 chunk_size(16);
@@ -210,7 +217,7 @@ int main() {
         skybox_exposure
     );
     
-    LidarVideo lidar_video(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 150);
+    LidarVideo lidar_video(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 1);
 
     // Important: save original first frame pose before overwriting it.
     glm::vec3 first_position = lidar_video.get_scan(0).point_cloud().transform.position;
@@ -278,6 +285,8 @@ int main() {
 
     std::vector<glm::mat4> transform_mem(3);
 
+    uint32_t received_scan_count = 0;
+
     while (!engine.window().should_close()) {
         engine.window().poll_events();
 
@@ -329,11 +338,47 @@ int main() {
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
 
+        // if (auto scan = scan_receiver.try_pop_scan(manager_bundle)) {
+        //     network_scan = std::move(scan);
+
+        //     LidarScan& current_scan = *network_scan;
+
+        //     gicp_pass.fit(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer(), 10);
+        //     voxel_map_inserter.insert(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
+        //     voxel_grid.voxelize_point_cloud(engine, current_scan.point_cloud(), voxel_write_list, max_write_count);
+        // }
+
+        // if (auto scan = scan_receiver.try_pop_scan(manager_bundle)) {
+        //     network_scan = std::move(scan);
+
+        //     // LidarScan& current_scan = *network_scan;
+
+        //     // renderer.render(command_buffer, current_scan.point_cloud());
+
+        //     // gicp_pass.fit(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer(), 10);
+        //     // voxel_map_inserter.insert(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
+        //     // voxel_grid.voxelize_point_cloud(engine, current_scan.point_cloud(), voxel_write_list, max_write_count);
+        // }
+
+        if (auto scan = scan_receiver.try_pop_scan(manager_bundle)) {
+            if (network_scan) {
+                retired_network_scans.push_back(std::move(network_scan));
+            }
+
+            network_scan = std::move(scan);
+            std::cout << "Received scan #" << received_scan_count << std::endl;
+            received_scan_count++;
+
+            while (retired_network_scans.size() > engine.num_frames_in_flight()) {
+                retired_network_scans.pop_front();
+            }
+        }
+
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), window, camera);
         lighting_system.update(engine.current_frame(), window, camera);
 
-        voxel_grid.update(window, camera);
+        // voxel_grid.update(window, camera);
 
         if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
             g_pressed = true;
@@ -395,7 +440,10 @@ int main() {
                 // rgba(37, 150, 190)
                 renderer.render(command_buffer, scene);
 
-                renderer.render(command_buffer, voxel_grid.render_object());
+                if (network_scan)
+                    renderer.render(command_buffer, network_scan->point_cloud());
+
+                // renderer.render(command_buffer, voxel_grid.render_object());
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
