@@ -73,6 +73,7 @@ public:
 
     // Point cloud
     ComputePass normals_from_webots_lidar_point_cloud_cp;
+    ComputePass remove_near_origin_lidar_points_cp;
 
     // PBR
     ComputePass equirect_to_cubemap_cp;
@@ -148,6 +149,7 @@ public:
 
     // Point cloud
     ComputePass create_normals_from_webots_lidar_point_cloud_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_remove_near_origin_lidar_points_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
 private:
     DescriptorPool m_pool;

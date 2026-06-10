@@ -388,11 +388,11 @@ int main() {
                 retired_network_scans.pop_front();
             }
 
-            if (received_scan_count > 0)
-                gicp_pass.fit(voxel_point_map, network_scan->point_cloud(), network_scan->normal_buffer(), 10);
+            // if (received_scan_count > 0)
+            //     gicp_pass.fit(voxel_point_map, network_scan->point_cloud(), network_scan->normal_buffer(), 10);
             
-            voxel_map_inserter.insert(voxel_point_map, network_scan->point_cloud(), network_scan->normal_buffer());
-            voxel_grid.voxelize_point_cloud(engine, network_scan->point_cloud(), voxel_write_list, max_write_count);
+            // voxel_map_inserter.insert(voxel_point_map, network_scan->point_cloud(), network_scan->normal_buffer());
+            // voxel_grid.voxelize_point_cloud(engine, network_scan->point_cloud(), voxel_write_list, max_write_count);
 
             received_scan_count++;
         }
@@ -463,8 +463,8 @@ int main() {
                 // rgba(37, 150, 190)
                 renderer.render(command_buffer, scene);
 
-                // if (network_scan)
-                //     renderer.render(command_buffer, network_scan->point_cloud(), network_scan->point_cloud().transform.get_model_matrix());
+                if (network_scan)
+                    renderer.render(command_buffer, network_scan->point_cloud(), network_scan->point_cloud().transform.get_model_matrix());
 
                 renderer.render(command_buffer, voxel_grid.render_object());
 

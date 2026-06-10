@@ -17,9 +17,12 @@ LidarScan::LidarScan(ManagerBundle& manager_bundle,
         m_normal_buffer(VulkanBuffer::create_host_visible_storage_buffer(manager_bundle.engine(), 
                                                                          m_point_cloud.point_count() * sizeof(glm::vec4))) {
     // m_normal_buffer.upload(m_normals);
+    point_cloud_preprocessor.remove_points_near_origin(*m_point_cloud.instance_buffer(),
+                                                       m_point_cloud.point_count());
     point_cloud_preprocessor.get_normals_from_webots_lidar_point_cloud(*m_point_cloud.instance_buffer(), 
                                                                        m_normal_buffer, 
-                                                                       m_point_cloud.point_count());
+                                                                       m_point_cloud.point_count(),
+                                                                       16);
     add_child(m_point_cloud);
 }
 
@@ -29,9 +32,12 @@ LidarScan::LidarScan(ManagerBundle& manager_bundle,
     :   m_point_cloud(load_from_frame(manager_bundle, std::move(frame))),
         m_normal_buffer(VulkanBuffer::create_host_visible_storage_buffer(manager_bundle.engine(), 
                                                                          m_point_cloud.point_count() * sizeof(glm::vec4))) {
+    point_cloud_preprocessor.remove_points_near_origin(*m_point_cloud.instance_buffer(),
+                                                       m_point_cloud.point_count());
     point_cloud_preprocessor.get_normals_from_webots_lidar_point_cloud(*m_point_cloud.instance_buffer(), 
                                                                        m_normal_buffer, 
-                                                                       m_point_cloud.point_count());
+                                                                       m_point_cloud.point_count(),
+                                                                       frame.ring_count);
     add_child(m_point_cloud);
 }
 

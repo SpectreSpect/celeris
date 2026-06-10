@@ -75,7 +75,7 @@ bool LidarScanReceiver::try_pop_frame(LidarScan::FrameData& frame) {
 
 std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_scan(ManagerBundle& manager_bundle) {
     LidarScan::FrameData frame;
-    
+
     if (!try_pop_frame(frame))
         return nullptr;
 
@@ -195,10 +195,13 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
             return false;
         }
 
+        frame.ring_count = 16;
+
         frame.samples.resize(point_count);
         const uint8_t* p = payload.data();
 
         uint32_t valid_count = 0;
+
         for (uint32_t i = 0; i < point_count; ++i) {
             float x, y, z;
             float time;

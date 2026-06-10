@@ -23,6 +23,7 @@ public:
 
     struct FrameData {
         uint64_t timestamp_ns = 0;
+        uint32_t ring_count = 0;
         std::vector<TimedPointSample> samples;
         std::vector<PointInstance> points;
     };
