@@ -4,6 +4,7 @@
 #include "../point_instance.h"
 #include "../point_cloud.h"
 #include "../../../path_utils.h"
+#include "../../../vulkan_self/logger/logger_header.h"
 
 #include <cstdint>
 #include <vector>
@@ -13,6 +14,8 @@ class PointCloudPreprocessor;
 
 class LidarScan : public SceneObject {
 public:
+    _XCHILD_NAME(LidarScan);
+
     struct TimedPointSample {
         glm::vec3 p_local_ros{0.0f};
         float time = 0.0f;
@@ -28,12 +31,20 @@ public:
         std::vector<PointInstance> points;
     };
 
-    LidarScan(ManagerBundle& manager_bundle, 
-              PointCloudPreprocessor& point_cloud_preprocessor, 
-              const std::filesystem::path& path);
-    LidarScan(ManagerBundle& manager_bundle, 
-              PointCloudPreprocessor& point_cloud_preprocessor, 
-              FrameData&& frame);
+    LidarScan(
+        ManagerBundle& manager_bundle, 
+        PointCloudPreprocessor& point_cloud_preprocessor, 
+        const std::filesystem::path& path
+    );
+    LidarScan(
+        ManagerBundle& manager_bundle, 
+        const std::filesystem::path& path
+    );
+    LidarScan(
+        ManagerBundle& manager_bundle, 
+        PointCloudPreprocessor& point_cloud_preprocessor, 
+        FrameData&& frame
+    );
 
     void set_timestamp_ns(uint64_t timestamp_ns);
     uint64_t timestamp_ns() const noexcept;
@@ -54,26 +65,28 @@ private:
     PointCloud m_point_cloud;
     VulkanBuffer m_normal_buffer;
     
-
     PointCloud load_from_file(ManagerBundle& manager_bundle, const std::filesystem::path& path);
     PointCloud load_from_frame(ManagerBundle& manager_bundle, FrameData&& frame);
     static FrameData read_frame_from_file(const std::filesystem::path& path);
 
-    std::vector<glm::vec4> calculate_normals(std::vector<PointInstance> points);
+    // bool is_point_valid(const PointInstance &p);
+    // glm::vec3 triangle_normal(const PointInstance& a, const PointInstance& b, const PointInstance& c);
+    // int xy_id(int x, int y, int ring_width, int cloud_size);
+    // bool is_same_object(
+    //     const PointInstance &p0,
+    //     const PointInstance &p1,
+    //     float rel_thresh = 1.5f,
+    //     bool more_permissive_with_distance = true,
+    //     float abs_thresh = 0.12f
+    // );
 
-    void remove_points_near_origin(std::vector<PointInstance>& points, std::vector<glm::vec4>& normals, float min_distance);
-    void drop_out_points_and_normals(std::vector<PointInstance>& points, std::vector<glm::vec4>& normals, size_t target_size);
-    void remove_invalid_points_and_normals(std::vector<PointInstance>& points, std::vector<glm::vec4>& normals);
-    glm::vec3 triangle_normal(const PointInstance& a, const PointInstance& b, const PointInstance& c);
-    bool is_point_valid(const PointInstance &p);
-    int xy_id(int x, int y, int ring_width, int cloud_size);
-    void get_normals(const std::vector<PointInstance>& points, std::vector<glm::vec4>& normals);
-    bool is_same_object(const PointInstance &p0,const PointInstance &p1,
-                        float rel_thresh = 1.5f, bool more_permissive_with_distance = true,
-                        float abs_thresh = 0.12f);
-    float radial_distance(const PointInstance &p);
+    // void get_normals(const std::vector<PointInstance>& points, std::vector<glm::vec4>& normals);
+    // void remove_invalid_points_and_normals(std::vector<PointInstance>& points, std::vector<glm::vec4>& normals);
+    // void drop_out_points_and_normals(std::vector<PointInstance>& points, std::vector<glm::vec4>& normals, size_t target_size);
+    // void remove_points_near_origin(std::vector<PointInstance>& points, std::vector<glm::vec4>& normals, float min_distance);
 
-    void keep_only_upward_facing_points_and_normals(std::vector<PointInstance>& points, std::vector<glm::vec4>& normals, float up_dot_threshold);
-
-    void remove_ground_points_and_normals(std::vector<PointInstance>& points, std::vector<glm::vec4>& normals, float up_dot_threshold, float max_ground_height);
+    // std::vector<glm::vec4> calculate_normals(std::vector<PointInstance> points);
+    // float radial_distance(const PointInstance &p);
+    // void keep_only_upward_facing_points_and_normals(std::vector<PointInstance>& points, std::vector<glm::vec4>& normals, float up_dot_threshold);
+    // void remove_ground_points_and_normals(std::vector<PointInstance>& points, std::vector<glm::vec4>& normals, float up_dot_threshold, float max_ground_height);
 };

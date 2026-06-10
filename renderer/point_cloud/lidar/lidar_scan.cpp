@@ -10,34 +10,53 @@
 #include "../../../managers/manager_bundle.h"
 #include "../point_cloud_preprocessor.h"
 
-LidarScan::LidarScan(ManagerBundle& manager_bundle, 
-                     PointCloudPreprocessor& point_cloud_preprocessor, 
-                     const std::filesystem::path& path) 
+LidarScan::LidarScan(
+    ManagerBundle& manager_bundle, 
+    PointCloudPreprocessor& point_cloud_preprocessor, 
+    const std::filesystem::path& path) 
     :   m_point_cloud(load_from_file(manager_bundle, path)),
-        m_normal_buffer(VulkanBuffer::create_host_visible_storage_buffer(manager_bundle.engine(), 
-                                                                         m_point_cloud.point_count() * sizeof(glm::vec4))) {
-    // m_normal_buffer.upload(m_normals);
-    point_cloud_preprocessor.remove_points_near_origin(*m_point_cloud.instance_buffer(),
-                                                       m_point_cloud.point_count());
-    point_cloud_preprocessor.get_normals_from_webots_lidar_point_cloud(*m_point_cloud.instance_buffer(), 
-                                                                       m_normal_buffer, 
-                                                                       m_point_cloud.point_count(),
-                                                                       16);
+        m_normal_buffer(
+            VulkanBuffer::create_host_visible_storage_buffer(
+                manager_bundle.engine(), 
+                m_point_cloud.point_count() * sizeof(glm::vec4)
+            )
+        ) 
+{
+    point_cloud_preprocessor.remove_points_near_origin(
+        m_point_cloud.instance_buffer(),
+        m_point_cloud.point_count()
+    );
+    point_cloud_preprocessor.get_normals_from_webots_lidar_point_cloud(
+        m_point_cloud.instance_buffer(), 
+        m_normal_buffer, 
+        m_point_cloud.point_count(),
+        16
+    );
     add_child(m_point_cloud);
 }
 
-LidarScan::LidarScan(ManagerBundle& manager_bundle, 
-                     PointCloudPreprocessor& point_cloud_preprocessor, 
-                     FrameData&& frame)
+LidarScan::LidarScan(
+    ManagerBundle& manager_bundle, 
+    PointCloudPreprocessor& point_cloud_preprocessor, 
+    FrameData&& frame)
     :   m_point_cloud(load_from_frame(manager_bundle, std::move(frame))),
-        m_normal_buffer(VulkanBuffer::create_host_visible_storage_buffer(manager_bundle.engine(), 
-                                                                         m_point_cloud.point_count() * sizeof(glm::vec4))) {
-    point_cloud_preprocessor.remove_points_near_origin(*m_point_cloud.instance_buffer(),
-                                                       m_point_cloud.point_count());
-    point_cloud_preprocessor.get_normals_from_webots_lidar_point_cloud(*m_point_cloud.instance_buffer(), 
-                                                                       m_normal_buffer, 
-                                                                       m_point_cloud.point_count(),
-                                                                       frame.ring_count);
+        m_normal_buffer(
+            VulkanBuffer::create_host_visible_storage_buffer(
+                manager_bundle.engine(), 
+                m_point_cloud.point_count() * sizeof(glm::vec4)
+            )
+        ) 
+{
+    point_cloud_preprocessor.remove_points_near_origin(
+        m_point_cloud.instance_buffer(),
+        m_point_cloud.point_count()
+    );
+    point_cloud_preprocessor.get_normals_from_webots_lidar_point_cloud(
+        m_point_cloud.instance_buffer(), 
+        m_normal_buffer, 
+        m_point_cloud.point_count(),
+        frame.ring_count
+    );
     add_child(m_point_cloud);
 }
 
@@ -190,17 +209,6 @@ void LidarScan::build_points_for_frame(FrameData& frame) {
     }
 }
 
-std::vector<glm::vec4> LidarScan::calculate_normals(std::vector<PointInstance> points) {
-    std::vector<glm::vec4> normals;
-
-    get_normals(m_points, normals);
-    remove_invalid_points_and_normals(m_points, normals);
-    drop_out_points_and_normals(m_points, normals, 10000);
-    remove_points_near_origin(m_points, normals, 3);
-
-    return normals;
-}
-
 glm::mat3 LidarScan::rpy_to_mat3_zyx(float roll, float pitch, float yaw)
     {
         // R = Rz(yaw) * Ry(pitch) * Rx(roll)
@@ -239,399 +247,394 @@ VulkanBuffer& LidarScan::normal_buffer() {
     return m_normal_buffer;
 }
 
-void LidarScan::remove_points_near_origin(std::vector<PointInstance>& points,
-                                           std::vector<glm::vec4>& normals,
-                                           float min_distance)
-{
-    if (points.size() != normals.size()) {
-        std::cout << "remove_points_near_origin: points.size() != normals.size()\n";
-        return;
-    }
+// std::vector<glm::vec4> LidarScan::calculate_normals(std::vector<PointInstance> points) {
+//     std::vector<glm::vec4> normals;
 
-    float min_dist_sq = min_distance * min_distance;
+//     get_normals(m_points, normals);
+//     remove_invalid_points_and_normals(m_points, normals);
+//     drop_out_points_and_normals(m_points, normals, 10000);
+//     remove_points_near_origin(m_points, normals, 3);
 
-    std::vector<PointInstance> filtered_points;
-    std::vector<glm::vec4> filtered_normals;
+//     return normals;
+// }
 
-    filtered_points.reserve(points.size());
-    filtered_normals.reserve(normals.size());
+// void LidarScan::remove_points_near_origin(std::vector<PointInstance>& points,
+//                                            std::vector<glm::vec4>& normals,
+//                                            float min_distance)
+// {
+//     if (points.size() != normals.size()) {
+//         std::cout << "remove_points_near_origin: points.size() != normals.size()\n";
+//         return;
+//     }
 
-    for (size_t i = 0; i < points.size(); i++) {
-        const PointInstance& p = points[i];
-        const glm::vec4& n = normals[i];
+//     float min_dist_sq = min_distance * min_distance;
 
-        glm::vec3 pos = glm::vec3(p.pos);
-        float dist_sq = glm::dot(pos, pos);
+//     std::vector<PointInstance> filtered_points;
+//     std::vector<glm::vec4> filtered_normals;
 
-        // remove points that are too close to the lidar origin
-        // if (dist_sq < min_dist_sq || p.pos.y < 1.0)
-        if (dist_sq < min_dist_sq)
-            continue;
+//     filtered_points.reserve(points.size());
+//     filtered_normals.reserve(normals.size());
 
-        filtered_points.push_back(p);
-        filtered_normals.push_back(n);
-    }
+//     for (size_t i = 0; i < points.size(); i++) {
+//         const PointInstance& p = points[i];
+//         const glm::vec4& n = normals[i];
 
-    points = std::move(filtered_points);
-    normals = std::move(filtered_normals);
-}
+//         glm::vec3 pos = glm::vec3(p.pos);
+//         float dist_sq = glm::dot(pos, pos);
 
-void LidarScan::drop_out_points_and_normals(std::vector<PointInstance>& points,
-                                             std::vector<glm::vec4>& normals,
-                                             size_t target_size)
-{
-    if (points.size() != normals.size()) {
-        std::cout << "drop_out_points_and_normals: points.size() != normals.size()\n";
-        return;
-    }
+//         // remove points that are too close to the lidar origin
+//         // if (dist_sq < min_dist_sq || p.pos.y < 1.0)
+//         if (dist_sq < min_dist_sq)
+//             continue;
 
-    size_t n = points.size();
+//         filtered_points.push_back(p);
+//         filtered_normals.push_back(n);
+//     }
 
-    if (target_size >= n) {
-        return; // nothing to drop
-    }
+//     points = std::move(filtered_points);
+//     normals = std::move(filtered_normals);
+// }
 
-    if (target_size == 0) {
-        points.clear();
-        normals.clear();
-        return;
-    }
+// void LidarScan::drop_out_points_and_normals(std::vector<PointInstance>& points,
+//                                              std::vector<glm::vec4>& normals,
+//                                              size_t target_size)
+// {
+//     if (points.size() != normals.size()) {
+//         std::cout << "drop_out_points_and_normals: points.size() != normals.size()\n";
+//         return;
+//     }
 
-    // Create indices [0, 1, 2, ..., n-1]
-    std::vector<size_t> indices(n);
-    std::iota(indices.begin(), indices.end(), 0);
+//     size_t n = points.size();
 
-    // Shuffle indices randomly
-    static std::random_device rd;
-    static std::mt19937 rng(rd());
-    std::shuffle(indices.begin(), indices.end(), rng);
+//     if (target_size >= n) {
+//         return; // nothing to drop
+//     }
 
-    // Keep only the first target_size indices
-    indices.resize(target_size);
+//     if (target_size == 0) {
+//         points.clear();
+//         normals.clear();
+//         return;
+//     }
 
-    // Optional: sort so the remaining points keep their original relative order
-    std::sort(indices.begin(), indices.end());
+//     // Create indices [0, 1, 2, ..., n-1]
+//     std::vector<size_t> indices(n);
+//     std::iota(indices.begin(), indices.end(), 0);
 
-    std::vector<PointInstance> new_points;
-    std::vector<glm::vec4> new_normals;
+//     // Shuffle indices randomly
+//     static std::random_device rd;
+//     static std::mt19937 rng(rd());
+//     std::shuffle(indices.begin(), indices.end(), rng);
 
-    new_points.reserve(target_size);
-    new_normals.reserve(target_size);
+//     // Keep only the first target_size indices
+//     indices.resize(target_size);
 
-    for (size_t idx : indices) {
-        new_points.push_back(points[idx]);
-        new_normals.push_back(normals[idx]);
-    }
+//     // Optional: sort so the remaining points keep their original relative order
+//     std::sort(indices.begin(), indices.end());
 
-    points = std::move(new_points);
-    normals = std::move(new_normals);
-}
+//     std::vector<PointInstance> new_points;
+//     std::vector<glm::vec4> new_normals;
 
+//     new_points.reserve(target_size);
+//     new_normals.reserve(target_size);
 
-void LidarScan::keep_only_upward_facing_points_and_normals(
-    std::vector<PointInstance>& points,
-    std::vector<glm::vec4>& normals,
-    float up_dot_threshold)
-{
-    if (points.size() != normals.size()) {
-        std::cout << "keep_only_upward_facing_points_and_normals: points.size() != normals.size()\n";
-        return;
-    }
+//     for (size_t idx : indices) {
+//         new_points.push_back(points[idx]);
+//         new_normals.push_back(normals[idx]);
+//     }
 
-    std::vector<PointInstance> kept_points;
-    std::vector<glm::vec4> kept_normals;
-
-    kept_points.reserve(points.size());
-    kept_normals.reserve(normals.size());
-
-    const glm::vec3 up(0.0f, 1.0f, 0.0f);
-
-    for (size_t i = 0; i < points.size(); ++i) {
-        const PointInstance& p = points[i];
-        const glm::vec3 n = glm::vec3(normals[i]);
-
-        if (!is_point_valid(p) || glm::dot(n, n) < 1e-12f) {
-            continue;
-        }
-
-        float up_dot = glm::dot(glm::normalize(n), up);
-
-        if (up_dot >= up_dot_threshold) {
-            kept_points.push_back(p);
-            kept_normals.push_back(normals[i]);
-        }
-    }
-
-    points = std::move(kept_points);
-    normals = std::move(kept_normals);
-}
+//     points = std::move(new_points);
+//     normals = std::move(new_normals);
+// }
 
 
+// void LidarScan::keep_only_upward_facing_points_and_normals(
+//     std::vector<PointInstance>& points,
+//     std::vector<glm::vec4>& normals,
+//     float up_dot_threshold)
+// {
+//     if (points.size() != normals.size()) {
+//         std::cout << "keep_only_upward_facing_points_and_normals: points.size() != normals.size()\n";
+//         return;
+//     }
 
-void LidarScan::remove_ground_points_and_normals(
-    std::vector<PointInstance>& points,
-    std::vector<glm::vec4>& normals,
-    float up_dot_threshold,
-    float max_ground_height)
-{
-    if (points.size() != normals.size()) {
-        std::cout << "remove_ground_points_and_normals: points.size() != normals.size()\n";
-        return;
-    }
+//     std::vector<PointInstance> kept_points;
+//     std::vector<glm::vec4> kept_normals;
 
-    std::vector<PointInstance> filtered_points;
-    std::vector<glm::vec4> filtered_normals;
+//     kept_points.reserve(points.size());
+//     kept_normals.reserve(normals.size());
 
-    filtered_points.reserve(points.size());
-    filtered_normals.reserve(normals.size());
+//     const glm::vec3 up(0.0f, 1.0f, 0.0f);
 
-    const glm::vec3 up(0.0f, 1.0f, 0.0f);
+//     for (size_t i = 0; i < points.size(); ++i) {
+//         const PointInstance& p = points[i];
+//         const glm::vec3 n = glm::vec3(normals[i]);
 
-    for (size_t i = 0; i < points.size(); ++i) {
-        const PointInstance& p = points[i];
-        const glm::vec3 n = glm::vec3(normals[i]);
+//         if (!is_point_valid(p) || glm::dot(n, n) < 1e-12f) {
+//             continue;
+//         }
 
-        // Keep invalid points/normals handling simple
-        if (!is_point_valid(p) || glm::dot(n, n) < 1e-12f) {
-            filtered_points.push_back(p);
-            filtered_normals.push_back(normals[i]);
-            continue;
-        }
+//         float up_dot = glm::dot(glm::normalize(n), up);
 
-        glm::vec3 nn = glm::normalize(n);
-        float up_dot = glm::dot(nn, up);
+//         if (up_dot >= up_dot_threshold) {
+//             kept_points.push_back(p);
+//             kept_normals.push_back(normals[i]);
+//         }
+//     }
 
-        bool looks_like_ground =
-            (up_dot >= up_dot_threshold) &&
-            (p.pos.y <= max_ground_height);
-
-        if (!looks_like_ground) {
-            filtered_points.push_back(p);
-            filtered_normals.push_back(normals[i]);
-        }
-    }
-
-    points = std::move(filtered_points);
-    normals = std::move(filtered_normals);
-}
-
-
-void LidarScan::remove_invalid_points_and_normals(std::vector<PointInstance>& points,
-                                                   std::vector<glm::vec4>& normals)
-{
-    if (points.size() != normals.size()) {
-        std::cout << "remove_invalid_points_and_normals: points.size() != normals.size()\n";
-        return;
-    }
-
-    std::vector<PointInstance> filtered_points;
-    std::vector<glm::vec4> filtered_normals;
-
-    filtered_points.reserve(points.size());
-    filtered_normals.reserve(normals.size());
-
-    for (size_t i = 0; i < points.size(); i++) {
-        const PointInstance& p = points[i];
-        const glm::vec4& n4 = normals[i];
-        glm::vec3 n = glm::vec3(n4);
-
-        bool point_valid = is_point_valid(p);
-        bool normal_valid = glm::dot(n, n) > 1e-12f;
-
-        if (!point_valid || !normal_valid)
-            continue;
-
-        filtered_points.push_back(p);
-        filtered_normals.push_back(glm::vec4(glm::normalize(n), 0.0f));
-    }
-
-    points = std::move(filtered_points);
-    normals = std::move(filtered_normals);
-}
+//     points = std::move(kept_points);
+//     normals = std::move(kept_normals);
+// }
 
 
 
-// void LidarScan::get_normals(std::vector<PointInstance> points, std::vector<glm::vec3> normals) {
-//     int rings_count = 16;
-//     int ring_width = points.size() / rings_count;
-//     int cloud_size = points.size();
+// void LidarScan::remove_ground_points_and_normals(
+//     std::vector<PointInstance>& points,
+//     std::vector<glm::vec4>& normals,
+//     float up_dot_threshold,
+//     float max_ground_height)
+// {
+//     if (points.size() != normals.size()) {
+//         std::cout << "remove_ground_points_and_normals: points.size() != normals.size()\n";
+//         return;
+//     }
 
-//     for (int y = 0; y < rings_count - 1; y++){
-//         for (int x = 0; x < ring_width - 1; x++){
+//     std::vector<PointInstance> filtered_points;
+//     std::vector<glm::vec4> filtered_normals;
 
+//     filtered_points.reserve(points.size());
+//     filtered_normals.reserve(normals.size());
+
+//     const glm::vec3 up(0.0f, 1.0f, 0.0f);
+
+//     for (size_t i = 0; i < points.size(); ++i) {
+//         const PointInstance& p = points[i];
+//         const glm::vec3 n = glm::vec3(normals[i]);
+
+//         // Keep invalid points/normals handling simple
+//         if (!is_point_valid(p) || glm::dot(n, n) < 1e-12f) {
+//             filtered_points.push_back(p);
+//             filtered_normals.push_back(normals[i]);
+//             continue;
+//         }
+
+//         glm::vec3 nn = glm::normalize(n);
+//         float up_dot = glm::dot(nn, up);
+
+//         bool looks_like_ground =
+//             (up_dot >= up_dot_threshold) &&
+//             (p.pos.y <= max_ground_height);
+
+//         if (!looks_like_ground) {
+//             filtered_points.push_back(p);
+//             filtered_normals.push_back(normals[i]);
+//         }
+//     }
+
+//     points = std::move(filtered_points);
+//     normals = std::move(filtered_normals);
+// }
+
+
+// void LidarScan::get_normals(const std::vector<PointInstance>& points, std::vector<glm::vec4>& normals)
+// {
+//     normals.clear();
+//     normals.resize(points.size(), glm::vec4(0.0f));
+
+//     if (points.empty())
+//         return;
+
+//     const int rings_count = 16;
+//     const int cloud_size = static_cast<int>(points.size());
+
+//     if (cloud_size < rings_count)
+//         return;
+
+//     const int ring_width = cloud_size / rings_count;
+//     if (ring_width < 2)
+//         return;
+
+//     const float rel_thresh = 1.0f;
+
+//     auto accumulate_triangle_normal = [&](int ia, int ib, int ic)
+//     {
+//         const PointInstance& a = points[ia];
+//         const PointInstance& b = points[ib];
+//         const PointInstance& c = points[ic];
+
+//         // Extra safety: don't accumulate into invalid points
+//         if (!is_point_valid(a) || !is_point_valid(b) || !is_point_valid(c))
+//             return;
+
+//         glm::vec3 n = triangle_normal(a, b, c);
+
+//         if (glm::dot(n, n) < 1e-12f)
+//             return;
+
+//         // Keep normals consistently oriented upward
+//         if (glm::dot(n, glm::vec3(0.0f, 1.0f, 0.0f)) < 0.0f)
+//             n = -n;
+
+//         glm::vec4 n4(n, 0.0f);
+
+//         normals[ia] += n4;
+//         normals[ib] += n4;
+//         normals[ic] += n4;
+//     };
+
+//     for (int y = 0; y < rings_count - 1; y++) {
+//         for (int x = 0; x < ring_width - 1; x++) {
+//             int id1 = xy_id(x,     y,     ring_width, cloud_size);
+//             int id2 = xy_id(x,     y + 1, ring_width, cloud_size);
+//             int id3 = xy_id(x + 1, y + 1, ring_width, cloud_size);
+//             int id5 = xy_id(x + 1, y,     ring_width, cloud_size);
+
+//             const PointInstance& p0 = points[id1]; // lower-left
+//             const PointInstance& p1 = points[id2]; // upper-left
+//             const PointInstance& p2 = points[id3]; // upper-right
+//             const PointInstance& p3 = points[id5]; // lower-right
+
+//             bool tri1_ok = false;
+//             bool tri2_ok = false;
+
+//             if (is_point_valid(p0) && is_point_valid(p1) && is_point_valid(p2)) {
+//                 if (is_same_object(p0, p1, rel_thresh) &&
+//                     is_same_object(p1, p2, 1.5f, false))
+//                 {
+//                     tri1_ok = true;
+//                 }
+//             }
+
+//             if (is_point_valid(p2) && is_point_valid(p3) && is_point_valid(p0)) {
+//                 if (is_same_object(p3, p2, rel_thresh) &&
+//                     is_same_object(p3, p0, 1.5f, false))
+//                 {
+//                     tri2_ok = true;
+//                 }
+//             }
+
+//             if (tri1_ok) {
+//                 accumulate_triangle_normal(id3, id1, id2);
+//             }
+
+//             if (tri2_ok) {
+//                 accumulate_triangle_normal(id1, id3, id5);
+//             }
+//         }
+//     }
+
+//     // Normalize only valid points that actually accumulated something.
+//     // Invalid points remain degenerate: (0,0,0,0).
+//     for (size_t i = 0; i < normals.size(); i++) {
+//         if (!is_point_valid(points[i])) {
+//             normals[i] = glm::vec4(0.0f);
+//             continue;
+//         }
+
+//         glm::vec3 n = glm::vec3(normals[i]);
+//         float len2 = glm::dot(n, n);
+
+//         if (len2 < 1e-12f) {
+//             normals[i] = glm::vec4(0.0f);
+//         } else {
+//             normals[i] = glm::vec4(glm::normalize(n), 0.0f);
 //         }
 //     }
 // }
 
-// void LidarScan::draw(RenderState state) {
-//     state.transform *= get_model_matrix();
-//     point_cloud.draw(state);
+// void LidarScan::remove_invalid_points_and_normals(std::vector<PointInstance>& points,
+//                                                    std::vector<glm::vec4>& normals)
+// {
+//     if (points.size() != normals.size()) {
+//         std::cout << "remove_invalid_points_and_normals: points.size() != normals.size()\n";
+//         return;
+//     }
+
+//     std::vector<PointInstance> filtered_points;
+//     std::vector<glm::vec4> filtered_normals;
+
+//     filtered_points.reserve(points.size());
+//     filtered_normals.reserve(normals.size());
+
+//     for (size_t i = 0; i < points.size(); i++) {
+//         const PointInstance& p = points[i];
+//         const glm::vec4& n4 = normals[i];
+//         glm::vec3 n = glm::vec3(n4);
+
+//         bool point_valid = is_point_valid(p);
+//         bool normal_valid = glm::dot(n, n) > 1e-12f;
+
+//         if (!point_valid || !normal_valid)
+//             continue;
+
+//         filtered_points.push_back(p);
+//         filtered_normals.push_back(glm::vec4(glm::normalize(n), 0.0f));
+//     }
+
+//     points = std::move(filtered_points);
+//     normals = std::move(filtered_normals);
 // }
 
-bool LidarScan::is_point_valid(const PointInstance &p) {
-    return std::isfinite(p.pos.x) && std::isfinite(p.pos.y) && std::isfinite(p.pos.z);
-}
+// bool LidarScan::is_point_valid(const PointInstance &p) {
+//     return std::isfinite(p.pos.x) && std::isfinite(p.pos.y) && std::isfinite(p.pos.z);
+// }
 
-glm::vec3 LidarScan::triangle_normal(const PointInstance& a, const PointInstance& b, const PointInstance& c) {
-    glm::vec3 av = {a.pos.x, a.pos.y, a.pos.z};
-    glm::vec3 bv = {b.pos.x, b.pos.y, b.pos.z};
-    glm::vec3 cv = {c.pos.x, c.pos.y, c.pos.z};
+// glm::vec3 LidarScan::triangle_normal(const PointInstance& a, const PointInstance& b, const PointInstance& c) {
+//     glm::vec3 av = {a.pos.x, a.pos.y, a.pos.z};
+//     glm::vec3 bv = {b.pos.x, b.pos.y, b.pos.z};
+//     glm::vec3 cv = {c.pos.x, c.pos.y, c.pos.z};
 
-    glm::vec3 u = bv - av;
-    glm::vec3 v = cv - av;
-    glm::vec3 n = glm::cross(u, v);           // unnormalized normal (also proportional to triangle area)
-    return glm::normalize(n);       // returns {0,0,0} if degenerate
-}
+//     glm::vec3 u = bv - av;
+//     glm::vec3 v = cv - av;
+//     glm::vec3 n = glm::cross(u, v);           // unnormalized normal (also proportional to triangle area)
+//     return glm::normalize(n);       // returns {0,0,0} if degenerate
+// }
 
-int LidarScan::xy_id(int x, int y, int ring_width, int cloud_size){
-    int idx = x + y * ring_width;
+// int LidarScan::xy_id(int x, int y, int ring_width, int cloud_size) {
+//     int idx = x + y * ring_width;
 
-    if (idx < 0 || idx >= cloud_size) {
-        throw "Bad index";
-        return -1;
-    }
+//     if (idx < 0 || idx >= cloud_size) {
+//         throw "Bad index";
+//         return -1;
+//     }
 
-    return idx;
-}
+//     return idx;
+// }
 
-float LidarScan::radial_distance(const PointInstance &p) {
-    return std::hypot(static_cast<double>(p.pos.x), static_cast<double>(p.pos.y), static_cast<double>(p.pos.z));
-}
+// float LidarScan::radial_distance(const PointInstance &p) {
+//     return std::hypot(static_cast<double>(p.pos.x), static_cast<double>(p.pos.y), static_cast<double>(p.pos.z));
+// }
 
+// bool LidarScan::is_same_object(
+//     const PointInstance &p0,
+//     const PointInstance &p1,
+//     float rel_thresh,
+//     bool more_permissive_with_distance,
+//     float abs_thresh)
+// {
+//     if (!is_point_valid(p0) || !is_point_valid(p1))
+//         return false;
 
-bool LidarScan::is_same_object(const PointInstance &p0, const PointInstance &p1,
-                                float rel_thresh, bool more_permissive_with_distance,float abs_thresh)
-{
-    if (!is_point_valid(p0) || !is_point_valid(p1))
-        return false;
+//     float r0 = radial_distance(p0);
+//     float r1 = radial_distance(p1);
 
-    float r0 = radial_distance(p0);
-    float r1 = radial_distance(p1);
+//     if (!std::isfinite(r0) || !std::isfinite(r1))
+//         return false;
 
-    if (!std::isfinite(r0) || !std::isfinite(r1))
-        return false;
-
-    float allowed = 0;
-    float dr = std::fabs(r0 - r1);
-
-
-    if (more_permissive_with_distance) {
-        // float thresh = std::max(0.2f - p0.pos.y, 0.0f);
-        // allowed = std::max(thresh * std::min(r0, r1), abs_thresh);
-        float permission_factor = 1.5;
-        allowed = rel_thresh * pow((std::min(r0, r1) / std::pow(permission_factor, 1.5)), permission_factor);
-    }
-    else {
-        // float thresh = std::max(0.2f - p0.pos.y, 0.0f);
-        // allowed = std::max(thresh, abs_thresh);
-        allowed = std::max(rel_thresh, abs_thresh);
-    }
-    return dr <= allowed;
-}
+//     float allowed = 0;
+//     float dr = std::fabs(r0 - r1);
 
 
-void LidarScan::get_normals(const std::vector<PointInstance>& points, std::vector<glm::vec4>& normals)
-{
-    normals.clear();
-    normals.resize(points.size(), glm::vec4(0.0f));
+//     if (more_permissive_with_distance) {
+//         // float thresh = std::max(0.2f - p0.pos.y, 0.0f);
+//         // allowed = std::max(thresh * std::min(r0, r1), abs_thresh);
+//         float permission_factor = 1.5;
+//         allowed = rel_thresh * pow((std::min(r0, r1) / std::pow(permission_factor, 1.5)), permission_factor);
+//     }
+//     else {
+//         // float thresh = std::max(0.2f - p0.pos.y, 0.0f);
+//         // allowed = std::max(thresh, abs_thresh);
+//         allowed = std::max(rel_thresh, abs_thresh);
+//     }
+//     return dr <= allowed;
+// }
 
-    if (points.empty())
-        return;
-
-    const int rings_count = 16;
-    const int cloud_size = static_cast<int>(points.size());
-
-    if (cloud_size < rings_count)
-        return;
-
-    const int ring_width = cloud_size / rings_count;
-    if (ring_width < 2)
-        return;
-
-    const float rel_thresh = 1.0f;
-
-    auto accumulate_triangle_normal = [&](int ia, int ib, int ic)
-    {
-        const PointInstance& a = points[ia];
-        const PointInstance& b = points[ib];
-        const PointInstance& c = points[ic];
-
-        // Extra safety: don't accumulate into invalid points
-        if (!is_point_valid(a) || !is_point_valid(b) || !is_point_valid(c))
-            return;
-
-        glm::vec3 n = triangle_normal(a, b, c);
-
-        if (glm::dot(n, n) < 1e-12f)
-            return;
-
-        // Keep normals consistently oriented upward
-        if (glm::dot(n, glm::vec3(0.0f, 1.0f, 0.0f)) < 0.0f)
-            n = -n;
-
-        glm::vec4 n4(n, 0.0f);
-
-        normals[ia] += n4;
-        normals[ib] += n4;
-        normals[ic] += n4;
-    };
-
-    for (int y = 0; y < rings_count - 1; y++) {
-        for (int x = 0; x < ring_width - 1; x++) {
-            int id1 = xy_id(x,     y,     ring_width, cloud_size);
-            int id2 = xy_id(x,     y + 1, ring_width, cloud_size);
-            int id3 = xy_id(x + 1, y + 1, ring_width, cloud_size);
-            int id5 = xy_id(x + 1, y,     ring_width, cloud_size);
-
-            const PointInstance& p0 = points[id1]; // lower-left
-            const PointInstance& p1 = points[id2]; // upper-left
-            const PointInstance& p2 = points[id3]; // upper-right
-            const PointInstance& p3 = points[id5]; // lower-right
-
-            bool tri1_ok = false;
-            bool tri2_ok = false;
-
-            if (is_point_valid(p0) && is_point_valid(p1) && is_point_valid(p2)) {
-                if (is_same_object(p0, p1, rel_thresh) &&
-                    is_same_object(p1, p2, 1.5f, false))
-                {
-                    tri1_ok = true;
-                }
-            }
-
-            if (is_point_valid(p2) && is_point_valid(p3) && is_point_valid(p0)) {
-                if (is_same_object(p3, p2, rel_thresh) &&
-                    is_same_object(p3, p0, 1.5f, false))
-                {
-                    tri2_ok = true;
-                }
-            }
-
-            if (tri1_ok) {
-                accumulate_triangle_normal(id3, id1, id2);
-            }
-
-            if (tri2_ok) {
-                accumulate_triangle_normal(id1, id3, id5);
-            }
-        }
-    }
-
-    // Normalize only valid points that actually accumulated something.
-    // Invalid points remain degenerate: (0,0,0,0).
-    for (size_t i = 0; i < normals.size(); i++) {
-        if (!is_point_valid(points[i])) {
-            normals[i] = glm::vec4(0.0f);
-            continue;
-        }
-
-        glm::vec3 n = glm::vec3(normals[i]);
-        float len2 = glm::dot(n, n);
-
-        if (len2 < 1e-12f) {
-            normals[i] = glm::vec4(0.0f);
-        } else {
-            normals[i] = glm::vec4(glm::normalize(n), 0.0f);
-        }
-    }
-}

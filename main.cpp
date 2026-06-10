@@ -44,7 +44,7 @@
 #include "renderer/point_cloud/gicp/voxel_point_map.h"
 #include "renderer/point_cloud/gicp/voxel_map_point_inserter.h"
 #include "renderer/point_cloud/gicp/voxel_map_point_reseter.h"
-#include "renderer/point_cloud/lidar/lidar_scan_receiver.h"
+// #include "renderer/point_cloud/lidar/lidar_scan_receiver.h"
 #include "imgui_layer.h"
 #include "renderer/lighting_system/lighting_system.h"
 #include "renderer/pbr/equirect_to_cubemap_pass.h"
@@ -56,9 +56,10 @@
 #include "renderer/static_mesh_data.h"
 #include "renderer/indirect_render_object.h"
 #include "voxel_grid_vulkan/voxelizator.h"
+#include "renderer/point_cloud/point_cloud_mesher.h"
 #include "renderer/point_cloud/point_cloud_preprocessor.h"
 #include "math_utils.h"
-#include <queue>
+#include "renderer/point_cloud/point_instance.h"
 
 #include <vector>
 #include <random>
@@ -100,15 +101,17 @@ int main() {
     MeshManager mesh_manager(engine, resource_loader);
     ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
 
-    PointCloudPreprocessor point_cloud_preprocessor(engine.device(), 
-                                                engine.compute_queue(),
-                                                compute_pass_manager);
+    PointCloudPreprocessor point_cloud_preprocessor(
+        engine.device(), 
+        engine.compute_queue(),
+        compute_pass_manager
+    );
 
-    LidarScanReceiver scan_receiver(point_cloud_preprocessor, 5000);
-    scan_receiver.start();
+    // LidarScanReceiver scan_receiver(point_cloud_preprocessor, 5000);
+    // scan_receiver.start();
 
     std::unique_ptr<LidarScan> network_scan;
-    std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
+    // std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
 
     glm::vec3 voxel_size(1.0f);
     glm::ivec3 chunk_size(16);
@@ -142,7 +145,7 @@ int main() {
     Voxelizator::VoxelizatorDesc voxelizator_desc {
         .chunk_size = chunk_size,
         .voxel_size = voxel_size,
-        .counter_hash_table_size = 10'000,
+        .counter_hash_table_size = 1'000'000,
         .count_voxel_writes = 0 // Будут использоваться те, что внутри voxel_grid
     };
 
@@ -152,6 +155,75 @@ int main() {
         engine.compute_queue(),
         compute_pass_manager,
         voxelizator_desc
+    );
+
+    uint32_t count_points_in_lidar_ring = 3600;
+    uint32_t count_rings_in_lidar = 16;
+    uint32_t count_triangles_in_polygon_ribbon = count_points_in_lidar_ring * 2 - 2;
+    uint32_t count_polygon_ribbons = count_rings_in_lidar - 1;
+    uint32_t total_count_triangles_in_scan = count_polygon_ribbons * count_triangles_in_polygon_ribbon;
+
+    VulkanBuffer scan_vertex_buffer(
+        engine.physical_device(),
+        engine.device(),
+        sizeof(PBRVertex) * total_count_triangles_in_scan * 3,
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    );
+
+    VulkanBuffer scan_index_buffer(
+        engine.physical_device(),
+        engine.device(),
+        sizeof(uint32_t) * total_count_triangles_in_scan * 3,
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    );
+    
+    MeshView scan_mesh_view(
+        scan_vertex_buffer.get_view(),
+        scan_index_buffer.get_view(),
+        total_count_triangles_in_scan * 3
+    );
+
+    RenderObject scan_object(scan_mesh_view, material_instance_manager.pbr);
+    scan_object.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
+
+    VoxelWriteGPU blue_voxelize_prefab;
+    blue_voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
+    blue_voxelize_prefab.set_flags = OVERWRITE_BIT;
+
+    VoxelWriteGPU transparent_voxelize_prefab;
+    transparent_voxelize_prefab.voxel_data = VoxelDataGPU(0, 0, glm::ivec3(255));
+    transparent_voxelize_prefab.set_flags = OVERWRITE_BIT;
+
+    PointCloudMesher mesher(
+        engine.device(),
+        engine.compute_queue(),
+        compute_pass_manager,
+        3600
+    );
+
+    LidarScan lidar_scan(manager_bundle, point_cloud_preprocessor, path_utils::executable_dir() / "assets" / "lidar_scans" / "frame_000000.bin");
+    mesher.convert_to_mesh(
+        lidar_scan.point_cloud(),
+        scan_object.mesh_view().vertex_buffer_view().handle(),
+        scan_object.mesh_view().index_buffer_view().handle(),
+        sizeof(PointInstance),
+        offsetof(PointInstance, pos),
+        sizeof(PBRVertex),
+        offsetof(PBRVertex, position),
+        offsetof(PBRVertex, normal)
+    );
+
+    scan_object.transform.scale = glm::vec3(5.0f);
+
+    voxelizator.voxelize_and_submit(
+        blue_voxelize_prefab,
+        scan_object.mesh_view(),
+        offsetof(PBRVertex, position),
+        sizeof(PBRVertex),
+        scan_object.transform.get_model_matrix(),
+        &voxel_grid.local_voxel_write_list()
     );
 
     glm::ivec3 block_size = glm::ivec3(10, 20, 30);
@@ -202,14 +274,6 @@ int main() {
     RenderObject vox_box(mesh_manager.cube, material_instance_manager.pbr);
     vox_box.transform.position = glm::vec3(0.0f, 80.0f, 0.0f);
     vox_box.transform.scale = glm::vec3(20.0f);
-
-    VoxelWriteGPU blue_voxelize_prefab;
-    blue_voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
-    blue_voxelize_prefab.set_flags = OVERWRITE_BIT;
-
-    VoxelWriteGPU transparent_voxelize_prefab;
-    transparent_voxelize_prefab.voxel_data = VoxelDataGPU(0, 0, glm::ivec3(255));
-    transparent_voxelize_prefab.set_flags = OVERWRITE_BIT;
 
     const float skybox_exposure = 1.8f;
 
@@ -283,6 +347,8 @@ int main() {
 
     scene.add(skybox);
     scene.add(sphere);
+    // scene.add(lidar_scan);
+    scene.add(scan_object);
     // scene.add(voxel_map_point_cloud);
     
     skybox.update(scene);
@@ -376,26 +442,30 @@ int main() {
         //     // voxel_grid.voxelize_point_cloud(engine, current_scan.point_cloud(), voxel_write_list, max_write_count);
         // }
 
-        if (auto scan = scan_receiver.try_pop_scan(manager_bundle)) {
-            if (network_scan) {
-                retired_network_scans.push_back(std::move(network_scan));
-            }
 
-            network_scan = std::move(scan);
-            std::cout << "Received scan #" << received_scan_count << std::endl;
+    
 
-            while (retired_network_scans.size() > engine.num_frames_in_flight()) {
-                retired_network_scans.pop_front();
-            }
 
-            if (received_scan_count > 0)
-                gicp_pass.fit(voxel_point_map, network_scan->point_cloud(), network_scan->normal_buffer(), 10);
+        // if (auto scan = scan_receiver.try_pop_scan(manager_bundle)) {
+        //     if (network_scan) {
+        //         retired_network_scans.push_back(std::move(network_scan));
+        //     }
+
+        //     network_scan = std::move(scan);
+        //     std::cout << "Received scan #" << received_scan_count << std::endl;
+
+        //     while (retired_network_scans.size() > engine.num_frames_in_flight()) {
+        //         retired_network_scans.pop_front();
+        //     }
+
+        //     if (received_scan_count > 0)
+        //         gicp_pass.fit(voxel_point_map, network_scan->point_cloud(), network_scan->normal_buffer(), 10);
             
-            voxel_map_inserter.insert(voxel_point_map, network_scan->point_cloud(), network_scan->normal_buffer());
-            voxel_grid.voxelize_point_cloud(engine, network_scan->point_cloud(), voxel_write_list, max_write_count);
+        //     voxel_map_inserter.insert(voxel_point_map, network_scan->point_cloud(), network_scan->normal_buffer());
+        //     voxel_grid.voxelize_point_cloud(engine, network_scan->point_cloud(), voxel_write_list, max_write_count);
 
-            received_scan_count++;
-        }
+        //     received_scan_count++;
+        // }
 
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), window, camera);

@@ -62,7 +62,7 @@ void VoxelMapPointInserter::insert(VoxelPointMap& voxel_point_map, PointCloud& s
 
 
     insert_pass.set_uniform_buffer(0, uniform_buffer);
-    insert_pass.set_storage_buffer(1, *source_point_cloud.instance_buffer());
+    insert_pass.set_storage_buffer(1, source_point_cloud.instance_buffer());
     insert_pass.set_storage_buffer(2, source_normal_buffer);
     insert_pass.set_storage_buffer(3, voxel_point_map.map_point_count_buffer);
     insert_pass.set_storage_buffer(4, voxel_point_map.map_point_buffer);

@@ -102,13 +102,14 @@ add_executable(app
   renderer/scene_object.cpp
   renderer/skybox.cpp
   renderer/point_cloud/lidar/lidar_scan.cpp
-  renderer/point_cloud/lidar/lidar_scan_receiver.cpp
+  # renderer/point_cloud/lidar/lidar_scan_receiver.cpp
   renderer/point_cloud/lidar/lidar_video.cpp
   renderer/point_cloud/gicp/gicp_pass.cpp
   renderer/point_cloud/gicp/voxel_point_map.cpp
   renderer/point_cloud/gicp/voxel_map_point_inserter.cpp
   renderer/point_cloud/gicp/voxel_map_point_reseter.cpp
   renderer/point_cloud/gicp/gicp_reductor.cpp
+  renderer/point_cloud/point_cloud_mesher.cpp
   imgui_layer.cpp
   renderer/lighting_system/lighting_system.cpp
   voxel_grid_vulkan/voxel_grid.cpp

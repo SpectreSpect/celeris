@@ -49,7 +49,7 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
     uniform_buffer.upload(&uniform_data, sizeof(GICPPassUniform));
 
     gicp_step_pass.set_uniform_buffer(0, uniform_buffer);
-    gicp_step_pass.set_storage_buffer(1, *source_point_cloud.instance_buffer());
+    gicp_step_pass.set_storage_buffer(1, source_point_cloud.instance_buffer());
     gicp_step_pass.set_storage_buffer(2, source_normal_buffer);
     gicp_step_pass.set_storage_buffer(3, voxel_point_map.map_point_count_buffer);
     gicp_step_pass.set_storage_buffer(4, voxel_point_map.map_point_buffer);
