@@ -57,7 +57,7 @@
 #include "voxel_grid_vulkan/voxelizator.h"
 #include "renderer/point_cloud/point_cloud_mesher.h"
 #include "math_utils.h"
-#include <queue>
+#include "renderer/point_cloud/point_instance.h"
 
 #include <vector>
 #include <random>
@@ -143,14 +143,55 @@ int main() {
         voxelizator_desc
     );
 
+    uint32_t count_points_in_lidar_ring = 3600;
+    uint32_t count_rings_in_lidar = 16;
+    uint32_t count_triangles_in_polygon_ribbon = count_points_in_lidar_ring * 2 - 2;
+    uint32_t count_polygon_ribbons = count_rings_in_lidar - 1;
+    uint32_t total_count_triangles_in_scan = count_polygon_ribbons * count_triangles_in_polygon_ribbon;
+
+    VulkanBuffer scan_vertex_buffer(
+        engine.physical_device(),
+        engine.device(),
+        sizeof(PBRVertex) * total_count_triangles_in_scan * 3,
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    );
+
+    VulkanBuffer scan_index_buffer(
+        engine.physical_device(),
+        engine.device(),
+        sizeof(uint32_t) * total_count_triangles_in_scan * 3,
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    );
+    
+    MeshView scan_mesh_view(
+        scan_vertex_buffer.get_view(),
+        scan_index_buffer.get_view(),
+        total_count_triangles_in_scan * 3
+    );
+
+    RenderObject scan_object(scan_mesh_view, material_instance_manager.pbr);
+    scan_object.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
+
     PointCloudMesher mesher(
         engine.device(),
         engine.compute_queue(),
-        compute_pass_manager
+        compute_pass_manager,
+        3600
     );
 
     LidarScan lidar_scan(manager_bundle, path_utils::executable_dir() / "assets" / "lidar_scans" / "frame_000000.bin");
-
+    mesher.convert_to_mesh(
+        lidar_scan.point_cloud(),
+        scan_object.mesh_view().vertex_buffer_view().handle(),
+        scan_object.mesh_view().index_buffer_view().handle(),
+        sizeof(PointInstance),
+        offsetof(PointInstance, pos),
+        sizeof(PBRVertex),
+        offsetof(PBRVertex, position),
+        offsetof(PBRVertex, normal)
+    );
 
     glm::ivec3 block_size = glm::ivec3(10, 20, 30);
     glm::ivec3 block_origin = glm::ivec3(0, 30, 0);
@@ -270,7 +311,8 @@ int main() {
 
     scene.add(skybox);
     scene.add(sphere);
-    scene.add(lidar_scan);
+    // scene.add(lidar_scan);
+    scene.add(scan_object);
     // scene.add(voxel_map_point_cloud);
     
     skybox.update(scene);

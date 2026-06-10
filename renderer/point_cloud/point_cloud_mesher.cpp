@@ -67,10 +67,22 @@ void PointCloudMesher::convert_to_mesh(
 
     uint32_t count_triangles_in_ring_group = math_utils::div_up_u32(count_triangles_in_lidar_ring, 256u);
     
-    command_buffer.dispatch(count_triangles_in_ring_group, count_rings, 1);
+    command_buffer.dispatch(count_triangles_in_ring_group, count_rings - 1, 1);
 
-    vertex_buffer.memory_barrier_compute_write_to_compute_write_read(command_buffer);
-    index_buffer.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    vertex_buffer.memory_barrier(
+        command_buffer,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT
+    );
+    index_buffer.memory_barrier(
+        command_buffer,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDEX_READ_BIT
+    );
 }
 
 void PointCloudMesher::convert_to_mesh(

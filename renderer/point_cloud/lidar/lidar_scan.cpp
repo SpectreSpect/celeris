@@ -9,7 +9,8 @@
 
 LidarScan::LidarScan(ManagerBundle& manager_bundle, const std::filesystem::path& path) 
     :   m_point_cloud(load_from_file(manager_bundle, path)),
-        m_normal_buffer(VulkanBuffer::create_host_visible_storage_buffer(manager_bundle.engine(), m_normals.size() * sizeof(glm::vec4))) {
+        m_normal_buffer(VulkanBuffer::create_host_visible_storage_buffer(manager_bundle.engine(), m_normals.size() * sizeof(glm::vec4)))
+{
     m_normal_buffer.upload(m_normals);
     add_child(m_point_cloud);
 }
@@ -135,15 +136,6 @@ PointCloud LidarScan::load_from_file(ManagerBundle& manager_bundle, const std::f
     }
 
     get_normals(m_points, m_normals);
-    remove_invalid_points_and_normals(m_points, m_normals);
-    drop_out_points_and_normals(m_points, m_normals, 10000);
-    remove_points_near_origin(m_points, m_normals, 3);
-
-    // point_cloud.create(engine);
-    // point_cloud.set_points(std::move(points));
-
-    // normal_buffer.create(engine, normals.size() * sizeof(glm::vec4));
-    // normal_buffer.update_data(normals.data(), normals.size() * sizeof(glm::vec4));
 
     return PointCloud(manager_bundle, m_points);
 }
@@ -197,6 +189,14 @@ VulkanBuffer& LidarScan::normal_buffer() {
     return m_normal_buffer;
 }
 
+LidarScan LidarScan::from_preprocess(ManagerBundle& manager_bundle, const std::filesystem::path& path) {
+    LOG_NAMED("LidarScan");
+
+    LidarScan lidar_scan(manager_bundle, path);
+    lidar_scan.to_preprocess_points();
+    return lidar_scan;
+}
+
 void LidarScan::remove_points_near_origin(std::vector<PointInstance>& points,
                                            std::vector<glm::vec4>& normals,
                                            float min_distance)
@@ -232,6 +232,14 @@ void LidarScan::remove_points_near_origin(std::vector<PointInstance>& points,
 
     points = std::move(filtered_points);
     normals = std::move(filtered_normals);
+}
+
+void LidarScan::to_preprocess_points() {
+    LOG_METHOD();
+
+    remove_invalid_points_and_normals(m_points, m_normals);
+    drop_out_points_and_normals(m_points, m_normals, 10000);
+    remove_points_near_origin(m_points, m_normals, 3);
 }
 
 void LidarScan::drop_out_points_and_normals(std::vector<PointInstance>& points,
@@ -374,120 +382,6 @@ void LidarScan::remove_ground_points_and_normals(
 }
 
 
-void LidarScan::remove_invalid_points_and_normals(std::vector<PointInstance>& points,
-                                                   std::vector<glm::vec4>& normals)
-{
-    if (points.size() != normals.size()) {
-        std::cout << "remove_invalid_points_and_normals: points.size() != normals.size()\n";
-        return;
-    }
-
-    std::vector<PointInstance> filtered_points;
-    std::vector<glm::vec4> filtered_normals;
-
-    filtered_points.reserve(points.size());
-    filtered_normals.reserve(normals.size());
-
-    for (size_t i = 0; i < points.size(); i++) {
-        const PointInstance& p = points[i];
-        const glm::vec4& n4 = normals[i];
-        glm::vec3 n = glm::vec3(n4);
-
-        bool point_valid = is_point_valid(p);
-        bool normal_valid = glm::dot(n, n) > 1e-12f;
-
-        if (!point_valid || !normal_valid)
-            continue;
-
-        filtered_points.push_back(p);
-        filtered_normals.push_back(glm::vec4(glm::normalize(n), 0.0f));
-    }
-
-    points = std::move(filtered_points);
-    normals = std::move(filtered_normals);
-}
-
-
-
-// void LidarScan::get_normals(std::vector<PointInstance> points, std::vector<glm::vec3> normals) {
-//     int rings_count = 16;
-//     int ring_width = points.size() / rings_count;
-//     int cloud_size = points.size();
-
-//     for (int y = 0; y < rings_count - 1; y++){
-//         for (int x = 0; x < ring_width - 1; x++){
-
-//         }
-//     }
-// }
-
-// void LidarScan::draw(RenderState state) {
-//     state.transform *= get_model_matrix();
-//     point_cloud.draw(state);
-// }
-
-bool LidarScan::is_point_valid(const PointInstance &p) {
-    return std::isfinite(p.pos.x) && std::isfinite(p.pos.y) && std::isfinite(p.pos.z);
-}
-
-glm::vec3 LidarScan::triangle_normal(const PointInstance& a, const PointInstance& b, const PointInstance& c) {
-    glm::vec3 av = {a.pos.x, a.pos.y, a.pos.z};
-    glm::vec3 bv = {b.pos.x, b.pos.y, b.pos.z};
-    glm::vec3 cv = {c.pos.x, c.pos.y, c.pos.z};
-
-    glm::vec3 u = bv - av;
-    glm::vec3 v = cv - av;
-    glm::vec3 n = glm::cross(u, v);           // unnormalized normal (also proportional to triangle area)
-    return glm::normalize(n);       // returns {0,0,0} if degenerate
-}
-
-int LidarScan::xy_id(int x, int y, int ring_width, int cloud_size){
-    int idx = x + y * ring_width;
-
-    if (idx < 0 || idx >= cloud_size) {
-        throw "Bad index";
-        return -1;
-    }
-
-    return idx;
-}
-
-float LidarScan::radial_distance(const PointInstance &p) {
-    return std::hypot(static_cast<double>(p.pos.x), static_cast<double>(p.pos.y), static_cast<double>(p.pos.z));
-}
-
-
-bool LidarScan::is_same_object(const PointInstance &p0, const PointInstance &p1,
-                                float rel_thresh, bool more_permissive_with_distance,float abs_thresh)
-{
-    if (!is_point_valid(p0) || !is_point_valid(p1))
-        return false;
-
-    float r0 = radial_distance(p0);
-    float r1 = radial_distance(p1);
-
-    if (!std::isfinite(r0) || !std::isfinite(r1))
-        return false;
-
-    float allowed = 0;
-    float dr = std::fabs(r0 - r1);
-
-
-    if (more_permissive_with_distance) {
-        // float thresh = std::max(0.2f - p0.pos.y, 0.0f);
-        // allowed = std::max(thresh * std::min(r0, r1), abs_thresh);
-        float permission_factor = 1.5;
-        allowed = rel_thresh * pow((std::min(r0, r1) / std::pow(permission_factor, 1.5)), permission_factor);
-    }
-    else {
-        // float thresh = std::max(0.2f - p0.pos.y, 0.0f);
-        // allowed = std::max(thresh, abs_thresh);
-        allowed = std::max(rel_thresh, abs_thresh);
-    }
-    return dr <= allowed;
-}
-
-
 void LidarScan::get_normals(const std::vector<PointInstance>& points, std::vector<glm::vec4>& normals)
 {
     normals.clear();
@@ -593,3 +487,120 @@ void LidarScan::get_normals(const std::vector<PointInstance>& points, std::vecto
         }
     }
 }
+
+void LidarScan::remove_invalid_points_and_normals(std::vector<PointInstance>& points,
+                                                   std::vector<glm::vec4>& normals)
+{
+    if (points.size() != normals.size()) {
+        std::cout << "remove_invalid_points_and_normals: points.size() != normals.size()\n";
+        return;
+    }
+
+    std::vector<PointInstance> filtered_points;
+    std::vector<glm::vec4> filtered_normals;
+
+    filtered_points.reserve(points.size());
+    filtered_normals.reserve(normals.size());
+
+    for (size_t i = 0; i < points.size(); i++) {
+        const PointInstance& p = points[i];
+        const glm::vec4& n4 = normals[i];
+        glm::vec3 n = glm::vec3(n4);
+
+        bool point_valid = is_point_valid(p);
+        bool normal_valid = glm::dot(n, n) > 1e-12f;
+
+        if (!point_valid || !normal_valid)
+            continue;
+
+        filtered_points.push_back(p);
+        filtered_normals.push_back(glm::vec4(glm::normalize(n), 0.0f));
+    }
+
+    points = std::move(filtered_points);
+    normals = std::move(filtered_normals);
+}
+
+
+
+// void LidarScan::get_normals(std::vector<PointInstance> points, std::vector<glm::vec3> normals) {
+//     int rings_count = 16;
+//     int ring_width = points.size() / rings_count;
+//     int cloud_size = points.size();
+
+//     for (int y = 0; y < rings_count - 1; y++){
+//         for (int x = 0; x < ring_width - 1; x++){
+
+//         }
+//     }
+// }
+
+// void LidarScan::draw(RenderState state) {
+//     state.transform *= get_model_matrix();
+//     point_cloud.draw(state);
+// }
+
+bool LidarScan::is_point_valid(const PointInstance &p) {
+    return std::isfinite(p.pos.x) && std::isfinite(p.pos.y) && std::isfinite(p.pos.z);
+}
+
+glm::vec3 LidarScan::triangle_normal(const PointInstance& a, const PointInstance& b, const PointInstance& c) {
+    glm::vec3 av = {a.pos.x, a.pos.y, a.pos.z};
+    glm::vec3 bv = {b.pos.x, b.pos.y, b.pos.z};
+    glm::vec3 cv = {c.pos.x, c.pos.y, c.pos.z};
+
+    glm::vec3 u = bv - av;
+    glm::vec3 v = cv - av;
+    glm::vec3 n = glm::cross(u, v);           // unnormalized normal (also proportional to triangle area)
+    return glm::normalize(n);       // returns {0,0,0} if degenerate
+}
+
+int LidarScan::xy_id(int x, int y, int ring_width, int cloud_size) {
+    int idx = x + y * ring_width;
+
+    if (idx < 0 || idx >= cloud_size) {
+        throw "Bad index";
+        return -1;
+    }
+
+    return idx;
+}
+
+float LidarScan::radial_distance(const PointInstance &p) {
+    return std::hypot(static_cast<double>(p.pos.x), static_cast<double>(p.pos.y), static_cast<double>(p.pos.z));
+}
+
+bool LidarScan::is_same_object(
+    const PointInstance &p0,
+    const PointInstance &p1,
+    float rel_thresh,
+    bool more_permissive_with_distance,
+    float abs_thresh)
+{
+    if (!is_point_valid(p0) || !is_point_valid(p1))
+        return false;
+
+    float r0 = radial_distance(p0);
+    float r1 = radial_distance(p1);
+
+    if (!std::isfinite(r0) || !std::isfinite(r1))
+        return false;
+
+    float allowed = 0;
+    float dr = std::fabs(r0 - r1);
+
+
+    if (more_permissive_with_distance) {
+        // float thresh = std::max(0.2f - p0.pos.y, 0.0f);
+        // allowed = std::max(thresh * std::min(r0, r1), abs_thresh);
+        float permission_factor = 1.5;
+        allowed = rel_thresh * pow((std::min(r0, r1) / std::pow(permission_factor, 1.5)), permission_factor);
+    }
+    else {
+        // float thresh = std::max(0.2f - p0.pos.y, 0.0f);
+        // allowed = std::max(thresh, abs_thresh);
+        allowed = std::max(rel_thresh, abs_thresh);
+    }
+    return dr <= allowed;
+}
+
