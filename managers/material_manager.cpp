@@ -11,11 +11,14 @@
 #include "../renderer/material_data_types.h"
 #include "../vulkan_self/image/cubemap.h"
 #include "../vulkan_self/image/cubemap_array.h"
+#include "../renderer/material_structures.h"
+#include "../renderer/lines/line_instance.h"
 
 MaterialManager::MaterialManager(VulkanEngine& engine, ShaderManager& shader_manager, FrameResources& frame_resources)
 :   blin_phong_mp(create_blin_phong_pass(engine, frame_resources, shader_manager.blinn_phong_vs, shader_manager.blinn_phong_fs)),
     unlit_mp(create_unlit_pass(engine, frame_resources, shader_manager.unlit_vs, shader_manager.unlit_fs)),
     point_mp(create_point_pass(engine, frame_resources, shader_manager.point_vs, shader_manager.point_fs)),
+    line_mp(create_line_pass(engine, frame_resources, shader_manager.line_vs, shader_manager.line_fs)),
     skybox_mp(create_skybox_pass(engine, frame_resources, shader_manager.skybox_vs, shader_manager.skybox_fs)),
     pbr_mp(create_pbr_pass(engine, frame_resources, shader_manager.pbr_vs, shader_manager.pbr_fs)),
     voxel_mesh_mp(create_voxel_mesh_pass(engine, frame_resources, shader_manager.voxel_mesh_vs, shader_manager.voxel_mesh_fs)),
@@ -124,6 +127,33 @@ MaterialPass MaterialManager::create_point_pass(VulkanEngine& engine, FrameResou
 
     builder.add_vertex_attribute(1, 1, Formats::vec4, offsetof(PointInstance, pos));
     builder.add_vertex_attribute(2, 1, Formats::vec4, offsetof(PointInstance, color));
+
+    return create_pass(engine, builder, vs, fs);
+}
+
+MaterialPass MaterialManager::create_line_pass(
+    VulkanEngine& engine, 
+    FrameResources& frame_resources, 
+    const VulkanShaderModule& vs, 
+    const VulkanShaderModule& fs)
+{
+    LOG_METHOD();
+
+    MaterialPassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::vertex);
+
+    builder.add_push_constants(sizeof(TransformPushConstants), 0);
+    builder.add_descriptor_set_layout(frame_resources.descriptor_layout());
+
+    builder.add_vertex_binding(0, sizeof(LineVertex), VK_VERTEX_INPUT_RATE_VERTEX);
+    builder.add_vertex_binding(1, sizeof(LineInstance), VK_VERTEX_INPUT_RATE_INSTANCE);
+
+    builder.add_vertex_attribute(0, 0, Formats::vec2, offsetof(LineVertex, corner));
+
+    builder.add_vertex_attribute(1, 1, Formats::vec3, offsetof(LineInstance, p0));
+    builder.add_vertex_attribute(2, 1, Formats::vec3, offsetof(LineInstance, p1));
+    builder.add_vertex_attribute(3, 1, Formats::vec4, offsetof(LineInstance, color));
 
     return create_pass(engine, builder, vs, fs);
 }

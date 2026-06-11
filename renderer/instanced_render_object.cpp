@@ -39,11 +39,19 @@ uint32_t InstancedRenderObject::instance_count() const {
     return m_instance_buffer_view.instance_count();
 }
 
+void InstancedRenderObject::set_instance_count(uint32_t count) {
+    LOG_METHOD();
+
+    logger.check(instance_buffer_view_valid(), "Instance buffer must be valid");
+    
+    m_instance_buffer_view.set_instance_count(count);
+}
+
 uint32_t InstancedRenderObject::instance_size() const {
     return m_instance_buffer_view.instance_size();
 }
 
-InstanceBufferView InstancedRenderObject::get_instance_view() const {
+InstanceBufferView InstancedRenderObject::instance_view() const {
     return m_instance_buffer_view;
 }
 

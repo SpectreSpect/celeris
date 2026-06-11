@@ -60,6 +60,8 @@
 #include "renderer/point_cloud/point_cloud_preprocessor.h"
 #include "math_utils.h"
 #include "renderer/point_cloud/point_instance.h"
+#include "renderer/lines/line_cloud.h"
+#include "renderer/lines/line_instance.h"
 
 #include <vector>
 #include <random>
@@ -287,6 +289,57 @@ int main() {
     );
 
     
+    constexpr uint32_t segment_count = 128;
+
+    constexpr float x_start = -10.0f;
+    constexpr float x_end = 10.0f;
+
+    constexpr float amplitude = 2.0f;
+    constexpr float frequency = 1.0f;
+
+    const glm::vec4 color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
+    std::vector<LineInstance> lines;
+    lines.reserve(segment_count);
+
+    auto make_point = [](float x) {
+        constexpr float amplitude = 2.0f;
+        constexpr float frequency = 1.0f;
+
+        return glm::vec3(
+            x,
+            0.0f,
+            std::sin(x * frequency) * amplitude
+        );
+    };
+
+    for (uint32_t i = 0; i < segment_count; i++) {
+        float t0 = static_cast<float>(i) / static_cast<float>(segment_count);
+        float t1 = static_cast<float>(i + 1) / static_cast<float>(segment_count);
+
+        float x0 = glm::mix(x_start, x_end, t0);
+        float x1 = glm::mix(x_start, x_end, t1);
+
+        lines.push_back(LineInstance{
+            .p0 = make_point(x0),
+            .p1 = make_point(x1),
+            .color = color
+        });
+    }
+
+    LineCloud line_cloud(
+        engine,
+        mesh_manager.line_quad,
+        material_instance_manager.line,
+        lines
+    );
+
+    line_cloud.set_material_data(LineMaterialData{
+        .color = glm::vec4(245.0f, 176.0f, 66.0f, 255.0f) * glm::vec4(1/255.0f),
+        .line_width_pixels = 20
+    });
+    line_cloud.sync_material();
+
     
     // LidarVideo lidar_video(manager_bundle, 
     //                        point_cloud_preprocessor,
@@ -350,6 +403,7 @@ int main() {
     // scene.add(lidar_scan);
     scene.add(scan_object);
     // scene.add(voxel_map_point_cloud);
+    scene.add(line_cloud);
     
     skybox.update(scene);
 

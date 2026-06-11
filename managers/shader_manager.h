@@ -16,6 +16,9 @@ public:
 
     VulkanShaderModule point_vs;
     VulkanShaderModule point_fs;
+
+    VulkanShaderModule line_vs;
+    VulkanShaderModule line_fs;    
     
     VulkanShaderModule skybox_vs;
     VulkanShaderModule skybox_fs;

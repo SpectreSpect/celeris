@@ -11,6 +11,9 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         point_vs(device, path_utils::executable_dir() / "shaders" / "point_cloud.vert.spv"),
         point_fs(device, path_utils::executable_dir() / "shaders" / "point_cloud.frag.spv"),
 
+        line_vs(device, path_utils::executable_dir() / "shaders" / "line_cloud.vert.spv"),
+        line_fs(device, path_utils::executable_dir() / "shaders" / "line_cloud.frag.spv"),   
+
         skybox_vs(device, path_utils::executable_dir() / "shaders" / "skybox.vert.spv"),
         skybox_fs(device, path_utils::executable_dir() / "shaders" / "skybox.frag.spv"),
         pbr_vs(device, path_utils::executable_dir() / "shaders" / "pbr.vert.spv"),
