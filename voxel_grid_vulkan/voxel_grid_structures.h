@@ -65,7 +65,12 @@ struct alignas(8) VoxelDataGPU {
             static_cast<float>(color & 0xFFu)
         ) / 255.0f;
     }
+
+    inline bool is_solid() const {
+        return ((type_flags >> VOXEL_TYPE_BITS) & VOXEL_VISABILITY_FLAG_BIT) > 0;
+    }
 };
+
 static_assert(sizeof(VoxelDataGPU) == 8);
 static_assert(alignof(VoxelDataGPU) == 8);
 

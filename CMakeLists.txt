@@ -129,6 +129,7 @@ add_executable(app
   renderer/pbr/pbr_maps.cpp
   renderer/pbr/pbr_map_generator.cpp
   renderer/point_cloud/point_cloud_preprocessor.cpp
+  a_star/occupancy_grid_3d.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

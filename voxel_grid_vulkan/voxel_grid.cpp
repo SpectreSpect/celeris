@@ -1316,6 +1316,23 @@ VoxelGridChunk VoxelGrid::read_chunk(glm::ivec3 chunk_pos) {
     return VoxelGridChunk(m_params.chunk_size, std::move(voxels));
 }
 
+glm::ivec3 VoxelGrid::chunk_pos_from_voxel_pos(glm::ivec3 voxel_pos) {
+    return glm::ivec3(
+        math_utils::floor_div(voxel_pos.x, static_cast<int>(m_params.chunk_size.x)),
+        math_utils::floor_div(voxel_pos.y, static_cast<int>(m_params.chunk_size.y)),
+        math_utils::floor_div(voxel_pos.z, static_cast<int>(m_params.chunk_size.z))
+    );
+}
+
+glm::ivec3 VoxelGrid::pos_in_chunk_from_global_voxel_pos(glm::ivec3 voxel_pos) {
+    glm::ivec3 chunk_pos = chunk_pos_from_voxel_pos(voxel_pos);
+    return voxel_pos - chunk_pos * glm::ivec3(m_params.chunk_size);
+}
+
+glm::ivec3 VoxelGrid::pos_in_chunk_from_global_voxel_pos(glm::ivec3 chunk_pos, glm::ivec3 voxel_pos) {
+    return voxel_pos - chunk_pos * glm::ivec3(m_params.chunk_size);
+}
+
 void VoxelGrid::world_init_gpu() {
     LOG_METHOD();
 

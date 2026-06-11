@@ -115,6 +115,10 @@ public:
     void update(Window& window, Camera& camera);
     void set_voxels(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src);
     VoxelGridChunk read_chunk(glm::ivec3 chunk_pos);
+
+    glm::ivec3 chunk_pos_from_voxel_pos(glm::ivec3 voxel_pos);
+    glm::ivec3 pos_in_chunk_from_global_voxel_pos(glm::ivec3 voxel_pos);
+    glm::ivec3 pos_in_chunk_from_global_voxel_pos(glm::ivec3 chunk_pos, glm::ivec3 voxel_pos);
     
 
 public:

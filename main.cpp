@@ -62,6 +62,8 @@
 #include "renderer/point_cloud/point_instance.h"
 #include "renderer/lines/line_cloud.h"
 #include "renderer/lines/line_instance.h"
+#include "a_star/occupancy_grid_3d.h"
+#include "a_star/a_star.h"
 
 #include <vector>
 #include <random>
@@ -232,8 +234,8 @@ int main() {
 
     
 
-    glm::ivec3 block_size = glm::ivec3(1, 2, 1);
-    glm::ivec3 block_origin = glm::ivec3(5, 5, 5);
+    glm::ivec3 block_size = glm::ivec3(1, 5, 5);
+    glm::ivec3 block_origin = glm::ivec3(5, 0, 0);
     std::vector<VoxelWriteGPU> test_voxel_writes;
     test_voxel_writes.reserve(static_cast<size_t>(block_size.x * block_size.y * block_size.z));
 
@@ -402,6 +404,8 @@ int main() {
     //     lidar_video.get_scan(0).normal_buffer(), 
     //     lidar_video.get_scan(0).point_cloud().point_count());
 
+    OccupancyGrid3D occupancy_gird_3d(voxel_grid);
+
     VoxelPointMap voxel_point_map(engine, 1500000, 1500000);
     voxel_map_reseter.reset(voxel_point_map);
 
@@ -421,7 +425,7 @@ int main() {
     scene.add(skybox);
     scene.add(sphere);
     // scene.add(lidar_scan);
-    scene.add(scan_object);
+    // scene.add(scan_object);
     // scene.add(voxel_map_point_cloud);
     scene.add(line_cloud);
     
