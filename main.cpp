@@ -67,6 +67,7 @@
 #include "a_star/a_star_structures.h"
 #include "a_star/nonholonomic_a_star.h"
 
+#include <cmath>
 #include <vector>
 #include <random>
 
@@ -272,18 +273,18 @@ int main() {
     voxel_grid.update(window, camera);
 
 
-    VoxelGridChunk chunk = voxel_grid.read_chunk(glm::ivec3(0, 0, 0));
-    glm::uvec3 read_chunk_size = chunk.chunk_size();
+    // VoxelGridChunk chunk = voxel_grid.read_chunk(glm::ivec3(0, 0, 0));
+    // glm::uvec3 read_chunk_size = chunk.chunk_size();
 
-    for (int x = 0; x < read_chunk_size.x; x++)
-        for (int y = 0; y < read_chunk_size.y; y++)
-            for (int z = 0; z < read_chunk_size.z; z++) {
-                VoxelDataGPU voxel = chunk.voxel(glm::uvec3(x, y, z));
-                glm::vec4 color = voxel.color_vec4();
+    // for (int x = 0; x < read_chunk_size.x; x++)
+    //     for (int y = 0; y < read_chunk_size.y; y++)
+    //         for (int z = 0; z < read_chunk_size.z; z++) {
+    //             VoxelDataGPU voxel = chunk.voxel(glm::uvec3(x, y, z));
+    //             glm::vec4 color = voxel.color_vec4();
 
-                if (color.x != 0 || color.y != 0 || color.z != 0)
-                    std::cout << "pos: (" << x << ", " << y << ", " << z << ")" << std::endl;
-            }
+    //             if (color.x != 0 || color.y != 0 || color.z != 0)
+    //                 std::cout << "pos: (" << x << ", " << y << ", " << z << ")" << std::endl;
+    //         }
 
 
 
@@ -299,6 +300,8 @@ int main() {
     RenderObject sphere(mesh_manager.sphere, material_instance_manager.pbr);
     RenderObject start_sphere(mesh_manager.sphere, material_instance_manager.pbr);
     RenderObject end_sphere(mesh_manager.sphere, material_instance_manager.pbr);
+    RenderObject start_direction_sphere(mesh_manager.sphere, material_instance_manager.pbr);
+    RenderObject end_direction_sphere(mesh_manager.sphere, material_instance_manager.pbr);
 
     RenderObject vox_box(mesh_manager.cube, material_instance_manager.pbr);
     vox_box.transform.position = glm::vec3(0.0f, 80.0f, 0.0f);
@@ -330,23 +333,72 @@ int main() {
 
     NonholonomicPos start_pos;
     NonholonomicPos end_pos;
+    bool has_start_pos = false;
+    bool has_end_pos = false;
+    bool has_planned_path = false;
+    std::string path_planning_status = "Place start and end positions.";
 
     start_pos.pos = glm::vec3(0, 1, 10);
-    start_pos.theta = 3.14;
+    start_pos.theta = 3.14f;
     end_pos.pos = glm::vec3(10, 1, 0);
 
     NonholonomicAStar planner(voxel_grid);
+    OccupancyGrid3D path_placement_grid(voxel_grid);
     // NonholonomicAStar nonholonomic_astar(voxel_grid);
 
-    planner.initialize(start_pos, end_pos);
-    planner.find_nonholomic_path();
+    constexpr uint32_t max_path_line_count = 20000;
 
-    const std::vector<NonholonomicPos>& path = planner.state_path;
+    auto make_pose_from_camera = [&](const Camera& camera, float fallback_theta, NonholonomicPos& out_pose) {
+        NonholonomicPos pose_from_camera;
+        pose_from_camera.pos = camera.position;
 
-    // Why does nonholonomic_a_star crashes with the "vector assertion failed" or something like that? Is it because I removed the old "crosses_extreme_curvature" function? You can check the old astar code in the a_star_old folder. The old code worked.  I moved the old code but now it crashes for some reason even though I didn't change anything (except for commenting out the crosses_extreme_curvature function)
+        glm::vec2 heading(camera.front.x, camera.front.z);
+        if (glm::length(heading) > 0.0001f) {
+            heading = glm::normalize(heading);
+            pose_from_camera.theta = std::atan2(heading.y, heading.x);
+        } else {
+            pose_from_camera.theta = fallback_theta;
+        }
 
-    std::vector<LineInstance> lines;
-    lines.reserve(segment_count);
+        if (!path_placement_grid.adjust_to_ground(pose_from_camera.pos))
+            return false;
+
+        out_pose = pose_from_camera;
+        return true;
+    };
+
+    auto make_placeholder_line = []() {
+        return LineInstance{
+            .p0 = glm::vec3(0.0f),
+            .p1 = glm::vec3(0.0f),
+            .color = glm::vec4(0.0f)
+        };
+    };
+
+    auto make_path_lines = [&](const std::vector<NonholonomicPos>& path) {
+        std::vector<LineInstance> path_lines;
+        path_lines.reserve(std::min<size_t>(path.size(), max_path_line_count));
+
+        for (uint32_t i = 1; i < path.size() && path_lines.size() < max_path_line_count; i++) {
+            glm::vec4 line_color = glm::vec4(1, 0, 0, 1);
+            if (path[i].dir == -1)
+                line_color = glm::vec4(0, 0, 1, 1);
+
+            path_lines.push_back(LineInstance{
+                .p0 = path[i - 1].pos + glm::vec3(0, 0.2f, 0),
+                .p1 = path[i].pos + glm::vec3(0, 0.2f, 0),
+                .color = line_color
+            });
+        }
+
+        if (path_lines.empty())
+            path_lines.push_back(make_placeholder_line());
+
+        return path_lines;
+    };
+
+    std::vector<LineInstance> lines = {make_placeholder_line()};
+    lines.reserve(max_path_line_count);
 
     auto make_point = [](float x) {
         constexpr float amplitude = 2.0f;
@@ -373,30 +425,13 @@ int main() {
     //     });
     // }
 
-    for (uint32_t i = 1; i < path.size(); i++) {
-        // float t0 = static_cast<float>(i) / static_cast<float>(segment_count);
-        // float t1 = static_cast<float>(i + 1) / static_cast<float>(segment_count);
-
-        // float x0 = glm::mix(x_start, x_end, t0);
-        // float x1 = glm::mix(x_start, x_end, t1);
-        glm::vec4 line_color = glm::vec4(1, 0, 0, 1);
-        if (path[i].dir == -1)
-            line_color = glm::vec4(0, 0, 1, 1);
-            
-
-        lines.push_back(LineInstance{
-            .p0 = path[i - 1].pos + glm::vec3(0, 0.2, 0),
-            .p1 = path[i].pos + glm::vec3(0, 0.2, 0),
-            .color = line_color
-        });
-    }
-
     LineCloud line_cloud(
         engine,
         mesh_manager.line_quad,
         material_instance_manager.line,
-        lines
+        max_path_line_count
     );
+    line_cloud.set_lines(lines);
 
     line_cloud.set_material_data(LineMaterialData{
         // .color = glm::vec4(245.0f, 176.0f, 66.0f, 255.0f) * glm::vec4(1/255.0f),
@@ -449,8 +484,57 @@ int main() {
 
     
 
-    start_sphere.transform.position = glm::vec3(start_pos.pos) + glm::vec3(0, 0.5f, 0);
-    end_sphere.transform.position = glm::vec3(end_pos.pos) + glm::vec3(0, 0.5f, 0);
+    auto sync_path_marker_transforms = [&]() {
+        auto direction_offset = [](float theta) {
+            return glm::vec3(std::cos(theta), 0.0f, std::sin(theta));
+        };
+
+        start_sphere.transform.position = glm::vec3(start_pos.pos) + glm::vec3(0, 0.5f, 0);
+        end_sphere.transform.position = glm::vec3(end_pos.pos) + glm::vec3(0, 0.5f, 0);
+        start_direction_sphere.transform.position = start_pos.pos + direction_offset(start_pos.theta) * 0.85f + glm::vec3(0, 0.4f, 0);
+        end_direction_sphere.transform.position = end_pos.pos + direction_offset(end_pos.theta) * 0.85f + glm::vec3(0, 0.4f, 0);
+    };
+
+    sync_path_marker_transforms();
+
+    auto place_start = [&]() {
+        if (make_pose_from_camera(camera, start_pos.theta, start_pos)) {
+            has_start_pos = true;
+            has_planned_path = false;
+            path_planning_status = has_end_pos ? "Start position placed on ground." : "Start position placed on ground. Place end position.";
+            sync_path_marker_transforms();
+        } else {
+            path_planning_status = "Could not place start: no ground found near camera.";
+        }
+    };
+
+    auto place_end = [&]() {
+        if (make_pose_from_camera(camera, end_pos.theta, end_pos)) {
+            has_end_pos = true;
+            has_planned_path = false;
+            path_planning_status = has_start_pos ? "End position placed on ground." : "End position placed on ground. Place start position.";
+            sync_path_marker_transforms();
+        } else {
+            path_planning_status = "Could not place end: no ground found near camera.";
+        }
+    };
+
+    auto start_path_planning = [&]() {
+        if (has_start_pos && has_end_pos) {
+            planner.initialize(start_pos, end_pos);
+            planner.find_nonholomic_path();
+
+            lines = make_path_lines(planner.state_path);
+            line_cloud.set_lines(lines);
+
+            has_planned_path = !planner.state_path.empty();
+            path_planning_status = has_planned_path
+                ? "Path planning finished."
+                : "Path planning finished with no path.";
+        } else {
+            path_planning_status = "Place start and end positions first.";
+        }
+    };
 
     // OccupancyGrid3D occupancy_gird_3d(voxel_grid);
 
@@ -468,9 +552,13 @@ int main() {
     sphere.set_material_data(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
     start_sphere.set_material_data(PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(1, 0, 0, 1)));
     end_sphere.set_material_data(PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(0, 0, 1, 1)));
+    start_direction_sphere.set_material_data(PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(1, 0, 0, 1)));
+    end_direction_sphere.set_material_data(PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(0, 0, 1, 1)));
     vox_box.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
 
     sphere.transform.position = glm::vec4(0, 2, 0, 1);
+    start_direction_sphere.transform.scale = glm::vec3(0.3f);
+    end_direction_sphere.transform.scale = glm::vec3(0.3f);
 
     Scene scene;
 
@@ -478,6 +566,8 @@ int main() {
     // scene.add(sphere);
     scene.add(start_sphere);
     scene.add(end_sphere);
+    scene.add(start_direction_sphere);
+    scene.add(end_direction_sphere);
     // scene.add(lidar_scan);
     // scene.add(scan_object);
     // scene.add(voxel_map_point_cloud);
@@ -487,6 +577,9 @@ int main() {
 
     bool g_pressed = false;
     bool n_pressed = false;
+    bool place_start_pressed = false;
+    bool place_end_pressed = false;
+    bool start_path_planning_pressed = false;
 
     int step = 0;
     
@@ -601,6 +694,33 @@ int main() {
 
         voxel_grid.update(window, camera);
 
+        if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
+            place_start_pressed = true;
+            place_start();
+        }
+
+        if (place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_RELEASE) {
+            place_start_pressed = false;
+        }
+
+        if (!place_end_pressed && glfwGetKey(window.handle(), GLFW_KEY_2) == GLFW_PRESS) {
+            place_end_pressed = true;
+            place_end();
+        }
+
+        if (place_end_pressed && glfwGetKey(window.handle(), GLFW_KEY_2) == GLFW_RELEASE) {
+            place_end_pressed = false;
+        }
+
+        if (!start_path_planning_pressed && glfwGetKey(window.handle(), GLFW_KEY_3) == GLFW_PRESS) {
+            start_path_planning_pressed = true;
+            start_path_planning();
+        }
+
+        if (start_path_planning_pressed && glfwGetKey(window.handle(), GLFW_KEY_3) == GLFW_RELEASE) {
+            start_path_planning_pressed = false;
+        }
+
         if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
             g_pressed = true;
 
@@ -674,6 +794,26 @@ int main() {
                 if (ImGui::Button("Next frame")) {
                     // next_frame();
                 }
+
+                if (ImGui::Button("Place start")) {
+                    place_start();
+                }
+                ImGui::SameLine();
+                ImGui::TextUnformatted("Key: 1");
+
+                if (ImGui::Button("Place end")) {
+                    place_end();
+                }
+                ImGui::SameLine();
+                ImGui::TextUnformatted("Key: 2");
+
+                if (ImGui::Button("Start path planning")) {
+                    start_path_planning();
+                }
+                ImGui::SameLine();
+                ImGui::TextUnformatted("Key: 3");
+
+                ImGui::Text("Path: %s", path_planning_status.c_str());
 
                 ImGui::End();
                 

@@ -94,7 +94,10 @@ void main() {
     // float height = -30.0 + n * 30.0; // базовый уровень + амплитуда
     float height = 0; // базовый уровень + амплитуда
 
-    uint type = (float(worldVoxel.y) <= height) ? 1u : 0u;
+    bool precipice = ((worldVoxel.z / 20) % 2) == 0;
+
+    // uint type = (float(worldVoxel.y) <= height) ? 1u : 0u;
+    uint type = (precipice) && (float(worldVoxel.y) <= height) ? 1u : 0u;
     uint voxel_flags = (type != 0u) ? VOXEL_VISABILITY_FLAG_BIT : VOXEL_EASY_OVERWRITE_FLAG_BIT;
 
     VoxelData vd;
