@@ -15,10 +15,10 @@ public:
     static glm::ivec3 floor_pos(const glm::vec3& p);
     static std::vector<glm::ivec3> line_intersects(glm::vec3 pos1, glm::vec3 pos2);
     bool is_solid(glm::ivec3 pos);
-    bool adjust_to_ground(std::vector<glm::vec3>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1);
-    bool adjust_to_ground(std::vector<glm::ivec3>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1);
-    bool adjust_to_ground(std::vector<NonholonomicPos>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1);
-    bool adjust_to_ground(glm::vec3& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1);
+    bool adjust_to_ground(std::vector<glm::vec3>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1, bool allow_flying_over_precepices = true);
+    bool adjust_to_ground(std::vector<glm::ivec3>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1, bool allow_flying_over_precepices = true);
+    bool adjust_to_ground(std::vector<NonholonomicPos>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1, bool allow_flying_over_precepices = true);
+    bool adjust_to_ground(glm::vec3& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1, bool allow_flying_over_precepices = true);
     bool get_closest_invisible_top_pos(glm::ivec3 pos, glm::ivec3 &result, int scan_height);
     bool get_closest_visible_bottom_pos(glm::ivec3 pos, glm::ivec3 &result, int max_drop);
     bool get_ground_positions(glm::vec3 pos1, glm::vec3 pos2, std::vector<glm::ivec3>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1);
@@ -29,7 +29,7 @@ public:
     template <class T, class GetPos, class SetPos>
     bool adjust_to_ground_range(T* begin, T* end,
                                         GetPos get_pos, SetPos set_pos,
-                                        int max_step_up, int max_drop, int max_y_diff)
+                                        int max_step_up, int max_drop, int max_y_diff, bool allow_flying_over_precepices = true)
     {
         if (begin == end) return true; 
 
@@ -39,7 +39,7 @@ public:
             glm::vec3 p = get_pos(*it);
             p.y = last_y;
 
-            if (!adjust_to_ground(p, max_step_up, max_drop, max_y_diff))
+            if (!adjust_to_ground(p, max_step_up, max_drop, max_y_diff, allow_flying_over_precepices))
                 return false;
 
             // if (max_y_diff >= 0 && std::abs(get_pos(*it).y - p.y) > max_y_diff)
