@@ -1,10 +1,13 @@
 #include "a_star.h"
 
-// AStar::AStar() {
-//     this->grid = new OccupancyGrid3D();
-// }
 
-AStar::AStar(VoxelGrid& voxel_grid) : m_grid(voxel_grid) {}
+AStar::AStar() {
+    this->grid = new OccupancyGrid3D();
+}
+
+AStar::AStar(VoxelGrid* voxel_grid) {
+    this->grid = new VoxelOccupancyGrid3D(voxel_grid);
+}
 
 float AStar::get_heuristic(glm::ivec3 a, glm::ivec3 b) {
     return glm::distance(glm::vec3(a), glm::vec3(b));
@@ -17,8 +20,7 @@ PlainAstarData AStar::reconstruct_path(std::unordered_map<uint64_t, AStarCell> c
     float dist_to_end = 0;
 
     while (true) {
-        uint64_t cur_key = math_utils::pack_key(cur_pos.x, cur_pos.y, cur_pos.z);
-
+        uint64_t cur_key = grid->pack_key(cur_pos.x, cur_pos.y, cur_pos.z);
         auto it = closed_heap.find(cur_key);
 
         if (it == closed_heap.end())
@@ -132,7 +134,7 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
 
         
 
-        uint64_t cur_key = math_utils::pack_key(cur_cell.pos.x, cur_cell.pos.y, cur_cell.pos.z);
+        uint64_t cur_key = grid->pack_key(cur_cell.pos.x, cur_cell.pos.y, cur_cell.pos.z);
         auto cur_it = g_score.find(cur_key);
 
         if (cur_it != g_score.end())
@@ -164,10 +166,10 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
 
                 glm::vec3 new_pos = glm::vec3(nx, ny, nz);
 
-                if (!m_grid->adjust_to_ground(new_pos, max_step_up, max_drop, max_y_diff))
+                if (!grid->adjust_to_ground(new_pos, max_step_up, max_drop, max_y_diff))
                     continue;
 
-                uint64_t new_key = math_utils::pack_key(new_pos.x, new_pos.y, new_pos.z);
+                uint64_t new_key = grid->pack_key(new_pos.x, new_pos.y, new_pos.z);
                 auto heap_it = closed_heap.find(new_key);
                 if (heap_it != closed_heap.end())
                     continue;
@@ -175,7 +177,7 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
 
                 float new_g = cur_cell.g + glm::distance((glm::vec3)cur_cell.pos, (glm::vec3)new_pos);
 
-                uint64_t key = math_utils::pack_key(new_pos.x, new_pos.y, new_pos.z);
+                uint64_t key = grid->pack_key(new_pos.x, new_pos.y, new_pos.z);
                 auto it = g_score.find(key);
                 
                 if (it != g_score.end()) {

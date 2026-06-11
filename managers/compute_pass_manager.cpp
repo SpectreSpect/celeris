@@ -54,6 +54,7 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         hash_table_conditional_dispatch_adapter_cp(create_hash_table_conditional_dispatch_adapter_compute_pass(device, shader_manager.hash_table_conditional_dispatch_adapter_cs)),
         clear_chunk_hash_table_cp(create_clear_chunk_hash_table_compute_pass(device, shader_manager.clear_chunk_hash_table_cs)),
         fill_chunk_hash_table_cp(create_fill_chunk_hash_table_compute_pass(device, shader_manager.fill_chunk_hash_table_cs)),
+        read_voxel_grid_chunk_cp(create_read_voxel_grid_chunk_compute_pass(device, shader_manager.read_voxel_grid_chunk_cs)),
 
         voxel_writes_from_point_cloud_cp(create_voxel_writes_from_point_cloud_compute_pass(device, shader_manager.voxel_writes_from_point_cloud_cs)),
 
@@ -167,6 +168,7 @@ ComputePass ComputePassManager::create_generate_mesh_compute_pass(VulkanDevice& 
     builder.add_storage_buffer(0, ShaderStages::compute); // PointCloud
     builder.add_storage_buffer(1, ShaderStages::compute); // VertciesOut
     builder.add_storage_buffer(2, ShaderStages::compute); // IndicesOut
+    builder.add_storage_buffer(3, ShaderStages::compute); // MeshCounters
     
     builder.add_push_constantsf(sizeof(GenerateMeshPushConstants), ShaderStages::compute);
     
@@ -687,6 +689,20 @@ ComputePass ComputePassManager::create_fill_chunk_hash_table_compute_pass(Vulkan
     builder.add_storage_buffer(2, ShaderStages::compute); // EnqueuedBuf
 
     builder.add_push_constantsf(sizeof(FillChunkHashTablePushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_read_voxel_grid_chunk_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // ChunkHashTable
+    builder.add_storage_buffer(1, ShaderStages::compute); // ChunkVoxels
+    builder.add_storage_buffer(2, ShaderStages::compute); // OutputVoxels
+
+    builder.add_push_constantsf(sizeof(ReadVoxelGridChunkPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }

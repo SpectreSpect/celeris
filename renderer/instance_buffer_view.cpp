@@ -21,6 +21,14 @@ uint32_t InstanceBufferView::instance_count() const noexcept {
     return m_instance_count;
 }
 
+void InstanceBufferView::set_instance_count(uint32_t instance_count) {
+    LOG_METHOD();
+
+    logger.check(valid(), "Instance buffer is not valid. Maybe you're doing something wrong?");
+
+    m_instance_count = instance_count;
+}
+
 uint32_t InstanceBufferView::instance_size() const noexcept {
     return m_instance_size;
 }

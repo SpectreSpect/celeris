@@ -20,6 +20,7 @@ public:
     SlotPassInstance rock_blinn_phong;
     SlotPassInstance dirt_blinn_phong;
     SlotPassInstance point_cloud;
+    SlotPassInstance line;
     SlotPassInstance st_peters_square_night_4k_hdr;
     SlotPassInstance dirt_pbr;
     SlotPassInstance pbr;
@@ -27,8 +28,7 @@ public:
     SlotPassInstance voxel_pbr;
 
     VulkanBuffer point_cloud_ubo;
-
-
+    
     MaterialInstanceManager(VulkanEngine& engine, MaterialManager& material_manager, TextureManager& texture_manager);
 
 private:

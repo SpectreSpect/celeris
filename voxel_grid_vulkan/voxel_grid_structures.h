@@ -56,7 +56,21 @@ struct alignas(8) VoxelDataGPU {
         this->type_flags = (flags << VOXEL_TYPE_BITS) | (type & VOXEL_TYPE_MASK);
         this->color = color;
     }
+
+    inline glm::vec4 color_vec4() const {
+        return glm::vec4(
+            static_cast<float>((color >> 24u) & 0xFFu),
+            static_cast<float>((color >> 16u) & 0xFFu),
+            static_cast<float>((color >> 8u) & 0xFFu),
+            static_cast<float>(color & 0xFFu)
+        ) / 255.0f;
+    }
+
+    inline bool is_solid() const {
+        return ((type_flags >> VOXEL_TYPE_BITS) & VOXEL_VISABILITY_FLAG_BIT) > 0;
+    }
 };
+
 static_assert(sizeof(VoxelDataGPU) == 8);
 static_assert(alignof(VoxelDataGPU) == 8);
 
