@@ -221,17 +221,19 @@ int main() {
 
     scan_object.transform.scale = glm::vec3(1.0f);
 
-    voxelizator.voxelize_and_submit(
-        blue_voxelize_prefab,
-        scan_object.mesh_view(),
-        offsetof(PBRVertex, position),
-        sizeof(PBRVertex),
-        scan_object.transform.get_model_matrix(),
-        &voxel_grid.local_voxel_write_list()
-    );
+    // voxelizator.voxelize_and_submit(
+    //     blue_voxelize_prefab,
+    //     scan_object.mesh_view(),
+    //     offsetof(PBRVertex, position),
+    //     sizeof(PBRVertex),
+    //     scan_object.transform.get_model_matrix(),
+    //     &voxel_grid.local_voxel_write_list()
+    // );
 
-    glm::ivec3 block_size = glm::ivec3(10, 20, 30);
-    glm::ivec3 block_origin = glm::ivec3(0, 30, 0);
+    
+
+    glm::ivec3 block_size = glm::ivec3(1, 2, 1);
+    glm::ivec3 block_origin = glm::ivec3(5, 5, 5);
     std::vector<VoxelWriteGPU> test_voxel_writes;
     test_voxel_writes.reserve(static_cast<size_t>(block_size.x * block_size.y * block_size.z));
 
@@ -263,6 +265,24 @@ int main() {
     engine.compute_submit(compute_command_buffer, &compute_fence);
     compute_fence.wait();
 
+    voxel_grid.update(window, camera);
+
+
+    VoxelGridChunk chunk = voxel_grid.read_chunk(glm::ivec3(0, 0, 0));
+    glm::uvec3 read_chunk_size = chunk.chunk_size();
+
+    for (int x = 0; x < read_chunk_size.x; x++)
+        for (int y = 0; y < read_chunk_size.y; y++)
+            for (int z = 0; z < read_chunk_size.z; z++) {
+                VoxelDataGPU voxel = chunk.voxel(glm::uvec3(x, y, z));
+                glm::vec4 color = voxel.color_vec4();
+
+                if (color.x != 0 || color.y != 0 || color.z != 0)
+                    std::cout << "pos: (" << x << ", " << y << ", " << z << ")" << std::endl;
+            }
+
+
+
     uint32_t max_write_count = 100000;
     VulkanBuffer voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * max_write_count);
 
@@ -289,7 +309,6 @@ int main() {
         skybox_exposure
     );
 
-    
     constexpr uint32_t segment_count = 128;
 
     constexpr float x_start = -10.0f;
@@ -496,10 +515,6 @@ int main() {
         //     // voxel_map_inserter.insert(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
         //     // voxel_grid.voxelize_point_cloud(engine, current_scan.point_cloud(), voxel_write_list, max_write_count);
         // }
-
-
-    
-
 
         // if (auto scan = scan_receiver.try_pop_scan(manager_bundle)) {
         //     if (network_scan) {

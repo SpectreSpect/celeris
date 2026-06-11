@@ -72,6 +72,7 @@ public:
     VulkanShaderModule hash_table_conditional_dispatch_adapter_cs;
     VulkanShaderModule clear_chunk_hash_table_cs;
     VulkanShaderModule fill_chunk_hash_table_cs;
+    VulkanShaderModule read_voxel_grid_chunk_cs;
 
     VulkanShaderModule voxel_writes_from_point_cloud_cs;
 

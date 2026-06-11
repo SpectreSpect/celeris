@@ -139,6 +139,17 @@ struct WriteVoxelsToGridPushConstants {
     uint32_t u_pack_bits;
 };
 
+struct ReadVoxelGridChunkPushConstants {
+    glm::ivec4 u_chunk_dim;
+    glm::ivec4 chunk_pos;
+    uint32_t u_chunk_hash_table_size;
+
+    uint32_t u_voxels_per_chunk;
+
+    uint32_t u_pack_offset;
+    uint32_t u_pack_bits;
+};
+
 struct EvictBucketsBuildPushConstants {
     glm::vec4 u_cam_pos;
     glm::ivec4 u_chunk_dim;

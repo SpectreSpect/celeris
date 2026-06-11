@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <stdexcept>
 #include <vector>
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
@@ -28,6 +29,32 @@ class VulkanQueue;
 class Camera;
 class Window;
 class PointCloud;
+
+class VoxelGridChunk {
+public:
+    _XCLASS_NAME(VoxelGridChunk);
+
+    VoxelGridChunk() = default;
+    VoxelGridChunk(glm::uvec3 chunk_size, std::vector<VoxelDataGPU> voxels);
+
+    glm::uvec3 chunk_size() const noexcept;
+    uint32_t voxel_count() const noexcept;
+
+    const VoxelDataGPU& voxel(uint32_t x, uint32_t y, uint32_t z) const;
+    VoxelDataGPU& voxel(uint32_t x, uint32_t y, uint32_t z);
+
+    const VoxelDataGPU& voxel(glm::uvec3 local_pos) const;
+    VoxelDataGPU& voxel(glm::uvec3 local_pos);
+
+    const std::vector<VoxelDataGPU>& voxels() const noexcept;
+    std::vector<VoxelDataGPU>& voxels() noexcept;
+
+private:
+    uint32_t voxel_index(uint32_t x, uint32_t y, uint32_t z) const;
+
+    glm::uvec3 m_chunk_size{0u, 0u, 0u};
+    std::vector<VoxelDataGPU> m_voxels;
+};
 
 
 class VoxelGrid {
@@ -87,6 +114,7 @@ public:
     
     void update(Window& window, Camera& camera);
     void set_voxels(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src);
+    VoxelGridChunk read_chunk(glm::ivec3 chunk_pos);
     
 
 public:
@@ -138,6 +166,7 @@ public:
         VulkanBuffer ib_returned_nodes_list;
 
         VulkanBuffer build_indirect_cmds_uniform;
+        VulkanBuffer read_chunk_output;
 
         // vb_heads  vb_heads_ = BufferObject(sizeof(uint32_t) * (size_t)(vb_order_ + 1), GL_DYNAMIC_DRAW);
         // vb_state  vb_state_ = BufferObject(sizeof(uint32_t) * (size_t)count_vb_pages_, GL_DYNAMIC_DRAW);
@@ -182,6 +211,7 @@ public:
         PassWriter hash_table_conditional_dispatch_adapter_pw;
         PassInstance clear_chunk_hash_table_pi;
         PassInstance fill_chunk_hash_table_pi;
+        PassInstance read_voxel_grid_chunk_pi;
         
         PassInstance voxel_writes_from_point_cloud_pi;
     };

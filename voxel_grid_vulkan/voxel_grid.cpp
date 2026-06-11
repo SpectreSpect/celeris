@@ -2,6 +2,7 @@
 
 #include <string>
 #include <algorithm>
+#include <utility>
 
 #include "../math_utils.h"
 #include "../managers/compute_pass_manager.h"
@@ -19,6 +20,49 @@
 #include "../math_utils.h"
 
 #include "shader_helper/buffer_dispatch_arg.h"
+
+VoxelGridChunk::VoxelGridChunk(glm::uvec3 chunk_size, std::vector<VoxelDataGPU> voxels)
+    : m_chunk_size(chunk_size), m_voxels(std::move(voxels)) {}
+
+glm::uvec3 VoxelGridChunk::chunk_size() const noexcept {
+    return m_chunk_size;
+}
+
+uint32_t VoxelGridChunk::voxel_count() const noexcept {
+    return static_cast<uint32_t>(m_voxels.size());
+}
+
+const VoxelDataGPU& VoxelGridChunk::voxel(uint32_t x, uint32_t y, uint32_t z) const {
+    return m_voxels[voxel_index(x, y, z)];
+}
+
+VoxelDataGPU& VoxelGridChunk::voxel(uint32_t x, uint32_t y, uint32_t z) {
+    return m_voxels[voxel_index(x, y, z)];
+}
+
+const VoxelDataGPU& VoxelGridChunk::voxel(glm::uvec3 local_pos) const {
+    return voxel(local_pos.x, local_pos.y, local_pos.z);
+}
+
+VoxelDataGPU& VoxelGridChunk::voxel(glm::uvec3 local_pos) {
+    return voxel(local_pos.x, local_pos.y, local_pos.z);
+}
+
+const std::vector<VoxelDataGPU>& VoxelGridChunk::voxels() const noexcept {
+    return m_voxels;
+}
+
+std::vector<VoxelDataGPU>& VoxelGridChunk::voxels() noexcept {
+    return m_voxels;
+}
+
+uint32_t VoxelGridChunk::voxel_index(uint32_t x, uint32_t y, uint32_t z) const {
+    if (x >= m_chunk_size.x || y >= m_chunk_size.y || z >= m_chunk_size.z) {
+        throw std::out_of_range("VoxelGridChunk voxel position is out of bounds");
+    }
+
+    return x + m_chunk_size.x * (y + m_chunk_size.y * z);
+}
 
 VoxelGrid::VoxelGrid(
     const VulkanPhysicalDevice& physical_device,
@@ -929,6 +973,7 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(VulkanDevice&
         .hash_table_conditional_dispatch_adapter_pw = PassWriter(device, compute_pass_manager.hash_table_conditional_dispatch_adapter_cp),
         .clear_chunk_hash_table_pi = PassInstance(compute_pass_manager.clear_chunk_hash_table_cp, dp),
         .fill_chunk_hash_table_pi = PassInstance(compute_pass_manager.fill_chunk_hash_table_cp, dp),
+        .read_voxel_grid_chunk_pi = PassInstance(compute_pass_manager.read_voxel_grid_chunk_cp, dp),
 
         .voxel_writes_from_point_cloud_pi = PassInstance(compute_pass_manager.voxel_writes_from_point_cloud_cp, dp)
     };
@@ -978,6 +1023,7 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
 
     VkDeviceSize dirty_quad_count_size = sizeof(uint32_t) * m_params.count_active_chunks;
     VkDeviceSize emit_counters_size = sizeof(uint32_t) * m_params.count_active_chunks;
+    VkDeviceSize read_chunk_output_size = sizeof(VoxelDataGPU) * vox_per_chunk();
 
     VkDeviceSize chunk_mesh_alloc_local_size = sizeof(ChunkMeshAlloc) * m_params.count_active_chunks;
     VkDeviceSize vb_returned_nodes_list_size = sizeof(uint32_t) * (size_t)(1u + m_params.count_vb_nodes);
@@ -1164,7 +1210,8 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         .chunk_mesh_alloc_local = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_mesh_alloc_local_size),
         .vb_returned_nodes_list = std::move(vb_returned_nodes_list),
         .ib_returned_nodes_list = std::move(ib_returned_nodes_list),
-        .build_indirect_cmds_uniform = VulkanBuffer::create_host_visible_uniform_buffer(physical_device, device, sizeof(BuildIndirectCmdsUniform))
+        .build_indirect_cmds_uniform = VulkanBuffer::create_host_visible_uniform_buffer(physical_device, device, sizeof(BuildIndirectCmdsUniform)),
+        .read_chunk_output = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, read_chunk_output_size)
 
 
         // global_vertex_buffer_ = BufferObject(sizeof(VertexGPU) * (size_t)max_mesh_vertices_, GL_DYNAMIC_DRAW);
@@ -1226,6 +1273,47 @@ void VoxelGrid::merge_voxel_write_lists(VulkanCommandBuffer& command_buffer, con
 void VoxelGrid::set_voxels(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src) {
     LOG_METHOD();
     merge_voxel_write_lists(command_buffer, voxel_write_list_src, m_buffers.local_voxel_write_list);
+}
+
+VoxelGridChunk VoxelGrid::read_chunk(glm::ivec3 chunk_pos) {
+    LOG_METHOD();
+
+    {
+        auto scope = m_command_buffer.begin_scope();
+
+        m_pass_instances.read_voxel_grid_chunk_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+        m_pass_instances.read_voxel_grid_chunk_pi.set_storage_buffer(1, m_buffers.voxels);
+        m_pass_instances.read_voxel_grid_chunk_pi.set_storage_buffer(2, m_buffers.read_chunk_output);
+
+        m_pass_instances.read_voxel_grid_chunk_pi.bind(m_command_buffer);
+
+        m_pass_instances.read_voxel_grid_chunk_pi.push_constants(m_command_buffer, ReadVoxelGridChunkPushConstants{
+            .u_chunk_dim = glm::ivec4(m_params.chunk_size, 0),
+            .chunk_pos = glm::ivec4(chunk_pos, 0),
+            .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
+            .u_voxels_per_chunk = static_cast<uint32_t>(vox_per_chunk()),
+            .u_pack_offset = static_cast<uint32_t>(math_utils::OFFSET),
+            .u_pack_bits = math_utils::BITS
+        });
+
+        uint32_t groups_x = math_utils::div_up_u32(static_cast<uint32_t>(vox_per_chunk()), 256u);
+        m_command_buffer.dispatch(groups_x, 1, 1);
+
+        m_buffers.read_chunk_output.memory_barrier(
+            m_command_buffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_HOST_BIT,
+            VK_ACCESS_HOST_READ_BIT
+        );
+    }
+
+    submit_compute_commands();
+
+    std::vector<VoxelDataGPU> voxels(static_cast<size_t>(vox_per_chunk()));
+    m_buffers.read_chunk_output.read(voxels);
+
+    return VoxelGridChunk(m_params.chunk_size, std::move(voxels));
 }
 
 void VoxelGrid::world_init_gpu() {
