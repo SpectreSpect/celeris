@@ -129,9 +129,7 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
 
         if (counter >= limit)
             return {};
-
         
-
         uint64_t cur_key = math_utils::pack_key(cur_cell.pos.x, cur_cell.pos.y, cur_cell.pos.z);
         auto cur_it = g_score.find(cur_key);
 
@@ -164,7 +162,7 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
 
                 glm::vec3 new_pos = glm::vec3(nx, ny, nz);
 
-                if (!m_grid.adjust_to_ground(new_pos, max_step_up, max_drop, max_y_diff))
+                if (!m_grid.adjust_to_ground(new_pos, max_step_up, max_drop, max_y_diff, -1))
                     continue;
 
                 uint64_t new_key = math_utils::pack_key(new_pos.x, new_pos.y, new_pos.z);
