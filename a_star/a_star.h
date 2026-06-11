@@ -12,28 +12,6 @@
 // #include "../voxel_engine/voxel_grid.h"
 // #include "voxel_occupancy_grid_3d.h"
 
-struct AStarCell {
-    float g;
-    float f;
-    glm::ivec3 pos;
-    glm::ivec3 came_from;
-    bool no_parent = true;
-
-    bool has_intermediate_pos = false;
-    glm::ivec3 intermediate_pos;
-};
-
-struct ByPriority {
-    bool operator()(const AStarCell& a, const AStarCell& b) const {
-        return a.f > b.f; // higher priority first
-    }
-};
-
-struct PlainAstarData {
-    std::vector<glm::ivec3> path;
-    std::vector<float> dist_to_end;
-};
-
 class VoxelGrid;
 
 class AStar {

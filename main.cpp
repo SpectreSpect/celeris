@@ -64,6 +64,7 @@
 #include "renderer/lines/line_instance.h"
 #include "a_star/occupancy_grid_3d.h"
 #include "a_star/a_star.h"
+#include "a_star/a_star_structures.h"
 
 #include <vector>
 #include <random>
@@ -234,8 +235,8 @@ int main() {
 
     
 
-    glm::ivec3 block_size = glm::ivec3(1, 5, 5);
-    glm::ivec3 block_origin = glm::ivec3(5, 0, 0);
+    glm::ivec3 block_size = glm::ivec3(1, 5, 10);
+    glm::ivec3 block_origin = glm::ivec3(3, 0, -5);
     std::vector<VoxelWriteGPU> test_voxel_writes;
     test_voxel_writes.reserve(static_cast<size_t>(block_size.x * block_size.y * block_size.z));
 
@@ -295,6 +296,8 @@ int main() {
     Renderer renderer(engine, frame_resources);
     
     RenderObject sphere(mesh_manager.sphere, material_instance_manager.pbr);
+    RenderObject start_sphere(mesh_manager.sphere, material_instance_manager.pbr);
+    RenderObject end_sphere(mesh_manager.sphere, material_instance_manager.pbr);
 
     RenderObject vox_box(mesh_manager.cube, material_instance_manager.pbr);
     vox_box.transform.position = glm::vec3(0.0f, 80.0f, 0.0f);
@@ -321,6 +324,15 @@ int main() {
 
     const glm::vec4 color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
+    glm::ivec3 start_pos(0, 1, 0);
+    glm::ivec3 end_pos(10, 1, 0);
+
+    AStar a_star(voxel_grid);
+
+    PlainAstarData plain_a_star_data = a_star.find_path(start_pos, end_pos);
+
+    
+
     std::vector<LineInstance> lines;
     lines.reserve(segment_count);
 
@@ -335,16 +347,32 @@ int main() {
         );
     };
 
-    for (uint32_t i = 0; i < segment_count; i++) {
-        float t0 = static_cast<float>(i) / static_cast<float>(segment_count);
-        float t1 = static_cast<float>(i + 1) / static_cast<float>(segment_count);
+    // for (uint32_t i = 0; i < segment_count; i++) {
+    //     float t0 = static_cast<float>(i) / static_cast<float>(segment_count);
+    //     float t1 = static_cast<float>(i + 1) / static_cast<float>(segment_count);
 
-        float x0 = glm::mix(x_start, x_end, t0);
-        float x1 = glm::mix(x_start, x_end, t1);
+    //     float x0 = glm::mix(x_start, x_end, t0);
+    //     float x1 = glm::mix(x_start, x_end, t1);
+
+    //     lines.push_back(LineInstance{
+    //         .p0 = make_point(x0),
+    //         .p1 = make_point(x1),
+    //         .color = color
+    //     });
+    // }
+
+    for (uint32_t i = 1; i < plain_a_star_data.path.size(); i++) {
+        // float t0 = static_cast<float>(i) / static_cast<float>(segment_count);
+        // float t1 = static_cast<float>(i + 1) / static_cast<float>(segment_count);
+
+        // float x0 = glm::mix(x_start, x_end, t0);
+        // float x1 = glm::mix(x_start, x_end, t1);
+
+
 
         lines.push_back(LineInstance{
-            .p0 = make_point(x0),
-            .p1 = make_point(x1),
+            .p0 = glm::vec3(plain_a_star_data.path[i - 1]) + glm::vec3(0, 0.2, 0),
+            .p1 = glm::vec3(plain_a_star_data.path[i]) + glm::vec3(0, 0.2, 0),
             .color = color
         });
     }
@@ -404,7 +432,14 @@ int main() {
     //     lidar_video.get_scan(0).normal_buffer(), 
     //     lidar_video.get_scan(0).point_cloud().point_count());
 
-    OccupancyGrid3D occupancy_gird_3d(voxel_grid);
+    
+
+    start_sphere.transform.position = glm::vec3(start_pos) + glm::vec3(0, 0.5f, 0);
+    end_sphere.transform.position = glm::vec3(end_pos) + glm::vec3(0, 0.5f, 0);
+
+    // OccupancyGrid3D occupancy_gird_3d(voxel_grid);
+
+    
 
     VoxelPointMap voxel_point_map(engine, 1500000, 1500000);
     voxel_map_reseter.reset(voxel_point_map);
@@ -416,6 +451,8 @@ int main() {
     PointCloud voxel_map_point_cloud(manager_bundle, voxel_point_map.map_point_buffer, voxel_point_map.m_map_point_count);
 
     sphere.set_material_data(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
+    start_sphere.set_material_data(PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(1, 0, 0, 1)));
+    end_sphere.set_material_data(PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(0, 0, 1, 1)));
     vox_box.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
 
     sphere.transform.position = glm::vec4(0, 2, 0, 1);
@@ -423,7 +460,9 @@ int main() {
     Scene scene;
 
     scene.add(skybox);
-    scene.add(sphere);
+    // scene.add(sphere);
+    scene.add(start_sphere);
+    scene.add(end_sphere);
     // scene.add(lidar_scan);
     // scene.add(scan_object);
     // scene.add(voxel_map_point_cloud);
