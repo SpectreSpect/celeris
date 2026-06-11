@@ -5,7 +5,6 @@
 #include "../vulkan_self/vulkan_queue.h"
 #include "../managers/compute_pass_manager.h"
 #include "../vulkan_self/descriptor_set/descriptor_pool.h"
-#include "../renderer/mesh_view.h"
 #include "shader_helper/buffer_dispatch_arg.h"
 #include "shader_helper/value_dispatch_arg.h"
 #include "../vulkan_self/push_constants_structures.h"
@@ -140,32 +139,6 @@ void Voxelizator::voxelize(
         //     //TODO
         // }
     }
-}
-
-void Voxelizator::voxelize_and_submit(
-    const VoxelWriteGPU& prifab,
-    MeshView mesh,
-    uint32_t position_attribute_offset,
-    uint32_t vertex_stride,
-    glm::mat4 transform,
-    VulkanBuffer* out_voxel_writes)
-{
-    LOG_METHOD();
-
-    {
-        auto scope = m_command_buffer.begin_scope();
-        voxelize(
-            m_command_buffer,
-            prifab,
-            mesh,
-            position_attribute_offset,
-            vertex_stride,
-            transform,
-            out_voxel_writes
-        );
-    }
-
-    submit_compute_commands();
 }
 
 void Voxelizator::reset_voxelize_pipline(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_writes, bool reset_voxel_write_list) {

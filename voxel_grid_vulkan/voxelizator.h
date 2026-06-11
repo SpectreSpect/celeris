@@ -12,6 +12,7 @@
 #include "voxel_grid_structures.h"
 #include "../vulkan_self/pass/instance/pass_instance.h"
 #include "shader_helper/shader_helper.h"
+#include "../renderer/mesh_view.h"
 
 class VulkanPhysicalDevice;
 class VulkanDevice;
@@ -57,14 +58,42 @@ public:
         VulkanBuffer* out_voxel_writes = nullptr
     );
 
+    template<class T>
     void voxelize_and_submit(
         const VoxelWriteGPU& prifab,
         MeshView mesh,
-        uint32_t position_attribute_offset,
-        uint32_t vertex_stride,
-        glm::mat4 transform = glm::identity<glm::mat4>(),
-        VulkanBuffer* out_voxel_writes = nullptr
-    );
+        glm::mat4 transform,
+        VulkanBuffer* out_voxel_writes)
+    {
+        LOG_METHOD();
+
+        static_assert(
+            std::is_standard_layout_v<T>,
+            "Vertex type must be a standard-layout type!"
+        );
+        static_assert(
+            requires(T v) { v.position; },
+            "Vertex type must contain a 'position' field!"
+        );
+
+        constexpr uint32_t position_attribute_offset = offsetof(T, position);
+        constexpr uint32_t vertex_stride = sizeof(T);
+
+        {
+            auto scope = m_command_buffer.begin_scope();
+            voxelize(
+                m_command_buffer,
+                prifab,
+                mesh,
+                position_attribute_offset,
+                vertex_stride,
+                transform,
+                out_voxel_writes
+            );
+        }
+
+        submit_compute_commands();
+    }
 
 private:
     struct VoxelizatorBuffers {

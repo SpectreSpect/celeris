@@ -85,37 +85,6 @@ void PointCloudMesher::convert_to_mesh(
     );
 }
 
-void PointCloudMesher::convert_to_mesh(
-    const PointCloud& point_cloud,
-    VulkanBuffer& vertex_buffer,
-    VulkanBuffer& index_buffer,
-    uint32_t point_stride_bytes,
-    uint32_t point_position_offset_bytes,
-    uint32_t vertex_stride_bytes,
-    uint32_t vertex_position_offset_bytes, 
-    uint32_t vertex_normal_offset_bytes,
-    uint32_t vertex_color_offset_bytes)
-{
-    LOG_METHOD();
-
-    {
-        auto scope = m_command_buffer.begin_scope();
-        convert_to_mesh(
-            m_command_buffer,
-            point_cloud,
-            vertex_buffer,
-            index_buffer,
-            point_stride_bytes,
-            point_position_offset_bytes,
-            vertex_stride_bytes,
-            vertex_position_offset_bytes, 
-            vertex_normal_offset_bytes,
-            vertex_color_offset_bytes
-        );
-    }
-    submit_compute_commands();
-}
-
 void PointCloudMesher::submit_compute_commands() {
     LOG_METHOD();
 
