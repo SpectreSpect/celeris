@@ -181,15 +181,6 @@ int main() {
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     );
     
-    MeshView scan_mesh_view(
-        scan_vertex_buffer.get_view(),
-        scan_index_buffer.get_view(),
-        total_count_triangles_in_scan * 3
-    );
-
-    RenderObject scan_object(scan_mesh_view, material_instance_manager.pbr);
-    scan_object.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
-
     VoxelWriteGPU blue_voxelize_prefab;
     blue_voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
     blue_voxelize_prefab.set_flags = OVERWRITE_BIT;
@@ -199,6 +190,7 @@ int main() {
     transparent_voxelize_prefab.set_flags = OVERWRITE_BIT;
 
     PointCloudMesher mesher(
+        engine.physical_device(),
         engine.device(),
         engine.compute_queue(),
         compute_pass_manager,
@@ -206,10 +198,10 @@ int main() {
     );
 
     LidarScan lidar_scan(manager_bundle, point_cloud_preprocessor, path_utils::executable_dir() / "assets" / "lidar_scans" / "frame_000000.bin");
-    mesher.convert_to_mesh(
+    uint32_t scan_index_count = mesher.convert_to_mesh(
         lidar_scan.point_cloud(),
-        scan_object.mesh_view().vertex_buffer_view().handle(),
-        scan_object.mesh_view().index_buffer_view().handle(),
+        scan_vertex_buffer,
+        scan_index_buffer,
         sizeof(PointInstance),
         offsetof(PointInstance, pos),
         sizeof(PBRVertex),
@@ -217,7 +209,17 @@ int main() {
         offsetof(PBRVertex, normal)
     );
 
-    scan_object.transform.scale = glm::vec3(5.0f);
+    MeshView scan_mesh_view(
+        scan_vertex_buffer.get_view(),
+        scan_index_buffer.get_view(),
+        scan_index_count
+    );
+
+    RenderObject scan_object(scan_mesh_view, material_instance_manager.pbr);
+    // RenderObject scan_object(mesh_manager.cube.get_view(), material_instance_manager.pbr);
+    scan_object.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
+
+    scan_object.transform.scale = glm::vec3(1.0f);
 
     voxelizator.voxelize_and_submit(
         blue_voxelize_prefab,

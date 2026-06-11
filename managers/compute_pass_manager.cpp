@@ -167,6 +167,7 @@ ComputePass ComputePassManager::create_generate_mesh_compute_pass(VulkanDevice& 
     builder.add_storage_buffer(0, ShaderStages::compute); // PointCloud
     builder.add_storage_buffer(1, ShaderStages::compute); // VertciesOut
     builder.add_storage_buffer(2, ShaderStages::compute); // IndicesOut
+    builder.add_storage_buffer(3, ShaderStages::compute); // MeshCounters
     
     builder.add_push_constantsf(sizeof(GenerateMeshPushConstants), ShaderStages::compute);
     

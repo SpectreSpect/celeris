@@ -8,9 +8,11 @@ layout(local_size_x = 256) in;
 layout(std430, set = 0, binding=0) readonly buffer PointCloud { float cloud_points[]; };
 layout(std430, set = 0, binding=1) buffer VertciesOut { float vertices_out[]; };
 layout(std430, set = 0, binding=2) buffer IndicesOut { uint indices_out[]; };
+layout(std430, set = 0, binding=3) buffer MeshCounters { uint valid_triangle_count; };
 
 layout(push_constant) uniform GenerateMeshPushConstants {
     uint count_triangles_in_lidar_ring;
+    uint count_points_in_lidar_ring;
 
     uint point_stride_bytes;
     uint point_position_offset_bytes;
@@ -111,11 +113,10 @@ void main(){
 
     if (triangle_id >= count_triangles_in_lidar_ring) return;
 
-    uint first_vertex_id = triangle_id * 3 + ring_id * count_triangles_in_lidar_ring * 3;
     uint left_bottom_point_id = triangle_id / 2;
     bool is_triangle_0 = triangle_id % 2 == 0;
     
-    uint ring_size = count_triangles_in_lidar_ring / 2;
+    uint ring_size = count_points_in_lidar_ring;
 
     uint p0_id = left_bottom_point_id + ring_id * ring_size;
     uint p1_id = left_bottom_point_id + (ring_id + 1) * ring_size;
@@ -131,10 +132,13 @@ void main(){
 
     float rel_thresh = 1.5;
     float abs_thresh = 0.12;
+    vec3 a;
+    vec3 b;
+    vec3 c;
 
     if (is_triangle_0) {
         bool ok = false;
-        if (is_point_valid(p0_position) && is_point_valid(p1_position) && is_point_valid(p1_position)) {
+        if (is_point_valid(p0_position) && is_point_valid(p1_position) && is_point_valid(p2_position)) {
             if (is_same_object(p0_position, p1_position, rel_thresh, true, abs_thresh) && is_same_object(p1_position, p2_position, rel_thresh, false, abs_thresh))
                 ok = true;
         }
@@ -142,11 +146,9 @@ void main(){
         if (!ok)
             return;
         
-        set_vertex_position(first_vertex_id, p0_position);
-        set_vertex_position(first_vertex_id + 1, p1_position);
-        set_vertex_position(first_vertex_id + 2, p2_position);
-
-        normal = triangle_normal(p0_position, p1_position, p2_position);
+        a = p0_position;
+        b = p1_position;
+        c = p2_position;
     }
     else {
         bool ok = false;
@@ -158,13 +160,20 @@ void main(){
         if (!ok)
             return;
         
-        set_vertex_position(first_vertex_id, p2_position);
-        set_vertex_position(first_vertex_id + 1, p3_position);
-        set_vertex_position(first_vertex_id + 2, p0_position);
-
-        normal = triangle_normal(p2_position, p3_position, p0_position);
+        a = p2_position;
+        b = p3_position;
+        c = p0_position;
     }
     
+    uint out_triangle_id = atomicAdd(valid_triangle_count, 1u);
+    uint first_vertex_id = out_triangle_id * 3u;
+    
+    set_vertex_position(first_vertex_id, a);
+    set_vertex_position(first_vertex_id + 1u, b);
+    set_vertex_position(first_vertex_id + 2u, c);
+
+    normal = triangle_normal(a, b, c);
+
     vec4 color = vec4(1, 1, 1, 1.0);
 
     for (uint i = 0; i < 3; i++) {
@@ -174,6 +183,6 @@ void main(){
     }
 
     indices_out[first_vertex_id] = first_vertex_id;
-    indices_out[first_vertex_id + 1] = first_vertex_id + 1;
-    indices_out[first_vertex_id + 2] = first_vertex_id + 2;
+    indices_out[first_vertex_id + 1u] = first_vertex_id + 1u;
+    indices_out[first_vertex_id + 2u] = first_vertex_id + 2u;
 }

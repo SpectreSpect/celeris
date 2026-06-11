@@ -7,8 +7,10 @@
 #include "../../vulkan_self/vulkan_command_buffer.h"
 #include "../../vulkan_self/vulkan_command_pool.h"
 #include "../../vulkan_self/vulkan_fence.h"
+#include "../../vulkan_self/vulkan_buffer.h"
 
 class VulkanDevice;
+class VulkanPhysicalDevice;
 class ComputePassManager;
 class VulkanQueue;
 class PointCloud;
@@ -21,6 +23,7 @@ public:
     _XCLASS_NAME(PointCloudMesher);
 
     explicit PointCloudMesher(
+        const VulkanPhysicalDevice& physical_device,
         const VulkanDevice& device,
         VulkanQueue& queue,
         ComputePassManager& compute_pass_manager,
@@ -47,7 +50,7 @@ public:
         uint32_t vertex_color_offset_bytes = DONT_SET_COLOR
     );
 
-    void convert_to_mesh(
+    uint32_t convert_to_mesh(
         const PointCloud& point_cloud,
         VulkanBuffer& vertex_buffer,
         VulkanBuffer& index_buffer,
@@ -69,6 +72,7 @@ private:
     VulkanFence m_fence;
 
     PassInstance m_generate_mesh_pi;
+    VulkanBuffer m_valid_triangle_count_buffer;
 
     uint32_t m_count_points_in_lidar_ring = 0;
 };
