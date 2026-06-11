@@ -65,6 +65,7 @@
 #include "a_star/occupancy_grid_3d.h"
 #include "a_star/a_star.h"
 #include "a_star/a_star_structures.h"
+#include "a_star/nonholonomic_a_star.h"
 
 #include <vector>
 #include <random>
@@ -324,14 +325,25 @@ int main() {
 
     const glm::vec4 color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
-    glm::ivec3 start_pos(0, 1, 0);
-    glm::ivec3 end_pos(10, 1, 0);
+    // glm::ivec3 start_pos(0, 1, 0);
+    // glm::ivec3 end_pos(10, 1, 0);
 
-    AStar a_star(voxel_grid);
+    NonholonomicPos start_pos;
+    NonholonomicPos end_pos;
 
-    PlainAstarData plain_a_star_data = a_star.find_path(start_pos, end_pos);
+    start_pos.pos = glm::vec3(0, 1, 10);
+    start_pos.theta = 3.14;
+    end_pos.pos = glm::vec3(10, 1, 0);
 
-    
+    NonholonomicAStar planner(voxel_grid);
+    // NonholonomicAStar nonholonomic_astar(voxel_grid);
+
+    planner.initialize(start_pos, end_pos);
+    planner.find_nonholomic_path();
+
+    const std::vector<NonholonomicPos>& path = planner.state_path;
+
+    // Why does nonholonomic_a_star crashes with the "vector assertion failed" or something like that? Is it because I removed the old "crosses_extreme_curvature" function? You can check the old astar code in the a_star_old folder. The old code worked.  I moved the old code but now it crashes for some reason even though I didn't change anything (except for commenting out the crosses_extreme_curvature function)
 
     std::vector<LineInstance> lines;
     lines.reserve(segment_count);
@@ -361,19 +373,21 @@ int main() {
     //     });
     // }
 
-    for (uint32_t i = 1; i < plain_a_star_data.path.size(); i++) {
+    for (uint32_t i = 1; i < path.size(); i++) {
         // float t0 = static_cast<float>(i) / static_cast<float>(segment_count);
         // float t1 = static_cast<float>(i + 1) / static_cast<float>(segment_count);
 
         // float x0 = glm::mix(x_start, x_end, t0);
         // float x1 = glm::mix(x_start, x_end, t1);
-
-
+        glm::vec4 line_color = glm::vec4(1, 0, 0, 1);
+        if (path[i].dir == -1)
+            line_color = glm::vec4(0, 0, 1, 1);
+            
 
         lines.push_back(LineInstance{
-            .p0 = glm::vec3(plain_a_star_data.path[i - 1]) + glm::vec3(0, 0.2, 0),
-            .p1 = glm::vec3(plain_a_star_data.path[i]) + glm::vec3(0, 0.2, 0),
-            .color = color
+            .p0 = path[i - 1].pos + glm::vec3(0, 0.2, 0),
+            .p1 = path[i].pos + glm::vec3(0, 0.2, 0),
+            .color = line_color
         });
     }
 
@@ -385,8 +399,9 @@ int main() {
     );
 
     line_cloud.set_material_data(LineMaterialData{
-        .color = glm::vec4(245.0f, 176.0f, 66.0f, 255.0f) * glm::vec4(1/255.0f),
-        .line_width_pixels = 10
+        // .color = glm::vec4(245.0f, 176.0f, 66.0f, 255.0f) * glm::vec4(1/255.0f),
+        .color = glm::vec4(1, 1, 1, 1),
+        .line_width_pixels = 5
     });
     line_cloud.sync_material();
 
@@ -434,8 +449,8 @@ int main() {
 
     
 
-    start_sphere.transform.position = glm::vec3(start_pos) + glm::vec3(0, 0.5f, 0);
-    end_sphere.transform.position = glm::vec3(end_pos) + glm::vec3(0, 0.5f, 0);
+    start_sphere.transform.position = glm::vec3(start_pos.pos) + glm::vec3(0, 0.5f, 0);
+    end_sphere.transform.position = glm::vec3(end_pos.pos) + glm::vec3(0, 0.5f, 0);
 
     // OccupancyGrid3D occupancy_gird_3d(voxel_grid);
 

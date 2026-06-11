@@ -131,6 +131,8 @@ add_executable(app
   renderer/point_cloud/point_cloud_preprocessor.cpp
   a_star/occupancy_grid_3d.cpp
   a_star/a_star.cpp
+  a_star/nonholonomic_a_star.cpp
+  a_star/reeds_shepp.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

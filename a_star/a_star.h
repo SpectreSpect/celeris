@@ -32,6 +32,6 @@ public:
     // virtual std::vector<glm::ivec3> find_path(glm::ivec3 start_pos, glm::ivec3 end_pos);
     virtual PlainAstarData find_path(glm::ivec3 start_pos, glm::ivec3 end_pos);
 
-private:
+protected:
     OccupancyGrid3D m_grid;
 };
