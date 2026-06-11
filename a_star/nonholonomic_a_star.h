@@ -169,6 +169,10 @@ public:
     float change_steer_pentalty = 1.5;
     bool use_reed_shepps_fallback = false;
     bool force_reeds_shepp_shot = false;
+    bool allow_flying_after_big_fall = true;
+    bool use_plain_astar_guide_when_flying = false;
+    int min_fall_voxels_to_start_flying = 4;
+    int wall_height_voxels = 2;
     uint64_t state_counter = 0;
     int iteration_limit = 10000;
     bool track_explored_paths = true;
@@ -193,12 +197,31 @@ public:
     uint64_t state_key(const NonholonomicPos& s) const {
         // pick a resolution that matches your planner step / grid
         constexpr float POS_RES = 0.5f;
+        constexpr int BITS_XZ = 18;
+        constexpr int BITS_Y = 12;
+        constexpr int BITS_THETA = 8;
+        constexpr int32_t OFFSET_XZ = 1 << (BITS_XZ - 1);
+        constexpr int32_t OFFSET_Y = 1 << (BITS_Y - 1);
+        constexpr uint64_t MASK_XZ = (1ull << BITS_XZ) - 1ull;
+        constexpr uint64_t MASK_Y = (1ull << BITS_Y) - 1ull;
+        constexpr uint64_t MASK_THETA = (1ull << BITS_THETA) - 1ull;
 
         int32_t ix = (int32_t)std::floor(s.pos.x / POS_RES);
+        int32_t iy = (int32_t)std::floor(s.pos.y);
         int32_t iz = (int32_t)std::floor(s.pos.z / POS_RES);
         int32_t it = discretize_angle(s.theta, num_theta_bins);
 
-        return math_utils::pack_key(ix, iz, it);
+        auto enc = [](int32_t value, int32_t offset, uint64_t mask) {
+            return static_cast<uint64_t>(static_cast<int64_t>(value) + offset) & mask;
+        };
+
+        uint64_t ux = enc(ix, OFFSET_XZ, MASK_XZ);
+        uint64_t uy = enc(iy, OFFSET_Y, MASK_Y);
+        uint64_t uz = enc(iz, OFFSET_XZ, MASK_XZ);
+        uint64_t ut = static_cast<uint64_t>(it) & MASK_THETA;
+        uint64_t flying = s.is_flying ? 1ull : 0ull;
+
+        return (ux << 39) | (uz << 21) | (uy << 9) | (ut << 1) | flying;
     }
     
     // static void print_vec(glm::vec3 vec) {
@@ -215,6 +238,11 @@ public:
     double reeds_shepp_distance(NonholonomicPos& start_pos, NonholonomicPos& end_pos);
     bool shot_reeds_shepp(NonholonomicPos start_pos, NonholonomicPos end_pos);
     bool adjust_and_check_path(std::vector<NonholonomicPos>& path, int max_step_up = 1, int max_drop = 1);
+    bool adjust_or_fly(glm::vec3& pos);
+    bool adjust_or_fly(NonholonomicPos& pos);
+    bool adjust_or_fly(std::vector<NonholonomicPos>& path);
+    bool get_ground_positions_or_fly(const std::vector<NonholonomicPos>& path, std::vector<glm::ivec3>& ground_positions);
+    bool crosses_wall_while_flying(const std::vector<NonholonomicPos>& path);
     // bool adjust_to_ground(glm::ivec3& voxel_pos, int max_step_up = 1, int max_drop = 1);
     static bool almost_equal(NonholonomicPos a, NonholonomicPos b);
     std::vector<NonholonomicPos> reconstruct_path(std::unordered_map<uint64_t, NonholonomicAStarCell> closed_heap, NonholonomicPos pos);

@@ -370,7 +370,7 @@ bool NonholonomicAStar::adjust_and_check_path(std::vector<NonholonomicPos>& path
     if (path.size() > 0)
     for (int i = 0; i < path.size(); i++) {
         glm::vec3 voxel_pos = glm::vec3(glm::floor(path[i].pos));
-        if (!m_grid.adjust_to_ground(voxel_pos, max_step_up, max_drop, max_y_diff)) {
+        if (!adjust_or_fly(voxel_pos)) {
             return false;
         }
             
@@ -380,6 +380,133 @@ bool NonholonomicAStar::adjust_and_check_path(std::vector<NonholonomicPos>& path
             path[i + 1].pos.y = path[i].pos.y;
     }
     return true;
+}
+
+bool NonholonomicAStar::adjust_or_fly(glm::vec3& pos) {
+    glm::vec3 original_pos = pos;
+    glm::vec3 grounded_pos = pos;
+    int fall_probe_depth = allow_flying_after_big_fall
+        ? std::max(0, min_fall_voxels_to_start_flying)
+        : max_drop;
+    int step_probe_height = std::max(0, wall_height_voxels);
+
+    if (m_grid.adjust_to_ground(grounded_pos, step_probe_height, fall_probe_depth, -1)) {
+        float y_diff = grounded_pos.y - original_pos.y;
+
+        if (y_diff > 0.0f && y_diff >= static_cast<float>(wall_height_voxels))
+            return false;
+
+        if (std::abs(y_diff) <= static_cast<float>(max_y_diff)) {
+            pos.y = grounded_pos.y;
+            return true;
+        }
+
+        if (allow_flying_after_big_fall &&
+            y_diff < 0.0f &&
+            -y_diff >= static_cast<float>(min_fall_voxels_to_start_flying)) {
+            pos.y = original_pos.y;
+            return true;
+        }
+
+        return false;
+    }
+
+    if (allow_flying_after_big_fall && fall_probe_depth >= min_fall_voxels_to_start_flying) {
+        pos.y = original_pos.y;
+        return true;
+    }
+
+    return false;
+}
+
+bool NonholonomicAStar::adjust_or_fly(NonholonomicPos& pos) {
+    if (pos.is_flying) {
+        glm::ivec3 cell = glm::ivec3(glm::floor(pos.pos));
+
+        if (m_grid.is_solid(cell - glm::ivec3(0, 1, 0))) {
+            pos.pos.y = static_cast<float>(cell.y);
+            pos.is_flying = false;
+        }
+
+        return true;
+    }
+
+    glm::vec3 original_pos = pos.pos;
+    glm::vec3 adjusted_pos = pos.pos;
+
+    if (!adjust_or_fly(adjusted_pos))
+        return false;
+
+    pos.pos.y = adjusted_pos.y;
+    pos.is_flying = (adjusted_pos.y == original_pos.y &&
+                     allow_flying_after_big_fall &&
+                     !m_grid.is_solid(glm::ivec3(glm::floor(pos.pos)) - glm::ivec3(0, 1, 0)));
+
+    return true;
+}
+
+bool NonholonomicAStar::adjust_or_fly(std::vector<NonholonomicPos>& path) {
+    for (NonholonomicPos& pos : path) {
+        if (!adjust_or_fly(pos))
+            return false;
+    }
+
+    return true;
+}
+
+bool NonholonomicAStar::crosses_wall_while_flying(const std::vector<NonholonomicPos>& path) {
+    if (wall_height_voxels <= 0)
+        return false;
+
+    for (size_t i = 1; i < path.size(); ++i) {
+        std::vector<glm::ivec3> cells = m_grid.line_intersects_xz(path[i - 1].pos, path[i].pos);
+        int flight_y = static_cast<int>(std::floor(std::max(path[i - 1].pos.y, path[i].pos.y)));
+
+        for (const glm::ivec3& cell : cells) {
+            for (int base_y = flight_y - wall_height_voxels + 1; base_y <= flight_y; ++base_y) {
+                bool solid_stack = true;
+
+                for (int dy = 0; dy < wall_height_voxels; ++dy) {
+                    if (!m_grid.is_solid(glm::ivec3(cell.x, base_y + dy, cell.z))) {
+                        solid_stack = false;
+                        break;
+                    }
+                }
+
+                if (solid_stack)
+                    return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+bool NonholonomicAStar::get_ground_positions_or_fly(const std::vector<NonholonomicPos>& path, std::vector<glm::ivec3>& ground_positions) {
+    if (path.size() < 2)
+        return false;
+
+    std::vector<NonholonomicPos> adjusted_path = path;
+    if (!adjust_or_fly(adjusted_path))
+        return false;
+
+    for (const NonholonomicPos& pos : adjusted_path) {
+        if (pos.is_flying)
+            return !crosses_wall_while_flying(adjusted_path);
+    }
+
+    int fall_probe_depth = allow_flying_after_big_fall
+        ? std::max(0, min_fall_voxels_to_start_flying)
+        : max_drop;
+    int step_probe_height = std::max(0, wall_height_voxels);
+
+    if (m_grid.get_ground_positions(adjusted_path, ground_positions, step_probe_height, fall_probe_depth, max_y_diff))
+        return true;
+
+    if (!allow_flying_after_big_fall)
+        return false;
+
+    return !crosses_wall_while_flying(adjusted_path);
 }
 
 bool NonholonomicAStar::almost_equal(NonholonomicPos a, NonholonomicPos b) {
@@ -441,11 +568,12 @@ DistToPathData NonholonomicAStar::dist_to_path(glm::ivec3 pos, std::vector<glm::
 
         path_pos.y = cur_pos.y;
 
-        std::vector<glm::vec3> line = {cur_pos, path_pos};
-
+        std::vector<NonholonomicPos> segment(2);
+        segment[0].pos = cur_pos;
+        segment[1].pos = path_pos;
 
         std::vector<glm::ivec3> ground_positions;
-        if (!m_grid.get_ground_positions(line, ground_positions, max_step_up, max_drop, max_y_diff))
+        if (!get_ground_positions_or_fly(segment, ground_positions))
             continue;
         
         // if (!crosses_extreme_curvature(ground_positions, curvature_limit))
@@ -482,10 +610,12 @@ DistToPathData NonholonomicAStar::max_unimpended_dist_to_path(glm::vec3 pos, std
 
         path_pos.y = cur_pos.y;
 
-        std::vector<glm::vec3> line = {cur_pos, path_pos};
+        std::vector<NonholonomicPos> segment(2);
+        segment[0].pos = cur_pos;
+        segment[1].pos = path_pos;
 
         std::vector<glm::ivec3> ground_positions;
-        if (!m_grid.get_ground_positions(line, ground_positions, max_step_up, max_drop, max_y_diff))
+        if (!get_ground_positions_or_fly(segment, ground_positions))
             continue;
         
         // if (!crosses_extreme_curvature(ground_positions, curvature_limit))
@@ -591,7 +721,9 @@ float NonholonomicAStar::get_nonholonomic_f(NonholonomicPos& new_pos, Nonholonom
 
     // int target_id = unimpended_dist.id;
 
-    
+    if (new_pos.is_flying || cur_pos.is_flying)
+        return glm::distance(new_pos.pos, end_pos.pos);
+
     if (unimpended_astar_positions.empty())
         return glm::distance(new_pos.pos, end_pos.pos);
 
@@ -611,7 +743,7 @@ float NonholonomicAStar::get_nonholonomic_f(NonholonomicPos& new_pos, Nonholonom
         std::vector<NonholonomicPathElement> dubins_path;
         dubins_path = ReedsShepp::get_optimal_path(new_pos, unimpended_astar_positions[new_pos.dubins_segment_id], min_radius);
         f += ReedsShepp::get_length(dubins_path) * min_radius;
-        force_reeds_shepp_shot = true;
+        force_reeds_shepp_shot = !new_pos.is_flying;
 
     } else if ((new_pos.dubins_segment_id > 0 && dubins_distance_to_end[new_pos.dubins_segment_id - 1] <= 2.0f) ||
                glm::distance(new_pos.pos, unimpended_astar_positions[new_pos.dubins_segment_id].pos) <= 2.0f) {
@@ -638,10 +770,26 @@ void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos en
     
     min_radius = wheel_base / std::tan(max_steer);
 
-    state_plain_astar_path = find_path(glm::ivec3(glm::floor(start_pos.pos)), glm::ivec3(glm::floor(end_pos.pos)));
+    state_plain_astar_path = PlainAstarData();
+    glm::ivec3 start_cell = glm::ivec3(glm::floor(start_pos.pos));
+    glm::ivec3 end_cell = glm::ivec3(glm::floor(end_pos.pos));
 
-    if (state_plain_astar_path.path.empty())
-        return;
+    if (!allow_flying_after_big_fall || use_plain_astar_guide_when_flying)
+        state_plain_astar_path = find_path(start_cell, end_cell);
+
+    if (state_plain_astar_path.path.empty()) {
+        if (!allow_flying_after_big_fall)
+            return;
+
+        state_plain_astar_path.path.push_back(start_cell);
+        if (end_cell != start_cell)
+            state_plain_astar_path.path.push_back(end_cell);
+
+        float direct_dist = glm::distance(start_pos.pos, end_pos.pos);
+        state_plain_astar_path.dist_to_end.push_back(direct_dist);
+        if (end_cell != start_cell)
+            state_plain_astar_path.dist_to_end.push_back(0.0f);
+    }
 
     unimpended_astar_positions = std::vector<NonholonomicPos>();
 
@@ -909,7 +1057,10 @@ bool NonholonomicAStar::try_reeds_shepp_shot(NonholonomicPos& start, Nonholonomi
     if (out_path.empty())
         return false;
 
-    if (!m_grid.adjust_to_ground(out_path, max_step_up, max_drop, max_y_diff))
+    if (!adjust_or_fly(out_path))
+        return false;
+
+    if (crosses_wall_while_flying(out_path))
         return false;
 
     // if (!crosses_extreme_curvature(out_path, curvature_limit))
@@ -976,7 +1127,10 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
         return true;
     }
 
-    if (use_reed_shepps_fallback || force_reeds_shepp_shot)
+    if (cur_cell.pos.is_flying)
+        force_reeds_shepp_shot = false;
+
+    if (!cur_cell.pos.is_flying && (use_reed_shepps_fallback || force_reeds_shepp_shot))
         if (state_counter % try_reeds_shepp_interval == 0 || force_reeds_shepp_shot) {
             force_reeds_shepp_shot = false;
             bool status = try_finish_with_reeds_shepp(cur_cell.pos, state_end_pos);
@@ -996,13 +1150,10 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
 
             // motion_simulation_time.add(motion_simulation_end - motion_simulation_start);
 
-
-
-
             std::vector<NonholonomicPos> simplified_motion = {motion[0], motion[motion.size() - 1]};
 
             auto adjust_to_ground_start = std::chrono::steady_clock::now();
-            if (!m_grid.adjust_to_ground(simplified_motion, max_step_up, max_drop, max_y_diff))
+            if (!adjust_or_fly(simplified_motion))
                 continue;
             auto adjust_to_ground_end = std::chrono::steady_clock::now();
 
@@ -1012,7 +1163,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
             // auto get_ground_positions_start = std::chrono::steady_clock::now();
             get_ground_positions_time.start();
             std::vector<glm::ivec3> ground_positions;
-            if (!m_grid.get_ground_positions(simplified_motion, ground_positions, max_step_up, max_drop, max_y_diff))
+            if (!get_ground_positions_or_fly(simplified_motion, ground_positions))
                 continue;
             get_ground_positions_time.end();
             // auto get_ground_positions_end = std::chrono::steady_clock::now();
