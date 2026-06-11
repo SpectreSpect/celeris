@@ -17,7 +17,7 @@ class VoxelGrid;
 class AStar {
 public:
     const int max_step_up = 2;
-    const int max_drop = 2;
+    const int max_drop = 6;
     const int max_y_diff = 1;
     bool allow_diagonal_moves = false;
     bool allow_flying_over_precepices = true;

@@ -224,16 +224,17 @@ int main() {
     // RenderObject scan_object(mesh_manager.cube.get_view(), material_instance_manager.pbr);
     scan_object.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
 
-    scan_object.transform.scale = glm::vec3(1.0f);
+    scan_object.transform.scale = glm::vec3(3.0f);
+    scan_object.transform.position.y += 10;
 
-    // voxelizator.voxelize_and_submit(
-    //     blue_voxelize_prefab,
-    //     scan_object.mesh_view(),
-    //     offsetof(PBRVertex, position),
-    //     sizeof(PBRVertex),
-    //     scan_object.transform.get_model_matrix(),
-    //     &voxel_grid.local_voxel_write_list()
-    // );
+    voxelizator.voxelize_and_submit(
+        blue_voxelize_prefab,
+        scan_object.mesh_view(),
+        offsetof(PBRVertex, position),
+        sizeof(PBRVertex),
+        scan_object.transform.get_model_matrix(),
+        &voxel_grid.local_voxel_write_list()
+    );
 
     
 
