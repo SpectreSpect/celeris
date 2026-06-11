@@ -263,7 +263,6 @@ int main() {
     engine.compute_submit(compute_command_buffer, &compute_fence);
     compute_fence.wait();
 
-
     uint32_t max_write_count = 100000;
     VulkanBuffer voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * max_write_count);
 
@@ -338,7 +337,7 @@ int main() {
 
     line_cloud.set_material_data(LineMaterialData{
         .color = glm::vec4(245.0f, 176.0f, 66.0f, 255.0f) * glm::vec4(1/255.0f),
-        .line_width_pixels = 20
+        .line_width_pixels = 10
     });
     line_cloud.sync_material();
 
