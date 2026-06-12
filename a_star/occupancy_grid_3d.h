@@ -10,15 +10,22 @@ class OccupancyGrid3D {
 public:
     _XCLASS_NAME(OccupancyGrid3D);
 
+    enum GroundAdjustingState {
+        FOUND_GROUND,
+        OVER_PRECIPICE,
+        TOO_HIGH,
+        TOO_LOW
+    };
+
     OccupancyGrid3D(VoxelGrid& voxel_grid);
 
     static glm::ivec3 floor_pos(const glm::vec3& p);
     static std::vector<glm::ivec3> line_intersects(glm::vec3 pos1, glm::vec3 pos2);
     bool is_solid(glm::ivec3 pos);
-    bool adjust_to_ground(std::vector<glm::vec3>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1, bool allow_flying_over_precepices = true);
-    bool adjust_to_ground(std::vector<glm::ivec3>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1, bool allow_flying_over_precepices = true);
-    bool adjust_to_ground(std::vector<NonholonomicPos>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1, bool allow_flying_over_precepices = true);
-    bool adjust_to_ground(glm::vec3& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1, bool allow_flying_over_precepices = true);
+    GroundAdjustingState adjust_to_ground(std::vector<glm::vec3>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1);
+    GroundAdjustingState adjust_to_ground(std::vector<glm::ivec3>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1);
+    GroundAdjustingState adjust_to_ground(std::vector<NonholonomicPos>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1);
+    GroundAdjustingState adjust_to_ground(glm::vec3& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1);
     bool get_closest_invisible_top_pos(glm::ivec3 pos, glm::ivec3 &result, int scan_height);
     bool get_closest_visible_bottom_pos(glm::ivec3 pos, glm::ivec3 &result, int max_drop);
     bool get_ground_positions(glm::vec3 pos1, glm::vec3 pos2, std::vector<glm::ivec3>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1);
@@ -27,20 +34,24 @@ public:
     std::vector<glm::ivec3> line_intersects_xz(glm::vec3 pos1, glm::vec3 pos2);
 
     template <class T, class GetPos, class SetPos>
-    bool adjust_to_ground_range(T* begin, T* end,
-                                        GetPos get_pos, SetPos set_pos,
-                                        int max_step_up, int max_drop, int max_y_diff, bool allow_flying_over_precepices = true)
+    GroundAdjustingState adjust_to_ground_range(T* begin, T* end,
+                                                GetPos get_pos, SetPos set_pos,
+                                                int max_step_up, int max_drop, int max_y_diff)
     {
-        if (begin == end) return true; 
+        if (begin == end) return FOUND_GROUND; 
 
         float last_y = get_pos(*begin).y;
+        GroundAdjustingState result = FOUND_GROUND;
 
         for (auto* it = begin; it != end; ++it) {
             glm::vec3 p = get_pos(*it);
             p.y = last_y;
 
-            if (!adjust_to_ground(p, max_step_up, max_drop, max_y_diff, allow_flying_over_precepices))
-                return false;
+            GroundAdjustingState state = adjust_to_ground(p, max_step_up, max_drop, max_y_diff);
+            if (state == TOO_HIGH || state == TOO_LOW)
+                return state;
+            if (state == OVER_PRECIPICE)
+                result = OVER_PRECIPICE;
 
             // if (max_y_diff >= 0 && std::abs(get_pos(*it).y - p.y) > max_y_diff)
             //     return false;
@@ -48,7 +59,7 @@ public:
             set_pos(*it, p);
             last_y = p.y;
         }
-        return true;
+        return result;
     }
     
     // template <class It, class GetPos, class Fn>

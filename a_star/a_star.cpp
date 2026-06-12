@@ -162,7 +162,7 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
 
                 glm::vec3 new_pos = glm::vec3(nx, ny, nz);
 
-                if (!m_grid.adjust_to_ground(new_pos, max_step_up, max_drop, max_y_diff, -1))
+                if (m_grid.adjust_to_ground(new_pos, max_step_up, max_drop, max_y_diff) != OccupancyGrid3D::FOUND_GROUND)
                     continue;
 
                 uint64_t new_key = math_utils::pack_key(new_pos.x, new_pos.y, new_pos.z);

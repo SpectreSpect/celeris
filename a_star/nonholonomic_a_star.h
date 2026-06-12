@@ -170,6 +170,7 @@ public:
     bool use_reed_shepps_fallback = false;
     bool force_reeds_shepp_shot = false;
     bool allow_flying_over_precipices = true;
+    bool connect_to_goal_once_over_precipice = true;
     uint64_t state_counter = 0;
     int iteration_limit = 10000;
     bool track_explored_paths = true;

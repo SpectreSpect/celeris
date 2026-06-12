@@ -21,7 +21,6 @@ public:
     const int max_y_diff = 1;
     const int limit = 20000;
     bool allow_diagonal_moves = false;
-    bool allow_flying_over_precepices = true;
 
     
     // AStar();
