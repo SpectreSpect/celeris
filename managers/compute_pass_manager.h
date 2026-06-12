@@ -71,6 +71,7 @@ public:
     ComputePass alloc_active_chunk_triangles_cp;
     ComputePass fill_triangle_indices_cp;
     ComputePass mark_and_count_active_chunks_cp;
+    ComputePass mark_and_count_fail_slots_cp;
     ComputePass reset_voxelize_pipeline_cp;
     ComputePass voxelize_triangles_cp;
 
@@ -148,6 +149,7 @@ public:
     ComputePass create_alloc_active_chunk_triangles_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_fill_triangle_indices_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_mark_and_count_active_chunks_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_mark_and_count_fail_slots_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_reset_voxelize_pipeline_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_voxelize_triangles_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 

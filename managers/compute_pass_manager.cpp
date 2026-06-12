@@ -62,6 +62,7 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         alloc_active_chunk_triangles_cp(create_alloc_active_chunk_triangles_compute_pass(device, shader_manager.alloc_active_chunk_triangles_cs)),
         fill_triangle_indices_cp(create_fill_triangle_indices_compute_pass(device, shader_manager.fill_triangle_indices_cs)),
         mark_and_count_active_chunks_cp(create_mark_and_count_active_chunks_compute_pass(device, shader_manager.mark_and_count_active_chunks_cs)),
+        mark_and_count_fail_slots_cp(create_mark_and_count_fail_slots_compute_pass(device, shader_manager.mark_and_count_fail_slots_cs)),
         reset_voxelize_pipeline_cp(create_reset_voxelize_pipeline_compute_pass(device, shader_manager.reset_voxelize_pipeline_cs)),
         voxelize_triangles_cp(create_voxelize_triangles_compute_pass(device, shader_manager.voxelize_triangles_cs)),
 
@@ -762,6 +763,23 @@ ComputePass ComputePassManager::create_mark_and_count_active_chunks_compute_pass
     builder.add_storage_buffer(4, ShaderStages::compute); // EBO
 
     builder.add_push_constantsf(sizeof(MarkAndCountActiveChunksPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_mark_and_count_fail_slots_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.set_descriptor_set_flags(VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // CounterHashTable
+    builder.add_storage_buffer(1, ShaderStages::compute); // ReadableCounterHashTableFailureSlots
+    builder.add_storage_buffer(2, ShaderStages::compute); // WritableCounterHashTableFailureSlots
+    builder.add_storage_buffer(3, ShaderStages::compute); // ActiveChunkKeysList
+
+    builder.add_push_constantsf(sizeof(MarkAndCountFailSlotsPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }

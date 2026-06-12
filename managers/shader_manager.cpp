@@ -73,6 +73,7 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         alloc_active_chunk_triangles_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "alloc_active_chunk_triangles.comp.spv"),
         fill_triangle_indices_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "fill_triangle_indices.comp.spv"),
         mark_and_count_active_chunks_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "mark_and_count_active_chunks.comp.spv"),
+        mark_and_count_fail_slots_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "mark_and_count_fail_slots.comp.spv"),
         reset_voxelize_pipeline_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "reset_voxelize_pipeline.comp.spv"),
         voxelize_triangles_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "voxelize_triangles.comp.spv"),
 
