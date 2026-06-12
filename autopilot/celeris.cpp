@@ -114,12 +114,20 @@ void Celeris::find_path() {
     m_planner.find_nonholomic_path(); // state_explored_paths
 }
 
+void Celeris::set_start(const NonholonomicPos& position) {
+    m_start_position = position;
+}
+
 void Celeris::set_goal(const NonholonomicPos& position) {
     m_goal_position = position;
 }
 
 LidarScan* Celeris::network_scan() {
     return m_network_scan.get();
+}
+
+NonholonomicPos Celeris::start_position() const noexcept {
+    return m_start_position;
 }
 
 NonholonomicPos Celeris::goal_position() const noexcept {
