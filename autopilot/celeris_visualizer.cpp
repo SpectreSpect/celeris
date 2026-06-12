@@ -69,6 +69,10 @@ void CelerisVisualizer::update() {
 
     logger.check(m_celeris, "Celeris was null");
 
+    set_start(m_celeris->start_position());
+    set_goal(m_celeris->goal_position());
+    m_path_line_cloud.set_lines(make_path_lines(m_celeris->planner().state_path));
+
     if (scan_generation != m_celeris->received_scan_count()) {
         scan_generation = m_celeris->received_scan_count();
 

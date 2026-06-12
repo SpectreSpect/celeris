@@ -162,7 +162,20 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
 
                 glm::vec3 new_pos = glm::vec3(nx, ny, nz);
 
-                if (m_grid.adjust_to_ground(new_pos, max_step_up, max_drop, max_y_diff) != OccupancyGrid3D::FOUND_GROUND)
+                OccupancyGrid3D::GroundAdjustingState state = m_grid.adjust_to_ground(new_pos, max_step_up, max_drop, max_y_diff);
+
+                // if (state == OccupancyGrid3D::OVER_PRECIPICE) {
+                //     PlainAstarData data = reconstruct_path(closed_heap, cur_cell.pos);
+                    
+                //     float dist_to_end = data.dist_to_end.back() + glm::distance((glm::vec3)end_pos, (glm::vec3)cur_cell.pos);
+                //     data.dist_to_end.push_back(dist_to_end);
+            
+                //     data.path.push_back(end_pos);
+                //     return data;
+                // }
+
+
+                if (state != OccupancyGrid3D::FOUND_GROUND)
                     continue;
 
                 uint64_t new_key = math_utils::pack_key(new_pos.x, new_pos.y, new_pos.z);

@@ -984,15 +984,15 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
         return true;
     }
 
-    if (use_reed_shepps_fallback || force_reeds_shepp_shot)
-        if (state_counter % try_reeds_shepp_interval == 0 || force_reeds_shepp_shot) {
-            force_reeds_shepp_shot = false;
-            bool status = try_finish_with_reeds_shepp(cur_cell.pos, state_end_pos);
-            if (status) {
-                std::cout << "4. Reeds-shepp shot succeeded" << std::endl;
-                return true;
-            }
-        }
+    // if (use_reed_shepps_fallback || force_reeds_shepp_shot)
+    //     if (state_counter % try_reeds_shepp_interval == 0 || force_reeds_shepp_shot) {
+    //         force_reeds_shepp_shot = false;
+    //         bool status = try_finish_with_reeds_shepp(cur_cell.pos, state_end_pos);
+    //         if (status) {
+    //             std::cout << "4. Reeds-shepp shot succeeded" << std::endl;
+    //             return true;
+    //         }
+    //     }
     
     for (int dir = -1; dir <= 1; dir += 2)
         for (int steer = -1; steer <= 1; steer++) {
