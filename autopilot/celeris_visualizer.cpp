@@ -38,7 +38,7 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
                    max_path_line_count) {
     m_path_line_cloud.set_material_data(LineMaterialData{
         .color = glm::vec4(1, 1, 1, 1),
-        .line_width_pixels = 2
+        .line_width_pixels = 5
     });
     
     add_child(m_start_marker);
@@ -69,15 +69,19 @@ void CelerisVisualizer::update() {
 
     logger.check(m_celeris, "Celeris was null");
 
-    if (scan_generation != m_celeris->received_scan_count()) {
-        scan_generation = m_celeris->received_scan_count();
+    set_start(m_celeris->start_position());
+    set_goal(m_celeris->goal_position());
+    m_path_line_cloud.set_lines(make_path_lines(m_celeris->planner().state_path));
 
-        if (m_celeris->network_scan()) {
-            set_start(m_celeris->network_scan()->point_cloud().transform);
-            set_goal(m_celeris->goal_position());
-            m_path_line_cloud.set_lines(make_path_lines(m_celeris->planner().state_path));
-        }
-    }
+    // if (scan_generation != m_celeris->received_scan_count()) {
+    //     scan_generation = m_celeris->received_scan_count();
+
+    //     if (m_celeris->network_scan()) {
+    //         set_start(m_celeris->network_scan()->point_cloud().transform);
+    //         set_goal(m_celeris->goal_position());
+    //         m_path_line_cloud.set_lines(make_path_lines(m_celeris->planner().state_path));
+    //     }
+    // }
 }
 
 void CelerisVisualizer::set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position) {

@@ -37,10 +37,14 @@ public:
     void update();
 
     void find_path();
+    void set_start(const NonholonomicPos& position);
     void set_goal(const NonholonomicPos& position);
-
+    
     LidarScan* network_scan();
+
+    NonholonomicPos start_position() const noexcept;
     NonholonomicPos goal_position() const noexcept;
+
     NonholonomicAStar& planner();
     uint32_t received_scan_count() const noexcept;
 

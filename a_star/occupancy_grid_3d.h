@@ -6,16 +6,11 @@
 #include "a_star_structures.h"
 #include "../vulkan_self/logger/logger_header.h"
 
+#include "a_star_structures.h"
+
 class OccupancyGrid3D {
 public:
     _XCLASS_NAME(OccupancyGrid3D);
-
-    enum GroundAdjustingState {
-        FOUND_GROUND,
-        OVER_PRECIPICE,
-        TOO_HIGH,
-        TOO_LOW
-    };
 
     OccupancyGrid3D(VoxelGrid& voxel_grid);
 

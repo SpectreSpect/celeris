@@ -370,7 +370,7 @@ bool NonholonomicAStar::adjust_and_check_path(std::vector<NonholonomicPos>& path
     if (path.size() > 0)
     for (int i = 0; i < path.size(); i++) {
         glm::vec3 voxel_pos = glm::vec3(glm::floor(path[i].pos));
-        if (m_grid.adjust_to_ground(voxel_pos, max_step_up, max_drop, max_y_diff) != OccupancyGrid3D::FOUND_GROUND) {
+        if (m_grid.adjust_to_ground(voxel_pos, max_step_up, max_drop, max_y_diff) != GroundAdjustingState::FOUND_GROUND) {
             return false;
         }
             
@@ -914,10 +914,10 @@ bool NonholonomicAStar::try_reeds_shepp_shot(NonholonomicPos& start, Nonholonomi
     if (out_path.empty())
         return false;
 
-    OccupancyGrid3D::GroundAdjustingState ground_state =
+    GroundAdjustingState ground_state =
         m_grid.adjust_to_ground(out_path, max_step_up, max_drop, max_y_diff);
-    if (ground_state != OccupancyGrid3D::FOUND_GROUND
-        && !(allow_flying_over_precipices && ground_state == OccupancyGrid3D::OVER_PRECIPICE))
+    if (ground_state != GroundAdjustingState::FOUND_GROUND
+        && !(allow_flying_over_precipices && ground_state == GroundAdjustingState::OVER_PRECIPICE))
         return false;
 
     // if (!crosses_extreme_curvature(out_path, curvature_limit))
@@ -1007,10 +1007,14 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
             std::vector<NonholonomicPos> simplified_motion = {motion[0], motion[motion.size() - 1]};
 
             auto adjust_to_ground_start = std::chrono::steady_clock::now();
-            OccupancyGrid3D::GroundAdjustingState ground_state =
+            GroundAdjustingState ground_state =
                 m_grid.adjust_to_ground(simplified_motion, max_step_up, max_drop, max_y_diff);
-            if (ground_state != OccupancyGrid3D::FOUND_GROUND
-                && !(allow_flying_over_precipices && ground_state == OccupancyGrid3D::OVER_PRECIPICE)) {
+
+            if (ground_state == GroundAdjustingState::OVER_PRECIPICE)
+                std::cout << "AA" << std::endl;
+            
+            if (ground_state != GroundAdjustingState::FOUND_GROUND
+                && !(allow_flying_over_precipices && ground_state == GroundAdjustingState::OVER_PRECIPICE)) {
                 continue;
             }
                 

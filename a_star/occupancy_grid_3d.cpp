@@ -266,7 +266,7 @@ std::vector<glm::ivec3> OccupancyGrid3D::line_intersects_xz(glm::vec3 pos1, glm:
     return out;
 }
 
-OccupancyGrid3D::GroundAdjustingState OccupancyGrid3D::adjust_to_ground(std::vector<glm::vec3>& output, int max_step_up, int max_drop, int max_y_diff) {
+GroundAdjustingState OccupancyGrid3D::adjust_to_ground(std::vector<glm::vec3>& output, int max_step_up, int max_drop, int max_y_diff) {
     GroundAdjustingState state = adjust_to_ground_range(output.data(), 
                                                         output.data() + output.size(), 
                                                         [](const glm::vec3& s){ return s;},
@@ -292,7 +292,7 @@ OccupancyGrid3D::GroundAdjustingState OccupancyGrid3D::adjust_to_ground(std::vec
     return state;
 }
 
-OccupancyGrid3D::GroundAdjustingState OccupancyGrid3D::adjust_to_ground(std::vector<glm::ivec3>& output, int max_step_up, int max_drop, int max_y_diff) {
+GroundAdjustingState OccupancyGrid3D::adjust_to_ground(std::vector<glm::ivec3>& output, int max_step_up, int max_drop, int max_y_diff) {
     GroundAdjustingState state = adjust_to_ground_range(output.data(), 
                                                         output.data() + output.size(), 
                                                         [](const glm::ivec3& s){ return (glm::vec3)s;},
@@ -316,7 +316,7 @@ OccupancyGrid3D::GroundAdjustingState OccupancyGrid3D::adjust_to_ground(std::vec
     return state;
 }
 
-OccupancyGrid3D::GroundAdjustingState OccupancyGrid3D::adjust_to_ground(std::vector<NonholonomicPos>& output, int max_step_up, int max_drop, int max_y_diff) {
+GroundAdjustingState OccupancyGrid3D::adjust_to_ground(std::vector<NonholonomicPos>& output, int max_step_up, int max_drop, int max_y_diff) {
     GroundAdjustingState state = adjust_to_ground_range(output.data(), 
                                                         output.data() + output.size(), 
                                                         [](const NonholonomicPos& s){ return (glm::vec3)s.pos;},
@@ -325,7 +325,7 @@ OccupancyGrid3D::GroundAdjustingState OccupancyGrid3D::adjust_to_ground(std::vec
     return state;
 }
 
-OccupancyGrid3D::GroundAdjustingState OccupancyGrid3D::adjust_to_ground(glm::vec3& output, int max_step_up, int max_drop, int max_y_diff) {
+GroundAdjustingState OccupancyGrid3D::adjust_to_ground(glm::vec3& output, int max_step_up, int max_drop, int max_y_diff) {
     glm::ivec3 norm_pos = glm::ivec3(glm::floor(output));
     glm::ivec3 result_pos = norm_pos;
 

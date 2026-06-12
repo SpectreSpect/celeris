@@ -10,8 +10,11 @@ float AStar::get_heuristic(glm::ivec3 a, glm::ivec3 b) {
     return glm::distance(glm::vec3(a), glm::vec3(b));
 }
 
-PlainAstarData AStar::reconstruct_path(std::unordered_map<uint64_t, AStarCell> closed_heap, glm::ivec3 pos) {
+PlainAstarData AStar::reconstruct_path(std::unordered_map<uint64_t, AStarCell> closed_heap, 
+                                       glm::ivec3 pos, 
+                                       GroundAdjustingState last_point_state) {
     PlainAstarData plain_astar_data;
+    plain_astar_data.last_point_state = last_point_state;
     // plain_astar_data.path.push_back(pos);
     glm::ivec3 cur_pos = pos;
     float dist_to_end = 0;
@@ -161,8 +164,16 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
                 int nz = dz + cur_cell.pos.z;
 
                 glm::vec3 new_pos = glm::vec3(nx, ny, nz);
+                
+                GroundAdjustingState state = m_grid.adjust_to_ground(new_pos, max_step_up, max_drop, max_y_diff);
 
-                if (m_grid.adjust_to_ground(new_pos, max_step_up, max_drop, max_y_diff) != OccupancyGrid3D::FOUND_GROUND)
+                if (connect_to_goal_when_over_precipice && state == GroundAdjustingState::OVER_PRECIPICE) {
+                    end_pos = cur_cell.pos;
+                    return reconstruct_path(closed_heap, end_pos, state);
+                }
+                
+
+                if (state != GroundAdjustingState::FOUND_GROUND)
                     continue;
 
                 uint64_t new_key = math_utils::pack_key(new_pos.x, new_pos.y, new_pos.z);

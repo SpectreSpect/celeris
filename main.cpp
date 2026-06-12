@@ -71,6 +71,7 @@
 #include "autopilot/celeris_visualizer.h"
 
 #include <cmath>
+#include <optional>
 #include <vector>
 #include <random>
 
@@ -320,6 +321,40 @@ int main() {
         }
     };
 
+    auto make_pose_from_camera = [&]() -> std::optional<NonholonomicPos> {
+        glm::vec3 horizontal_front(camera.front.x, 0.0f, camera.front.z);
+        if (glm::dot(horizontal_front, horizontal_front) == 0.0f)
+            return std::nullopt;
+
+        NonholonomicPos pose;
+        pose.pos = camera.position;
+        pose.theta = std::atan2(horizontal_front.z, horizontal_front.x);
+
+        GroundAdjustingState ground_state =
+            celeris.planner().occupancy_grid().adjust_to_ground(pose.pos);
+        if (ground_state != GroundAdjustingState::FOUND_GROUND)
+            return std::nullopt;
+
+        pose.pos += glm::vec3(0.0f, 0.5f, 0.0f);
+        return pose;
+    };
+
+    auto place_start = [&]() {
+        if (auto pose = make_pose_from_camera()) {
+            celeris.set_start(*pose);
+            has_start_pos = true;
+            has_planned_path = false;
+        }
+    };
+
+    auto place_end = [&]() {
+        if (auto pose = make_pose_from_camera()) {
+            celeris.set_goal(*pose);
+            has_end_pos = true;
+            has_planned_path = false;
+        }
+    };
+
     vox_box.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
 
     Scene scene;
@@ -382,6 +417,7 @@ int main() {
 
         if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
             place_start_pressed = true;
+            place_start();
         }
 
         if (place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_RELEASE) {
@@ -390,6 +426,7 @@ int main() {
 
         if (!place_end_pressed && glfwGetKey(window.handle(), GLFW_KEY_2) == GLFW_PRESS) {
             place_end_pressed = true;
+            place_end();
         }
 
         if (place_end_pressed && glfwGetKey(window.handle(), GLFW_KEY_2) == GLFW_RELEASE) {
@@ -464,13 +501,13 @@ int main() {
                 }
 
                 if (ImGui::Button("Place start")) {
-                    // place_start();
+                    place_start();
                 }
                 ImGui::SameLine();
                 ImGui::TextUnformatted("Key: 1");
 
                 if (ImGui::Button("Place end")) {
-                    // place_end();
+                    place_end();
                 }
                 ImGui::SameLine();
                 ImGui::TextUnformatted("Key: 2");

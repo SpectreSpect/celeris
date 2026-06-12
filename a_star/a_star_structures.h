@@ -4,6 +4,13 @@
 #include <vector>
 #include "../renderer/transform.h"
 
+enum GroundAdjustingState {
+        FOUND_GROUND,
+        OVER_PRECIPICE,
+        TOO_HIGH,
+        TOO_LOW
+    };
+
 struct AStarCell {
     float g;
     float f;
@@ -24,6 +31,7 @@ struct ByPriority {
 struct PlainAstarData {
     std::vector<glm::ivec3> path;
     std::vector<float> dist_to_end;
+    GroundAdjustingState last_point_state;
 };
 
 struct NonholonomicPos {
