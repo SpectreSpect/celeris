@@ -223,14 +223,3 @@ static_assert(offsetof(BuildIndirectCmdsUniform, u_vb_page_verts) == 56);
 static_assert(offsetof(BuildIndirectCmdsUniform, u_ib_page_inds) == 60);
 static_assert(offsetof(BuildIndirectCmdsUniform, render_distance) == 64);
 static_assert(sizeof(BuildIndirectCmdsUniform) == 80);
-
-// layout(std430, set = 0, binding=7) buffer UniformBuffer  { 
-//     uint u_vb_pages;
-//     uint u_ib_pages;
-//     uint u_vb_nodes;
-//     uint u_ib_nodes;
-//     uint u_vb_heads_count;
-//     uint u_ib_heads_count;
-//     uint u_max_chunks;
-//     uint pad0;
-// } ubo;

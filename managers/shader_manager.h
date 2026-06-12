@@ -80,6 +80,7 @@ public:
     VulkanShaderModule alloc_active_chunk_triangles_cs;
     VulkanShaderModule fill_triangle_indices_cs;
     VulkanShaderModule mark_and_count_active_chunks_cs;
+    VulkanShaderModule mark_and_count_fail_slots_cs;
     VulkanShaderModule reset_voxelize_pipeline_cs;
     VulkanShaderModule voxelize_triangles_cs;
     

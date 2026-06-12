@@ -301,3 +301,7 @@ struct RemoveNearOriginLidarPointsPushConstants {
     uint32_t point_count;
     float min_distance;
 };
+
+struct MarkAndCountFailSlotsPushConstants {
+    uint32_t u_counter_hash_table_size;
+};

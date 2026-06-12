@@ -150,7 +150,9 @@ int main() {
         .chunk_size = chunk_size,
         .voxel_size = voxel_size,
         .counter_hash_table_size = 1'000'000,
-        .count_voxel_writes = 0 // Будут использоваться те, что внутри voxel_grid
+        .count_hash_table_failure_slots = 1'000'000,
+        .count_voxel_writes = 0, // Будут использоваться те, что внутри voxel_grid
+        .count_hash_table_attempts = 5
     };
 
     Voxelizator voxelizator(
@@ -221,18 +223,16 @@ int main() {
     // RenderObject scan_object(mesh_manager.cube.get_view(), material_instance_manager.pbr);
     scan_object.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
 
-    scan_object.transform.scale = glm::vec3(1.0f);
+    scan_object.transform.scale = glm::vec3(6.0f);
 
-    // voxelizator.voxelize_and_submit(
-    //     blue_voxelize_prefab,
-    //     scan_object.mesh_view(),
-    //     offsetof(PBRVertex, position),
-    //     sizeof(PBRVertex),
-    //     scan_object.transform.get_model_matrix(),
-    //     &voxel_grid.local_voxel_write_list()
-    // );
-
-    
+    voxelizator.voxelize_and_submit(
+        blue_voxelize_prefab,
+        scan_object.mesh_view(),
+        offsetof(PBRVertex, position),
+        sizeof(PBRVertex),
+        scan_object.transform.get_model_matrix(),
+        &voxel_grid.local_voxel_write_list()
+    );
 
     glm::ivec3 block_size = glm::ivec3(1, 5, 5);
     glm::ivec3 block_origin = glm::ivec3(5, 0, 0);
@@ -270,18 +270,18 @@ int main() {
     voxel_grid.update(window, camera);
 
 
-    VoxelGridChunk chunk = voxel_grid.read_chunk(glm::ivec3(0, 0, 0));
-    glm::uvec3 read_chunk_size = chunk.chunk_size();
+    // VoxelGridChunk chunk = voxel_grid.read_chunk(glm::ivec3(0, 0, 0));
+    // glm::uvec3 read_chunk_size = chunk.chunk_size();
 
-    for (int x = 0; x < read_chunk_size.x; x++)
-        for (int y = 0; y < read_chunk_size.y; y++)
-            for (int z = 0; z < read_chunk_size.z; z++) {
-                VoxelDataGPU voxel = chunk.voxel(glm::uvec3(x, y, z));
-                glm::vec4 color = voxel.color_vec4();
+    // for (int x = 0; x < read_chunk_size.x; x++)
+    //     for (int y = 0; y < read_chunk_size.y; y++)
+    //         for (int z = 0; z < read_chunk_size.z; z++) {
+    //             VoxelDataGPU voxel = chunk.voxel(glm::uvec3(x, y, z));
+    //             glm::vec4 color = voxel.color_vec4();
 
-                if (color.x != 0 || color.y != 0 || color.z != 0)
-                    std::cout << "pos: (" << x << ", " << y << ", " << z << ")" << std::endl;
-            }
+    //             if (color.x != 0 || color.y != 0 || color.z != 0)
+    //                 std::cout << "pos: (" << x << ", " << y << ", " << z << ")" << std::endl;
+    //         }
 
 
 
@@ -425,7 +425,7 @@ int main() {
     scene.add(skybox);
     scene.add(sphere);
     // scene.add(lidar_scan);
-    // scene.add(scan_object);
+    scene.add(scan_object);
     // scene.add(voxel_map_point_cloud);
     scene.add(line_cloud);
     

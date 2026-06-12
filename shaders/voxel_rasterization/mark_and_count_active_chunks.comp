@@ -8,9 +8,10 @@ layout(local_size_x = 256) in;
 // -------------------
 
 layout(std430, set = 0, binding=0) coherent buffer CounterHashTable { HashTableCounters counter_hash_table_counters; CounterHashTableSlot counter_hash_table_slots[]; };
-layout(std430, set = 0, binding=1) buffer ActiveChunkKeysList { uint active_chunk_keys_counter; uvec2 active_chunk_keys_list[]; };
-layout(std430, set = 0, binding=2) readonly buffer VBO { float vbo_data[]; };
-layout(std430, set = 0, binding=3) readonly buffer EBO { uint ebo_data[]; };
+layout(std430, set = 0, binding=1) buffer CounterHashTableFailureSlots { uint failure_counter; uvec2 failure_key[]; };
+layout(std430, set = 0, binding=2) buffer ActiveChunkKeysList { uint active_chunk_keys_counter; uvec2 active_chunk_keys_list[]; };
+layout(std430, set = 0, binding=3) readonly buffer VBO { float vbo_data[]; };
+layout(std430, set = 0, binding=4) readonly buffer EBO { uint ebo_data[]; };
 
 layout(push_constant) uniform MarkAndCountActiveChunksPushConstants {
     vec4 u_voxel_size;
@@ -43,7 +44,10 @@ vec4 voxel_index_to_position(uint voxel_id) {
 }
 
 void main() {
+    // if (gl_GlobalInvocationID.x != 0) return;
+
     uint triangle_id = gl_GlobalInvocationID.x;
+    // for (uint triangle_id = 0; triangle_id < u_count_mesh_triangles; triangle_id++) {
     if (triangle_id >= u_count_mesh_triangles) return;
 
     uint vi0 = ebo_data[triangle_id*3u + 0u];
@@ -62,6 +66,13 @@ void main() {
     ivec3 min_p = min(p0, min(p1, p2));
     ivec3 max_p = max(p0, max(p1, p2));
 
+    ivec3 extent = max_p - min_p + ivec3(1);
+    uint touched = uint(extent.x) * uint(extent.y) * uint(extent.z);
+    if (extent.x <= 0 || extent.y <= 0 || extent.z <= 0 || touched > 1024u) {
+        return;
+    }
+
+    uint idx = 0;
     for (int x = min_p.x; x <= max_p.x; x++)
     for (int y = min_p.y; y <= max_p.y; y++)
     for (int z = min_p.z; z <= max_p.z; z++) {
@@ -69,7 +80,11 @@ void main() {
 
         uint slot_id;
         bool created;
-        if (!counter_hash_table_get_or_create_slot(key, slot_id, created)) continue;
+        if (!counter_hash_table_get_or_create_slot(key, slot_id, created)) {
+            uint failure_slot_id = atomicAdd(failure_counter, 1u);
+            failure_key[failure_slot_id] = key;
+            continue;
+        }
 
         if (created) {
             uint active_chunk_key_idx = atomicAdd(active_chunk_keys_counter, 1u);
@@ -77,5 +92,8 @@ void main() {
         }
 
         atomicAdd(counter_hash_table_slots[slot_id].value.count_triangles, 1u);
+
+        idx++;
     }
+    // }
 }
