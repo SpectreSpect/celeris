@@ -756,9 +756,10 @@ ComputePass ComputePassManager::create_mark_and_count_active_chunks_compute_pass
     ComputePassBuilder builder;
 
     builder.add_storage_buffer(0, ShaderStages::compute); // CounterHashTable
-    builder.add_storage_buffer(1, ShaderStages::compute); // ActiveChunkKeysList
-    builder.add_storage_buffer(2, ShaderStages::compute); // VBO
-    builder.add_storage_buffer(3, ShaderStages::compute); // EBO
+    builder.add_storage_buffer(1, ShaderStages::compute); // CounterHashTableFailureSlots
+    builder.add_storage_buffer(2, ShaderStages::compute); // ActiveChunkKeysList
+    builder.add_storage_buffer(3, ShaderStages::compute); // VBO
+    builder.add_storage_buffer(4, ShaderStages::compute); // EBO
 
     builder.add_push_constantsf(sizeof(MarkAndCountActiveChunksPushConstants), ShaderStages::compute);
 

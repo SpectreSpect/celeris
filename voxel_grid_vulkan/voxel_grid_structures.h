@@ -234,3 +234,12 @@ static_assert(sizeof(BuildIndirectCmdsUniform) == 80);
 //     uint u_max_chunks;
 //     uint pad0;
 // } ubo;
+
+struct CounterHashTableFailureSlot {
+    uint64_t key;
+    uint32_t invocation_id;
+    uint32_t pad0_;
+};
+
+static_assert(alignof(CounterHashTableFailureSlot) == 8);
+static_assert(sizeof(CounterHashTableFailureSlot) == 16);

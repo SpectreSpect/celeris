@@ -16,8 +16,6 @@ struct CounterHashTableFailureSlot {
 layout(std430, set = 0, binding=0) coherent buffer CounterHashTable { HashTableCounters counter_hash_table_counters; CounterHashTableSlot counter_hash_table_slots[]; };
 layout(std430, set = 0, binding=1) buffer CounterHashTableFailureSlots { uint counter_hash_table_failure_slots_counter; uint pad0_; CounterHashTableFailureSlot counter_hash_table_failure_slots[]; };
 layout(std430, set = 0, binding=2) buffer ActiveChunkKeysList { uint active_chunk_keys_counter; uvec2 active_chunk_keys_list[]; };
-layout(std430, set = 0, binding=3) readonly buffer VBO { float vbo_data[]; };
-layout(std430, set = 0, binding=4) readonly buffer EBO { uint ebo_data[]; };
 
 layout(push_constant) uniform MarkAndCountActiveChunksPushConstants {
     vec4 u_voxel_size;

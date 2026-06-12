@@ -38,6 +38,7 @@ Voxelizator::VoxelizatorBuffers Voxelizator::create_buffers(
     VkDeviceSize active_chunk_keys_list_size = sizeof(uint64_t) * (m_params.counter_hash_table_size + 1u);
     VkDeviceSize triangle_indices_list_size = sizeof(uint32_t) * (m_params.counter_hash_table_size + 1u);
     VkDeviceSize voxel_writes_size = sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * m_params.count_voxel_writes;
+    VkDeviceSize counter_hash_table_failure_slots_size = sizeof(uint32_t) * 2 + sizeof(CounterHashTableFailureSlot) * m_params.count_hash_table_failure_slots;
 
     VulkanBuffer triangle_indices_list = VulkanBuffer(
         physical_device,
@@ -58,9 +59,17 @@ Voxelizator::VoxelizatorBuffers Voxelizator::create_buffers(
     return VoxelizatorBuffers{
         .dispatch_args = VulkanBuffer::create_host_visible_indirect_storage_buffer(physical_device, device, dispatch_args_size),
         .counter_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, counter_hash_table_size),
+        // .counter_hash_table_failure_keys = VulkanBuffer::create_storage_buffer(physical_device, device, counter_hash_table_failure_keys_size),
+        .counter_hash_table_failure_slots = VulkanBuffer(
+            physical_device,
+            device,
+            counter_hash_table_failure_slots_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        ),
         .active_chunk_keys_list = VulkanBuffer::create_storage_buffer(physical_device, device, active_chunk_keys_list_size),
         .triangle_indices_list = std::move(triangle_indices_list),
-        .voxel_writes = VulkanBuffer::create_storage_buffer(physical_device, device, voxel_writes_size)
+        .voxel_writes = VulkanBuffer::create_storage_buffer(physical_device, device, voxel_writes_size),
     };
 }
 
@@ -105,8 +114,15 @@ void Voxelizator::voxelize(
     VulkanBuffer* voxel_writes_buffer = out_voxel_writes ? out_voxel_writes : &m_buffers.voxel_writes;
 
     reset_voxelize_pipline(command_buffer, *voxel_writes_buffer, out_voxel_writes == nullptr);
-
+    
+    reset_failure_slots_counter(command_buffer);
     mark_and_count_active_chunks(command_buffer, mesh, position_attribute_offset, vertex_stride, transform);
+
+    for (uint32_t i = 0; i < 10; i++) {
+        m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, BufferDispatchArg(&m_buffers.counter_hash_table_failure_slots, 0));    
+        // mark_and_count_fail_slots();
+        reset_failure_slots_counter(command_buffer);
+    }
 
     m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, BufferDispatchArg(&m_buffers.active_chunk_keys_list, 0));
     alloc_active_chunk_triangles(command_buffer, m_buffers.dispatch_args);
@@ -192,6 +208,12 @@ void Voxelizator::reset_voxelize_pipline(VulkanCommandBuffer& command_buffer, Vu
     voxel_writes.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
+void Voxelizator::reset_failure_slots_counter(VulkanCommandBuffer& command_buffer) {
+    LOG_METHOD();
+    m_buffers.counter_hash_table_failure_slots.fill(command_buffer, 0, sizeof(uint32_t));
+    m_buffers.counter_hash_table_failure_slots.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+}
+
 void Voxelizator::mark_and_count_active_chunks(
     VulkanCommandBuffer& command_buffer,
     MeshView mesh,
@@ -202,9 +224,10 @@ void Voxelizator::mark_and_count_active_chunks(
     LOG_METHOD();
 
     m_pass_instances.mark_and_count_active_chunks_pi.set_storage_buffer(0, m_buffers.counter_hash_table);
-    m_pass_instances.mark_and_count_active_chunks_pi.set_storage_buffer(1, m_buffers.active_chunk_keys_list);
-    m_pass_instances.mark_and_count_active_chunks_pi.set_storage_buffer(2, mesh.vertex_buffer_view().handle());
-    m_pass_instances.mark_and_count_active_chunks_pi.set_storage_buffer(3, mesh.index_buffer_view().handle());
+    m_pass_instances.mark_and_count_active_chunks_pi.set_storage_buffer(1, m_buffers.counter_hash_table_failure_slots);
+    m_pass_instances.mark_and_count_active_chunks_pi.set_storage_buffer(2, m_buffers.active_chunk_keys_list);
+    m_pass_instances.mark_and_count_active_chunks_pi.set_storage_buffer(3, mesh.vertex_buffer_view().handle());
+    m_pass_instances.mark_and_count_active_chunks_pi.set_storage_buffer(4, mesh.index_buffer_view().handle());
 
     m_pass_instances.mark_and_count_active_chunks_pi.bind(command_buffer);
 

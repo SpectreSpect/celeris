@@ -1,4 +1,4 @@
-#include "hash_table_decl.inc"
+#include "../../common/hash_table/hash_table_decl.inc"
 
 bool HASH_TABLE_PREFIX(get_or_create_slot)(SLOT_KEY_TYPE key, out uint out_slot_id, out bool created) {
     uint idx = KEY_HASH_FUNC(key) % HASH_TABLE_SIZE;
@@ -8,7 +8,10 @@ bool HASH_TABLE_PREFIX(get_or_create_slot)(SLOT_KEY_TYPE key, out uint out_slot_
     HASH_TABLE_PREFIX(tomb_list_tail_id) = INVALID_ID;
     HASH_TABLE_PREFIX(tomb_list_count_elements) = 0u;
 
+    uint attempt = 0;
     for (uint probe = 0u; probe < MAX_PROBES + 1u;) {
+        if (attempt >= 5) return false;
+        
         uint state = atomicAdd(SLOTS_BUFFER[idx].state, 0u);
 
         if (state == SLOT_EMPTY || probe == MAX_PROBES) {
@@ -26,10 +29,14 @@ bool HASH_TABLE_PREFIX(get_or_create_slot)(SLOT_KEY_TYPE key, out uint out_slot_
                 return false; // Нет ни SLOT_EMPTY, ни SLOT_TOMB в очереди
             }
 
+
             uint prev = atomicCompSwap(SLOTS_BUFFER[idx_to_create].state, slot_state, SLOT_LOCKED);
             if (prev != slot_state) {
                 // кто-то успел — перепроверяем этот же idx
-                if (prev == SLOT_LOCKED) continue;
+                if (prev == SLOT_LOCKED) {
+                    attempt++;
+                    continue;
+                }
 
                 if (slot_state == SLOT_TOMB && prev == SLOT_OCCUPIED) {
                     memoryBarrierBuffer();
@@ -51,6 +58,7 @@ bool HASH_TABLE_PREFIX(get_or_create_slot)(SLOT_KEY_TYPE key, out uint out_slot_
                     last_tomb_id = INVALID_ID;
                 }
 
+                attempt++;
                 continue;
             }
 
@@ -94,7 +102,10 @@ bool HASH_TABLE_PREFIX(get_or_create_slot)(SLOT_KEY_TYPE key, out uint out_slot_
             return true;
         }
 
-        if (state == SLOT_LOCKED) continue;
+        if (state == SLOT_LOCKED) {
+            attempt++;
+            continue;
+        }
 
         if (state == SLOT_TOMB) {
             HASH_TABLE_PREFIX(push_tomb_id)(idx);
@@ -104,6 +115,7 @@ bool HASH_TABLE_PREFIX(get_or_create_slot)(SLOT_KEY_TYPE key, out uint out_slot_
         }
 
         if (state == SLOT_OCCUPIED) {
+            memoryBarrierBuffer();
             // uint prev = atomicCompSwap(SLOTS_BUFFER[idx].state, SLOT_OCCUPIED, SLOT_LOCKED);
             // if (prev != SLOT_OCCUPIED) continue;
 
