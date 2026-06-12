@@ -7,15 +7,9 @@ layout(local_size_x = 256) in;
 #include "../common/buffer_structures.inc"
 // -------------------
 
-struct CounterHashTableFailureSlot {
-    uvec2 key;
-    uint invocation_id;
-    uint pad0_;
-};
-
 layout(std430, set = 0, binding=0) coherent buffer CounterHashTable { HashTableCounters counter_hash_table_counters; CounterHashTableSlot counter_hash_table_slots[]; };
-layout(std430, set = 0, binding=1) readonly buffer ReadableCounterHashTableFailureSlots { uint counter_hash_table_failure_slots_counter_readable; uint rpad0_; CounterHashTableFailureSlot counter_hash_table_failure_slots_readable[]; };
-layout(std430, set = 0, binding=2) buffer WritableCounterHashTableFailureSlots { uint counter_hash_table_failure_slots_counter_writable; uint wpad0_; CounterHashTableFailureSlot counter_hash_table_failure_slots_writable[]; };
+layout(std430, set = 0, binding=1) readonly buffer ReadableCounterHashTableFailureSlots { uint readable_failure_counter; uvec2 readable_failure_key[]; };
+layout(std430, set = 0, binding=2) buffer WritableCounterHashTableFailureSlots { uint writable_failure_counter; uvec2 writable_failure_key[]; };
 layout(std430, set = 0, binding=3) buffer ActiveChunkKeysList { uint active_chunk_keys_counter; uvec2 active_chunk_keys_list[]; };
 
 layout(push_constant) uniform MarkAndCountFailSlotsPushConstants {
@@ -28,22 +22,21 @@ layout(push_constant) uniform MarkAndCountFailSlotsPushConstants {
 
 void main() {
     uint fail_slot_id = gl_GlobalInvocationID.x;
-    if (fail_slot_id >= counter_hash_table_failure_slots_counter_readable) return;
+    if (fail_slot_id >= readable_failure_counter) return;
 
-    CounterHashTableFailureSlot failure_slot = counter_hash_table_failure_slots_readable[fail_slot_id];
+    uvec2 key = readable_failure_key[fail_slot_id];
 
     uint slot_id;
     bool created;
-    if (!counter_hash_table_get_or_create_slot(failure_slot.key, slot_id, created)) {
-        uint failure_slot_id = atomicAdd(counter_hash_table_failure_slots_counter_writable, 1u);
-        counter_hash_table_failure_slots_writable[failure_slot_id].invocation_id = failure_slot.invocation_id;
-        counter_hash_table_failure_slots_writable[failure_slot_id].key = failure_slot.key;
+    if (!counter_hash_table_get_or_create_slot(key, slot_id, created)) {
+        uint failure_slot_id = atomicAdd(writable_failure_counter, 1u);
+        writable_failure_key[failure_slot_id] = key;
         return;
     }
 
     if (created) {
         uint active_chunk_key_idx = atomicAdd(active_chunk_keys_counter, 1u);
-        active_chunk_keys_list[active_chunk_key_idx] = failure_slot.key;
+        active_chunk_keys_list[active_chunk_key_idx] = key;
     }
 
     atomicAdd(counter_hash_table_slots[slot_id].value.count_triangles, 1u);

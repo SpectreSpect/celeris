@@ -7,14 +7,8 @@ layout(local_size_x = 256) in;
 #include "../common/buffer_structures.inc"
 // -------------------
 
-struct CounterHashTableFailureSlot {
-    uvec2 key;
-    uint invocation_id;
-    uint pad0_;
-};
-
 layout(std430, set = 0, binding=0) coherent buffer CounterHashTable { HashTableCounters counter_hash_table_counters; CounterHashTableSlot counter_hash_table_slots[]; };
-layout(std430, set = 0, binding=1) buffer CounterHashTableFailureSlots { uint counter_hash_table_failure_slots_counter; uint pad0_; CounterHashTableFailureSlot counter_hash_table_failure_slots[]; };
+layout(std430, set = 0, binding=1) buffer CounterHashTableFailureSlots { uint failure_counter; uvec2 failure_key[]; };
 layout(std430, set = 0, binding=2) buffer ActiveChunkKeysList { uint active_chunk_keys_counter; uvec2 active_chunk_keys_list[]; };
 layout(std430, set = 0, binding=3) readonly buffer VBO { float vbo_data[]; };
 layout(std430, set = 0, binding=4) readonly buffer EBO { uint ebo_data[]; };
@@ -87,9 +81,8 @@ void main() {
         uint slot_id;
         bool created;
         if (!counter_hash_table_get_or_create_slot(key, slot_id, created)) {
-            uint failure_slot_id = atomicAdd(counter_hash_table_failure_slots_counter, 1u);
-            counter_hash_table_failure_slots[failure_slot_id].invocation_id = triangle_id;
-            counter_hash_table_failure_slots[failure_slot_id].key = key;
+            uint failure_slot_id = atomicAdd(failure_counter, 1u);
+            failure_key[failure_slot_id] = key;
             continue;
         }
 

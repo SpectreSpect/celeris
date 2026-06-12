@@ -29,6 +29,7 @@ public:
         uint32_t counter_hash_table_size;
         uint32_t count_hash_table_failure_slots;
         uint32_t count_voxel_writes;
+        uint32_t count_hash_table_attempts;
     };
 
     typedef VoxelizatorParams VoxelizatorDesc;

@@ -116,28 +116,6 @@ bool HASH_TABLE_PREFIX(get_or_create_slot)(SLOT_KEY_TYPE key, out uint out_slot_
 
         if (state == SLOT_OCCUPIED) {
             memoryBarrierBuffer();
-            // uint prev = atomicCompSwap(SLOTS_BUFFER[idx].state, SLOT_OCCUPIED, SLOT_LOCKED);
-            // if (prev != SLOT_OCCUPIED) continue;
-
-            // memoryBarrierBuffer();
-
-            // SLOT_KEY_TYPE slot_key = SLOTS_BUFFER[idx].key;
-            // atomicExchange(SLOTS_BUFFER[idx].state, SLOT_OCCUPIED);
-
-            // #ifdef KEY_COMP_FUNC
-            //     if (KEY_COMP_FUNC(slot_key, key)) {
-            //         out_slot_id = idx;
-            //         created = false;
-            //         return true;
-            //     }
-            // #else
-            //     if (slot_key == key) {
-            //         out_slot_id = idx;
-            //         created = false;
-            //         return true;
-            //     }
-            // #endif
-
 
             #ifdef KEY_COMP_FUNC
                 if (KEY_COMP_FUNC(SLOTS_BUFFER[idx].key, key)) {

@@ -8,4 +8,5 @@
 #define KEY_HASH_FUNC hash_uvec2
 #define KEY_COMP_FUNC chunk_key_comp
 #define VALUE_INIT_FUNC counter_alloc_meta_init
+#define MAX_CAS_ATTEMPTS 5u
 // #define INIT_SLOT_CALLBACK init_chunk_meta

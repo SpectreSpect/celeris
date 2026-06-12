@@ -151,7 +151,8 @@ int main() {
         .voxel_size = voxel_size,
         .counter_hash_table_size = 1'000'000,
         .count_hash_table_failure_slots = 1'000'000,
-        .count_voxel_writes = 0 // Будут использоваться те, что внутри voxel_grid
+        .count_voxel_writes = 0, // Будут использоваться те, что внутри voxel_grid
+        .count_hash_table_attempts = 5
     };
 
     Voxelizator voxelizator(
@@ -222,7 +223,7 @@ int main() {
     // RenderObject scan_object(mesh_manager.cube.get_view(), material_instance_manager.pbr);
     scan_object.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
 
-    scan_object.transform.scale = glm::vec3(5.0f);
+    scan_object.transform.scale = glm::vec3(6.0f);
 
     voxelizator.voxelize_and_submit(
         blue_voxelize_prefab,

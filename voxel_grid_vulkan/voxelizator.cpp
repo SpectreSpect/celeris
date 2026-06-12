@@ -40,7 +40,7 @@ Voxelizator::VoxelizatorBuffers Voxelizator::create_buffers(
     VkDeviceSize active_chunk_keys_list_size = sizeof(uint64_t) * (m_params.counter_hash_table_size + 1u);
     VkDeviceSize triangle_indices_list_size = sizeof(uint32_t) * (m_params.counter_hash_table_size + 1u);
     VkDeviceSize voxel_writes_size = sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * m_params.count_voxel_writes;
-    VkDeviceSize counter_hash_table_failure_slots_size = sizeof(uint32_t) * 2 + sizeof(CounterHashTableFailureSlot) * m_params.count_hash_table_failure_slots;
+    VkDeviceSize counter_hash_table_failure_slots_size = sizeof(uint32_t) * 2 + sizeof(uint64_t) * m_params.count_hash_table_failure_slots;
 
     VulkanBuffer triangle_indices_list = VulkanBuffer(
         physical_device,
@@ -129,9 +129,13 @@ void Voxelizator::voxelize(
 
     VulkanBuffer* readable_failure_slots_buffer = &m_buffers.counter_hash_table_failure_slots;
     VulkanBuffer* writable_failure_slots_buffer = &m_buffers.counter_hash_table_failure_slots_additional;
-    for (uint32_t i = 0; i < 10; i++) {
+    for (uint32_t attempt = 0; attempt < m_params.count_hash_table_attempts; attempt++) {
         reset_failure_slots_counter(command_buffer, *writable_failure_slots_buffer);
-        m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, BufferDispatchArg(readable_failure_slots_buffer, 0));    
+        m_shader_helper.prepare_dispatch_args(
+            command_buffer,
+            m_buffers.dispatch_args,
+            BufferDispatchArg(readable_failure_slots_buffer, 0)
+        );    
         mark_and_count_fail_slots(
             command_buffer,
             m_buffers.dispatch_args,
@@ -141,7 +145,11 @@ void Voxelizator::voxelize(
         std::swap(readable_failure_slots_buffer, writable_failure_slots_buffer);
     }
 
-    m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, BufferDispatchArg(&m_buffers.active_chunk_keys_list, 0));
+    m_shader_helper.prepare_dispatch_args(
+        command_buffer,
+        m_buffers.dispatch_args,
+        BufferDispatchArg(&m_buffers.active_chunk_keys_list, 0)
+    );
     alloc_active_chunk_triangles(command_buffer, m_buffers.dispatch_args);
 
     fill_triangle_indices(command_buffer, mesh, position_attribute_offset, vertex_stride, transform);
