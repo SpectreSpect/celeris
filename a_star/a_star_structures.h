@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 #include <vector>
+#include "../renderer/transform.h"
 
 struct AStarCell {
     float g;
@@ -32,6 +33,14 @@ struct NonholonomicPos {
 
     float steer = 0;
     float dir = 1;
+
+    void from_transform(const Transform& transform) {
+        glm::quat q = glm::normalize(transform.rotation);
+        glm::vec3 forward = q * glm::vec3(-1.0f, 0.0f, 0.0f);
+        
+        pos = transform.position;
+        theta = std::atan2(forward.z, forward.x);
+    }
 };
 
 struct NonholonomicAStarCell {

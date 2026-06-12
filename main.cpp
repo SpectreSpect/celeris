@@ -275,36 +275,11 @@ int main() {
 
     voxel_grid.update(window, camera);
 
-
-    // VoxelGridChunk chunk = voxel_grid.read_chunk(glm::ivec3(0, 0, 0));
-    // glm::uvec3 read_chunk_size = chunk.chunk_size();
-
-    // for (int x = 0; x < read_chunk_size.x; x++)
-    //     for (int y = 0; y < read_chunk_size.y; y++)
-    //         for (int z = 0; z < read_chunk_size.z; z++) {
-    //             VoxelDataGPU voxel = chunk.voxel(glm::uvec3(x, y, z));
-    //             glm::vec4 color = voxel.color_vec4();
-
-    //             if (color.x != 0 || color.y != 0 || color.z != 0)
-    //                 std::cout << "pos: (" << x << ", " << y << ", " << z << ")" << std::endl;
-    //         }
-
-
     uint32_t max_write_count = 100000;
     VulkanBuffer voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * max_write_count);
 
-    GICPPass gicp_pass(engine, compute_pass_manager);
-    VoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);
-    VoxelMapPointReseter voxel_map_reseter(engine, compute_pass_manager);
-
     Renderer renderer(engine, frame_resources);
     
-    RenderObject sphere(mesh_manager.sphere, material_instance_manager.pbr);
-    RenderObject start_sphere(mesh_manager.sphere, material_instance_manager.pbr);
-    RenderObject end_sphere(mesh_manager.sphere, material_instance_manager.pbr);
-    RenderObject start_direction_sphere(mesh_manager.sphere, material_instance_manager.pbr);
-    RenderObject end_direction_sphere(mesh_manager.sphere, material_instance_manager.pbr);
-
     RenderObject vox_box(mesh_manager.cube, material_instance_manager.pbr);
     vox_box.transform.position = glm::vec3(0.0f, 80.0f, 0.0f);
     vox_box.transform.scale = glm::vec3(20.0f);
@@ -320,291 +295,36 @@ int main() {
         skybox_exposure
     );
 
-    constexpr uint32_t segment_count = 128;
-
-    constexpr float x_start = -10.0f;
-    constexpr float x_end = 10.0f;
-
-    constexpr float amplitude = 2.0f;
-    constexpr float frequency = 1.0f;
-
-    const glm::vec4 color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-
-    // glm::ivec3 start_pos(0, 1, 0);
-    // glm::ivec3 end_pos(10, 1, 0);
-
-    NonholonomicPos start_pos;
-    NonholonomicPos end_pos;
     bool has_start_pos = true;
     bool has_end_pos = true;
     bool has_planned_path = false;
-    std::string path_planning_status = "Place start and end positions.";
 
-    start_pos.pos = glm::vec3(0, 1, 10);
-    start_pos.theta = 3.14f;
-    end_pos.pos = glm::vec3(-170.69, 1.92, -51.30);
-
-    NonholonomicAStar planner(voxel_grid);
-    // OccupancyGrid3D path_placement_grid(voxel_grid);
-    // NonholonomicAStar nonholonomic_astar(voxel_grid);
-
-    constexpr uint32_t max_path_line_count = 20000;
-
-    auto make_pose_from_camera = [&](const Camera& camera, float fallback_theta, NonholonomicPos& out_pose) {
-        NonholonomicPos pose_from_camera;
-        pose_from_camera.pos = camera.position;
-
-        glm::vec2 heading(camera.front.x, camera.front.z);
-        if (glm::length(heading) > 0.0001f) {
-            heading = glm::normalize(heading);
-            pose_from_camera.theta = std::atan2(heading.y, heading.x);
-        } else {
-            pose_from_camera.theta = fallback_theta;
-        }
-
-        if (!planner.occupancy_grid().adjust_to_ground(pose_from_camera.pos))
-            return false;
-
-        out_pose = pose_from_camera;
-        return true;
-    };
-
-    auto make_placeholder_line = []() {
-        return LineInstance{
-            .p0 = glm::vec3(0.0f),
-            .p1 = glm::vec3(0.0f),
-            .color = glm::vec4(0.0f)
-        };
-    };
-
-    auto make_path_lines = [&](const std::vector<NonholonomicPos>& path) {
-        std::vector<LineInstance> path_lines;
-        path_lines.reserve(std::min<size_t>(path.size(), max_path_line_count));
-
-        for (uint32_t i = 1; i < path.size() && path_lines.size() < max_path_line_count; i++) {
-            glm::vec4 line_color = glm::vec4(1, 0, 0, 1);
-            if (path[i].dir == -1)
-                line_color = glm::vec4(0, 0, 1, 1);
-
-            path_lines.push_back(LineInstance{
-                .p0 = path[i - 1].pos + glm::vec3(0, 0.2f, 0),
-                .p1 = path[i].pos + glm::vec3(0, 0.2f, 0),
-                .color = line_color
-            });
-        }
-
-        if (path_lines.empty())
-            path_lines.push_back(make_placeholder_line());
-
-        return path_lines;
-    };
-
-    std::vector<LineInstance> lines = {make_placeholder_line()};
-    lines.reserve(max_path_line_count);
-
-    auto make_point = [](float x) {
-        constexpr float amplitude = 2.0f;
-        constexpr float frequency = 1.0f;
-
-        return glm::vec3(
-            x,
-            0.0f,
-            std::sin(x * frequency) * amplitude
-        );
-    };
-
-    // for (uint32_t i = 0; i < segment_count; i++) {
-    //     float t0 = static_cast<float>(i) / static_cast<float>(segment_count);
-    //     float t1 = static_cast<float>(i + 1) / static_cast<float>(segment_count);
-
-    //     float x0 = glm::mix(x_start, x_end, t0);
-    //     float x1 = glm::mix(x_start, x_end, t1);
-
-    //     lines.push_back(LineInstance{
-    //         .p0 = make_point(x0),
-    //         .p1 = make_point(x1),
-    //         .color = color
-    //     });
-    // }
-
-    LineCloud line_cloud(
-        engine,
-        mesh_manager.line_quad,
-        material_instance_manager.line,
-        max_path_line_count
-    );
-    line_cloud.set_lines(lines);
-
-    line_cloud.set_material_data(LineMaterialData{
-        // .color = glm::vec4(245.0f, 176.0f, 66.0f, 255.0f) * glm::vec4(1/255.0f),
-        .color = glm::vec4(1, 1, 1, 1),
-        .line_width_pixels = 5
-    });
-    line_cloud.sync_material();
-
-    LineCloud explored_path_line_cloud(
-        engine,
-        mesh_manager.line_quad,
-        material_instance_manager.line,
-        max_path_line_count
-    );
-    explored_path_line_cloud.set_lines(lines);
-
-    explored_path_line_cloud.set_material_data(LineMaterialData{
-        // .color = glm::vec4(245.0f, 176.0f, 66.0f, 255.0f) * glm::vec4(1/255.0f),
-        .color = glm::vec4(0, 0, 0, 1),
-        .line_width_pixels = 2
-    });
-    explored_path_line_cloud.sync_material();
-
-    
-    // LidarVideo lidar_video(manager_bundle, 
-    //                        point_cloud_preprocessor,
-    //                        "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 1);
-
-    // Important: save original first frame pose before overwriting it.
-    // glm::vec3 first_position = lidar_video.get_scan(0).point_cloud().transform.position;
-    // glm::quat first_rotation = glm::normalize(lidar_video.get_scan(0).point_cloud().transform.rotation);
-
-    // for (int i = static_cast<int>(lidar_video.get_scan_count()) - 1; i >= 1; --i) {
-    //     glm::vec3 p_prev = lidar_video.get_scan(i - 1).point_cloud().transform.position;
-    //     glm::vec3 p_curr = lidar_video.get_scan(i).point_cloud().transform.position;
-
-    //     glm::quat q_prev = glm::normalize(lidar_video.get_scan(i - 1).point_cloud().transform.rotation);
-    //     glm::quat q_curr = glm::normalize(lidar_video.get_scan(i).point_cloud().transform.rotation);
-
-    //     // Optional: avoid quaternion sign discontinuity.
-    //     // q and -q represent the same rotation.
-    //     if (glm::dot(q_prev, q_curr) < 0.0f) {
-    //         q_curr = -q_curr;
-    //     }
-
-    //     glm::vec3 delta_position = p_curr - p_prev;
-
-    //     // Since your update convention is:
-    //     // q_new = dq * q_old
-    //     glm::quat delta_rotation = glm::normalize(q_curr * glm::inverse(q_prev));
-
-    //     lidar_video.get_scan(i).point_cloud().transform.position = delta_position;
-    //     lidar_video.get_scan(i).point_cloud().transform.rotation = delta_rotation;
-    // }
-
-    // lidar_video.get_scan(0).point_cloud().transform.position = glm::vec3(0.0f);
-    // lidar_video.get_scan(0).point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-
-
-        
-    // point_cloud_preprocessor.get_normals_from_webots_lidar_point_cloud(
-    //     *lidar_video.get_scan(0).point_cloud().instance_buffer(), 
-    //     lidar_video.get_scan(0).normal_buffer(), 
-    //     lidar_video.get_scan(0).point_cloud().point_count());
-
-    auto direction_offset = [](float theta) {
-        return glm::vec3(std::cos(theta), 0.0f, std::sin(theta));
-    };
-
-    auto sync_path_marker_transforms = [&]() {
-        
-
-        start_sphere.transform.position = glm::vec3(start_pos.pos) + glm::vec3(0, 0.5f, 0);
-        end_sphere.transform.position = glm::vec3(end_pos.pos) + glm::vec3(0, 0.5f, 0);
-        start_direction_sphere.transform.position = start_pos.pos + direction_offset(start_pos.theta) * 0.85f + glm::vec3(0, 0.4f, 0);
-        end_direction_sphere.transform.position = end_pos.pos + direction_offset(end_pos.theta) * 0.85f + glm::vec3(0, 0.4f, 0);
-    };
-
-    sync_path_marker_transforms();
-
-    auto place_start = [&]() {
-        if (make_pose_from_camera(camera, start_pos.theta, start_pos)) {
-            has_start_pos = true;
-            has_planned_path = false;
-            path_planning_status = has_end_pos ? "Start position placed on ground." : "Start position placed on ground. Place end position.";
-            sync_path_marker_transforms();
-        } else {
-            path_planning_status = "Could not place start: no ground found near camera.";
-        }
-    };
-
-    auto place_end = [&]() {
-        if (make_pose_from_camera(camera, end_pos.theta, end_pos)) {
-            has_end_pos = true;
-            has_planned_path = false;
-            path_planning_status = has_start_pos ? "End position placed on ground." : "End position placed on ground. Place start position.";
-            sync_path_marker_transforms();
-        } else {
-            path_planning_status = "Could not place end: no ground found near camera.";
-        }
-    };
-
-    auto start_path_planning = [&]() {
-        if (has_start_pos && has_end_pos) {
-            planner.initialize(start_pos, end_pos);
-            planner.find_nonholomic_path(); // state_explored_paths
-
-            lines = make_path_lines(planner.state_path);
-            line_cloud.set_lines(lines);
-            // explored_path_line_cloud.set_lines(planner.state_explored_paths);
-
-            has_planned_path = !planner.state_path.empty();
-            path_planning_status = has_planned_path
-                ? "Path planning finished."
-                : "Path planning finished with no path.";
-        } else {
-            path_planning_status = "Place start and end positions first.";
-        }
-    };
-
-    // OccupancyGrid3D occupancy_gird_3d(voxel_grid);
-
-    
-
-    VoxelPointMap voxel_point_map(engine, 1500000, 1500000);
-    voxel_map_reseter.reset(voxel_point_map);
-
-    // voxel_map_inserter.insert(voxel_point_map, target_point_cloud, target_normal_buffer);
-    // voxel_map_inserter.insert(voxel_point_map, lidar_video.get_scan(0).point_cloud(), lidar_video.get_scan(0).normal_buffer());
-    // voxel_point_map.upload_voxels(engine, voxel_grid);
-
-    PointCloud voxel_map_point_cloud(manager_bundle, voxel_point_map.map_point_buffer, voxel_point_map.m_map_point_count);
-
-    sphere.set_material_data(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
-    start_sphere.set_material_data(PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(1, 0, 0, 1)));
-    end_sphere.set_material_data(PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(0, 0, 1, 1)));
-    start_direction_sphere.set_material_data(PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(1, 0, 0, 1)));
-    end_direction_sphere.set_material_data(PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(0, 0, 1, 1)));
-    vox_box.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
-
-    sphere.transform.position = glm::vec4(0, 2, 0, 1);
-    start_direction_sphere.transform.scale = glm::vec3(0.3f);
-    end_direction_sphere.transform.scale = glm::vec3(0.3f);
-
-    SphericalPoseMarker oriented_sphere(mesh_manager, 
-                                   material_instance_manager, 
-                                   PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(0, 1, 0, 1)));
-    
     Celeris celeris(engine, 
                     engine.compute_queue(), 
                     manager_bundle, 
                     voxel_grid, 
                     Celeris::CelerisDesc());
+    celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69, 1.92, -51.30)});   
     celeris.start_lidar_receiver();
 
-    CelerisVisualizer celeris_visualizer(mesh_manager, material_instance_manager, celeris, skybox_exposure);
+    CelerisVisualizer celeris_visualizer(mesh_manager, 
+                                         material_instance_manager, 
+                                         celeris, 
+                                         20000, 
+                                         skybox_exposure);
+
+    auto start_path_planning = [&]() {
+        if (has_start_pos && has_end_pos) {
+            celeris.find_path();
+            has_planned_path = !celeris.planner().state_path.empty();
+        }
+    };
+
+    vox_box.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
 
     Scene scene;
 
     scene.add(skybox);
-    // scene.add(sphere);
-    scene.add(start_sphere);
-    scene.add(end_sphere);
-    scene.add(start_direction_sphere);
-    scene.add(end_direction_sphere);
-    // scene.add(lidar_scan);
-    // scene.add(scan_object);
-    // scene.add(voxel_map_point_cloud);
-    scene.add(line_cloud);
-    scene.add(explored_path_line_cloud);
-    scene.add(oriented_sphere);
     scene.add(celeris_visualizer);
     
     skybox.update(scene);
@@ -647,113 +367,9 @@ int main() {
         glm::quat rot_x = glm::angleAxis(angle, glm::vec3(1.0f, 0.0f, 0.0f));
         glm::quat rot_y = glm::angleAxis(angle, glm::vec3(0.0f, 1.0f, 0.0f));
 
-        // for (const glm::mat4 transform : transform_mem) {
-        //     voxelizator.voxelize_and_submit(
-        //         transparent_voxelize_prefab,
-        //         vox_box.mesh_view(),
-        //         offsetof(PBRVertex, position),
-        //         sizeof(PBRVertex),
-        //         transform,
-        //         &voxel_grid.local_voxel_write_list()        
-        //     );
-        // }
-
-        // for (size_t i = 0; i < transform_mem.size(); i++) {
-        //     vox_box.transform.rotation = glm::normalize(
-        //         vox_box.transform.rotation * rot_x * rot_y
-        //     );
-
-        //     voxelizator.voxelize_and_submit(
-        //         blue_voxelize_prefab,
-        //         vox_box.mesh_view(),
-        //         offsetof(PBRVertex, position),
-        //         sizeof(PBRVertex),
-        //         vox_box.transform.get_model_matrix(),
-        //         &voxel_grid.local_voxel_write_list()        
-        //     );
-
-        //     transform_mem[i] = vox_box.transform.get_model_matrix();
-        // }
-
         uint32_t image_index = 0;
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
-
-        // if (auto scan = scan_receiver.try_pop_scan(manager_bundle)) {
-        //     network_scan = std::move(scan);
-
-        //     LidarScan& current_scan = *network_scan;
-
-        //     gicp_pass.fit(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer(), 10);
-        //     voxel_map_inserter.insert(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
-        //     voxel_grid.voxelize_point_cloud(engine, current_scan.point_cloud(), voxel_write_list, max_write_count);
-        // }
-
-        // if (auto scan = scan_receiver.try_pop_scan(manager_bundle)) {
-        //     network_scan = std::move(scan);
-
-        //     // LidarScan& current_scan = *network_scan;
-
-        //     // renderer.render(command_buffer, current_scan.point_cloud());
-
-        //     // gicp_pass.fit(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer(), 10);
-        //     // voxel_map_inserter.insert(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
-        //     // voxel_grid.voxelize_point_cloud(engine, current_scan.point_cloud(), voxel_write_list, max_write_count);
-        // }
-
-        // if (auto scan = scan_receiver.try_pop_scan(manager_bundle)) {
-        //     if (network_scan) {
-        //         retired_network_scans.push_back(std::move(network_scan));
-        //     }
-
-        //     network_scan = std::move(scan);
-        //     std::cout << "Received scan #" << received_scan_count << std::endl;
-
-        //     while (retired_network_scans.size() > engine.num_frames_in_flight()) {
-        //         retired_network_scans.pop_front();
-        //     }
-
-        //     if (received_scan_count > 0)
-        //         gicp_pass.fit(voxel_point_map, network_scan->point_cloud(), network_scan->normal_buffer(), 10);
-            
-        //     start_pos.pos = network_scan->point_cloud().transform.position;
-        //     glm::quat q = glm::normalize(network_scan->point_cloud().transform.rotation);
-        //     glm::vec3 forward = q * glm::vec3(-1.0f, 0.0f, 0.0f);
-        //     start_pos.theta = std::atan2(forward.z, forward.x);
-            
-        //     // start_sphere.transform.position = network_scan->point_cloud().transform.position;
-        //     // start_direction_sphere.transform.position = start_pos.pos + direction_offset(start_pos.theta) * 0.85f + glm::vec3(0, 0.4f, 0);
-
-        //     oriented_sphere.transform = network_scan->point_cloud().transform;
-
-        //     // planner.initialize(start_pos, end_pos);
-        //     // planner.find_nonholomic_path(); // state_explored_paths
-
-        //     lines = make_path_lines(planner.state_path);
-        //     line_cloud.set_lines(lines);
-        //     // explored_path_line_cloud.set_lines(planner.state_explored_paths);
-
-        //     has_planned_path = !planner.state_path.empty();
-        //     path_planning_status = has_planned_path
-        //         ? "Path planning finished."
-        //         : "Path planning finished with no path.";
-            
-
-        //     // if (make_pose_from_camera(camera, start_pos.theta, start_pos)) {
-        //     //     has_start_pos = true;
-        //     //     has_planned_path = false;
-        //     //     path_planning_status = has_end_pos ? "Start position placed on ground." : "Start position placed on ground. Place end position.";
-        //     //     sync_path_marker_transforms();
-        //     // } else {
-        //     //     path_planning_status = "Could not place start: no ground found near camera.";
-        //     // }
-            
-
-        //     voxel_map_inserter.insert(voxel_point_map, network_scan->point_cloud(), network_scan->normal_buffer());
-        //     voxel_grid.voxelize_point_cloud(engine, network_scan->point_cloud(), voxel_write_list, max_write_count);
-
-        //     received_scan_count++;
-        // }
 
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), window, camera);
@@ -766,7 +382,6 @@ int main() {
 
         if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
             place_start_pressed = true;
-            place_start();
         }
 
         if (place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_RELEASE) {
@@ -775,7 +390,6 @@ int main() {
 
         if (!place_end_pressed && glfwGetKey(window.handle(), GLFW_KEY_2) == GLFW_PRESS) {
             place_end_pressed = true;
-            place_end();
         }
 
         if (place_end_pressed && glfwGetKey(window.handle(), GLFW_KEY_2) == GLFW_RELEASE) {
@@ -807,30 +421,6 @@ int main() {
         if (g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_RELEASE) {
             g_pressed = false;
         }
-
-        // auto next_frame = [&]() {
-        //     uint32_t current_frame_id = lidar_video.current_frame_id();
-
-        //     if (current_frame_id > 0) {
-        //         LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
-        //         LidarScan& previous_scan = lidar_video.get_scan(current_frame_id - 1);
-
-        //         PointCloud& current_point_cloud = current_scan.point_cloud();
-        //         PointCloud& previous_point_cloud = previous_scan.point_cloud();
-
-        //         current_point_cloud.transform.position = previous_point_cloud.transform.position + current_point_cloud.transform.position;
-
-        //         current_point_cloud.transform.rotation = glm::normalize(current_point_cloud.transform.rotation * previous_point_cloud.transform.rotation);
-
-        //         // gicp_pass.fit(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer(), 10);
-
-        //         voxel_map_inserter.insert(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
-        //         voxel_grid.voxelize_point_cloud(engine, current_scan.point_cloud(), voxel_write_list, max_write_count);
-        //         // voxel_map_point_cloud.set_instance_view(voxel_point_map.get_map_instance_view());
-        //     }
-            
-        //     lidar_video.next_frame();
-        // };
 
         if (!n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_PRESS) {
             n_pressed = true;
@@ -874,13 +464,13 @@ int main() {
                 }
 
                 if (ImGui::Button("Place start")) {
-                    place_start();
+                    // place_start();
                 }
                 ImGui::SameLine();
                 ImGui::TextUnformatted("Key: 1");
 
                 if (ImGui::Button("Place end")) {
-                    place_end();
+                    // place_end();
                 }
                 ImGui::SameLine();
                 ImGui::TextUnformatted("Key: 2");
@@ -891,7 +481,7 @@ int main() {
                 ImGui::SameLine();
                 ImGui::TextUnformatted("Key: 3");
 
-                ImGui::Text("Path: %s", path_planning_status.c_str());
+                // ImGui::Text("Path: %s", path_planning_status.c_str());
 
                 ImGui::End();
                 

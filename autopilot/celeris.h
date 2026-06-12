@@ -36,8 +36,15 @@ public:
     void start_lidar_receiver();
     void update();
 
+    void find_path();
+    void set_goal(const NonholonomicPos& position);
+
     LidarScan* network_scan();
     NonholonomicPos goal_position() const noexcept;
+    NonholonomicAStar& planner();
+    uint32_t received_scan_count() const noexcept;
+
+    VulkanEngine* engine();
 
 private:
     VulkanEngine* m_engine = nullptr;
