@@ -169,6 +169,7 @@ public:
     float change_steer_pentalty = 1.5;
     bool use_reed_shepps_fallback = false;
     bool force_reeds_shepp_shot = false;
+    bool allow_flying_over_precipices = true;
     uint64_t state_counter = 0;
     int iteration_limit = 10000;
     bool track_explored_paths = true;
@@ -216,7 +217,7 @@ public:
     bool shot_reeds_shepp(NonholonomicPos start_pos, NonholonomicPos end_pos);
     bool adjust_and_check_path(std::vector<NonholonomicPos>& path, int max_step_up = 1, int max_drop = 1);
     // bool adjust_to_ground(glm::ivec3& voxel_pos, int max_step_up = 1, int max_drop = 1);
-    static bool almost_equal(NonholonomicPos a, NonholonomicPos b);
+    static bool almost_equal(NonholonomicPos a, NonholonomicPos b, bool allow_flying_over_precipices);
     std::vector<NonholonomicPos> reconstruct_path(std::unordered_map<uint64_t, NonholonomicAStarCell> closed_heap, NonholonomicPos pos);
     std::vector<NonholonomicPos> simulate_motion(NonholonomicPos start_pos, int steer, int direction);
     void initialize(NonholonomicPos start_pos, NonholonomicPos end_pos);

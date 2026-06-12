@@ -118,7 +118,7 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
     start.g = 0;
     start.f = 0;
 
-    int limit = 10000;
+    // int limit = 20000;
     int counter = 0;
 
     pq.push(start);
@@ -196,4 +196,8 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
             }
     }
     return {};
+}
+
+OccupancyGrid3D& AStar::occupancy_grid() noexcept {
+    return m_grid;
 }

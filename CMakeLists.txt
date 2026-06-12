@@ -102,7 +102,7 @@ add_executable(app
   renderer/scene_object.cpp
   renderer/skybox.cpp
   renderer/point_cloud/lidar/lidar_scan.cpp
-  # renderer/point_cloud/lidar/lidar_scan_receiver.cpp
+  renderer/point_cloud/lidar/lidar_scan_receiver.cpp
   renderer/point_cloud/lidar/lidar_video.cpp
   renderer/point_cloud/gicp/gicp_pass.cpp
   renderer/point_cloud/gicp/voxel_point_map.cpp
@@ -133,6 +133,9 @@ add_executable(app
   a_star/a_star.cpp
   a_star/nonholonomic_a_star.cpp
   a_star/reeds_shepp.cpp
+  autopilot/spherical_pose_marker.cpp
+  autopilot/celeris.cpp
+  autopilot/celeris_visualizer.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

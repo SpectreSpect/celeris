@@ -44,7 +44,7 @@
 #include "renderer/point_cloud/gicp/voxel_point_map.h"
 #include "renderer/point_cloud/gicp/voxel_map_point_inserter.h"
 #include "renderer/point_cloud/gicp/voxel_map_point_reseter.h"
-// #include "renderer/point_cloud/lidar/lidar_scan_receiver.h"
+#include "renderer/point_cloud/lidar/lidar_scan_receiver.h"
 #include "imgui_layer.h"
 #include "renderer/lighting_system/lighting_system.h"
 #include "renderer/pbr/equirect_to_cubemap_pass.h"
@@ -66,6 +66,9 @@
 #include "a_star/a_star.h"
 #include "a_star/a_star_structures.h"
 #include "a_star/nonholonomic_a_star.h"
+#include "autopilot/spherical_pose_marker.h"
+#include "autopilot/celeris.h"
+#include "autopilot/celeris_visualizer.h"
 
 #include <cmath>
 #include <vector>
@@ -106,7 +109,8 @@ int main() {
     MaterialManager material_manager(engine, shader_manager, frame_resources);
     MaterialInstanceManager material_instance_manager(engine, material_manager, texture_manager);
     MeshManager mesh_manager(engine, resource_loader);
-    ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
+    ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, 
+                                 material_instance_manager, mesh_manager, compute_pass_manager);
 
     PointCloudPreprocessor point_cloud_preprocessor(
         engine.device(), 
@@ -114,11 +118,11 @@ int main() {
         compute_pass_manager
     );
 
-    // LidarScanReceiver scan_receiver(point_cloud_preprocessor, 5000);
+    LidarScanReceiver scan_receiver(point_cloud_preprocessor, 5000);
     // scan_receiver.start();
 
     std::unique_ptr<LidarScan> network_scan;
-    // std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
+    std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
 
     glm::vec3 voxel_size(1.0f);
     glm::ivec3 chunk_size(16);
@@ -227,16 +231,14 @@ int main() {
     scan_object.transform.scale = glm::vec3(3.0f);
     scan_object.transform.position.y += 10;
 
-    voxelizator.voxelize_and_submit(
-        blue_voxelize_prefab,
-        scan_object.mesh_view(),
-        offsetof(PBRVertex, position),
-        sizeof(PBRVertex),
-        scan_object.transform.get_model_matrix(),
-        &voxel_grid.local_voxel_write_list()
-    );
-
-    
+    // voxelizator.voxelize_and_submit(
+    //     blue_voxelize_prefab,
+    //     scan_object.mesh_view(),
+    //     offsetof(PBRVertex, position),
+    //     sizeof(PBRVertex),
+    //     scan_object.transform.get_model_matrix(),
+    //     &voxel_grid.local_voxel_write_list()
+    // );
 
     glm::ivec3 block_size = glm::ivec3(1, 5, 10);
     glm::ivec3 block_origin = glm::ivec3(3, 0, -5);
@@ -288,7 +290,6 @@ int main() {
     //         }
 
 
-
     uint32_t max_write_count = 100000;
     VulkanBuffer voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * max_write_count);
 
@@ -334,17 +335,17 @@ int main() {
 
     NonholonomicPos start_pos;
     NonholonomicPos end_pos;
-    bool has_start_pos = false;
-    bool has_end_pos = false;
+    bool has_start_pos = true;
+    bool has_end_pos = true;
     bool has_planned_path = false;
     std::string path_planning_status = "Place start and end positions.";
 
     start_pos.pos = glm::vec3(0, 1, 10);
     start_pos.theta = 3.14f;
-    end_pos.pos = glm::vec3(10, 1, 0);
+    end_pos.pos = glm::vec3(-170.69, 1.92, -51.30);
 
     NonholonomicAStar planner(voxel_grid);
-    OccupancyGrid3D path_placement_grid(voxel_grid);
+    // OccupancyGrid3D path_placement_grid(voxel_grid);
     // NonholonomicAStar nonholonomic_astar(voxel_grid);
 
     constexpr uint32_t max_path_line_count = 20000;
@@ -361,7 +362,7 @@ int main() {
             pose_from_camera.theta = fallback_theta;
         }
 
-        if (!path_placement_grid.adjust_to_ground(pose_from_camera.pos))
+        if (!planner.occupancy_grid().adjust_to_ground(pose_from_camera.pos))
             return false;
 
         out_pose = pose_from_camera;
@@ -441,6 +442,21 @@ int main() {
     });
     line_cloud.sync_material();
 
+    LineCloud explored_path_line_cloud(
+        engine,
+        mesh_manager.line_quad,
+        material_instance_manager.line,
+        max_path_line_count
+    );
+    explored_path_line_cloud.set_lines(lines);
+
+    explored_path_line_cloud.set_material_data(LineMaterialData{
+        // .color = glm::vec4(245.0f, 176.0f, 66.0f, 255.0f) * glm::vec4(1/255.0f),
+        .color = glm::vec4(0, 0, 0, 1),
+        .line_width_pixels = 2
+    });
+    explored_path_line_cloud.sync_material();
+
     
     // LidarVideo lidar_video(manager_bundle, 
     //                        point_cloud_preprocessor,
@@ -483,12 +499,12 @@ int main() {
     //     lidar_video.get_scan(0).normal_buffer(), 
     //     lidar_video.get_scan(0).point_cloud().point_count());
 
-    
+    auto direction_offset = [](float theta) {
+        return glm::vec3(std::cos(theta), 0.0f, std::sin(theta));
+    };
 
     auto sync_path_marker_transforms = [&]() {
-        auto direction_offset = [](float theta) {
-            return glm::vec3(std::cos(theta), 0.0f, std::sin(theta));
-        };
+        
 
         start_sphere.transform.position = glm::vec3(start_pos.pos) + glm::vec3(0, 0.5f, 0);
         end_sphere.transform.position = glm::vec3(end_pos.pos) + glm::vec3(0, 0.5f, 0);
@@ -523,10 +539,11 @@ int main() {
     auto start_path_planning = [&]() {
         if (has_start_pos && has_end_pos) {
             planner.initialize(start_pos, end_pos);
-            planner.find_nonholomic_path();
+            planner.find_nonholomic_path(); // state_explored_paths
 
             lines = make_path_lines(planner.state_path);
             line_cloud.set_lines(lines);
+            // explored_path_line_cloud.set_lines(planner.state_explored_paths);
 
             has_planned_path = !planner.state_path.empty();
             path_planning_status = has_planned_path
@@ -561,6 +578,19 @@ int main() {
     start_direction_sphere.transform.scale = glm::vec3(0.3f);
     end_direction_sphere.transform.scale = glm::vec3(0.3f);
 
+    SphericalPoseMarker oriented_sphere(mesh_manager, 
+                                   material_instance_manager, 
+                                   PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(0, 1, 0, 1)));
+    
+    Celeris celeris(engine, 
+                    engine.compute_queue(), 
+                    manager_bundle, 
+                    voxel_grid, 
+                    Celeris::CelerisDesc());
+    celeris.start_lidar_receiver();
+
+    CelerisVisualizer celeris_visualizer(mesh_manager, material_instance_manager, celeris, skybox_exposure);
+
     Scene scene;
 
     scene.add(skybox);
@@ -573,6 +603,9 @@ int main() {
     // scene.add(scan_object);
     // scene.add(voxel_map_point_cloud);
     scene.add(line_cloud);
+    scene.add(explored_path_line_cloud);
+    scene.add(oriented_sphere);
+    scene.add(celeris_visualizer);
     
     skybox.update(scene);
 
@@ -683,6 +716,39 @@ int main() {
         //     if (received_scan_count > 0)
         //         gicp_pass.fit(voxel_point_map, network_scan->point_cloud(), network_scan->normal_buffer(), 10);
             
+        //     start_pos.pos = network_scan->point_cloud().transform.position;
+        //     glm::quat q = glm::normalize(network_scan->point_cloud().transform.rotation);
+        //     glm::vec3 forward = q * glm::vec3(-1.0f, 0.0f, 0.0f);
+        //     start_pos.theta = std::atan2(forward.z, forward.x);
+            
+        //     // start_sphere.transform.position = network_scan->point_cloud().transform.position;
+        //     // start_direction_sphere.transform.position = start_pos.pos + direction_offset(start_pos.theta) * 0.85f + glm::vec3(0, 0.4f, 0);
+
+        //     oriented_sphere.transform = network_scan->point_cloud().transform;
+
+        //     // planner.initialize(start_pos, end_pos);
+        //     // planner.find_nonholomic_path(); // state_explored_paths
+
+        //     lines = make_path_lines(planner.state_path);
+        //     line_cloud.set_lines(lines);
+        //     // explored_path_line_cloud.set_lines(planner.state_explored_paths);
+
+        //     has_planned_path = !planner.state_path.empty();
+        //     path_planning_status = has_planned_path
+        //         ? "Path planning finished."
+        //         : "Path planning finished with no path.";
+            
+
+        //     // if (make_pose_from_camera(camera, start_pos.theta, start_pos)) {
+        //     //     has_start_pos = true;
+        //     //     has_planned_path = false;
+        //     //     path_planning_status = has_end_pos ? "Start position placed on ground." : "Start position placed on ground. Place end position.";
+        //     //     sync_path_marker_transforms();
+        //     // } else {
+        //     //     path_planning_status = "Could not place start: no ground found near camera.";
+        //     // }
+            
+
         //     voxel_map_inserter.insert(voxel_point_map, network_scan->point_cloud(), network_scan->normal_buffer());
         //     voxel_grid.voxelize_point_cloud(engine, network_scan->point_cloud(), voxel_write_list, max_write_count);
 
@@ -692,6 +758,9 @@ int main() {
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), window, camera);
         lighting_system.update(engine.current_frame(), window, camera);
+
+        celeris.update();
+        celeris_visualizer.update();
 
         voxel_grid.update(window, camera);
 
@@ -791,6 +860,14 @@ int main() {
                 ui.update_mouse_mode(window);
 
                 ImGui::Begin("Debug");
+
+                ImGui::TextUnformatted("Camera position:");
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "x: %.2f", camera.position.x);
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "y: %.2f", camera.position.y);
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(0.0f, 0.35f, 1.0f, 1.0f), "z: %.2f", camera.position.z);
 
                 if (ImGui::Button("Next frame")) {
                     // next_frame();

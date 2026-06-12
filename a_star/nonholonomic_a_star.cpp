@@ -382,7 +382,12 @@ bool NonholonomicAStar::adjust_and_check_path(std::vector<NonholonomicPos>& path
     return true;
 }
 
-bool NonholonomicAStar::almost_equal(NonholonomicPos a, NonholonomicPos b) {
+bool NonholonomicAStar::almost_equal(NonholonomicPos a, NonholonomicPos b, bool allow_flying_over_precipices) {
+    if (allow_flying_over_precipices) {
+        a.pos.y = 0;
+        b.pos.y = 0;
+    }    
+    
     float dist = glm::distance(a.pos, b.pos);
     float theta_diff = std::abs(angle_diff(a.theta, b.theta));
 
@@ -961,7 +966,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
     
     state_closed_heap[cur_key] = cur_cell;
 
-    if (almost_equal(cur_cell.pos, state_end_pos)) {
+    if (almost_equal(cur_cell.pos, state_end_pos, allow_flying_over_precipices)) {
         state_path = reconstruct_path(state_closed_heap, cur_cell.pos);
 
         if (!use_reed_shepps_fallback) {
@@ -1002,7 +1007,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
             std::vector<NonholonomicPos> simplified_motion = {motion[0], motion[motion.size() - 1]};
 
             auto adjust_to_ground_start = std::chrono::steady_clock::now();
-            if (!m_grid.adjust_to_ground(simplified_motion, max_step_up, max_drop, max_y_diff))
+            if (!m_grid.adjust_to_ground(simplified_motion, max_step_up, max_drop, max_y_diff, allow_flying_over_precipices))
                 continue;
             auto adjust_to_ground_end = std::chrono::steady_clock::now();
 
