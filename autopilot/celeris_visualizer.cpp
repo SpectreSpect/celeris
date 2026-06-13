@@ -35,15 +35,26 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
         m_path_line_cloud(*m_celeris->engine(),
                    mesh_manager.line_quad,
                    material_instance_manager.line,
+                   max_path_line_count),
+        m_guide_path_line_cloud(*m_celeris->engine(),
+                   mesh_manager.line_quad,
+                   material_instance_manager.line,
                    max_path_line_count) {
     m_path_line_cloud.set_material_data(LineMaterialData{
         .color = glm::vec4(1, 1, 1, 1),
         .line_width_pixels = 5
     });
-    
+
+    m_guide_path_line_cloud.set_material_data(LineMaterialData{
+        // .color = glm::vec4(0.078, 0.663, 0.494, 1.0),
+        .color = glm::vec4(0.3f, 1.0f, 0.3f, 1.0f),
+        .line_width_pixels = 5
+    });
+
     add_child(m_start_marker);
     add_child(m_goal_marker);
     add_child(m_path_line_cloud);
+    add_child(m_guide_path_line_cloud);
 
     set_goal(m_celeris->goal_position());
 }
@@ -72,6 +83,8 @@ void CelerisVisualizer::update() {
     set_start(m_celeris->start_position());
     set_goal(m_celeris->goal_position());
     m_path_line_cloud.set_lines(make_path_lines(m_celeris->planner().state_path));
+    // if (m_celeris->planner().state_explored_paths.size() > 0)
+    m_guide_path_line_cloud.set_lines(make_path_lines(m_celeris->planner().state_plain_astar_path.path));
 
     // if (scan_generation != m_celeris->received_scan_count()) {
     //     scan_generation = m_celeris->received_scan_count();
@@ -113,5 +126,45 @@ std::vector<LineInstance> CelerisVisualizer::make_path_lines(const std::vector<N
                                             .p1 = glm::vec3(0.0f),
                                             .color = glm::vec4(0.0f)});
     
+    return path_lines;
+}
+
+std::vector<LineInstance> CelerisVisualizer::make_path_lines(const std::vector<glm::vec3>& path) {
+    std::vector<LineInstance> path_lines;
+    path_lines.reserve(std::min<size_t>(path.size(), max_path_line_count));
+
+    for (uint32_t i = 1; i < path.size() && path_lines.size() < max_path_line_count; i++) {
+        path_lines.push_back(LineInstance{
+            .p0 = path[i - 1] + glm::vec3(0, 0.2f, 0),
+            .p1 = path[i] + glm::vec3(0, 0.2f, 0),
+            .color = glm::vec4(1, 0, 0, 1)
+        });
+    }
+
+    if (path_lines.empty())
+        path_lines.push_back(LineInstance{.p0 = glm::vec3(0.0f),
+                                            .p1 = glm::vec3(0.0f),
+                                            .color = glm::vec4(0.0f)});
+
+    return path_lines;
+}
+
+std::vector<LineInstance> CelerisVisualizer::make_path_lines(const std::vector<glm::ivec3>& path) {
+    std::vector<LineInstance> path_lines;
+    path_lines.reserve(std::min<size_t>(path.size(), max_path_line_count));
+
+    for (uint32_t i = 1; i < path.size() && path_lines.size() < max_path_line_count; i++) {
+        path_lines.push_back(LineInstance{
+            .p0 = glm::vec3(path[i - 1]) + glm::vec3(0, 0.2f, 0),
+            .p1 = glm::vec3(path[i]) + glm::vec3(0, 0.2f, 0),
+            .color = glm::vec4(1, 1, 1, 1)
+        });
+    }
+
+    if (path_lines.empty())
+        path_lines.push_back(LineInstance{.p0 = glm::vec3(0.0f),
+                                            .p1 = glm::vec3(0.0f),
+                                            .color = glm::vec4(0.0f)});
+
     return path_lines;
 }
