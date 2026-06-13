@@ -122,8 +122,8 @@ int main() {
     VoxelGrid::VoxelGridDesc voxel_grid_desc {
         .chunk_size = chunk_size,
         .voxel_size = voxel_size,
-        .count_active_chunks = 10'000,
-        .max_quads = 1'000'000,
+        .count_active_chunks = 8'000,
+        .max_quads = 500'000,
         .chunk_hash_table_size_factor = 1.0f,
         .count_evict_buckets = 32,
         .min_free_chunks = 4'500,
@@ -133,7 +133,7 @@ int main() {
         .ib_page_size_order_of_two = 10,
         .buddy_allocator_nodes_factor = 1.0,
         .render_distance = chunk_size.x * voxel_size.x * 30,
-        .generation_distance = 10,
+        .generation_distance = 5,
         .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000)
     };
 
@@ -149,8 +149,8 @@ int main() {
     Voxelizator::VoxelizatorDesc voxelizator_desc {
         .chunk_size = chunk_size,
         .voxel_size = voxel_size,
-        .counter_hash_table_size = 1'000'000,
-        .count_hash_table_failure_slots = 1'000'000,
+        .counter_hash_table_size = 150'000,
+        .count_hash_table_failure_slots = 150'000,
         .count_voxel_writes = 0, // Будут использоваться те, что внутри voxel_grid
         .count_hash_table_attempts = 5
     };
@@ -399,7 +399,7 @@ int main() {
 
     OccupancyGrid3D occupancy_gird_3d(voxel_grid);
 
-    VoxelPointMap voxel_point_map(engine, 1500000, 1500000);
+    VoxelPointMap voxel_point_map(engine, 1000000, 1000000);
     voxel_map_reseter.reset(voxel_point_map);
 
     // voxel_map_inserter.insert(voxel_point_map, target_point_cloud, target_normal_buffer);

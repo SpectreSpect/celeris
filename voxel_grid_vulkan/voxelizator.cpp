@@ -53,26 +53,33 @@ Voxelizator::VoxelizatorBuffers Voxelizator::create_buffers(
     }
     submit_compute_commands();
 
+    VulkanBuffer dispatch_args = VulkanBuffer::create_host_visible_indirect_storage_buffer(physical_device, device, dispatch_args_size);
+    VulkanBuffer counter_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, counter_hash_table_size);
+    VulkanBuffer counter_hash_table_failure_slots = VulkanBuffer(
+        physical_device,
+        device,
+        counter_hash_table_failure_slots_size,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    );
+    VulkanBuffer counter_hash_table_failure_slots_additional = VulkanBuffer(
+        physical_device,
+        device,
+        counter_hash_table_failure_slots_size,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    );
+    VulkanBuffer active_chunk_keys_list = VulkanBuffer::create_storage_buffer(physical_device, device, active_chunk_keys_list_size);
+    VulkanBuffer voxel_writes = VulkanBuffer::create_storage_buffer(physical_device, device, voxel_writes_size);
+
     return VoxelizatorBuffers{
-        .dispatch_args = VulkanBuffer::create_host_visible_indirect_storage_buffer(physical_device, device, dispatch_args_size),
-        .counter_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, counter_hash_table_size),
-        .counter_hash_table_failure_slots = VulkanBuffer(
-            physical_device,
-            device,
-            counter_hash_table_failure_slots_size,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-        ),
-        .counter_hash_table_failure_slots_additional = VulkanBuffer(
-            physical_device,
-            device,
-            counter_hash_table_failure_slots_size,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-        ),
-        .active_chunk_keys_list = VulkanBuffer::create_storage_buffer(physical_device, device, active_chunk_keys_list_size),
+        .dispatch_args = std::move(dispatch_args),
+        .counter_hash_table = std::move(counter_hash_table),
+        .counter_hash_table_failure_slots = std::move(counter_hash_table_failure_slots),
+        .counter_hash_table_failure_slots_additional = std::move(counter_hash_table_failure_slots_additional),
+        .active_chunk_keys_list = std::move(active_chunk_keys_list),
         .triangle_indices_list = std::move(triangle_indices_list),
-        .voxel_writes = VulkanBuffer::create_storage_buffer(physical_device, device, voxel_writes_size),
+        .voxel_writes = std::move(voxel_writes),
     };
 }
 

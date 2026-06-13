@@ -134,6 +134,14 @@ add_executable(app
 
 target_compile_features(app PRIVATE cxx_std_20)
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  target_compile_options(app PRIVATE
+    -fdiagnostics-color=always
+    -fdiagnostics-show-option
+    -fdiagnostics-show-caret
+  )
+endif()
+
 # ---------------- ImGui (FetchContent, no submodule) ----------------
 
 include(FetchContent)

@@ -1702,7 +1702,7 @@ void VoxelGrid::update(Window& window, Camera& camera) {
 
     {
         auto scope = m_command_buffer.begin_scope();
-        stream_chunks_sphere(m_command_buffer, camera.position, 5, 42);
+        stream_chunks_sphere(m_command_buffer, camera.position, -1, 42);
         build_mesh_from_dirty(m_command_buffer, math_utils::BITS, math_utils::OFFSET);
         build_indirect_draw_commands_frustum(m_command_buffer, vp, camera.position, math_utils::BITS, math_utils::OFFSET);
         // draw_indirect(vao.id, state.transform, state.vp, state.camera->position);
