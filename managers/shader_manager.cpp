@@ -11,6 +11,9 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         point_vs(device, path_utils::executable_dir() / "shaders" / "point_cloud.vert.spv"),
         point_fs(device, path_utils::executable_dir() / "shaders" / "point_cloud.frag.spv"),
 
+        line_vs(device, path_utils::executable_dir() / "shaders" / "line_cloud.vert.spv"),
+        line_fs(device, path_utils::executable_dir() / "shaders" / "line_cloud.frag.spv"),   
+
         skybox_vs(device, path_utils::executable_dir() / "shaders" / "skybox.vert.spv"),
         skybox_fs(device, path_utils::executable_dir() / "shaders" / "skybox.frag.spv"),
         pbr_vs(device, path_utils::executable_dir() / "shaders" / "pbr.vert.spv"),
@@ -62,6 +65,7 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         hash_table_conditional_dispatch_adapter_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "hash_table_conditional_dispatch_adapter.comp.spv"),
         clear_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "clear_chunk_hash_table.comp.spv"),
         fill_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "fill_chunk_hash_table.comp.spv"),
+        read_voxel_grid_chunk_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "read_voxel_grid_chunk.comp.spv"),
 
         voxel_writes_from_point_cloud_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_writes_from_point_cloud.comp.spv"),
 
@@ -69,6 +73,7 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         alloc_active_chunk_triangles_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "alloc_active_chunk_triangles.comp.spv"),
         fill_triangle_indices_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "fill_triangle_indices.comp.spv"),
         mark_and_count_active_chunks_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "mark_and_count_active_chunks.comp.spv"),
+        mark_and_count_fail_slots_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "mark_and_count_fail_slots.comp.spv"),
         reset_voxelize_pipeline_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "reset_voxelize_pipeline.comp.spv"),
         voxelize_triangles_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "voxelize_triangles.comp.spv"),
 

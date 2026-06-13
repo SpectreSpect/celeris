@@ -60,6 +60,10 @@
 #include "renderer/point_cloud/point_cloud_preprocessor.h"
 #include "math_utils.h"
 #include "renderer/point_cloud/point_instance.h"
+#include "renderer/lines/line_cloud.h"
+#include "renderer/lines/line_instance.h"
+#include "a_star/occupancy_grid_3d.h"
+#include "a_star/a_star.h"
 
 #include <vector>
 #include <random>
@@ -146,7 +150,9 @@ int main() {
         .chunk_size = chunk_size,
         .voxel_size = voxel_size,
         .counter_hash_table_size = 1'000'000,
-        .count_voxel_writes = 0 // Будут использоваться те, что внутри voxel_grid
+        .count_hash_table_failure_slots = 1'000'000,
+        .count_voxel_writes = 0, // Будут использоваться те, что внутри voxel_grid
+        .count_hash_table_attempts = 5
     };
 
     Voxelizator voxelizator(
@@ -179,15 +185,6 @@ int main() {
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     );
     
-    MeshView scan_mesh_view(
-        scan_vertex_buffer.get_view(),
-        scan_index_buffer.get_view(),
-        total_count_triangles_in_scan * 3
-    );
-
-    RenderObject scan_object(scan_mesh_view, material_instance_manager.pbr);
-    scan_object.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
-
     VoxelWriteGPU blue_voxelize_prefab;
     blue_voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
     blue_voxelize_prefab.set_flags = OVERWRITE_BIT;
@@ -197,6 +194,7 @@ int main() {
     transparent_voxelize_prefab.set_flags = OVERWRITE_BIT;
 
     PointCloudMesher mesher(
+        engine.physical_device(),
         engine.device(),
         engine.compute_queue(),
         compute_pass_manager,
@@ -204,11 +202,21 @@ int main() {
     );
 
     LidarScan lidar_scan(manager_bundle, point_cloud_preprocessor, path_utils::executable_dir() / "assets" / "lidar_scans" / "frame_000000.bin");
-    mesher.convert_to_mesh<PBRVertex, PointInstance>(
+    uint32_t scan_index_count = mesher.convert_to_mesh<PBRVertex, PointInstance>(
         lidar_scan.point_cloud(),
-        scan_object.mesh_view().vertex_buffer_view().handle(),
-        scan_object.mesh_view().index_buffer_view().handle()
+        scan_vertex_buffer,
+        scan_index_buffer
     );
+
+    MeshView scan_mesh_view(
+        scan_vertex_buffer.get_view(),
+        scan_index_buffer.get_view(),
+        scan_index_count
+    );
+
+    RenderObject scan_object(scan_mesh_view, material_instance_manager.pbr);
+    // RenderObject scan_object(mesh_manager.cube.get_view(), material_instance_manager.pbr);
+    scan_object.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
 
     scan_object.transform.scale = glm::vec3(5.0f);
 
@@ -219,8 +227,8 @@ int main() {
         &voxel_grid.local_voxel_write_list()
     );
 
-    glm::ivec3 block_size = glm::ivec3(10, 20, 30);
-    glm::ivec3 block_origin = glm::ivec3(0, 30, 0);
+    glm::ivec3 block_size = glm::ivec3(1, 5, 5);
+    glm::ivec3 block_origin = glm::ivec3(5, 0, 0);
     std::vector<VoxelWriteGPU> test_voxel_writes;
     test_voxel_writes.reserve(static_cast<size_t>(block_size.x * block_size.y * block_size.z));
 
@@ -252,6 +260,23 @@ int main() {
     engine.compute_submit(compute_command_buffer, &compute_fence);
     compute_fence.wait();
 
+    voxel_grid.update(window, camera);
+
+
+    // VoxelGridChunk chunk = voxel_grid.read_chunk(glm::ivec3(0, 0, 0));
+    // glm::uvec3 read_chunk_size = chunk.chunk_size();
+
+    // for (int x = 0; x < read_chunk_size.x; x++)
+    //     for (int y = 0; y < read_chunk_size.y; y++)
+    //         for (int z = 0; z < read_chunk_size.z; z++) {
+    //             VoxelDataGPU voxel = chunk.voxel(glm::uvec3(x, y, z));
+    //             glm::vec4 color = voxel.color_vec4();
+
+    //             if (color.x != 0 || color.y != 0 || color.z != 0)
+    //                 std::cout << "pos: (" << x << ", " << y << ", " << z << ")" << std::endl;
+    //         }
+
+
 
     uint32_t max_write_count = 100000;
     VulkanBuffer voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * max_write_count);
@@ -279,7 +304,57 @@ int main() {
         skybox_exposure
     );
 
-    
+    constexpr uint32_t segment_count = 128;
+
+    constexpr float x_start = -10.0f;
+    constexpr float x_end = 10.0f;
+
+    constexpr float amplitude = 2.0f;
+    constexpr float frequency = 1.0f;
+
+    const glm::vec4 color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
+    std::vector<LineInstance> lines;
+    lines.reserve(segment_count);
+
+    auto make_point = [](float x) {
+        constexpr float amplitude = 2.0f;
+        constexpr float frequency = 1.0f;
+
+        return glm::vec3(
+            x,
+            0.0f,
+            std::sin(x * frequency) * amplitude
+        );
+    };
+
+    for (uint32_t i = 0; i < segment_count; i++) {
+        float t0 = static_cast<float>(i) / static_cast<float>(segment_count);
+        float t1 = static_cast<float>(i + 1) / static_cast<float>(segment_count);
+
+        float x0 = glm::mix(x_start, x_end, t0);
+        float x1 = glm::mix(x_start, x_end, t1);
+
+        lines.push_back(LineInstance{
+            .p0 = make_point(x0),
+            .p1 = make_point(x1),
+            .color = color
+        });
+    }
+
+    LineCloud line_cloud(
+        engine,
+        mesh_manager.line_quad,
+        material_instance_manager.line,
+        lines
+    );
+
+    line_cloud.set_material_data(LineMaterialData{
+        .color = glm::vec4(245.0f, 176.0f, 66.0f, 255.0f) * glm::vec4(1/255.0f),
+        .line_width_pixels = 10
+    });
+    line_cloud.sync_material();
+
     
     // LidarVideo lidar_video(manager_bundle, 
     //                        point_cloud_preprocessor,
@@ -322,6 +397,8 @@ int main() {
     //     lidar_video.get_scan(0).normal_buffer(), 
     //     lidar_video.get_scan(0).point_cloud().point_count());
 
+    OccupancyGrid3D occupancy_gird_3d(voxel_grid);
+
     VoxelPointMap voxel_point_map(engine, 1500000, 1500000);
     voxel_map_reseter.reset(voxel_point_map);
 
@@ -343,6 +420,7 @@ int main() {
     // scene.add(lidar_scan);
     scene.add(scan_object);
     // scene.add(voxel_map_point_cloud);
+    scene.add(line_cloud);
     
     skybox.update(scene);
 
@@ -430,10 +508,6 @@ int main() {
         //     // voxel_map_inserter.insert(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
         //     // voxel_grid.voxelize_point_cloud(engine, current_scan.point_cloud(), voxel_write_list, max_write_count);
         // }
-
-
-    
-
 
         // if (auto scan = scan_receiver.try_pop_scan(manager_bundle)) {
         //     if (network_scan) {

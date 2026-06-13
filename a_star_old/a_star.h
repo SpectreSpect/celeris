@@ -1,16 +1,12 @@
 #pragma once
-
-#include <glm/glm.hpp>
+#include "occupancy_grid_3d.h"
 #include <queue>
 #include <vector>
 #include <set>
 #include <iostream>
 #include <algorithm>
-
-#include "occupancy_grid_3d.h"
-#include "../math_utils.h"
-// #include "../voxel_engine/voxel_grid.h"
-// #include "voxel_occupancy_grid_3d.h"
+#include "../voxel_engine/voxel_grid.h"
+#include "voxel_occupancy_grid_3d.h"
 
 struct AStarCell {
     float g;
@@ -34,8 +30,6 @@ struct PlainAstarData {
     std::vector<float> dist_to_end;
 };
 
-class VoxelGrid;
-
 class AStar {
 public:
     const int max_step_up = 500;
@@ -43,9 +37,9 @@ public:
     const int max_y_diff = 1;
     bool allow_diagonal_moves = false;
 
-    
-    // AStar();
-    AStar(VoxelGrid& voxel_grid);
+    OccupancyGrid3D* grid;
+    AStar();
+    AStar(VoxelGrid* voxel_grid);
 
     virtual float get_heuristic(glm::ivec3 a, glm::ivec3 b);
 
@@ -53,7 +47,4 @@ public:
     // bool adjust_to_ground(glm::ivec3& voxel_pos, int max_step_up = 1, int max_drop = 1);
     // virtual std::vector<glm::ivec3> find_path(glm::ivec3 start_pos, glm::ivec3 end_pos);
     virtual PlainAstarData find_path(glm::ivec3 start_pos, glm::ivec3 end_pos);
-
-private:
-    OccupancyGrid3D m_grid;
 };

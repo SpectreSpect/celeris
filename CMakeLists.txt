@@ -110,6 +110,9 @@ add_executable(app
   renderer/point_cloud/gicp/voxel_map_point_reseter.cpp
   renderer/point_cloud/gicp/gicp_reductor.cpp
   renderer/point_cloud/point_cloud_mesher.cpp
+
+  renderer/lines/line_cloud.cpp
+
   imgui_layer.cpp
   renderer/lighting_system/lighting_system.cpp
   voxel_grid_vulkan/voxel_grid.cpp
@@ -126,6 +129,7 @@ add_executable(app
   renderer/pbr/pbr_maps.cpp
   renderer/pbr/pbr_map_generator.cpp
   renderer/point_cloud/point_cloud_preprocessor.cpp
+  a_star/occupancy_grid_3d.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

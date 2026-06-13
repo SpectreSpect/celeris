@@ -19,7 +19,7 @@ public:
 
     RenderObject(Mesh& mesh, SlotPassInstance& material);
     RenderObject(MeshView mesh_view, SlotPassInstance& material);
-    ~RenderObject();
+    ~RenderObject() noexcept override;
 
     RenderObject(const RenderObject&) = delete;
     RenderObject& operator=(const RenderObject&) = delete;
@@ -66,6 +66,8 @@ public:
     virtual void render(Renderer& renderer, VulkanCommandBuffer& command_buffer, const glm::mat4& world_transform);
 
 private:
+    void destroy() noexcept;
+
     // Mesh& m_mesh;
     MeshView m_mesh_view;
     SlotPassInstance* m_material = nullptr;

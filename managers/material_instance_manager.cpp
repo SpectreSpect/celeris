@@ -11,6 +11,7 @@ MaterialInstanceManager::MaterialInstanceManager(VulkanEngine& engine, MaterialM
         rock_blinn_phong(material_manager.create_blinn_phong_material(engine, texture_manager.rock_texture)),
         dirt_blinn_phong(material_manager.create_blinn_phong_material(engine, texture_manager.dirt_texture)),
         point_cloud(create_mi(material_manager.point_mp, sizeof(UnlitMaterialData))),
+        line(create_mi(material_manager.line_mp, sizeof(LineMaterialData))),
         st_peters_square_night_4k_hdr(material_manager.create_skybox_material(engine, texture_manager.hdr_env_maps[TextureManager::st_peters_square_night_4k_pbr_map_id])),
         dirt_pbr(material_manager.create_pbr_material(engine, texture_manager.irradiance_maps, texture_manager.prefilter_maps, texture_manager.brdf_lut)),
         pbr(material_manager.create_pbr_material(engine, texture_manager.irradiance_maps, texture_manager.prefilter_maps, texture_manager.brdf_lut)),

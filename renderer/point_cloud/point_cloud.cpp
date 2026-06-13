@@ -70,10 +70,14 @@ void PointCloud::set_points(const std::vector<PointInstance>& points) {
 
     logger.check(!points.empty(), "Points vector was empty");
 
-    m_instance_batch->set_instance_count(points.size());
-    m_instance_batch->buffer().upload(points.data(), points.size() * sizeof(PointInstance));
+    // m_instance_batch->set_instance_count(points.size());
+    // m_instance_batch->buffer().upload(points.data(), points.size() * sizeof(PointInstance));
     
-    set_instance_view(m_instance_batch->get_view());
+    // set_instance_view(m_instance_batch->get_view());
+
+
+    set_instance_count(points.size());
+    instance_buffer().upload(points);
 }
 
 uint32_t PointCloud::point_count() const noexcept {

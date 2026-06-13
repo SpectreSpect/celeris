@@ -12,19 +12,28 @@ public:
 
     InstancedRenderObject(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material);
     InstancedRenderObject(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material, InstanceBatch& instance_batch);
-    InstancedRenderObject(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material,
-        VulkanBuffer& instance_buffer, uint32_t instance_count, uint32_t instance_size);
-    virtual void render(Renderer& renderer, VulkanCommandBuffer& command_buffer, const glm::mat4& world_transform);
+    InstancedRenderObject(
+        VulkanEngine& engine,
+        Mesh& mesh,
+        SlotPassInstance& material,
+        VulkanBuffer& instance_buffer,
+        uint32_t instance_count,
+        uint32_t instance_size
+    );
 
-    void set_instance_view(InstanceBufferView instance_buffer_view);
-    bool instance_buffer_view_valid() const;
     uint32_t instance_count() const;
+    void set_instance_count(uint32_t count);
+
     uint32_t instance_size() const;
-    InstanceBufferView get_instance_view() const;
 
     const VulkanBuffer& instance_buffer() const;
     VulkanBuffer& instance_buffer();
-    
+
+    InstanceBufferView instance_view() const;
+    void set_instance_view(InstanceBufferView instance_buffer_view);
+
+    bool instance_buffer_view_valid() const;
+    virtual void render(Renderer& renderer, VulkanCommandBuffer& command_buffer, const glm::mat4& world_transform);
 
 private:
     // InstanceBatch instance_data;

@@ -64,12 +64,14 @@ public:
     ComputePass hash_table_conditional_dispatch_adapter_cp;
     ComputePass clear_chunk_hash_table_cp;
     ComputePass fill_chunk_hash_table_cp;
+    ComputePass read_voxel_grid_chunk_cp;
     ComputePass voxel_writes_from_point_cloud_cp;
 
     // Voxelizator
     ComputePass alloc_active_chunk_triangles_cp;
     ComputePass fill_triangle_indices_cp;
     ComputePass mark_and_count_active_chunks_cp;
+    ComputePass mark_and_count_fail_slots_cp;
     ComputePass reset_voxelize_pipeline_cp;
     ComputePass voxelize_triangles_cp;
 
@@ -140,12 +142,14 @@ public:
     ComputePass create_hash_table_conditional_dispatch_adapter_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_clear_chunk_hash_table_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_fill_chunk_hash_table_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_read_voxel_grid_chunk_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_voxel_writes_from_point_cloud_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
     // Voxelizator
     ComputePass create_alloc_active_chunk_triangles_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_fill_triangle_indices_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_mark_and_count_active_chunks_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_mark_and_count_fail_slots_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_reset_voxelize_pipeline_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_voxelize_triangles_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 

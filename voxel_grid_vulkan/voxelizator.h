@@ -6,6 +6,9 @@
 #include <concepts>
 #include <type_traits>
 
+#include <utility>
+#include <cstdint>
+
 #include "../vulkan_self/logger/logger_header.h"
 #include "../vulkan_self/vulkan_buffer.h"
 #include "../vulkan_self/vulkan_command_buffer.h"
@@ -31,7 +34,9 @@ public:
         glm::ivec3 chunk_size;
         glm::vec3 voxel_size;
         uint32_t counter_hash_table_size;
+        uint32_t count_hash_table_failure_slots;
         uint32_t count_voxel_writes;
+        uint32_t count_hash_table_attempts;
     };
 
     typedef VoxelizatorParams VoxelizatorDesc;
@@ -80,8 +85,27 @@ public:
         VulkanBuffer* voxel_writes_buffer = out_voxel_writes ? out_voxel_writes : &m_buffers.voxel_writes;
 
         reset_voxelize_pipline(command_buffer, *voxel_writes_buffer, out_voxel_writes == nullptr);
-
+        
+        reset_failure_slots_counter(command_buffer, m_buffers.counter_hash_table_failure_slots);
         mark_and_count_active_chunks(command_buffer, mesh, vertex_position_offset, vertex_stride, transform);
+
+        VulkanBuffer* readable_failure_slots_buffer = &m_buffers.counter_hash_table_failure_slots;
+        VulkanBuffer* writable_failure_slots_buffer = &m_buffers.counter_hash_table_failure_slots_additional;
+        for (uint32_t attempt = 0; attempt < m_params.count_hash_table_attempts; attempt++) {
+            reset_failure_slots_counter(command_buffer, *writable_failure_slots_buffer);
+            m_shader_helper.prepare_dispatch_args(
+                command_buffer,
+                m_buffers.dispatch_args,
+                BufferDispatchArg(readable_failure_slots_buffer, 0)
+            );    
+            mark_and_count_fail_slots(
+                command_buffer,
+                m_buffers.dispatch_args,
+                *readable_failure_slots_buffer,
+                *writable_failure_slots_buffer
+            );
+            std::swap(readable_failure_slots_buffer, writable_failure_slots_buffer);
+        }
 
         m_shader_helper.prepare_dispatch_args(
             command_buffer,
@@ -149,6 +173,8 @@ private:
     struct VoxelizatorBuffers {
         VulkanBuffer dispatch_args;
         VulkanBuffer counter_hash_table;
+        VulkanBuffer counter_hash_table_failure_slots;
+        VulkanBuffer counter_hash_table_failure_slots_additional;
         VulkanBuffer active_chunk_keys_list;
         VulkanBuffer triangle_indices_list;
         VulkanBuffer voxel_writes;
@@ -157,6 +183,7 @@ private:
     struct VoxelizatorPassInstances {
         PassInstance reset_voxelize_pipeline_pi;
         PassInstance mark_and_count_active_chunks_pi;
+        PassWriter mark_and_count_fail_slots_pw;
         PassInstance alloc_active_chunk_triangles_pi;
         PassInstance fill_triangle_indices_pi;
         PassInstance voxelize_triangles_pi;
@@ -187,12 +214,19 @@ private:
     void submit_compute_commands();
 
     void reset_voxelize_pipline(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_writes, bool reset_voxel_write_list = true);
+    void reset_failure_slots_counter(VulkanCommandBuffer& command_buffer, VulkanBuffer& failure_slots);
     void mark_and_count_active_chunks(
         VulkanCommandBuffer& command_buffer,
         MeshView mesh,
         uint32_t position_attribute_offset,
         uint32_t vertex_stride,
         glm::mat4 transform = glm::identity<glm::mat4>()
+    );
+    void mark_and_count_fail_slots(
+        VulkanCommandBuffer& command_buffer,
+        const VulkanBuffer& dispatch_args,
+        VulkanBuffer& readable_failure_slots,
+        VulkanBuffer& writable_failure_slots
     );
     void alloc_active_chunk_triangles(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void fill_triangle_indices(

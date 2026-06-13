@@ -8,7 +8,7 @@
 #include <type_traits>
 
 #include "../../vulkan_self/logger/logger_header.h"
-#include "../../vulkan_self/pass/instance/pass_instance.h"
+#include "../../vulkan_self/pass/instance/pass_writer.h"
 #include "../../vulkan_self/vulkan_command_buffer.h"
 #include "../../vulkan_self/vulkan_command_pool.h"
 #include "../../vulkan_self/vulkan_fence.h"
@@ -18,6 +18,7 @@
 #include "../../math_utils.h"
 
 class VulkanDevice;
+class VulkanPhysicalDevice;
 class ComputePassManager;
 class VulkanQueue;
 
@@ -28,7 +29,8 @@ public:
     _XCLASS_NAME(PointCloudMesher);
 
     explicit PointCloudMesher(
-        const VulkanDevice& device,
+        const VulkanPhysicalDevice& physical_device,
+        VulkanDevice& device,
         VulkanQueue& queue,
         ComputePassManager& compute_pass_manager,
         uint32_t count_points_in_lidar_ring
@@ -88,7 +90,7 @@ public:
         constexpr uint32_t vertex_position_offset_bytes = offsetof(Vertex, position);
         constexpr uint32_t vertex_normal_offset_bytes = offsetof(Vertex, normal);
 
-        constexpr uint32_t vertex_color_offset_bytes = DONT_SET_COLOR;
+        uint32_t vertex_color_offset_bytes = DONT_SET_COLOR;
 
         if constexpr (requires(const Vertex& obj){obj.color;}) {
             static_assert(
@@ -99,16 +101,21 @@ public:
             vertex_color_offset_bytes = offsetof(Vertex, color);
         }
 
-        m_generate_mesh_pi.set_storage_buffer(0, point_cloud.instance_buffer());
-        m_generate_mesh_pi.set_storage_buffer(1, vertex_buffer);
-        m_generate_mesh_pi.set_storage_buffer(2, index_buffer);
+        m_valid_triangle_count_buffer.fill(command_buffer, 0u, sizeof(uint32_t));
+        m_valid_triangle_count_buffer.transfer_write_to_compute_read_write_barrier(command_buffer, 0u, sizeof(uint32_t));
 
-        m_generate_mesh_pi.bind(command_buffer);
+        m_generate_mesh_pw.set_storage_buffer(0, point_cloud.instance_buffer());
+        m_generate_mesh_pw.set_storage_buffer(1, vertex_buffer);
+        m_generate_mesh_pw.set_storage_buffer(2, index_buffer);
+        m_generate_mesh_pw.set_storage_buffer(3, m_valid_triangle_count_buffer);
+
+        m_generate_mesh_pw.bind(command_buffer);
 
         uint32_t count_triangles_in_lidar_ring = m_count_points_in_lidar_ring * 2 - 2;
 
-        m_generate_mesh_pi.push_constants(command_buffer, GenerateMeshPushConstants{
+        m_generate_mesh_pw.push_constants(command_buffer, GenerateMeshPushConstants{
             .count_triangles_in_lidar_ring = count_triangles_in_lidar_ring,
+            .count_points_in_lidar_ring = m_count_points_in_lidar_ring,
 
             .point_stride_bytes = point_stride_bytes,
             .point_position_offset_bytes = point_position_offset_bytes,
@@ -147,10 +154,17 @@ public:
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
             VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDEX_READ_BIT
         );
+        m_valid_triangle_count_buffer.memory_barrier(
+            command_buffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_HOST_BIT,
+            VK_ACCESS_HOST_READ_BIT
+        );
     }
 
     template<class Vertex, class PointInstance>
-    void convert_to_mesh(
+    uint32_t convert_to_mesh(
         const PointCloud& point_cloud,
         VulkanBuffer& vertex_buffer,
         VulkanBuffer& index_buffer)
@@ -167,6 +181,10 @@ public:
             );
         }
         submit_compute_commands();
+
+        uint32_t valid_triangle_count = 0u;
+        m_valid_triangle_count_buffer.read(&valid_triangle_count, sizeof(valid_triangle_count), 0u);
+        return valid_triangle_count * 3u;
     }
 
     void submit_compute_commands();
@@ -178,7 +196,8 @@ private:
     VulkanCommandBuffer m_command_buffer;
     VulkanFence m_fence;
 
-    PassInstance m_generate_mesh_pi;
+    PassWriter m_generate_mesh_pw;
+    VulkanBuffer m_valid_triangle_count_buffer;
 
     uint32_t m_count_points_in_lidar_ring = 0;
 };

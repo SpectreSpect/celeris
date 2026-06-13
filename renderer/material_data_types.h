@@ -68,3 +68,8 @@ struct PointUniform {
     int screen_space_size;
     float pad;
 };
+
+struct alignas(16) LineMaterialData {
+    alignas(16) glm::vec4 color;
+    float line_width_pixels;
+};

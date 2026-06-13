@@ -312,4 +312,16 @@ namespace StaticMeshData{
         0, 1, 5,
         5, 4, 0
     };
+
+    inline std::vector<float> line_quad_vertices = {
+        0.0f, -1.0f,
+        1.0f, -1.0f,
+        1.0f,  1.0f,
+        0.0f,  1.0f
+    };
+
+    inline std::vector<uint32_t> line_quad_indices = {
+        0, 1, 2,
+        2, 3, 0
+    };
 }

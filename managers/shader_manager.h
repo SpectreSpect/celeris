@@ -16,6 +16,9 @@ public:
 
     VulkanShaderModule point_vs;
     VulkanShaderModule point_fs;
+
+    VulkanShaderModule line_vs;
+    VulkanShaderModule line_fs;    
     
     VulkanShaderModule skybox_vs;
     VulkanShaderModule skybox_fs;
@@ -69,6 +72,7 @@ public:
     VulkanShaderModule hash_table_conditional_dispatch_adapter_cs;
     VulkanShaderModule clear_chunk_hash_table_cs;
     VulkanShaderModule fill_chunk_hash_table_cs;
+    VulkanShaderModule read_voxel_grid_chunk_cs;
 
     VulkanShaderModule voxel_writes_from_point_cloud_cs;
 
@@ -76,6 +80,7 @@ public:
     VulkanShaderModule alloc_active_chunk_triangles_cs;
     VulkanShaderModule fill_triangle_indices_cs;
     VulkanShaderModule mark_and_count_active_chunks_cs;
+    VulkanShaderModule mark_and_count_fail_slots_cs;
     VulkanShaderModule reset_voxelize_pipeline_cs;
     VulkanShaderModule voxelize_triangles_cs;
     

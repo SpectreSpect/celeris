@@ -14,6 +14,7 @@ public:
 
     bool valid() const noexcept;
     uint32_t instance_count() const noexcept;
+    void set_instance_count(uint32_t instance_count);
     uint32_t instance_size() const noexcept;
     
     const VulkanBuffer& buffer() const;

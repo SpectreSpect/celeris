@@ -56,7 +56,21 @@ struct alignas(8) VoxelDataGPU {
         this->type_flags = (flags << VOXEL_TYPE_BITS) | (type & VOXEL_TYPE_MASK);
         this->color = color;
     }
+
+    inline glm::vec4 color_vec4() const {
+        return glm::vec4(
+            static_cast<float>((color >> 24u) & 0xFFu),
+            static_cast<float>((color >> 16u) & 0xFFu),
+            static_cast<float>((color >> 8u) & 0xFFu),
+            static_cast<float>(color & 0xFFu)
+        ) / 255.0f;
+    }
+
+    inline bool is_solid() const {
+        return ((type_flags >> VOXEL_TYPE_BITS) & VOXEL_VISABILITY_FLAG_BIT) > 0;
+    }
 };
+
 static_assert(sizeof(VoxelDataGPU) == 8);
 static_assert(alignof(VoxelDataGPU) == 8);
 
@@ -209,14 +223,3 @@ static_assert(offsetof(BuildIndirectCmdsUniform, u_vb_page_verts) == 56);
 static_assert(offsetof(BuildIndirectCmdsUniform, u_ib_page_inds) == 60);
 static_assert(offsetof(BuildIndirectCmdsUniform, render_distance) == 64);
 static_assert(sizeof(BuildIndirectCmdsUniform) == 80);
-
-// layout(std430, set = 0, binding=7) buffer UniformBuffer  { 
-//     uint u_vb_pages;
-//     uint u_ib_pages;
-//     uint u_vb_nodes;
-//     uint u_ib_nodes;
-//     uint u_vb_heads_count;
-//     uint u_ib_heads_count;
-//     uint u_max_chunks;
-//     uint pad0;
-// } ubo;
