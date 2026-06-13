@@ -637,8 +637,7 @@ void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos en
     state_g_score = std::unordered_map<uint64_t, float>();
     state_path = std::vector<NonholonomicPos>();
     state_explored_paths = std::vector<LineInstance>();
-    state_start_pos = start_pos;
-    state_end_pos = end_pos;
+    
     state_counter = 0;
     
     min_radius = wheel_base / std::tan(max_steer);
@@ -647,6 +646,18 @@ void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos en
 
     if (state_plain_astar_path.path.empty())
         return;
+    
+    if (state_plain_astar_path.reached_precipice) {
+        glm::vec3 pos = state_plain_astar_path.path.back();
+        glm::vec3 dir_to_end = glm::normalize(end_pos.pos - pos);
+        float theta = std::atan2(dir_to_end.z, dir_to_end.x);
+        
+        end_pos.pos = pos;
+        end_pos.theta = theta;
+    }
+
+    state_start_pos = start_pos;
+    state_end_pos = end_pos;
 
     unimpended_astar_positions = std::vector<NonholonomicPos>();
 

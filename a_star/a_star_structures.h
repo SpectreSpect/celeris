@@ -24,6 +24,7 @@ struct ByPriority {
 struct PlainAstarData {
     std::vector<glm::ivec3> path;
     std::vector<float> dist_to_end;
+    bool reached_precipice = false;
 };
 
 struct NonholonomicPos {

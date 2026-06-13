@@ -18,7 +18,7 @@ public:
     bool adjust_to_ground(std::vector<glm::vec3>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1, bool allow_flying_over_precepices = true);
     bool adjust_to_ground(std::vector<glm::ivec3>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1, bool allow_flying_over_precepices = true);
     bool adjust_to_ground(std::vector<NonholonomicPos>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1, bool allow_flying_over_precepices = true);
-    bool adjust_to_ground(glm::vec3& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1, bool allow_flying_over_precepices = true);
+    bool adjust_to_ground(glm::vec3& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1, bool allow_flying_over_precepices = true, uint32_t* status = nullptr);
     bool get_closest_invisible_top_pos(glm::ivec3 pos, glm::ivec3 &result, int scan_height);
     bool get_closest_visible_bottom_pos(glm::ivec3 pos, glm::ivec3 &result, int max_drop);
     bool get_ground_positions(glm::vec3 pos1, glm::vec3 pos2, std::vector<glm::ivec3>& output, int max_step_up = 500, int max_drop = 500, int max_y_diff = -1);

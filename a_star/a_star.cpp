@@ -1,5 +1,7 @@
 #include "a_star.h"
 
+#include <cmath>
+
 // AStar::AStar() {
 //     this->grid = new OccupancyGrid3D();
 // }
@@ -8,6 +10,46 @@ AStar::AStar(VoxelGrid& voxel_grid) : m_grid(voxel_grid) {}
 
 float AStar::get_heuristic(glm::ivec3 a, glm::ivec3 b) {
     return glm::distance(glm::vec3(a), glm::vec3(b));
+}
+
+std::vector<glm::ivec3> AStar::get_straight_path(glm::ivec3& start, glm::ivec3& end, std::vector<glm::ivec3>& out_path) {
+    // std::vector<glm::ivec3> path;
+
+    glm::ivec3 delta = end - start;
+    int steps = std::max({std::abs(delta.x), std::abs(delta.y), std::abs(delta.z)});
+
+    out_path.clear();
+    out_path.reserve(steps + 1);
+
+    if (steps == 0) {
+        out_path.push_back(start);
+        return out_path;
+    }
+
+    glm::vec3 start_f = glm::vec3(start);
+    glm::vec3 step = glm::vec3(delta) / static_cast<float>(steps);
+
+    for (int i = 0; i <= steps; i++) {
+        glm::vec3 p = start_f + step * static_cast<float>(i);
+        out_path.push_back(glm::ivec3(glm::round(p)));
+    }
+
+    return out_path;
+}
+
+bool AStar::try_straight_shot(glm::ivec3& start, glm::ivec3& end, std::vector<glm::ivec3>& out_path) {
+    get_straight_path(start, end, out_path);
+
+    if (out_path.empty())
+        return false;
+
+    if (!m_grid.adjust_to_ground(out_path, max_step_up, max_drop, max_y_diff))
+        return false;
+
+    // if (!crosses_extreme_curvature(out_path, curvature_limit))
+    //     return false;
+    
+    return true;
 }
 
 PlainAstarData AStar::reconstruct_path(std::unordered_map<uint64_t, AStarCell> closed_heap, glm::ivec3 pos) {
@@ -139,6 +181,32 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
         
         closed_heap[cur_key] = cur_cell;
 
+        if (use_straight_fallback && counter % try_straight_interval == 0) {
+            std::vector<glm::ivec3> out_path;
+            if (try_straight_shot(cur_cell.pos, end_pos, out_path)) {
+                PlainAstarData data = reconstruct_path(closed_heap, cur_cell.pos);
+
+                if (out_path.size() == 1)
+                    return data;
+
+                float dist_to_end = data.dist_to_end.back();
+                glm::ivec3 prev_pos = data.path.back();
+
+                for (int i = 1; i < out_path.size(); i++) {
+                    glm::ivec3& cur_pos = out_path[i];
+
+                    dist_to_end += glm::distance((glm::vec3)cur_pos, (glm::vec3)prev_pos);
+                    
+                    data.path.push_back(cur_pos);
+                    data.dist_to_end.push_back(dist_to_end);
+                    
+                    prev_pos = out_path[i];
+                }
+
+                return data;
+            }
+        }
+
         counter++;
 
         if (cur_cell.pos == end_pos) {
@@ -162,8 +230,19 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
 
                 glm::vec3 new_pos = glm::vec3(nx, ny, nz);
 
-                if (!m_grid.adjust_to_ground(new_pos, max_step_up, max_drop, max_y_diff, -1))
+                uint32_t status = 0;
+
+                if (!m_grid.adjust_to_ground(new_pos, max_step_up, max_drop, max_y_diff, false, &status)) {
                     continue;
+                    // if (status != 1)
+                    //     continue;
+                    
+                    // PlainAstarData data = reconstruct_path(closed_heap, cur_cell.pos);
+                    // data.reached_precipice = true;
+
+                    // return data;
+                }
+                    
 
                 uint64_t new_key = math_utils::pack_key(new_pos.x, new_pos.y, new_pos.z);
                 auto heap_it = closed_heap.find(new_key);

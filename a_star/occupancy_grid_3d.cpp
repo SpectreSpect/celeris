@@ -337,16 +337,20 @@ bool OccupancyGrid3D::adjust_to_ground(std::vector<NonholonomicPos>& output, int
     return ok;
 }
 
-bool OccupancyGrid3D::adjust_to_ground(glm::vec3& output, int max_step_up, int max_drop, int max_y_diff, bool allow_flying_over_precepices) {
+bool OccupancyGrid3D::adjust_to_ground(glm::vec3& output, int max_step_up, int max_drop, int max_y_diff, bool allow_flying_over_precepices, uint32_t* status) {
     glm::ivec3 norm_pos = glm::ivec3(glm::floor(output));
     glm::ivec3 result_pos = norm_pos;
 
     if(!get_closest_visible_bottom_pos(norm_pos, result_pos, max_drop)) {
+        if (status)
+            *status = 1;
         return allow_flying_over_precepices; // couldn't find
     }
 
     if ((int)norm_pos.y == (int)result_pos.y) {
         if (!get_closest_invisible_top_pos(norm_pos + glm::ivec3(0, 1, 0), result_pos, max_step_up)) {
+            if (status)
+                *status = 2;
             return false; // couldn't find
         }
     }
@@ -356,11 +360,15 @@ bool OccupancyGrid3D::adjust_to_ground(glm::vec3& output, int max_step_up, int m
     if (max_y_diff >= 0) {
         float diff = std::abs(result_pos.y - norm_pos.y);
         if (diff > max_y_diff) {
+            if (status)
+                *status = 3;
             return false;
         }
     }
     
     output.y = result_pos.y;
+    if (status)
+        *status = 4;
     return true;
 }
 
