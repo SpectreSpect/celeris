@@ -5,8 +5,6 @@
 #include "../vulkan_self/vulkan_queue.h"
 #include "../managers/compute_pass_manager.h"
 #include "../vulkan_self/descriptor_set/descriptor_pool.h"
-#include "shader_helper/buffer_dispatch_arg.h"
-#include "shader_helper/value_dispatch_arg.h"
 #include "../vulkan_self/push_constants_structures.h"
 #include "../math_utils.h"
 
@@ -89,56 +87,6 @@ void Voxelizator::submit_compute_commands() {
     m_queue->submit(m_command_buffer, &m_fence);
     m_fence.wait();
     m_command_buffer.reset();
-}
-
-void Voxelizator::voxelize(
-    VulkanCommandBuffer& command_buffer,
-    const VoxelWriteGPU& prifab,
-    MeshView mesh,
-    uint32_t position_attribute_offset,
-    uint32_t vertex_stride,
-    glm::mat4 transform,
-    VulkanBuffer* out_voxel_writes)
-{
-    LOG_METHOD();
-    VulkanBuffer* voxel_writes_buffer = out_voxel_writes ? out_voxel_writes : &m_buffers.voxel_writes;
-
-    reset_voxelize_pipline(command_buffer, *voxel_writes_buffer, out_voxel_writes == nullptr);
-
-    mark_and_count_active_chunks(command_buffer, mesh, position_attribute_offset, vertex_stride, transform);
-
-    m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, BufferDispatchArg(&m_buffers.active_chunk_keys_list, 0));
-    alloc_active_chunk_triangles(command_buffer, m_buffers.dispatch_args);
-
-    fill_triangle_indices(command_buffer, mesh, position_attribute_offset, vertex_stride, transform);
-
-    m_shader_helper.prepare_dispatch_args(
-        command_buffer,
-        m_buffers.dispatch_args, 
-        ValueDispatchArg(m_params.chunk_size.x * m_params.chunk_size.y * m_params.chunk_size.z), 
-        BufferDispatchArg(&m_buffers.active_chunk_keys_list, 0)
-    );
-    voxelize_chunks(
-        command_buffer,
-        m_buffers.dispatch_args,
-        *voxel_writes_buffer,
-        prifab.voxel_data.type_flags,
-        prifab.voxel_data.color,
-        prifab.set_flags,
-        mesh,
-        position_attribute_offset,
-        vertex_stride,
-        transform
-    );
-
-    if (out_voxel_writes == nullptr) {
-        logger.throw_error("Not implemented yet :D");
-        // if (gridable_gpu != nullptr) {
-        //     gridable_gpu->set_voxels(voxel_writes_);
-        // } else {
-        //     //TODO
-        // }
-    }
 }
 
 void Voxelizator::reset_voxelize_pipline(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_writes, bool reset_voxel_write_list) {

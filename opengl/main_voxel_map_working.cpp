@@ -260,7 +260,7 @@ public:
                 continue;
 
             PointInstance p;
-            p.pos = glm::vec4(cell.centroid(), 1.0f);
+            p.position = glm::vec4(cell.centroid(), 1.0f);
             p.color = color;
             out.push_back(p);
         }
@@ -295,7 +295,7 @@ int find_closest_id(const std::vector<PointInstance>& target_points,
     float min_dist = max_dist_sq;
 
     for (size_t i = 0; i < target_points.size(); i++) {
-        float dist = glm::distance2(glm::vec3(target_points[i].pos), point);
+        float dist = glm::distance2(glm::vec3(target_points[i].position), point);
         if (dist < min_dist) {
             min_dist = dist;
             min_id = (int)i;
@@ -399,7 +399,7 @@ void icp_step(const std::vector<PointInstance>& source_points,
     int valid_count = 0;
     for (size_t i = 0; i < source_points.size(); i++) {
         // int target_id = correspondences[i];
-        glm::vec3 p = glm::vec3(source_points[i].pos);
+        glm::vec3 p = glm::vec3(source_points[i].position);
         glm::vec3 x = R * p + t;
         
         int target_id = find_closest_id(target_points, x, max_corr_dist_sq);
@@ -408,7 +408,7 @@ void icp_step(const std::vector<PointInstance>& source_points,
         }
         // int target_id = (int)i;
         
-        glm::vec3 q = glm::vec3(target_points[target_id].pos);
+        glm::vec3 q = glm::vec3(target_points[target_id].position);
         glm::vec3 n = glm::normalize(target_normals[target_id]);
 
         glm::vec3 a = glm::cross(x, n);
@@ -602,7 +602,7 @@ double icp_step(PointCloud& source_point_cloud,
     target_normals_world.reserve(target_points.size());
 
     for (size_t i = 0; i < target_points.size(); i++) {
-        glm::vec3 q_local = glm::vec3(target_points[i].pos);
+        glm::vec3 q_local = glm::vec3(target_points[i].position);
         target_points_world.push_back(transform_point_world(target_point_cloud, q_local));
         target_normals_world.push_back(transform_normal_world(target_point_cloud, target_normals[i]));
     }
@@ -611,7 +611,7 @@ double icp_step(PointCloud& source_point_cloud,
     int valid_count = 0;
 
     for (size_t i = 0; i < source_points.size(); i++) {
-        glm::vec3 p_local = glm::vec3(source_points[i].pos);
+        glm::vec3 p_local = glm::vec3(source_points[i].position);
 
         // Current source point in world space
         glm::vec3 x = transform_point_world(source_point_cloud, p_local);
@@ -824,7 +824,7 @@ double gicp_step(PointCloud& source_point_cloud,
     // source_distances.reserve(source_points.size());
 
     for (size_t i = 0; i < target_points.size(); i++) {
-        glm::vec3 q_local = glm::vec3(target_points[i].pos);
+        glm::vec3 q_local = glm::vec3(target_points[i].position);
         glm::vec3 n_world = transform_normal_world(target_point_cloud, target_normals[i]);
 
         target_points_world.push_back(transform_point_world(target_point_cloud, q_local));
@@ -836,7 +836,7 @@ double gicp_step(PointCloud& source_point_cloud,
     int valid_count = 0;
 
     for (size_t i = 0; i < source_points.size(); i++) {
-        glm::vec3 p_local = glm::vec3(source_points[i].pos);
+        glm::vec3 p_local = glm::vec3(source_points[i].position);
 
         // Source point and source normal in world space
         glm::vec3 x = transform_point_world(source_point_cloud, p_local);
@@ -1005,7 +1005,7 @@ void insert_scan_into_voxel_map(const PointCloud& scan_point_cloud,
     }
 
     for (size_t i = 0; i < pts.size(); i++) {
-        glm::vec3 p_local = glm::vec3(pts[i].pos);
+        glm::vec3 p_local = glm::vec3(pts[i].position);
         glm::vec3 p_world = transform_point_world(scan_point_cloud, p_local);
 
         glm::vec3 n_world = transform_normal_world(scan_point_cloud, scan_normals[i]);
@@ -1029,7 +1029,7 @@ void rebuild_map_point_cloud_from_voxel_map(VoxelMap& voxel_map,
 
     for (size_t i = 0; i < map_points_world.size(); i++) {
         PointInstance p{};
-        p.pos = glm::vec4(map_points_world[i], 1.0f);
+        p.position = glm::vec4(map_points_world[i], 1.0f);
         p.color = glm::vec4(1.0f, 0.0f, 1.0f, 1.0f); // blue map
         instances.push_back(p);
     }
@@ -1116,7 +1116,7 @@ size_t remove_outlires(PointCloud& source_point_cloud,
     target_points_world.reserve(target_points.size());
 
     for (size_t i = 0; i < target_points.size(); i++) {
-        glm::vec3 q_local = glm::vec3(target_points[i].pos);
+        glm::vec3 q_local = glm::vec3(target_points[i].position);
         target_points_world.push_back(transform_point_world(target_point_cloud, q_local));
     }
 
@@ -1129,7 +1129,7 @@ size_t remove_outlires(PointCloud& source_point_cloud,
     size_t removed_count = 0;
 
     for (size_t i = 0; i < source_points.size(); i++) {
-        glm::vec3 p_local = glm::vec3(source_points[i].pos);
+        glm::vec3 p_local = glm::vec3(source_points[i].position);
         glm::vec3 x_world = transform_point_world(source_point_cloud, p_local);
 
         int target_id = find_closest_id(target_points_world, x_world, max_dist_sq);
@@ -1245,9 +1245,9 @@ int main() {
         for (int z = 0; z < size_z; z++) {
             PointInstance new_point{};
 
-            new_point.pos.x = static_cast<float>(x);
-            new_point.pos.z = static_cast<float>(z);
-            new_point.pos.w = 1.0f;
+            new_point.position.x = static_cast<float>(x);
+            new_point.position.z = static_cast<float>(z);
+            new_point.position.w = 1.0f;
 
             // Normalize grid coords to [-1, 1]
             float u = 2.0f * static_cast<float>(x) / static_cast<float>(size_x - 1) - 1.0f;
@@ -1272,7 +1272,7 @@ int main() {
                 + 0.65f * e1
                 - 0.40f * e2;
 
-            new_point.pos.y = h * amplitude;
+            new_point.position.y = h * amplitude;
             new_point.color = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
 
             target_points.push_back(new_point);
@@ -1313,7 +1313,7 @@ int main() {
             }
 
             PointInstance src_point = new_point;
-            glm::vec3 p3 = glm::vec3(new_point.pos);
+            glm::vec3 p3 = glm::vec3(new_point.position);
 
             // First apply the rigid transform
             glm::vec3 transformed = initial_R * p3 + source_translation;
@@ -1339,7 +1339,7 @@ int main() {
 
             transformed += local_offset;
 
-            src_point.pos = glm::vec4(transformed, 1.0f);
+            src_point.position = glm::vec4(transformed, 1.0f);
             src_point.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
 
             source_points.push_back(src_point);

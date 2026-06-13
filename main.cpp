@@ -204,17 +204,15 @@ int main() {
     );
 
     LidarScan lidar_scan(manager_bundle, point_cloud_preprocessor, path_utils::executable_dir() / "assets" / "lidar_scans" / "frame_000000.bin");
-    mesher.convert_to_mesh<PBRVertex>(
+    mesher.convert_to_mesh<PBRVertex, PointInstance>(
         lidar_scan.point_cloud(),
         scan_object.mesh_view().vertex_buffer_view().handle(),
-        scan_object.mesh_view().index_buffer_view().handle(),
-        sizeof(PointInstance),
-        offsetof(PointInstance, pos)
+        scan_object.mesh_view().index_buffer_view().handle()
     );
 
     scan_object.transform.scale = glm::vec3(5.0f);
 
-    voxelizator.voxelize_and_submit<PBRVertex>(
+    voxelizator.voxelize<PBRVertex>(
         blue_voxelize_prefab,
         scan_object.mesh_view(),
         scan_object.transform.get_model_matrix(),
