@@ -595,7 +595,7 @@ void get_points(std::vector<PointInstance>& points, std::vector<glm::vec4>& norm
     // }
 
     PointInstance point;
-    point.pos = glm::vec4(0, 0, 0, 1);
+    point.position = glm::vec4(0, 0, 0, 1);
     point.color = color;
 
     points.push_back(point);

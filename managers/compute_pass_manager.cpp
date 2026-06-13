@@ -166,6 +166,8 @@ ComputePass ComputePassManager::create_generate_mesh_compute_pass(VulkanDevice& 
 
     ComputePassBuilder builder;
 
+    builder.set_descriptor_set_flags(VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+
     builder.add_storage_buffer(0, ShaderStages::compute); // PointCloud
     builder.add_storage_buffer(1, ShaderStages::compute); // VertciesOut
     builder.add_storage_buffer(2, ShaderStages::compute); // IndicesOut

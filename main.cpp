@@ -202,15 +202,10 @@ int main() {
     );
 
     LidarScan lidar_scan(manager_bundle, point_cloud_preprocessor, path_utils::executable_dir() / "assets" / "lidar_scans" / "frame_000000.bin");
-    uint32_t scan_index_count = mesher.convert_to_mesh(
+    uint32_t scan_index_count = mesher.convert_to_mesh<PBRVertex, PointInstance>(
         lidar_scan.point_cloud(),
         scan_vertex_buffer,
-        scan_index_buffer,
-        sizeof(PointInstance),
-        offsetof(PointInstance, pos),
-        sizeof(PBRVertex),
-        offsetof(PBRVertex, position),
-        offsetof(PBRVertex, normal)
+        scan_index_buffer
     );
 
     MeshView scan_mesh_view(
@@ -223,13 +218,11 @@ int main() {
     // RenderObject scan_object(mesh_manager.cube.get_view(), material_instance_manager.pbr);
     scan_object.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
 
-    scan_object.transform.scale = glm::vec3(6.0f);
+    scan_object.transform.scale = glm::vec3(5.0f);
 
-    voxelizator.voxelize_and_submit(
+    voxelizator.voxelize<PBRVertex>(
         blue_voxelize_prefab,
         scan_object.mesh_view(),
-        offsetof(PBRVertex, position),
-        sizeof(PBRVertex),
         scan_object.transform.get_model_matrix(),
         &voxel_grid.local_voxel_write_list()
     );
@@ -467,11 +460,9 @@ int main() {
         glm::quat rot_y = glm::angleAxis(angle, glm::vec3(0.0f, 1.0f, 0.0f));
 
         // for (const glm::mat4 transform : transform_mem) {
-        //     voxelizator.voxelize_and_submit(
+        //     voxelizator.voxelize_and_submit<PBRVertex>(
         //         transparent_voxelize_prefab,
         //         vox_box.mesh_view(),
-        //         offsetof(PBRVertex, position),
-        //         sizeof(PBRVertex),
         //         transform,
         //         &voxel_grid.local_voxel_write_list()        
         //     );
@@ -482,11 +473,9 @@ int main() {
         //         vox_box.transform.rotation * rot_x * rot_y
         //     );
 
-        //     voxelizator.voxelize_and_submit(
+        //     voxelizator.voxelize_and_submit<PBRVertex>(
         //         blue_voxelize_prefab,
         //         vox_box.mesh_view(),
-        //         offsetof(PBRVertex, position),
-        //         sizeof(PBRVertex),
         //         vox_box.transform.get_model_matrix(),
         //         &voxel_grid.local_voxel_write_list()        
         //     );

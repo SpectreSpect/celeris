@@ -20,7 +20,7 @@ Point::Point() {
     PointInstance dummy{};
     // dummy.pos   = {0, 0, 0};
     // dummy.color = {1, 1, 1};
-    dummy.pos   = {0, 0, 0, 0};
+    dummy.position   = {0, 0, 0, 0};
     dummy.color = {1, 1, 1, 1};
 
     vao = new VAO();
@@ -93,7 +93,7 @@ Point::Point(SSBO& instance_ssbo, int instance_count) {
     PointInstance dummy{};
     // dummy.pos   = {0, 0, 0};
     // dummy.color = {1, 1, 1};
-    dummy.pos   = {0, 0, 0, 0};
+    dummy.position   = {0, 0, 0, 0};
     dummy.color = {1, 1, 1, 1};
 
     vao = new VAO();

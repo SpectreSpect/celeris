@@ -1,15 +1,10 @@
 #include "voxelizator.h"
 
-#include <utility>
-
 #include "../vulkan_self/vulkan_physical_device.h"
 #include "../vulkan_self/vulkan_device.h"
 #include "../vulkan_self/vulkan_queue.h"
 #include "../managers/compute_pass_manager.h"
 #include "../vulkan_self/descriptor_set/descriptor_pool.h"
-#include "../renderer/mesh_view.h"
-#include "shader_helper/buffer_dispatch_arg.h"
-#include "shader_helper/value_dispatch_arg.h"
 #include "../vulkan_self/push_constants_structures.h"
 #include "../math_utils.h"
 
@@ -108,105 +103,6 @@ void Voxelizator::submit_compute_commands() {
     m_queue->submit(m_command_buffer, &m_fence);
     m_fence.wait();
     m_command_buffer.reset();
-}
-
-void Voxelizator::voxelize(
-    VulkanCommandBuffer& command_buffer,
-    const VoxelWriteGPU& prifab,
-    MeshView mesh,
-    uint32_t position_attribute_offset,
-    uint32_t vertex_stride,
-    glm::mat4 transform,
-    VulkanBuffer* out_voxel_writes)
-{
-    LOG_METHOD();
-    VulkanBuffer* voxel_writes_buffer = out_voxel_writes ? out_voxel_writes : &m_buffers.voxel_writes;
-
-    reset_voxelize_pipline(command_buffer, *voxel_writes_buffer, out_voxel_writes == nullptr);
-    
-    reset_failure_slots_counter(command_buffer, m_buffers.counter_hash_table_failure_slots);
-    mark_and_count_active_chunks(command_buffer, mesh, position_attribute_offset, vertex_stride, transform);
-
-    VulkanBuffer* readable_failure_slots_buffer = &m_buffers.counter_hash_table_failure_slots;
-    VulkanBuffer* writable_failure_slots_buffer = &m_buffers.counter_hash_table_failure_slots_additional;
-    for (uint32_t attempt = 0; attempt < m_params.count_hash_table_attempts; attempt++) {
-        reset_failure_slots_counter(command_buffer, *writable_failure_slots_buffer);
-        m_shader_helper.prepare_dispatch_args(
-            command_buffer,
-            m_buffers.dispatch_args,
-            BufferDispatchArg(readable_failure_slots_buffer, 0)
-        );    
-        mark_and_count_fail_slots(
-            command_buffer,
-            m_buffers.dispatch_args,
-            *readable_failure_slots_buffer,
-            *writable_failure_slots_buffer
-        );
-        std::swap(readable_failure_slots_buffer, writable_failure_slots_buffer);
-    }
-
-    m_shader_helper.prepare_dispatch_args(
-        command_buffer,
-        m_buffers.dispatch_args,
-        BufferDispatchArg(&m_buffers.active_chunk_keys_list, 0)
-    );
-    alloc_active_chunk_triangles(command_buffer, m_buffers.dispatch_args);
-
-    fill_triangle_indices(command_buffer, mesh, position_attribute_offset, vertex_stride, transform);
-
-    m_shader_helper.prepare_dispatch_args(
-        command_buffer,
-        m_buffers.dispatch_args, 
-        ValueDispatchArg(m_params.chunk_size.x * m_params.chunk_size.y * m_params.chunk_size.z), 
-        BufferDispatchArg(&m_buffers.active_chunk_keys_list, 0)
-    );
-    voxelize_chunks(
-        command_buffer,
-        m_buffers.dispatch_args,
-        *voxel_writes_buffer,
-        prifab.voxel_data.type_flags,
-        prifab.voxel_data.color,
-        prifab.set_flags,
-        mesh,
-        position_attribute_offset,
-        vertex_stride,
-        transform
-    );
-
-    if (out_voxel_writes == nullptr) {
-        logger.throw_error("Not implemented yet :D");
-        // if (gridable_gpu != nullptr) {
-        //     gridable_gpu->set_voxels(voxel_writes_);
-        // } else {
-        //     //TODO
-        // }
-    }
-}
-
-void Voxelizator::voxelize_and_submit(
-    const VoxelWriteGPU& prifab,
-    MeshView mesh,
-    uint32_t position_attribute_offset,
-    uint32_t vertex_stride,
-    glm::mat4 transform,
-    VulkanBuffer* out_voxel_writes)
-{
-    LOG_METHOD();
-
-    {
-        auto scope = m_command_buffer.begin_scope();
-        voxelize(
-            m_command_buffer,
-            prifab,
-            mesh,
-            position_attribute_offset,
-            vertex_stride,
-            transform,
-            out_voxel_writes
-        );
-    }
-
-    submit_compute_commands();
 }
 
 void Voxelizator::reset_voxelize_pipline(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_writes, bool reset_voxel_write_list) {

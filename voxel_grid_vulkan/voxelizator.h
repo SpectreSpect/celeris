@@ -3,6 +3,11 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <vulkan/vulkan.h>
+#include <concepts>
+#include <type_traits>
+
+#include <utility>
+#include <cstdint>
 
 #include "../vulkan_self/logger/logger_header.h"
 #include "../vulkan_self/vulkan_buffer.h"
@@ -12,12 +17,14 @@
 #include "voxel_grid_structures.h"
 #include "../vulkan_self/pass/instance/pass_instance.h"
 #include "shader_helper/shader_helper.h"
+#include "../renderer/mesh_view.h"
+#include "shader_helper/buffer_dispatch_arg.h"
+#include "shader_helper/value_dispatch_arg.h"
 
 class VulkanPhysicalDevice;
 class VulkanDevice;
 class VulkanQueue;
 class ComputePassManager;
-class MeshView;
 
 class Voxelizator {
 public:
@@ -49,24 +56,118 @@ public:
     Voxelizator(Voxelizator&&) noexcept = default;
     Voxelizator& operator=(Voxelizator&&) noexcept = default;
 
+    template <class Vertex>
     void voxelize(
         VulkanCommandBuffer& command_buffer,
         const VoxelWriteGPU& prifab,
         MeshView mesh,
-        uint32_t position_attribute_offset,
-        uint32_t vertex_stride,
         glm::mat4 transform = glm::identity<glm::mat4>(),
-        VulkanBuffer* out_voxel_writes = nullptr
-    );
+        VulkanBuffer* out_voxel_writes = nullptr)
+    {
+        LOG_METHOD();
 
-    void voxelize_and_submit(
+        static_assert(
+            std::is_standard_layout_v<Vertex>,
+            "Vertex must be a standard-layout type"
+        );
+        static_assert(
+            std::is_trivially_copyable_v<Vertex>,
+            "Vertex must be a trivially copyable type"
+        );
+        static_assert(
+            requires(const Vertex& obj){{obj.position} -> std::same_as<const glm::vec4&>;}, 
+            "Vertex must have glm::vec4 position"
+        );
+
+        constexpr uint32_t vertex_stride = sizeof(Vertex);
+        constexpr uint32_t vertex_position_offset = offsetof(Vertex, position);
+
+        VulkanBuffer* voxel_writes_buffer = out_voxel_writes ? out_voxel_writes : &m_buffers.voxel_writes;
+
+        reset_voxelize_pipline(command_buffer, *voxel_writes_buffer, out_voxel_writes == nullptr);
+        
+        reset_failure_slots_counter(command_buffer, m_buffers.counter_hash_table_failure_slots);
+        mark_and_count_active_chunks(command_buffer, mesh, vertex_position_offset, vertex_stride, transform);
+
+        VulkanBuffer* readable_failure_slots_buffer = &m_buffers.counter_hash_table_failure_slots;
+        VulkanBuffer* writable_failure_slots_buffer = &m_buffers.counter_hash_table_failure_slots_additional;
+        for (uint32_t attempt = 0; attempt < m_params.count_hash_table_attempts; attempt++) {
+            reset_failure_slots_counter(command_buffer, *writable_failure_slots_buffer);
+            m_shader_helper.prepare_dispatch_args(
+                command_buffer,
+                m_buffers.dispatch_args,
+                BufferDispatchArg(readable_failure_slots_buffer, 0)
+            );    
+            mark_and_count_fail_slots(
+                command_buffer,
+                m_buffers.dispatch_args,
+                *readable_failure_slots_buffer,
+                *writable_failure_slots_buffer
+            );
+            std::swap(readable_failure_slots_buffer, writable_failure_slots_buffer);
+        }
+
+        m_shader_helper.prepare_dispatch_args(
+            command_buffer,
+            m_buffers.dispatch_args,
+            BufferDispatchArg(&m_buffers.active_chunk_keys_list, 0)
+        );
+        alloc_active_chunk_triangles(command_buffer, m_buffers.dispatch_args);
+
+        fill_triangle_indices(command_buffer, mesh, vertex_position_offset, vertex_stride, transform);
+
+        m_shader_helper.prepare_dispatch_args(
+            command_buffer,
+            m_buffers.dispatch_args, 
+            ValueDispatchArg(m_params.chunk_size.x * m_params.chunk_size.y * m_params.chunk_size.z), 
+            BufferDispatchArg(&m_buffers.active_chunk_keys_list, 0)
+        );
+        voxelize_chunks(
+            command_buffer,
+            m_buffers.dispatch_args,
+            *voxel_writes_buffer,
+            prifab.voxel_data.type_flags,
+            prifab.voxel_data.color,
+            prifab.set_flags,
+            mesh,
+            vertex_position_offset,
+            vertex_stride,
+            transform
+        );
+
+        if (out_voxel_writes == nullptr) {
+            logger.throw_error("Not implemented yet :D");
+            // if (gridable_gpu != nullptr) {
+            //     gridable_gpu->set_voxels(voxel_writes_);
+            // } else {
+            //     //TODO
+            // }
+        }
+    }
+
+
+    template<class Vertex>
+    void voxelize(
         const VoxelWriteGPU& prifab,
         MeshView mesh,
-        uint32_t position_attribute_offset,
-        uint32_t vertex_stride,
-        glm::mat4 transform = glm::identity<glm::mat4>(),
-        VulkanBuffer* out_voxel_writes = nullptr
-    );
+        glm::mat4 transform,
+        VulkanBuffer* out_voxel_writes)
+    {
+        LOG_METHOD();
+
+        {
+            auto scope = m_command_buffer.begin_scope();
+            voxelize<Vertex>(
+                m_command_buffer,
+                prifab,
+                mesh,
+                transform,
+                out_voxel_writes
+            );
+        }
+
+        submit_compute_commands();
+    }
 
 private:
     struct VoxelizatorBuffers {
