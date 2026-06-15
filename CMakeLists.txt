@@ -136,6 +136,7 @@ add_executable(app
   autopilot/spherical_pose_marker.cpp
   autopilot/celeris.cpp
   autopilot/celeris_visualizer.cpp
+  voxel_grid_vulkan/voxel_grid_gpu_debugger.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
