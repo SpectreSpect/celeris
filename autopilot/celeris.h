@@ -72,4 +72,5 @@ private:
     std::unique_ptr<LidarScan> m_network_scan;
     std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;
     uint32_t m_received_scan_count = 0;
+    uint32_t path_replanning_interval = 5;
 };

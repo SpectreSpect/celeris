@@ -77,8 +77,10 @@ void Celeris::update() {
         // start_sphere.transform.position = m_network_scan->point_cloud().transform.position;
         // start_direction_sphere.transform.position = start_pos.pos + direction_offset(start_pos.theta) * 0.85f + glm::vec3(0, 0.4f, 0);
 
-        // m_planner.initialize(m_start_position, m_goal_position);
-        // m_planner.find_nonholomic_path(); // state_explored_paths
+        if (m_received_scan_count % path_replanning_interval == 0) {
+            m_planner.initialize(m_start_position, m_goal_position);
+            m_planner.find_nonholomic_path(); // state_explored_paths    
+        }
 
         // lines = make_path_lines(planner.state_path);
         // line_cloud.set_lines(lines);
