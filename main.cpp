@@ -69,6 +69,7 @@
 #include "autopilot/spherical_pose_marker.h"
 #include "autopilot/celeris.h"
 #include "autopilot/celeris_visualizer.h"
+#include "voxel_grid_vulkan/voxel_grid_gpu_debugger.h"
 
 #include <cmath>
 #include <vector>
@@ -152,6 +153,7 @@ int main() {
         material_instance_manager,
         voxel_grid_desc
     );
+    VoxelGridGPUDebugger debugger(voxel_grid);
 
     Voxelizator::VoxelizatorDesc voxelizator_desc {
         .chunk_size = chunk_size,

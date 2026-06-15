@@ -414,6 +414,20 @@ public:
         return buffer;
     }
 
+    template<class T>
+    inline T read_scalar(VkDeviceSize offset_bytes = 0) {
+        static_assert(std::is_trivially_copyable_v<T>, "Type T must be trivially copyable");
+
+        T result;
+        read(
+            &result,
+            sizeof(T),
+            offset_bytes
+        );
+
+        return result;
+    }
+
     VulkanBufferView get_view() noexcept;
         
 private:
