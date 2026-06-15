@@ -19,8 +19,6 @@ layout(std430, set = 0, binding=8) coherent buffer BBNodes  { Node bb_nodes[];  
 layout(std430, set = 0, binding=9) coherent buffer BBFreeNodesList  { uint bb_free_nodes_counter; uint bb_free_nodes_list[];  };
 layout(std430, set = 0, binding=10) coherent buffer BBReturnedNodesList  { uint bb_returned_nodes_counter; uint bb_returned_nodes_list[]; };
 
-layout(std430, set = 0, binding=11) buffer ActiveSplitters { uint bb_active_splitters; };
-
 layout(push_constant) uniform MeshAllocPushConstants {
     uint bb_pages;
     uint bb_page_elements;  // например 256
@@ -39,20 +37,15 @@ layout(push_constant) uniform MeshAllocPushConstants {
 #include "../common/utils.inc"
 
 #define PREFIX bb
-#include "../common/allocator/alloc_pages_impl.inc"
-#undef PREFIX
+#include "../common/allocator.inc"
 // -------------------
 
 bool is_vb_phase = u_is_vb_phase == 1u;
 
 void main() {
-    // if (gl_GlobalInvocationID.x != 0u) return;
-
-
-    // for (uint dirtyIdx = 0u; dirtyIdx < dirty_count; dirtyIdx++) {
     uint dirtyIdx = gl_GlobalInvocationID.x;
-    
-    if (dirtyIdx >= dirty_count) return;
+    uint dirtyCount = dirty_count;
+    if (dirtyIdx >= dirtyCount) return;
     
     uint chunkId = dirty_list[dirtyIdx];
 
@@ -112,12 +105,12 @@ void main() {
     uint bStart = bb_alloc_pages(bOrder);
     if (bStart == INVALID_ID) {
         if (is_vb_phase){
-            // atomicExchange(is_vb_full, 1u);
+            atomicExchange(is_vb_full, 1u);
             chunk_alloc_local[dirtyIdx].v_startPage = INVALID_ID;
             chunk_alloc_local[dirtyIdx].v_order = 0u;
             chunk_alloc_local[dirtyIdx].needV = 0u;
         } else {
-            // atomicExchange(is_ib_full, 1u);
+            atomicExchange(is_ib_full, 1u);
             chunk_alloc_local[dirtyIdx].i_startPage = INVALID_ID;
             chunk_alloc_local[dirtyIdx].i_order = 0u;
             chunk_alloc_local[dirtyIdx].needI = 0u;
@@ -138,6 +131,4 @@ void main() {
     }
 
     chunk_alloc_local[dirtyIdx].is_valid = 1u;
-
-    // }
 }

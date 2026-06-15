@@ -241,6 +241,7 @@ ComputePass ComputePassManager::create_mesh_alloc_compute_pass(VulkanDevice& dev
     builder.add_storage_buffer(8, ShaderStages::compute); // BBNodes
     builder.add_storage_buffer(9, ShaderStages::compute); // BBFreeNodesList
     builder.add_storage_buffer(10, ShaderStages::compute); // BBReturnedNodesList
+    builder.add_storage_buffer(11, ShaderStages::compute); // ActiveSplitters
 
     builder.add_push_constantsf(sizeof(MeshAllocPushConstants), ShaderStages::compute);
 

@@ -92,92 +92,35 @@ VoxelGrid::VoxelGrid(
         1.0f
     ));
 
-    // init_programs(*shader_manager); #TODO
-
-    // dispatch_args = BufferObject::from_fill(sizeof(uint32_t) * 3u, GL_DYNAMIC_DRAW, 1u, *shader_manager);
-    // dispatch_args_additional = BufferObject::from_fill(sizeof(uint32_t) * 3u, GL_DYNAMIC_DRAW, 1u, *shader_manager);
-    
-    
-
-
-
-    // dirty_quad_count_ = BufferObject(sizeof(uint32_t) * (size_t)count_active_chunks, GL_DYNAMIC_DRAW);
-    // emit_counters_     = BufferObject(sizeof(uint32_t) * (size_t)count_active_chunks, GL_DYNAMIC_DRAW);
-    
-    // verify_debug_stack_ = BufferObject::from_fill(sizeof(uint32_t) * 2 + sizeof(DebugStackElement) * 10'000, GL_DYNAMIC_DRAW, INVALID_ID, *shader_manager);
-    // verify_debug_stack_.update_subdata_fill(0, 0u, sizeof(uint32_t) * 2, *shader_manager);
-    
-    // local_voxel_write_list_ = BufferObject::from_fill(sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * desc.max_write_count, GL_DYNAMIC_DRAW, 0u, *shader_manager);
-
-
-
-    // global_vertex_buffer_ = BufferObject(sizeof(VertexGPU) * (size_t)max_mesh_vertices_, GL_DYNAMIC_DRAW);
-    // vb_heads_ = BufferObject(sizeof(uint32_t) * (size_t)(vb_order_ + 1), GL_DYNAMIC_DRAW);
-    // vb_nodes_ = BufferObject(sizeof(AllocNode) * (size_t)(count_vb_nodes_), GL_DYNAMIC_DRAW);
-    // vb_free_nodes_list_ = BufferObject(sizeof(uint32_t) * (size_t)(1u + count_vb_nodes_), GL_DYNAMIC_DRAW);
-    // vb_returned_nodes_list = BufferObject::from_fill(sizeof(uint32_t) * (size_t)(1u + count_vb_nodes_), GL_DYNAMIC_DRAW, 0u, *shader_manager);
-    // vb_state_ = BufferObject(sizeof(uint32_t) * (size_t)count_vb_pages_, GL_DYNAMIC_DRAW);
-    
-    // global_index_buffer_ = BufferObject(sizeof(uint32_t) * (size_t)max_mesh_indices_, GL_DYNAMIC_DRAW);
-    // ib_heads_ = BufferObject(sizeof(uint32_t) * (size_t)(ib_order_ + 1), GL_DYNAMIC_DRAW);
-    // ib_nodes_ = BufferObject(sizeof(AllocNode) * (size_t)(count_ib_nodes_), GL_DYNAMIC_DRAW);
-    // ib_free_nodes_list_ = BufferObject(sizeof(uint32_t) * (size_t)(1u + count_ib_nodes_), GL_DYNAMIC_DRAW);
-    // ib_returned_nodes_list = BufferObject::from_fill(sizeof(uint32_t) * (size_t)(1u + count_ib_nodes_), GL_DYNAMIC_DRAW, 0u, *shader_manager);
-    // ib_state_ = BufferObject(sizeof(uint32_t) * (size_t)count_ib_pages_, GL_DYNAMIC_DRAW);
-
-    // chunk_mesh_alloc_ = BufferObject(sizeof(ChunkMeshAlloc) * (size_t)count_active_chunks, GL_DYNAMIC_DRAW);
-    // chunk_mesh_alloc_local_ = BufferObject(sizeof(ChunkMeshAlloc) * (size_t)count_active_chunks, GL_DYNAMIC_DRAW);
-
-    // voxel_prifab_ = BufferObject(sizeof(VoxelDataGPU), GL_DYNAMIC_DRAW);
-
-    // voxels_ = BufferObject::from_fill(sizeof(VoxelDataGPU) * vox_per_chunk() * count_active_chunks, GL_DYNAMIC_DRAW, voxel_prifab, *shader_manager);
-
-    // alignof(ChunkHashTableSlot) == 8!!!
-
-    // std::vector<uint32_t> dirty_chunk_ids = {0, 1, 3};
-    // uint32_t dirty_chunk_count = dirty_chunk_ids.size();
-
-    // m_buffers.dirty_list.upload(&dirty_chunk_count, sizeof(uint32_t));
-    // m_buffers.dirty_list.upload(dirty_chunk_ids.data(), dirty_chunk_ids.size() * sizeof(uint32_t), sizeof(uint32_t));
-
     world_init_gpu();
-    // init_draw_buffers();
-    init_mesh_pool(); 
+    init_mesh_pool();
     
-
-    // std::vector<BucketHead> bucket_heads_before = m_buffers.bucket_heads.read_vector<BucketHead>(3);
+    
     // {
     //     auto scope = m_command_buffer.begin_scope();
-    //     reset_heads(m_command_buffer);
+    //     stream_chunks_sphere(m_command_buffer, glm::vec3(0, 0, 0), 6, 42);
+    //     build_mesh_from_dirty(m_command_buffer, math_utils::BITS, math_utils::OFFSET);
     // }
     // submit_compute_commands();
 
-    // std::vector<BucketHead> bucket_heads_after = m_buffers.bucket_heads.read_vector<BucketHead>(3);
-
-    // logger.log() << "Bucket heads before:\n";
-    // for (size_t i = 0; i < bucket_heads_before.size(); i++) {
-    //     logger.log() << clr(std::to_string(i), LoggerPalette::red) << ":\n"
-    //         << "\tcount = " << clr(std::to_string(bucket_heads_before[i].count), LoggerPalette::orange) << "\n"
-    //         << "\tid = " << clr(std::to_string(bucket_heads_before[i].id), LoggerPalette::orange) << "\n\n";
-    // }
 
     // std::cout << std::endl;
-
-    // logger.log() << "Bucket heads after:\n";
-    // for (size_t i = 0; i < bucket_heads_after.size(); i++) {
-    //     logger.log() << clr(std::to_string(i), LoggerPalette::red) << ":\n"
-    //         << "\tcount = " << clr(std::to_string(bucket_heads_after[i].count), LoggerPalette::blue) << "\n"
-    //         << "\tid = " << clr(std::to_string(bucket_heads_after[i].id), LoggerPalette::blue) << "\n\n";
-    // }
-
-    // m_buffers.load_list.upload(std::vector<uint32_t>{1, 2, 3});
-    // std::vector<uint32_t> load_list_before = m_buffers.load_list.read_vector<uint32_t>(3);
     
-    // {
-    //     auto scope = m_command_buffer.begin_scope();
-    //     stream_chunks_sphere(m_command_buffer, {0.0f, 0.0f, 0.0f}, 5, 534346);
+    // uint32_t dirty_count = m_buffers.dirty_list.read_scalar<uint32_t>(0);
+    // std::cout << "dirty_count: " << dirty_count << std::endl;
+
+    // std::vector<uint32_t> mesh_quad_count_per_dirty = m_buffers.dirty_quad_count.read_vector<uint32_t>(dirty_count);
+    
+    // uint32_t total_quad_count = 0;
+    // for (uint32_t count : mesh_quad_count_per_dirty) {
+    //     total_quad_count += count;
     // }
-    // submit_compute_commands();
+
+    // std::cout << "total_quad_count: " << total_quad_count << std::endl;
+
+    // std::vector<uint32_t> alloc_status = m_buffers.mesh_buffers_status.read_vector<uint32_t>(2);
+    // std::cout << "is_vb_full: " << alloc_status[0] << std::endl;
+    // std::cout << "is_ib_full: " << alloc_status[1] << std::endl;
 }
 
 void VoxelGrid::conditional_prepare_rebuild(VulkanCommandBuffer& command_buffer, VulkanBuffer& clear_dispatch_args, VulkanBuffer& fill_dispatch_args) {
@@ -491,6 +434,8 @@ void VoxelGrid::mesh_alloc_vb(VulkanCommandBuffer& command_buffer, const VulkanB
     m_pass_instances.mesh_alloc_vb_pi.set_storage_buffer(8, m_buffers.vb_nodes);
     m_pass_instances.mesh_alloc_vb_pi.set_storage_buffer(9, m_buffers.vb_free_nodes_list);
     m_pass_instances.mesh_alloc_vb_pi.set_storage_buffer(10, m_buffers.vb_returned_nodes_list);
+    
+    m_pass_instances.mesh_alloc_vb_pi.set_storage_buffer(11, m_buffers.active_splitters);
 
     m_pass_instances.mesh_alloc_vb_pi.push_constants(m_command_buffer, MeshAllocPushConstants{
         .bb_pages = m_params.count_vb_pages,
@@ -541,6 +486,8 @@ void VoxelGrid::mesh_alloc_ib(VulkanCommandBuffer& command_buffer, const VulkanB
     m_pass_instances.mesh_alloc_ib_pi.set_storage_buffer(9, m_buffers.ib_free_nodes_list);
     m_pass_instances.mesh_alloc_ib_pi.set_storage_buffer(10, m_buffers.ib_returned_nodes_list);
 
+    m_pass_instances.mesh_alloc_ib_pi.set_storage_buffer(11, m_buffers.active_splitters);
+
     m_pass_instances.mesh_alloc_ib_pi.push_constants(m_command_buffer, MeshAllocPushConstants{
         .bb_pages = m_params.count_ib_pages,
         .bb_page_elements = m_params.ib_page_size,
@@ -564,7 +511,12 @@ void VoxelGrid::mesh_alloc_ib(VulkanCommandBuffer& command_buffer, const VulkanB
 }
 
 void VoxelGrid::mesh_alloc(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args) {
+    m_buffers.active_splitters.fill(command_buffer, 0u);
+    m_buffers.active_splitters.memory_barrier_compute_write_to_compute_write_read(command_buffer);
     mesh_alloc_vb(command_buffer, dispatch_args);
+
+    m_buffers.active_splitters.fill(command_buffer, 0u);
+    m_buffers.active_splitters.memory_barrier_compute_write_to_compute_write_read(command_buffer);
     mesh_alloc_ib(command_buffer, dispatch_args);
 }
 
@@ -1007,6 +959,8 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize global_vertex_buffer_size = sizeof(VertexGPU) * m_params.max_mesh_vertices;
     VkDeviceSize global_index_buffer_size = sizeof(uint32_t) * m_params.max_mesh_indices;
 
+    VkDeviceSize active_splitters_size = sizeof(uint32_t);
+
     VkDeviceSize vb_heads_size = sizeof(uint32_t) * (size_t)(m_params.vb_order + 1);
     VkDeviceSize vb_nodes_size = sizeof(AllocNode) * (size_t)(m_params.count_vb_nodes);
     VkDeviceSize vb_state_size = sizeof(uint32_t) * m_params.count_vb_pages;
@@ -1117,17 +1071,10 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
 
     
     return VoxelGridBuffers {
-        // .chunk_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_hash_table_size),
-        // .free_list = VulkanBuffer::create_storage_buffer(physical_device, device, free_list_size),
-        // .chunk_meta = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_meta_size),
-        // .enqueued = VulkanBuffer::create_storage_buffer(physical_device, device, enqueued_size),
-        // .indirect_cmds = VulkanBuffer::create_storage_buffer(physical_device, device, indirect_cmds_size),
-        // .failed_dirty_list = VulkanBuffer::create_storage_buffer(physical_device, device, failed_dirty_list_size),
         .chunk_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_hash_table_size),
         .free_list = VulkanBuffer::create_storage_buffer(physical_device, device, free_list_size),
         .chunk_meta = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_meta_size),
         .enqueued = VulkanBuffer::create_storage_buffer(physical_device, device, enqueued_size),
-        // .indirect_cmds = VulkanBuffer::create_host_visible_indirect_storage_buffer(physical_device, device, indirect_cmds_size),
 
         .indirect_cmds = VulkanBuffer(
             physical_device,
@@ -1144,8 +1091,8 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
 
         // .mesh_buffers_status = VulkanBuffer::create_storage_buffer(physical_device, device, mesh_buffers_status_size),
         // .dirty_list = VulkanBuffer::create_storage_buffer(physical_device, device, dirty_list_size),
-        .mesh_buffers_status = VulkanBuffer::create_storage_buffer(physical_device, device, mesh_buffers_status_size),
-        .dirty_list = VulkanBuffer::create_storage_buffer(physical_device, device, dirty_list_size),
+        .mesh_buffers_status = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, mesh_buffers_status_size),
+        .dirty_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, dirty_list_size),
         .load_list = VulkanBuffer(
             physical_device,
             device,
@@ -1185,6 +1132,13 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         ),
+        .active_splitters = VulkanBuffer(
+            physical_device, 
+            device, 
+            active_splitters_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        ),
         .vb_heads = VulkanBuffer::create_storage_buffer(physical_device, device, vb_heads_size),
         // .vb_nodes = BufferObject(sizeof(AllocNode) * (size_t)(count_vb_nodes_), GL_DYNAMIC_DRAW);
         .vb_nodes = VulkanBuffer::create_storage_buffer(physical_device, device, vb_nodes_size),
@@ -1204,7 +1158,7 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         .dispatch_args = VulkanBuffer::create_host_visible_indirect_storage_buffer(physical_device, device, dispatch_args_size),
         .dispatch_args_additional = VulkanBuffer::create_host_visible_indirect_storage_buffer(physical_device, device, dispatch_args_size),
         
-        .dirty_quad_count = VulkanBuffer::create_storage_buffer(physical_device, device, dirty_quad_count_size),
+        .dirty_quad_count = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, dirty_quad_count_size),
         .emit_counters = VulkanBuffer::create_storage_buffer(physical_device, device, emit_counters_size),
 
         .chunk_mesh_alloc_local = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_mesh_alloc_local_size),
@@ -1522,39 +1476,6 @@ void VoxelGrid::init_mesh_pool() {
 
     submit_compute_commands();
 }
-
-// void VoxelGridGPU::init_draw_buffers() {
-//     static VertexLayout vertex_layout;
-//     if (vertex_layout.attributes.size() == 0) {
-//         vertex_layout.add(
-//             "position",
-//             0, 4, GL_FLOAT, GL_FALSE,
-//             sizeof(VertexGPU),
-//             offsetof(VertexGPU, pos), 
-//             0, {0.0f, 0.0f, 0.0f, 1.0f}
-//         );
-//         vertex_layout.add(
-//             "color",
-//             1, 1, GL_UNSIGNED_INT, GL_FALSE,
-//             sizeof(VertexGPU),
-//             offsetof(VertexGPU, color), 
-//             0, {0xffffffffu} // белый
-//         );
-//         vertex_layout.add(
-//             "face",
-//             2, 1, GL_UNSIGNED_INT, GL_FALSE,
-//             sizeof(VertexGPU),
-//             offsetof(VertexGPU, face), 
-//             0, {0u} // Направление 0 (хз куда это, вверх мб?)
-//         );
-//     }
-
-//     vao.setup(global_vertex_buffer_, global_index_buffer_, vertex_layout);
-// }
-
-// void VoxelGrid::init_draw_buffers() {
-
-// }
 
 // void VoxelGrid::apply_writes_to_world_gpu(uint32_t write_count) {
 //     LOG_METHOD();

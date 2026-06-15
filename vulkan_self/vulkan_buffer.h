@@ -170,7 +170,6 @@ public:
 
     void read(void* data, VkDeviceSize size_bytes, VkDeviceSize offset_bytes);
 
-    
     template<class T>
     inline void read(std::span<T> data, VkDeviceSize offset_bytes = 0) {
         using Elem = std::remove_cv_t<T>;
@@ -198,6 +197,20 @@ public:
         std::vector<T> data(element_count);
         read(std::span<T>(data), offset_bytes);
         return data;
+    }
+
+    template<class T>
+    inline T read_scalar(VkDeviceSize offset_bytes = 0) {
+        static_assert(std::is_trivially_copyable_v<T>, "Type T must be trivially copyable");
+
+        T result;
+        read(
+            &result,
+            sizeof(T),
+            offset_bytes
+        );
+
+        return result;
     }
 
     bool has_usage(VkBufferUsageFlags usage) const noexcept;

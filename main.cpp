@@ -153,6 +153,7 @@ int main() {
         voxel_grid_desc
     );
 
+
     Voxelizator::VoxelizatorDesc voxelizator_desc {
         .chunk_size = chunk_size,
         .voxel_size = voxel_size,
@@ -267,7 +268,7 @@ int main() {
     engine.compute_submit(compute_command_buffer, &compute_fence);
     compute_fence.wait();
 
-    voxel_grid.update(window, camera);
+    // voxel_grid.update(window, camera);
 
 
     // VoxelGridChunk chunk = voxel_grid.read_chunk(glm::ivec3(0, 0, 0));

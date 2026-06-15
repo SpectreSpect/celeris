@@ -141,6 +141,8 @@ public:
         VulkanBuffer global_vertex_buffer;
         VulkanBuffer global_index_buffer;
 
+        VulkanBuffer active_splitters;
+
         VulkanBuffer vb_heads;
         VulkanBuffer vb_nodes;
         VulkanBuffer vb_state;
