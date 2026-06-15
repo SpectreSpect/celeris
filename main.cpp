@@ -129,8 +129,8 @@ int main() {
     VoxelGrid::VoxelGridDesc voxel_grid_desc {
         .chunk_size = chunk_size,
         .voxel_size = voxel_size,
-        .count_active_chunks = 10'000,
-        .max_quads = 1'000'000,
+        .count_active_chunks = 8'000,
+        .max_quads = 500'000,
         .chunk_hash_table_size_factor = 1.0f,
         .count_evict_buckets = 32,
         .min_free_chunks = 4'500,
@@ -140,7 +140,7 @@ int main() {
         .ib_page_size_order_of_two = 10,
         .buddy_allocator_nodes_factor = 1.0,
         .render_distance = chunk_size.x * voxel_size.x * 30,
-        .generation_distance = 10,
+        .generation_distance = 5,
         .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000)
     };
 
@@ -156,8 +156,10 @@ int main() {
     Voxelizator::VoxelizatorDesc voxelizator_desc {
         .chunk_size = chunk_size,
         .voxel_size = voxel_size,
-        .counter_hash_table_size = 1'000'000,
-        .count_voxel_writes = 0 // Будут использоваться те, что внутри voxel_grid
+        .counter_hash_table_size = 150'000,
+        .count_hash_table_failure_slots = 150'000,
+        .count_voxel_writes = 0, // Будут использоваться те, что внутри voxel_grid
+        .count_hash_table_attempts = 5
     };
 
     Voxelizator voxelizator(
@@ -207,15 +209,10 @@ int main() {
     );
 
     LidarScan lidar_scan(manager_bundle, point_cloud_preprocessor, path_utils::executable_dir() / "assets" / "lidar_scans" / "frame_000000.bin");
-    uint32_t scan_index_count = mesher.convert_to_mesh(
+    uint32_t scan_index_count = mesher.convert_to_mesh<PBRVertex, PointInstance>(
         lidar_scan.point_cloud(),
         scan_vertex_buffer,
-        scan_index_buffer,
-        sizeof(PointInstance),
-        offsetof(PointInstance, pos),
-        sizeof(PBRVertex),
-        offsetof(PBRVertex, position),
-        offsetof(PBRVertex, normal)
+        scan_index_buffer
     );
 
     MeshView scan_mesh_view(
@@ -228,20 +225,17 @@ int main() {
     // RenderObject scan_object(mesh_manager.cube.get_view(), material_instance_manager.pbr);
     scan_object.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
 
-    scan_object.transform.scale = glm::vec3(3.0f);
-    scan_object.transform.position.y += 10;
+    scan_object.transform.scale = glm::vec3(5.0f);
 
-    // voxelizator.voxelize_and_submit(
-    //     blue_voxelize_prefab,
-    //     scan_object.mesh_view(),
-    //     offsetof(PBRVertex, position),
-    //     sizeof(PBRVertex),
-    //     scan_object.transform.get_model_matrix(),
-    //     &voxel_grid.local_voxel_write_list()
-    // );
+    voxelizator.voxelize<PBRVertex>(
+        blue_voxelize_prefab,
+        scan_object.mesh_view(),
+        scan_object.transform.get_model_matrix(),
+        &voxel_grid.local_voxel_write_list()
+    );
 
-    glm::ivec3 block_size = glm::ivec3(1, 5, 10);
-    glm::ivec3 block_origin = glm::ivec3(3, 0, -5);
+    glm::ivec3 block_size = glm::ivec3(1, 5, 5);
+    glm::ivec3 block_origin = glm::ivec3(5, 0, 0);
     std::vector<VoxelWriteGPU> test_voxel_writes;
     test_voxel_writes.reserve(static_cast<size_t>(block_size.x * block_size.y * block_size.z));
 
@@ -274,6 +268,22 @@ int main() {
     compute_fence.wait();
 
     voxel_grid.update(window, camera);
+
+
+    // VoxelGridChunk chunk = voxel_grid.read_chunk(glm::ivec3(0, 0, 0));
+    // glm::uvec3 read_chunk_size = chunk.chunk_size();
+
+    // for (int x = 0; x < read_chunk_size.x; x++)
+    //     for (int y = 0; y < read_chunk_size.y; y++)
+    //         for (int z = 0; z < read_chunk_size.z; z++) {
+    //             VoxelDataGPU voxel = chunk.voxel(glm::uvec3(x, y, z));
+    //             glm::vec4 color = voxel.color_vec4();
+
+    //             if (color.x != 0 || color.y != 0 || color.z != 0)
+    //                 std::cout << "pos: (" << x << ", " << y << ", " << z << ")" << std::endl;
+    //         }
+
+
 
     uint32_t max_write_count = 100000;
     VulkanBuffer voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * max_write_count);
@@ -395,6 +405,30 @@ int main() {
         float angle = angular_speed * delta_time;
         glm::quat rot_x = glm::angleAxis(angle, glm::vec3(1.0f, 0.0f, 0.0f));
         glm::quat rot_y = glm::angleAxis(angle, glm::vec3(0.0f, 1.0f, 0.0f));
+
+        // for (const glm::mat4 transform : transform_mem) {
+        //     voxelizator.voxelize_and_submit<PBRVertex>(
+        //         transparent_voxelize_prefab,
+        //         vox_box.mesh_view(),
+        //         transform,
+        //         &voxel_grid.local_voxel_write_list()        
+        //     );
+        // }
+
+        // for (size_t i = 0; i < transform_mem.size(); i++) {
+        //     vox_box.transform.rotation = glm::normalize(
+        //         vox_box.transform.rotation * rot_x * rot_y
+        //     );
+
+        //     voxelizator.voxelize_and_submit<PBRVertex>(
+        //         blue_voxelize_prefab,
+        //         vox_box.mesh_view(),
+        //         vox_box.transform.get_model_matrix(),
+        //         &voxel_grid.local_voxel_write_list()        
+        //     );
+
+        //     transform_mem[i] = vox_box.transform.get_model_matrix();
+        // }
 
         uint32_t image_index = 0;
         if (!engine.aquire_free_resources(image_index)) continue;

@@ -9,3 +9,4 @@
 #define KEY_COMP_FUNC chunk_key_comp
 #define VALUE_INIT_FUNC pop_free_chunk_id
 #define INIT_SLOT_CALLBACK init_chunk_meta
+#define MAX_CAS_ATTEMPTS 5u

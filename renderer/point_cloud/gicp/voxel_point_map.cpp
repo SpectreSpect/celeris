@@ -33,7 +33,7 @@ void VoxelPointMap::upload_voxels(VulkanEngine& engine, VoxelGrid& voxel_grid) {
     for (int i = 0; i < points.size(); i++) {
         glm::ivec3 color{0, 98, 255};
 
-        glm::vec3 local = glm::vec3(points[i].pos) / glm::vec3(voxel_grid.voxel_size());
+        glm::vec3 local = glm::vec3(points[i].position) / glm::vec3(voxel_grid.voxel_size());
 
         glm::ivec4 voxel_pos = glm::ivec4(glm::floor(local.x),
                                           glm::floor(local.y),
