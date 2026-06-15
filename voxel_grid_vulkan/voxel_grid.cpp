@@ -1229,6 +1229,10 @@ void VoxelGrid::set_voxels(VulkanCommandBuffer& command_buffer, const VulkanBuff
     merge_voxel_write_lists(command_buffer, voxel_write_list_src, m_buffers.local_voxel_write_list);
 }
 
+void VoxelGrid::set_render_distance(float value) {
+    m_params.render_distance = value;
+}
+
 VoxelGridChunk VoxelGrid::read_chunk(glm::ivec3 chunk_pos) {
     LOG_METHOD();
 
@@ -1572,6 +1576,18 @@ IndirectRenderObject& VoxelGrid::render_object() {
 
 VulkanBuffer& VoxelGrid::local_voxel_write_list() noexcept {
     return m_buffers.local_voxel_write_list;
+}
+
+const VoxelGrid::VoxelGridParams& VoxelGrid::params() const noexcept{
+    return m_params;
+}
+
+VoxelGrid::VoxelGridBuffers& VoxelGrid::buffers() noexcept {
+    return m_buffers;
+}
+
+ShaderHelper& VoxelGrid::shader_helper() noexcept {
+    return m_shader_helper;
 }
 
 glm::uvec3 VoxelGrid::voxel_size() {

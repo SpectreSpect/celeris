@@ -61,6 +61,8 @@ class VoxelGrid {
 public:
     _XCLASS_NAME(VoxelGrid);
 
+    friend class VoxelGridGPUDebugger;
+
     struct VoxelGridDesc {
         glm::ivec3 chunk_size; 
         glm::vec3 voxel_size;
@@ -79,46 +81,32 @@ public:
         uint32_t max_write_count;
     };
 
-public:
-    VoxelGrid(
-        const VulkanPhysicalDevice& physical_device,
-        VulkanDevice& device,
-        VulkanQueue& queue,
-        ComputePassManager& compute_pass_manager,
-        MaterialInstanceManager& material_instance_manager,
-        const VoxelGridDesc& desc
-    );
-    ~VoxelGrid() noexcept = default;
+    struct VoxelGridParams {
+        glm::uvec3 chunk_size = {0u, 0u, 0u};
+        glm::uvec3 voxel_size = {0u, 0u, 0u};
+        uint32_t count_active_chunks = 0u;
+        uint32_t count_evict_buckets = 0u;
+        uint32_t max_write_count = 0u;
+        uint32_t min_free_chunks = 0u;
+        uint32_t chunk_hash_table_size = 0u;
+        float tomb_fraction_to_rebuild = 0.0f;
+        float eviction_bucket_shell_thickness = 0.0f;
+        float render_distance = 0.0f;
+        float generation_distance = 0.0f;
 
-    VoxelGrid(const VoxelGrid&) = delete;
-    VoxelGrid& operator=(const VoxelGrid&) = delete;
+        uint32_t vb_page_size = 0;
+        uint32_t count_vb_pages = 0;
+        uint32_t count_vb_nodes = 0;
+        uint32_t vb_order = 0;
+        uint32_t max_mesh_vertices = 0;
+        
+        uint32_t ib_page_size = 0;
+        uint32_t count_ib_pages = 0;
+        uint32_t count_ib_nodes = 0;
+        uint32_t ib_order = 0;
+        uint32_t max_mesh_indices = 0;
+    };
 
-    VoxelGrid(VoxelGrid&&) noexcept = default;
-    VoxelGrid& operator=(VoxelGrid&&) noexcept = default;
-
-    IndirectRenderObject& render_object();
-    VulkanBuffer& local_voxel_write_list() noexcept;
-
-    // void apply_writes_to_world_gpu(uint32_t write_count);
-    // void apply_writes_to_world_from_cpu(
-    //     const std::vector<glm::ivec3>& positions,
-    //     const std::vector<VoxelDataGPU>& voxels
-    // );
-
-    glm::uvec3 voxel_size();
-    // void voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud);
-    void voxelize_point_cloud(VulkanCommandBuffer& command_buffer, VulkanEngine& engine, 
-                              PointCloud& point_cloud, VulkanBuffer& voxel_writes, uint32_t max_write_count);
-    void voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud, 
-                              VulkanBuffer& voxel_writes, uint32_t max_write_count);
-    
-    void update(Window& window, Camera& camera);
-    void set_voxels(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src);
-    VoxelGridChunk read_chunk(glm::ivec3 chunk_pos);
-    glm::ivec3 chunk_pos_from_voxel_pos(glm::ivec3 voxel_pos);
-    glm::ivec3 pos_in_chunk_from_global_voxel_pos(glm::ivec3 voxel_pos);
-    glm::ivec3 pos_in_chunk_from_global_voxel_pos(glm::ivec3 chunk_pos, glm::ivec3 voxel_pos);
-public:
     struct VoxelGridBuffers {
         VulkanBuffer chunk_hash_table;
         VulkanBuffer free_list;        
@@ -182,6 +170,51 @@ public:
         // chunk_mesh_alloc
     };
 
+public:
+    VoxelGrid(
+        const VulkanPhysicalDevice& physical_device,
+        VulkanDevice& device,
+        VulkanQueue& queue,
+        ComputePassManager& compute_pass_manager,
+        MaterialInstanceManager& material_instance_manager,
+        const VoxelGridDesc& desc
+    );
+    ~VoxelGrid() noexcept = default;
+
+    VoxelGrid(const VoxelGrid&) = delete;
+    VoxelGrid& operator=(const VoxelGrid&) = delete;
+
+    VoxelGrid(VoxelGrid&&) noexcept = default;
+    VoxelGrid& operator=(VoxelGrid&&) noexcept = default;
+
+    IndirectRenderObject& render_object();
+    VulkanBuffer& local_voxel_write_list() noexcept;
+    const VoxelGridParams& params() const noexcept;
+    VoxelGridBuffers& buffers() noexcept;
+    ShaderHelper& shader_helper() noexcept;
+
+    // void apply_writes_to_world_gpu(uint32_t write_count);
+    // void apply_writes_to_world_from_cpu(
+    //     const std::vector<glm::ivec3>& positions,
+    //     const std::vector<VoxelDataGPU>& voxels
+    // );
+
+    glm::uvec3 voxel_size();
+    // void voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud);
+    void voxelize_point_cloud(VulkanCommandBuffer& command_buffer, VulkanEngine& engine, 
+                              PointCloud& point_cloud, VulkanBuffer& voxel_writes, uint32_t max_write_count);
+    void voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud, 
+                              VulkanBuffer& voxel_writes, uint32_t max_write_count);
+    
+    void update(Window& window, Camera& camera);
+    void set_voxels(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src);
+    void set_render_distance(float value);
+    VoxelGridChunk read_chunk(glm::ivec3 chunk_pos);
+    glm::ivec3 chunk_pos_from_voxel_pos(glm::ivec3 voxel_pos);
+    glm::ivec3 pos_in_chunk_from_global_voxel_pos(glm::ivec3 voxel_pos);
+    glm::ivec3 pos_in_chunk_from_global_voxel_pos(glm::ivec3 chunk_pos, glm::ivec3 voxel_pos);
+
+public:
     struct VoxelGridPassInstances {
         PassWriter fill_buffer_pw;
         PassInstance world_init_pi;
@@ -217,32 +250,6 @@ public:
         PassInstance read_voxel_grid_chunk_pi;
         
         PassInstance voxel_writes_from_point_cloud_pi;
-    };
-
-    struct VoxelGridParams {
-        glm::uvec3 chunk_size = {0u, 0u, 0u};
-        glm::uvec3 voxel_size = {0u, 0u, 0u};
-        uint32_t count_active_chunks = 0u;
-        uint32_t count_evict_buckets = 0u;
-        uint32_t max_write_count = 0u;
-        uint32_t min_free_chunks = 0u;
-        uint32_t chunk_hash_table_size = 0u;
-        float tomb_fraction_to_rebuild = 0.0f;
-        float eviction_bucket_shell_thickness = 0.0f;
-        float render_distance = 0.0f;
-        float generation_distance = 0.0f;
-
-        uint32_t vb_page_size = 0;
-        uint32_t count_vb_pages = 0;
-        uint32_t count_vb_nodes = 0;
-        uint32_t vb_order = 0;
-        uint32_t max_mesh_vertices = 0;
-        
-        uint32_t ib_page_size = 0;
-        uint32_t count_ib_pages = 0;
-        uint32_t count_ib_nodes = 0;
-        uint32_t ib_order = 0;
-        uint32_t max_mesh_indices = 0;
     };
 
 private:
@@ -331,5 +338,5 @@ private:
         const glm::vec3& cam_pos,
         uint32_t pack_bits,
         int pack_offset
-    );
+    ); 
 };
