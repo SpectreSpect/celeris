@@ -8,13 +8,16 @@
 #include "mesh_manager.h"
 
 ManagerBundle::ManagerBundle(VulkanEngine& engine, ShaderManager& shader_manager, TextureManager& texture_manager, 
-                  MaterialManager& material_manager, MaterialInstanceManager& material_instance_manager, MeshManager& mesh_manager) 
+                  MaterialManager& material_manager, MaterialInstanceManager& material_instance_manager, 
+                  MeshManager& mesh_manager,
+                  ComputePassManager& compute_pass_manager) 
     :   m_engine(engine),
         m_shader_manager(shader_manager),
         m_texture_manager(texture_manager),
         m_material_manager(material_manager),
         m_material_instance_manager(material_instance_manager),
-        m_mesh_manager(mesh_manager) {}
+        m_mesh_manager(mesh_manager),
+        m_compute_pass_manager(compute_pass_manager) {}
 
 VulkanEngine& ManagerBundle::engine() noexcept {
     return m_engine;
@@ -38,4 +41,8 @@ MaterialInstanceManager& ManagerBundle::material_instance_manager() noexcept {
 
 MeshManager& ManagerBundle::mesh_manager() noexcept {
     return m_mesh_manager;
+}
+
+ComputePassManager& ManagerBundle::compute_pass_manager() noexcept {
+    return m_compute_pass_manager;
 }

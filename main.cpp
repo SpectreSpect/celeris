@@ -44,7 +44,7 @@
 #include "renderer/point_cloud/gicp/voxel_point_map.h"
 #include "renderer/point_cloud/gicp/voxel_map_point_inserter.h"
 #include "renderer/point_cloud/gicp/voxel_map_point_reseter.h"
-// #include "renderer/point_cloud/lidar/lidar_scan_receiver.h"
+#include "renderer/point_cloud/lidar/lidar_scan_receiver.h"
 #include "imgui_layer.h"
 #include "renderer/lighting_system/lighting_system.h"
 #include "renderer/pbr/equirect_to_cubemap_pass.h"
@@ -64,7 +64,13 @@
 #include "renderer/lines/line_instance.h"
 #include "a_star/occupancy_grid_3d.h"
 #include "a_star/a_star.h"
+#include "a_star/a_star_structures.h"
+#include "a_star/nonholonomic_a_star.h"
+#include "autopilot/spherical_pose_marker.h"
+#include "autopilot/celeris.h"
+#include "autopilot/celeris_visualizer.h"
 
+#include <cmath>
 #include <vector>
 #include <random>
 
@@ -103,7 +109,8 @@ int main() {
     MaterialManager material_manager(engine, shader_manager, frame_resources);
     MaterialInstanceManager material_instance_manager(engine, material_manager, texture_manager);
     MeshManager mesh_manager(engine, resource_loader);
-    ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, material_instance_manager, mesh_manager);
+    ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, 
+                                 material_instance_manager, mesh_manager, compute_pass_manager);
 
     PointCloudPreprocessor point_cloud_preprocessor(
         engine.device(), 
@@ -111,11 +118,11 @@ int main() {
         compute_pass_manager
     );
 
-    // LidarScanReceiver scan_receiver(point_cloud_preprocessor, 5000);
+    LidarScanReceiver scan_receiver(point_cloud_preprocessor, 5000);
     // scan_receiver.start();
 
     std::unique_ptr<LidarScan> network_scan;
-    // std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
+    std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
 
     glm::vec3 voxel_size(1.0f);
     glm::ivec3 chunk_size(16);
@@ -281,14 +288,8 @@ int main() {
     uint32_t max_write_count = 100000;
     VulkanBuffer voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * max_write_count);
 
-    GICPPass gicp_pass(engine, compute_pass_manager);
-    VoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);
-    VoxelMapPointReseter voxel_map_reseter(engine, compute_pass_manager);
-
     Renderer renderer(engine, frame_resources);
     
-    RenderObject sphere(mesh_manager.sphere, material_instance_manager.pbr);
-
     RenderObject vox_box(mesh_manager.cube, material_instance_manager.pbr);
     vox_box.transform.position = glm::vec3(0.0f, 80.0f, 0.0f);
     vox_box.transform.scale = glm::vec3(20.0f);
@@ -304,128 +305,74 @@ int main() {
         skybox_exposure
     );
 
-    constexpr uint32_t segment_count = 128;
+    bool has_start_pos = true;
+    bool has_end_pos = true;
+    bool has_planned_path = false;
 
-    constexpr float x_start = -10.0f;
-    constexpr float x_end = 10.0f;
+    Celeris celeris(engine, 
+                    engine.compute_queue(), 
+                    manager_bundle, 
+                    voxel_grid, 
+                    Celeris::CelerisDesc());
+    celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69, 1.92, -51.30)});   
+    celeris.start_lidar_receiver();
 
-    constexpr float amplitude = 2.0f;
-    constexpr float frequency = 1.0f;
+    CelerisVisualizer celeris_visualizer(mesh_manager, 
+                                         material_instance_manager, 
+                                         celeris, 
+                                         20000, 
+                                         skybox_exposure);
 
-    const glm::vec4 color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-
-    std::vector<LineInstance> lines;
-    lines.reserve(segment_count);
-
-    auto make_point = [](float x) {
-        constexpr float amplitude = 2.0f;
-        constexpr float frequency = 1.0f;
-
-        return glm::vec3(
-            x,
-            0.0f,
-            std::sin(x * frequency) * amplitude
-        );
+    auto start_path_planning = [&]() {
+        if (has_start_pos && has_end_pos) {
+            celeris.find_path();
+            has_planned_path = !celeris.planner().state_path.empty();
+        }
     };
 
-    for (uint32_t i = 0; i < segment_count; i++) {
-        float t0 = static_cast<float>(i) / static_cast<float>(segment_count);
-        float t1 = static_cast<float>(i + 1) / static_cast<float>(segment_count);
+    auto make_pose_from_camera = [&](NonholonomicPos& out_pose) {
+        glm::vec3 horizontal_front(camera.front.x, 0.0f, camera.front.z);
+        if (glm::dot(horizontal_front, horizontal_front) == 0.0f)
+            return false;
 
-        float x0 = glm::mix(x_start, x_end, t0);
-        float x1 = glm::mix(x_start, x_end, t1);
+        out_pose.pos = camera.position;
+        out_pose.theta = std::atan2(horizontal_front.z, horizontal_front.x);
 
-        lines.push_back(LineInstance{
-            .p0 = make_point(x0),
-            .p1 = make_point(x1),
-            .color = color
-        });
-    }
+        return celeris.planner().occupancy_grid().adjust_to_ground(out_pose.pos);
+    };
 
-    LineCloud line_cloud(
-        engine,
-        mesh_manager.line_quad,
-        material_instance_manager.line,
-        lines
-    );
+    auto place_start = [&]() {
+        NonholonomicPos pose;
+        if (make_pose_from_camera(pose)) {
+            celeris.set_start(pose);
+            has_start_pos = true;
+            has_planned_path = false;
+        }
+    };
 
-    line_cloud.set_material_data(LineMaterialData{
-        .color = glm::vec4(245.0f, 176.0f, 66.0f, 255.0f) * glm::vec4(1/255.0f),
-        .line_width_pixels = 10
-    });
-    line_cloud.sync_material();
+    auto place_end = [&]() {
+        NonholonomicPos pose;
+        if (make_pose_from_camera(pose)) {
+            celeris.set_goal(pose);
+            has_end_pos = true;
+            has_planned_path = false;
+        }
+    };
 
-    
-    // LidarVideo lidar_video(manager_bundle, 
-    //                        point_cloud_preprocessor,
-    //                        "/home/spectre/TEMP_lidar_output_mesh/recording/index.csv", 0, 1);
-
-    // Important: save original first frame pose before overwriting it.
-    // glm::vec3 first_position = lidar_video.get_scan(0).point_cloud().transform.position;
-    // glm::quat first_rotation = glm::normalize(lidar_video.get_scan(0).point_cloud().transform.rotation);
-
-    // for (int i = static_cast<int>(lidar_video.get_scan_count()) - 1; i >= 1; --i) {
-    //     glm::vec3 p_prev = lidar_video.get_scan(i - 1).point_cloud().transform.position;
-    //     glm::vec3 p_curr = lidar_video.get_scan(i).point_cloud().transform.position;
-
-    //     glm::quat q_prev = glm::normalize(lidar_video.get_scan(i - 1).point_cloud().transform.rotation);
-    //     glm::quat q_curr = glm::normalize(lidar_video.get_scan(i).point_cloud().transform.rotation);
-
-    //     // Optional: avoid quaternion sign discontinuity.
-    //     // q and -q represent the same rotation.
-    //     if (glm::dot(q_prev, q_curr) < 0.0f) {
-    //         q_curr = -q_curr;
-    //     }
-
-    //     glm::vec3 delta_position = p_curr - p_prev;
-
-    //     // Since your update convention is:
-    //     // q_new = dq * q_old
-    //     glm::quat delta_rotation = glm::normalize(q_curr * glm::inverse(q_prev));
-
-    //     lidar_video.get_scan(i).point_cloud().transform.position = delta_position;
-    //     lidar_video.get_scan(i).point_cloud().transform.rotation = delta_rotation;
-    // }
-
-    // lidar_video.get_scan(0).point_cloud().transform.position = glm::vec3(0.0f);
-    // lidar_video.get_scan(0).point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-
-
-        
-    // point_cloud_preprocessor.get_normals_from_webots_lidar_point_cloud(
-    //     *lidar_video.get_scan(0).point_cloud().instance_buffer(), 
-    //     lidar_video.get_scan(0).normal_buffer(), 
-    //     lidar_video.get_scan(0).point_cloud().point_count());
-
-    OccupancyGrid3D occupancy_gird_3d(voxel_grid);
-
-    VoxelPointMap voxel_point_map(engine, 1000000, 1000000);
-    voxel_map_reseter.reset(voxel_point_map);
-
-    // voxel_map_inserter.insert(voxel_point_map, target_point_cloud, target_normal_buffer);
-    // voxel_map_inserter.insert(voxel_point_map, lidar_video.get_scan(0).point_cloud(), lidar_video.get_scan(0).normal_buffer());
-    // voxel_point_map.upload_voxels(engine, voxel_grid);
-
-    PointCloud voxel_map_point_cloud(manager_bundle, voxel_point_map.map_point_buffer, voxel_point_map.m_map_point_count);
-
-    sphere.set_material_data(PBRMaterialData::create(1.0f, 0.01f, skybox_exposure));
     vox_box.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
-
-    sphere.transform.position = glm::vec4(0, 2, 0, 1);
 
     Scene scene;
 
     scene.add(skybox);
-    scene.add(sphere);
-    // scene.add(lidar_scan);
-    scene.add(scan_object);
-    // scene.add(voxel_map_point_cloud);
-    scene.add(line_cloud);
+    scene.add(celeris_visualizer);
     
     skybox.update(scene);
 
     bool g_pressed = false;
     bool n_pressed = false;
+    bool place_start_pressed = false;
+    bool place_end_pressed = false;
+    bool start_path_planning_pressed = false;
 
     int step = 0;
     
@@ -487,54 +434,41 @@ int main() {
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
 
-        // if (auto scan = scan_receiver.try_pop_scan(manager_bundle)) {
-        //     network_scan = std::move(scan);
-
-        //     LidarScan& current_scan = *network_scan;
-
-        //     gicp_pass.fit(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer(), 10);
-        //     voxel_map_inserter.insert(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
-        //     voxel_grid.voxelize_point_cloud(engine, current_scan.point_cloud(), voxel_write_list, max_write_count);
-        // }
-
-        // if (auto scan = scan_receiver.try_pop_scan(manager_bundle)) {
-        //     network_scan = std::move(scan);
-
-        //     // LidarScan& current_scan = *network_scan;
-
-        //     // renderer.render(command_buffer, current_scan.point_cloud());
-
-        //     // gicp_pass.fit(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer(), 10);
-        //     // voxel_map_inserter.insert(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
-        //     // voxel_grid.voxelize_point_cloud(engine, current_scan.point_cloud(), voxel_write_list, max_write_count);
-        // }
-
-        // if (auto scan = scan_receiver.try_pop_scan(manager_bundle)) {
-        //     if (network_scan) {
-        //         retired_network_scans.push_back(std::move(network_scan));
-        //     }
-
-        //     network_scan = std::move(scan);
-        //     std::cout << "Received scan #" << received_scan_count << std::endl;
-
-        //     while (retired_network_scans.size() > engine.num_frames_in_flight()) {
-        //         retired_network_scans.pop_front();
-        //     }
-
-        //     if (received_scan_count > 0)
-        //         gicp_pass.fit(voxel_point_map, network_scan->point_cloud(), network_scan->normal_buffer(), 10);
-            
-        //     voxel_map_inserter.insert(voxel_point_map, network_scan->point_cloud(), network_scan->normal_buffer());
-        //     voxel_grid.voxelize_point_cloud(engine, network_scan->point_cloud(), voxel_write_list, max_write_count);
-
-        //     received_scan_count++;
-        // }
-
         camera_controller.update(window, delta_time);
         frame_resources.update_camera(engine.current_frame(), window, camera);
         lighting_system.update(engine.current_frame(), window, camera);
 
+        celeris.update();
+        celeris_visualizer.update();
+
         voxel_grid.update(window, camera);
+
+        if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
+            place_start_pressed = true;
+            place_start();
+        }
+
+        if (place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_RELEASE) {
+            place_start_pressed = false;
+        }
+
+        if (!place_end_pressed && glfwGetKey(window.handle(), GLFW_KEY_2) == GLFW_PRESS) {
+            place_end_pressed = true;
+            place_end();
+        }
+
+        if (place_end_pressed && glfwGetKey(window.handle(), GLFW_KEY_2) == GLFW_RELEASE) {
+            place_end_pressed = false;
+        }
+
+        if (!start_path_planning_pressed && glfwGetKey(window.handle(), GLFW_KEY_3) == GLFW_PRESS) {
+            start_path_planning_pressed = true;
+            start_path_planning();
+        }
+
+        if (start_path_planning_pressed && glfwGetKey(window.handle(), GLFW_KEY_3) == GLFW_RELEASE) {
+            start_path_planning_pressed = false;
+        }
 
         if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
             g_pressed = true;
@@ -552,30 +486,6 @@ int main() {
         if (g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_RELEASE) {
             g_pressed = false;
         }
-
-        // auto next_frame = [&]() {
-        //     uint32_t current_frame_id = lidar_video.current_frame_id();
-
-        //     if (current_frame_id > 0) {
-        //         LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
-        //         LidarScan& previous_scan = lidar_video.get_scan(current_frame_id - 1);
-
-        //         PointCloud& current_point_cloud = current_scan.point_cloud();
-        //         PointCloud& previous_point_cloud = previous_scan.point_cloud();
-
-        //         current_point_cloud.transform.position = previous_point_cloud.transform.position + current_point_cloud.transform.position;
-
-        //         current_point_cloud.transform.rotation = glm::normalize(current_point_cloud.transform.rotation * previous_point_cloud.transform.rotation);
-
-        //         // gicp_pass.fit(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer(), 10);
-
-        //         voxel_map_inserter.insert(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
-        //         voxel_grid.voxelize_point_cloud(engine, current_scan.point_cloud(), voxel_write_list, max_write_count);
-        //         // voxel_map_point_cloud.set_instance_view(voxel_point_map.get_map_instance_view());
-        //     }
-            
-        //     lidar_video.next_frame();
-        // };
 
         if (!n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_PRESS) {
             n_pressed = true;
@@ -606,9 +516,37 @@ int main() {
 
                 ImGui::Begin("Debug");
 
+                ImGui::TextUnformatted("Camera position:");
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "x: %.2f", camera.position.x);
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "y: %.2f", camera.position.y);
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(0.0f, 0.35f, 1.0f, 1.0f), "z: %.2f", camera.position.z);
+
                 if (ImGui::Button("Next frame")) {
                     // next_frame();
                 }
+
+                if (ImGui::Button("Place start")) {
+                    place_start();
+                }
+                ImGui::SameLine();
+                ImGui::TextUnformatted("Key: 1");
+
+                if (ImGui::Button("Place end")) {
+                    place_end();
+                }
+                ImGui::SameLine();
+                ImGui::TextUnformatted("Key: 2");
+
+                if (ImGui::Button("Start path planning")) {
+                    start_path_planning();
+                }
+                ImGui::SameLine();
+                ImGui::TextUnformatted("Key: 3");
+
+                // ImGui::Text("Path: %s", path_planning_status.c_str());
 
                 ImGui::End();
                 
