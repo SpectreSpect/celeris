@@ -39,7 +39,6 @@ uint P(alloc_pages)(uint wantOrder) {
                 bool ok = P(push_free)(entire_order - 1u, start_buddy);
                 if (!ok) {
                     atomicAdd(P(active_splitters), 0xFFFFFFFFu);
-                    atomicAdd(debug_counter[0], 1u);
                     return INVALID_ID;
                 }
 
@@ -71,10 +70,7 @@ uint P(alloc_pages)(uint wantOrder) {
 
         if (splitters == 0u) {
             zero_attempts++;
-            if (zero_attempts >= ZERO_ATTEMPTS) {
-                atomicAdd(debug_counter[1], 1u);
-                return INVALID_ID;
-            }
+            if (zero_attempts >= ZERO_ATTEMPTS) return INVALID_ID;
         } else {
             zero_attempts = 0u;
         }
@@ -88,7 +84,6 @@ uint P(alloc_pages)(uint wantOrder) {
         // }
     }
 
-    atomicAdd(debug_counter[2], 1u);
     return INVALID_ID;
     // Цикл бесконечный, поэтому сюда никогда не попадём
 }

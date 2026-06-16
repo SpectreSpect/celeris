@@ -77,6 +77,7 @@ void VoxelGridGPUDebugger::print_counters() {
     VulkanBuffer& mesh_buffers_status = m_voxel_grid->buffers().mesh_buffers_status;
     VulkanBuffer& vb_free_nodes_list = m_voxel_grid->buffers().vb_free_nodes_list;
     VulkanBuffer& ib_free_nodes_list = m_voxel_grid->buffers().ib_free_nodes_list;
+    VulkanBuffer& debug_counter = m_voxel_grid->buffers().debug_counter;
 
     uint32_t load_list_count = load_list.read_scalar<uint32_t>(0u);
     uint32_t write_count = voxel_write_list.read_scalar<uint32_t>(0);
@@ -86,6 +87,7 @@ void VoxelGridGPUDebugger::print_counters() {
     uint32_t failed_dirty_count = failed_dirty_list.read_scalar<uint32_t>(0);
     uint32_t is_vb_full = mesh_buffers_status.read_scalar<uint32_t>(0);
     uint32_t is_ib_full = mesh_buffers_status.read_scalar<uint32_t>(sizeof(uint32_t));
+    std::vector<uint32_t> mesh_alloc_counters = debug_counter.read_vector<uint32_t>(3);
 
     std::cout << "write_count: " << write_count << std::endl;
     std::cout << "dirty_count: " << dirty_count << std::endl;
@@ -101,7 +103,13 @@ void VoxelGridGPUDebugger::print_counters() {
 
     std::cout << "count_free_nodes_vb: " << count_free_nodes_vb << std::endl;
     std::cout << "count_free_nodes_ib: " << count_free_nodes_ib << std::endl;
+    
+    std::cout << std::endl;
 
+    std::cout << "=== Mesh alloc debug counter ===" << std::endl;
+    std::cout << "push buddy errors: "  << mesh_alloc_counters[0] << std::endl;
+    std::cout << "zero attempts limit error: "  << mesh_alloc_counters[1] << std::endl;
+    std::cout << "out of while loop error: "  << mesh_alloc_counters[2] << std::endl;
     std::cout << std::endl;
 
     print_count_free_mesh_alloc();
@@ -745,19 +753,19 @@ void VoxelGridGPUDebugger::display_build_from_dirty_window(VulkanCommandBuffer& 
             BufferDispatchArg(&m_voxel_grid->buffers().dirty_list, 0u)
         );
         m_voxel_grid->verify_mesh_allocation(
-            command_buffer, 
-            m_voxel_grid->buffers().mesh_buffers_status
+            command_buffer,
+            m_voxel_grid->buffers().dispatch_args
         );
     }
 
     if (ImGui::Button("return_free_alloc_nodes()")) {
         m_voxel_grid->prepare_return_free_alloc_nodes(
             command_buffer,
-            m_voxel_grid->buffers().mesh_buffers_status
+            m_voxel_grid->buffers().dispatch_args
         );
         m_voxel_grid->return_free_alloc_nodes(
             command_buffer,
-            m_voxel_grid->buffers().mesh_buffers_status
+            m_voxel_grid->buffers().dispatch_args
         );
     }
 

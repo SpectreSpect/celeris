@@ -242,6 +242,7 @@ ComputePass ComputePassManager::create_mesh_alloc_compute_pass(VulkanDevice& dev
     builder.add_storage_buffer(9, ShaderStages::compute); // BBFreeNodesList
     builder.add_storage_buffer(10, ShaderStages::compute); // BBReturnedNodesList
     builder.add_storage_buffer(11, ShaderStages::compute); // ActiveSplitters
+    builder.add_storage_buffer(12, ShaderStages::compute); // DebugCounter
 
     builder.add_push_constantsf(sizeof(MeshAllocPushConstants), ShaderStages::compute);
 
@@ -450,12 +451,14 @@ ComputePass ComputePassManager::create_mesh_pool_seed_compute_pass(VulkanDevice&
     builder.add_storage_buffer(1, ShaderStages::compute); // VBNodes
     builder.add_storage_buffer(2, ShaderStages::compute); // VBState
     builder.add_storage_buffer(3, ShaderStages::compute); // VBFreeNodesList
-    builder.add_storage_buffer(4, ShaderStages::compute); // IBHeads
-    builder.add_storage_buffer(5, ShaderStages::compute); // IBNodes
-    builder.add_storage_buffer(6, ShaderStages::compute); // IBState
-    builder.add_storage_buffer(7, ShaderStages::compute); // IBFreeNodesList
+    builder.add_storage_buffer(4, ShaderStages::compute); // VBReturnedNodesList
+    builder.add_storage_buffer(5, ShaderStages::compute); // IBHeads
+    builder.add_storage_buffer(6, ShaderStages::compute); // IBNodes
+    builder.add_storage_buffer(7, ShaderStages::compute); // IBState
+    builder.add_storage_buffer(8, ShaderStages::compute); // IBFreeNodesList
+    builder.add_storage_buffer(9, ShaderStages::compute); // IBReturnedNodesList
 
-    builder.add_uniform_buffer(8, ShaderStages::compute); // UniformBuffer
+    builder.add_uniform_buffer(10, ShaderStages::compute); // UniformBuffer
 
     // builder.add_push_constantsf(sizeof(ApplyVoxelWritesPushConstants), ShaderStages::compute);
 

@@ -160,7 +160,7 @@ int main() {
         engine.compute_queue(),
         window,
         camera,
-        true
+        false
     );
 
     Voxelizator::VoxelizatorDesc voxelizator_desc {
@@ -451,7 +451,7 @@ int main() {
         celeris.update();
         celeris_visualizer.update();
 
-        // voxel_grid.update(window, camera);
+        voxel_grid.update(window, camera);
 
         if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
             place_start_pressed = true;
@@ -524,18 +524,18 @@ int main() {
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
                 
-                {
-                    VulkanCommandBuffer& debugger_command_buffer = debugger.command_buffer();
-                    auto scope = debugger_command_buffer.begin_scope();
-                    debugger.dispay_debug_window(camera);
-                    debugger.display_build_from_dirty_window(debugger_command_buffer);
-                    debugger.display_build_cmd_window(debugger_command_buffer, window, camera);
-                    debugger.display_draw_pipline_window(debugger_command_buffer);
-                    debugger.display_chunk_eviction_window(debugger_command_buffer, camera);
-                    debugger.display_stream_chunks_pipeline_window(debugger_command_buffer, camera);
-                    debugger.display_hash_table_window();
-                }
-                debugger.submit_commands();
+                // {
+                //     VulkanCommandBuffer& debugger_command_buffer = debugger.command_buffer();
+                //     auto scope = debugger_command_buffer.begin_scope();
+                //     debugger.dispay_debug_window(camera);
+                //     debugger.display_build_from_dirty_window(debugger_command_buffer);
+                //     debugger.display_build_cmd_window(debugger_command_buffer, window, camera);
+                //     debugger.display_draw_pipline_window(debugger_command_buffer);
+                //     debugger.display_chunk_eviction_window(debugger_command_buffer, camera);
+                //     debugger.display_stream_chunks_pipeline_window(debugger_command_buffer, camera);
+                //     debugger.display_hash_table_window();
+                // }
+                // debugger.submit_commands();
                 
 
                 // ImGui::Begin("Debug");

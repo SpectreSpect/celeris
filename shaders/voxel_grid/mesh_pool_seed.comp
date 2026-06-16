@@ -11,12 +11,14 @@ layout(std430, set = 0, binding=0) buffer VBHeads { uint vb_heads[]; };
 layout(std430, set = 0, binding=1) buffer VBNodes  { Node vb_nodes[];  };
 layout(std430, set = 0, binding=2) buffer VBState { uint vb_state[]; };
 layout(std430, set = 0, binding=3) buffer VBFreeNodesList  { uint vb_free_nodes_counter; uint vb_free_nodes_list[];  };
-layout(std430, set = 0, binding=4) buffer IBHeads { uint ib_heads[]; };
-layout(std430, set = 0, binding=5) buffer IBNodes  { Node ib_nodes[];  };
-layout(std430, set = 0, binding=6) buffer IBState { uint ib_state[]; };
-layout(std430, set = 0, binding=7) buffer IBFreeNodesList  { uint ib_free_nodes_counter; uint ib_free_nodes_list[];  };
+layout(std430, set = 0, binding=4) buffer VBReturnedNodesList  { uint vb_returned_nodes_counter; uint vb_returned_nodes_list[]; };
+layout(std430, set = 0, binding=5) buffer IBHeads { uint ib_heads[]; };
+layout(std430, set = 0, binding=6) buffer IBNodes  { Node ib_nodes[];  };
+layout(std430, set = 0, binding=7) buffer IBState { uint ib_state[]; };
+layout(std430, set = 0, binding=8) buffer IBFreeNodesList  { uint ib_free_nodes_counter; uint ib_free_nodes_list[];  };
+layout(std430, set = 0, binding=9) buffer IBReturnedNodesList  { uint ib_returned_nodes_counter; uint ib_returned_nodes_list[]; };
 
-layout(std140, set = 0, binding=8) uniform UniformBuffer  { 
+layout(std140, set = 0, binding=10) uniform UniformBuffer  { 
     uint u_vb_max_order;
     uint u_ib_max_order;
     uint pad1;
@@ -31,23 +33,63 @@ layout(std140, set = 0, binding=8) uniform UniformBuffer  {
 // ----- include -----
 // #include "../utils.glsl" <--- original path
 #include "../common/utils.inc"
-#include "../common/allocator/common.inc"
+
+#define PREFIX vb
+#include "../common/allocator/push_pop_impl.inc"
+#undef PREFIX
+
+#define PREFIX ib
+#include "../common/allocator/push_pop_impl.inc"
+#undef PREFIX
+
 // -------------------
 
 void main() {
-    uint vb_node_id = vb_free_nodes_counter - 1u;
-    vb_free_nodes_counter -= 1u;
+    // uint vb_node_id = vb_free_nodes_counter - 1u;
+    // vb_free_nodes_counter -= 1u;
 
-    vb_nodes[vb_node_id].page = 0u;
-    vb_nodes[vb_node_id].next = INVALID_ID;
-    vb_heads[ubo.u_vb_max_order] = pack_head(vb_node_id, 0u);
-    vb_state[0u] = pack_state(ubo.u_vb_max_order, ST_FREE);
+    // vb_nodes[vb_node_id].page = 0u;
+    // vb_nodes[vb_node_id].next = INVALID_ID;
+    // vb_heads[ubo.u_vb_max_order] = pack_head(vb_node_id, 0u);
+    // vb_state[0u] = pack_state(ubo.u_vb_max_order, ST_FREE);
 
-    uint ib_node_id = ib_free_nodes_counter - 1u;
-    ib_free_nodes_counter -= 1u;
+    // uint ib_node_id = ib_free_nodes_counter - 1u;
+    // ib_free_nodes_counter -= 1u;
 
-    ib_nodes[ib_node_id].page = 0u;
-    ib_nodes[ib_node_id].next = INVALID_ID;
-    ib_heads[ubo.u_ib_max_order] = pack_head(ib_node_id, 0u);
-    ib_state[0u] = pack_state(ubo.u_ib_max_order, ST_FREE);
+    // ib_nodes[ib_node_id].page = 0u;
+    // ib_nodes[ib_node_id].next = INVALID_ID;
+    // ib_heads[ubo.u_ib_max_order] = pack_head(ib_node_id, 0u);
+    // ib_state[0u] = pack_state(ubo.u_ib_max_order, ST_FREE);
+
+    uint count_vb_pages = 1u << ubo.u_vb_max_order;
+    uint count_ib_pages = 1u << ubo.u_ib_max_order;
+
+    uint order_to_set = 3u;
+    uint order_size = 1u << order_to_set;
+
+    for (uint page = 0u; page < count_vb_pages; page += order_size) {
+        vb_push_free(order_to_set, page);
+    }
+
+    for (uint page = 0u; page < count_ib_pages; page += order_size) {
+        ib_push_free(order_to_set, page);
+    }
+
+
+
+    // uint vb_node_id = vb_free_nodes_counter - 1u;
+    // vb_free_nodes_counter -= 1u;
+
+    // vb_nodes[vb_node_id].page = 0u;
+    // vb_nodes[vb_node_id].next = INVALID_ID;
+    // vb_heads[ubo.u_vb_max_order] = pack_head(vb_node_id, 0u);
+    // vb_state[0u] = pack_state(ubo.u_vb_max_order, ST_FREE);
+
+    // uint ib_node_id = ib_free_nodes_counter - 1u;
+    // ib_free_nodes_counter -= 1u;
+
+    // ib_nodes[ib_node_id].page = 0u;
+    // ib_nodes[ib_node_id].next = INVALID_ID;
+    // ib_heads[ubo.u_ib_max_order] = pack_head(ib_node_id, 0u);
+    // ib_state[0u] = pack_state(ubo.u_ib_max_order, ST_FREE);
 }

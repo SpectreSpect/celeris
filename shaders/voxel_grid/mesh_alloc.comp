@@ -20,6 +20,7 @@ layout(std430, set = 0, binding=9) coherent buffer BBFreeNodesList  { uint bb_fr
 layout(std430, set = 0, binding=10) coherent buffer BBReturnedNodesList  { uint bb_returned_nodes_counter; uint bb_returned_nodes_list[]; };
 
 layout(std430, set = 0, binding=11) buffer ActiveSplitters { uint bb_active_splitters; };
+layout(std430, set = 0, binding=12) buffer DebugCounter { uint debug_counter[]; };
 
 layout(push_constant) uniform MeshAllocPushConstants {
     uint bb_pages;
