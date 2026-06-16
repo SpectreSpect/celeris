@@ -70,14 +70,15 @@ VoxelGrid::VoxelGrid(
     VulkanQueue& queue,
     ComputePassManager& compute_pass_manager,
     MaterialInstanceManager& material_instance_manager,
-    const VoxelGridDesc& desc) 
+    const VoxelGridDesc& desc,
+    VkMemoryPropertyFlags ssbo_memory_properties) 
     :   m_command_pool(device, queue),
         m_command_buffer(device, m_command_pool),
         m_fence(device),
         m_queue(&queue),
         m_params(create_params(desc)),
         m_pass_instances(create_pass_instances(device, compute_pass_manager)),
-        m_buffers(create_buffers(physical_device, device, m_command_buffer)),
+        m_buffers(create_buffers(physical_device, device, m_command_buffer, ssbo_memory_properties)),
         m_mesh_view(m_buffers.global_vertex_buffer.get_view(), m_buffers.global_index_buffer.get_view(), m_params.max_mesh_indices),
         m_render_object(m_mesh_view, material_instance_manager.voxel_pbr, m_buffers.indirect_cmds, m_params.count_active_chunks),
         m_shader_helper(device, compute_pass_manager)
@@ -213,7 +214,7 @@ void VoxelGrid::reset_heads(VulkanCommandBuffer& command_buffer) {
     bucket_head.id = INVALID_ID;
     bucket_head.count = 0;
 
-    m_buffers.bucket_heads.fill(m_command_buffer, m_pass_instances.fill_buffer_pw, bucket_head, sizeof(BucketHead) * m_params.count_evict_buckets);
+    m_buffers.bucket_heads.fill(command_buffer, m_pass_instances.fill_buffer_pw, bucket_head, sizeof(BucketHead) * m_params.count_evict_buckets);
     m_buffers.bucket_heads.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
@@ -405,7 +406,7 @@ void VoxelGrid::mesh_count(VulkanCommandBuffer& command_buffer, const VulkanBuff
     m_pass_instances.mesh_count_pi.set_storage_buffer(3, m_buffers.dirty_quad_count);
     m_pass_instances.mesh_count_pi.set_storage_buffer(4, m_buffers.chunk_meta);
 
-    m_pass_instances.mesh_count_pi.push_constants(m_command_buffer, MeshCountPushConstants{
+    m_pass_instances.mesh_count_pi.push_constants(command_buffer, MeshCountPushConstants{
         .u_chunk_dim = glm::ivec4(m_params.chunk_size, 0),
         .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
         .u_voxels_per_chunk = static_cast<uint32_t>(vox_per_chunk()),
@@ -437,7 +438,7 @@ void VoxelGrid::mesh_alloc_vb(VulkanCommandBuffer& command_buffer, const VulkanB
     
     m_pass_instances.mesh_alloc_vb_pi.set_storage_buffer(11, m_buffers.active_splitters);
 
-    m_pass_instances.mesh_alloc_vb_pi.push_constants(m_command_buffer, MeshAllocPushConstants{
+    m_pass_instances.mesh_alloc_vb_pi.push_constants(command_buffer, MeshAllocPushConstants{
         .bb_pages = m_params.count_vb_pages,
         .bb_page_elements = m_params.vb_page_size,
         .bb_max_order = m_params.vb_order,
@@ -488,7 +489,7 @@ void VoxelGrid::mesh_alloc_ib(VulkanCommandBuffer& command_buffer, const VulkanB
 
     m_pass_instances.mesh_alloc_ib_pi.set_storage_buffer(11, m_buffers.active_splitters);
 
-    m_pass_instances.mesh_alloc_ib_pi.push_constants(m_command_buffer, MeshAllocPushConstants{
+    m_pass_instances.mesh_alloc_ib_pi.push_constants(command_buffer, MeshAllocPushConstants{
         .bb_pages = m_params.count_ib_pages,
         .bb_page_elements = m_params.ib_page_size,
         .bb_max_order = m_params.ib_order,
@@ -538,7 +539,7 @@ void VoxelGrid::verify_mesh_allocation(VulkanCommandBuffer& command_buffer, cons
     m_pass_instances.verify_mesh_allocation_pi.set_storage_buffer(12, m_buffers.ib_free_nodes_list);
     m_pass_instances.verify_mesh_allocation_pi.set_storage_buffer(13, m_buffers.ib_returned_nodes_list);
 
-    m_pass_instances.verify_mesh_allocation_pi.push_constants(m_command_buffer, VerifyMeshAllocationPushConstants{
+    m_pass_instances.verify_mesh_allocation_pi.push_constants(command_buffer, VerifyMeshAllocationPushConstants{
         .vb_max_order = m_params.vb_order,
         .ib_max_order = m_params.ib_order
     });
@@ -591,7 +592,7 @@ void VoxelGrid::return_free_alloc_nodes(VulkanCommandBuffer& command_buffer, Vul
     m_pass_instances.return_free_alloc_nodes_pw.set_storage_buffer(2, m_buffers.ib_free_nodes_list);
     m_pass_instances.return_free_alloc_nodes_pw.set_storage_buffer(3, m_buffers.ib_returned_nodes_list);
 
-    m_pass_instances.return_free_alloc_nodes_pw.push_constants(m_command_buffer, ReturnFreeAllocNodesPushConstants{
+    m_pass_instances.return_free_alloc_nodes_pw.push_constants(command_buffer, ReturnFreeAllocNodesPushConstants{
         .u3_chunk_size = glm::uvec4(m_params.chunk_size, 0)
     });
 
@@ -619,7 +620,7 @@ void VoxelGrid::mesh_emit(VulkanCommandBuffer& command_buffer, VulkanBuffer& dis
     m_pass_instances.mesh_emit_pi.set_storage_buffer(7, m_buffers.global_vertex_buffer);
     m_pass_instances.mesh_emit_pi.set_storage_buffer(8, m_buffers.global_index_buffer);
 
-    m_pass_instances.mesh_emit_pi.push_constants(m_command_buffer, MeshEmitPushConstants{
+    m_pass_instances.mesh_emit_pi.push_constants(command_buffer, MeshEmitPushConstants{
         .u_chunk_dim = glm::uvec4(m_params.chunk_size, 0),
         .u_voxel_size = glm::uvec4(m_params.voxel_size, 0),
 
@@ -934,7 +935,8 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(VulkanDevice&
 VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     const VulkanPhysicalDevice& physical_device,
     const VulkanDevice& device,
-    VulkanCommandBuffer& command_buffer) 
+    VulkanCommandBuffer& command_buffer,
+    VkMemoryPropertyFlags ssbo_memory_properties) 
 {
     LOG_METHOD();
     
@@ -983,36 +985,12 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize vb_returned_nodes_list_size = sizeof(uint32_t) * (size_t)(1u + m_params.count_vb_nodes);
     VkDeviceSize ib_returned_nodes_list_size = sizeof(uint32_t) * (size_t)(1u + m_params.count_ib_nodes);
 
-    VkDeviceSize total_size = 
-        free_list_size + 
-        chunk_hash_table_size + 
-        mesh_buffers_status_size +
-        chunk_meta_size +
-        enqueued_size + 
-        dirty_list_size +
-        load_list_size +
-        voxel_write_list_size + 
-        voxels_size +
-        indirect_cmds_size +
-        failed_dirty_list_size +
-        global_vertex_buffer_size +
-        global_index_buffer_size +
-        vb_heads_size +
-        vb_nodes_size +
-        vb_state_size +
-        vb_free_nodes_list_size +
-        ib_heads_size +
-        ib_nodes_size +
-        ib_state_size +
-        ib_free_nodes_list_size +
-        chunk_mesh_alloc_size;
-
     VulkanBuffer local_voxel_write_list = VulkanBuffer(
         physical_device,
         device,
         local_voxel_write_list_size,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        ssbo_memory_properties
     );
     
     VulkanBuffer vb_returned_nodes_list = VulkanBuffer(
@@ -1020,7 +998,7 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         device,
         vb_returned_nodes_list_size,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        ssbo_memory_properties
     );
 
     VulkanBuffer ib_returned_nodes_list = VulkanBuffer(
@@ -1028,16 +1006,23 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         device,
         ib_returned_nodes_list_size,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        ssbo_memory_properties
     );
 
-    VulkanBuffer bucket_heads = VulkanBuffer::create_storage_buffer(physical_device, device, bucket_heads_size);
+    VulkanBuffer bucket_heads = VulkanBuffer(
+        physical_device,
+        device,
+        bucket_heads_size,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        ssbo_memory_properties
+    );
+    
     VulkanBuffer bucket_next = VulkanBuffer(
         physical_device,
         device,
         bucket_next_size,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        ssbo_memory_properties
     );
 
     VulkanBuffer evicted_chunks_list = VulkanBuffer(
@@ -1045,7 +1030,7 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         device,
         evicted_chunks_list_size,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        ssbo_memory_properties
     );
 
     {
@@ -1066,16 +1051,36 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         // memory_barrier здесь не нужен, так как мы сразу делаем submit
     }
     submit_compute_commands();
-
-    
-
     
     return VoxelGridBuffers {
-        .chunk_hash_table = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_hash_table_size),
-        .free_list = VulkanBuffer::create_storage_buffer(physical_device, device, free_list_size),
-        .chunk_meta = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_meta_size),
-        .enqueued = VulkanBuffer::create_storage_buffer(physical_device, device, enqueued_size),
-
+        .chunk_hash_table = VulkanBuffer(
+            physical_device,
+            device,
+            chunk_hash_table_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
+        .free_list = VulkanBuffer(
+            physical_device,
+            device,
+            free_list_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
+        .chunk_meta = VulkanBuffer(
+            physical_device,
+            device,
+            chunk_meta_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
+        .enqueued = VulkanBuffer(
+            physical_device,
+            device,
+            enqueued_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
         .indirect_cmds = VulkanBuffer(
             physical_device,
             device,
@@ -1086,19 +1091,33 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
         ),
-
-        .failed_dirty_list = VulkanBuffer::create_storage_buffer(physical_device, device, failed_dirty_list_size),
-
-        // .mesh_buffers_status = VulkanBuffer::create_storage_buffer(physical_device, device, mesh_buffers_status_size),
-        // .dirty_list = VulkanBuffer::create_storage_buffer(physical_device, device, dirty_list_size),
-        .mesh_buffers_status = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, mesh_buffers_status_size),
-        .dirty_list = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, dirty_list_size),
+        .failed_dirty_list = VulkanBuffer(
+            physical_device,
+            device,
+            failed_dirty_list_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
+        .mesh_buffers_status = VulkanBuffer(
+            physical_device,
+            device,
+            mesh_buffers_status_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
+        .dirty_list = VulkanBuffer(
+            physical_device,
+            device,
+            dirty_list_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
         .load_list = VulkanBuffer(
             physical_device,
             device,
             load_list_size,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+            ssbo_memory_properties
         ),
         .local_voxel_write_list = std::move(local_voxel_write_list),
         .voxel_write_list = VulkanBuffer(
@@ -1106,14 +1125,14 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
             device,
             voxel_write_list_size,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+            ssbo_memory_properties
         ),
         .voxels = VulkanBuffer(
             physical_device,
             device,
             voxels_size,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+            ssbo_memory_properties
         ),
         .bucket_heads = std::move(bucket_heads),
         .bucket_next = std::move(bucket_next),
@@ -1123,63 +1142,168 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
             device, 
             global_vertex_buffer_size,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+            ssbo_memory_properties
         ),
         .global_index_buffer = VulkanBuffer(
             physical_device, 
             device, 
             global_index_buffer_size,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+            ssbo_memory_properties
         ),
         .active_splitters = VulkanBuffer(
             physical_device, 
             device, 
             active_splitters_size,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+            ssbo_memory_properties
         ),
-        .vb_heads = VulkanBuffer::create_storage_buffer(physical_device, device, vb_heads_size),
-        // .vb_nodes = BufferObject(sizeof(AllocNode) * (size_t)(count_vb_nodes_), GL_DYNAMIC_DRAW);
-        .vb_nodes = VulkanBuffer::create_storage_buffer(physical_device, device, vb_nodes_size),
-        .vb_state = VulkanBuffer::create_storage_buffer(physical_device, device, vb_state_size),
-        .vb_free_nodes_list = VulkanBuffer::create_storage_buffer(physical_device, device, vb_free_nodes_list_size),
+        .vb_heads = VulkanBuffer(
+            physical_device,
+            device,
+            vb_heads_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
+        .vb_nodes = VulkanBuffer(
+            physical_device,
+            device,
+            vb_nodes_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
+        .vb_state = VulkanBuffer(
+            physical_device,
+            device,
+            vb_state_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
+        .vb_free_nodes_list = VulkanBuffer(
+            physical_device,
+            device,
+            vb_free_nodes_list_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
 
-        .ib_heads = VulkanBuffer::create_storage_buffer(physical_device, device, ib_heads_size),
-        .ib_nodes = VulkanBuffer::create_storage_buffer(physical_device, device, ib_nodes_size),
-        .ib_state = VulkanBuffer::create_storage_buffer(physical_device, device, ib_state_size),
-        .ib_free_nodes_list = VulkanBuffer::create_storage_buffer(physical_device, device, ib_free_nodes_list_size),
+        .ib_heads = VulkanBuffer(
+            physical_device,
+            device,
+            ib_heads_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
+        .ib_nodes = VulkanBuffer(
+            physical_device,
+            device,
+            ib_nodes_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
+        .ib_state = VulkanBuffer(
+            physical_device,
+            device,
+            ib_state_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
+        .ib_free_nodes_list = VulkanBuffer(
+            physical_device,
+            device,
+            ib_free_nodes_list_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
 
-        .chunk_mesh_alloc = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_mesh_alloc_size),
+        .chunk_mesh_alloc = VulkanBuffer(
+            physical_device,
+            device,
+            chunk_mesh_alloc_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
 
-        .mesh_pool_clear_uniform = VulkanBuffer::create_host_visible_uniform_buffer(physical_device, device, sizeof(MeshPoolClearUniform)),
-        .mesh_pool_seed_uniform = VulkanBuffer::create_host_visible_uniform_buffer(physical_device, device, sizeof(MeshPoolSeedUniform)),
+        .mesh_pool_clear_uniform = VulkanBuffer(
+            physical_device,
+            device,
+            sizeof(MeshPoolClearUniform),
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        ),
+        .mesh_pool_seed_uniform = VulkanBuffer(
+            physical_device,
+            device,
+            sizeof(MeshPoolSeedUniform),
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        ),
 
-        .dispatch_args = VulkanBuffer::create_host_visible_indirect_storage_buffer(physical_device, device, dispatch_args_size),
-        .dispatch_args_additional = VulkanBuffer::create_host_visible_indirect_storage_buffer(physical_device, device, dispatch_args_size),
-        
-        .dirty_quad_count = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, dirty_quad_count_size),
-        .emit_counters = VulkanBuffer::create_storage_buffer(physical_device, device, emit_counters_size),
+        .dispatch_args = VulkanBuffer(
+            physical_device,
+            device,
+            dispatch_args_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+            VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        ),
+        .dispatch_args_additional = VulkanBuffer(
+            physical_device,
+            device,
+            dispatch_args_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+            VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        ),
 
-        .chunk_mesh_alloc_local = VulkanBuffer::create_storage_buffer(physical_device, device, chunk_mesh_alloc_local_size),
+        .dirty_quad_count = VulkanBuffer(
+            physical_device,
+            device,
+            dirty_quad_count_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
+
+        .emit_counters = VulkanBuffer(
+            physical_device,
+            device,
+            emit_counters_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
+
+        .chunk_mesh_alloc_local = VulkanBuffer(
+            physical_device,
+            device,
+            chunk_mesh_alloc_local_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            ssbo_memory_properties
+        ),
+
         .vb_returned_nodes_list = std::move(vb_returned_nodes_list),
         .ib_returned_nodes_list = std::move(ib_returned_nodes_list),
-        .build_indirect_cmds_uniform = VulkanBuffer::create_host_visible_uniform_buffer(physical_device, device, sizeof(BuildIndirectCmdsUniform)),
-        .read_chunk_output = VulkanBuffer::create_host_visible_storage_buffer(physical_device, device, read_chunk_output_size)
 
+        .build_indirect_cmds_uniform = VulkanBuffer(
+            physical_device,
+            device,
+            sizeof(BuildIndirectCmdsUniform),
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        ),
 
-        // global_vertex_buffer_ = BufferObject(sizeof(VertexGPU) * (size_t)max_mesh_vertices_, GL_DYNAMIC_DRAW);
-        // global_index_buffer_ = BufferObject(sizeof(uint32_t) * (size_t)max_mesh_indices_, GL_DYNAMIC_DRAW);
-
-        // .mesh_buffers_status = m_buffer_filler.fill_buffer(
-        //     command_buffer, 0u, VulkanBuffer::create_storage_buffer(physical_device, device, mesh_buffers_status_size)
-        // ),
-        // .dirty_list = m_buffer_filler.fill_buffer(
-        //     command_buffer, 0u, VulkanBuffer::create_storage_buffer(physical_device, device, dirty_list_size)
-        // ),
-        // .voxel_write_list = m_buffer_filler.fill_buffer(
-        //     command_buffer, 0u, VulkanBuffer::create_storage_buffer(physical_device, device, voxel_write_list_size)
-        // )
+        .read_chunk_output = VulkanBuffer(
+            physical_device,
+            device,
+            read_chunk_output_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        )
     };
 }
 

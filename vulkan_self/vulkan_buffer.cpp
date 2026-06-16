@@ -321,10 +321,12 @@ void VulkanBuffer::upload(const void* data, VkDeviceSize size_bytes, VkDeviceSiz
 void VulkanBuffer::read(void* data, VkDeviceSize size_bytes, VkDeviceSize offset_bytes) {
     LOG_METHOD();
 
+    if (size_bytes == 0) return;
+
     logger.check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
     logger.check(m_memory.has_value(), "Buffer memory is not initialized");
     logger.check(data != nullptr, "Attempt to read data into nullptr");
-    logger.check(size_bytes != 0, "Attempt to read zero bytes");
+    // logger.check(size_bytes != 0, "Attempt to read zero bytes");
     logger.check(offset_bytes <= size(), "Read offset is out of bounds");
     logger.check(size_bytes <= size() - offset_bytes, "Read range is out of bounds");
 

@@ -2,6 +2,7 @@
 
 #include <unordered_set>
 #include <vector>
+#include <cstddef>
 
 #include "shader_helper/buffer_dispatch_arg.h"
 #include "voxel_grid_structures.h"
@@ -9,10 +10,27 @@
 #include "../imgui_layer.h"
 #include "../math_utils.h"
 #include "voxel_grid.h"
+#include "../vulkan_self/vulkan_queue.h"
+#include "../vulkan_self/vulkan_device.h"
 
+VoxelGridGPUDebugger::VoxelGridGPUDebugger(
+    VoxelGrid& voxel_grid,
+    VulkanDevice& device,
+    VulkanQueue& queue,
+    const Window& window,
+    const Camera& camera,
+    bool default_tasks_activity_state)
+    :   m_voxel_grid(&voxel_grid),
+        m_queue(&queue),
+        m_command_pool(device, *m_queue),
+        m_command_buffer(device, m_command_pool),
+        m_fence(device),
+        m_draw_tasks(create_draw_tasks(window, camera, default_tasks_activity_state)),
+        m_generation_tasks(create_generation_tasks(camera, default_tasks_activity_state)) {}
 
-VoxelGridGPUDebugger::VoxelGridGPUDebugger(VoxelGrid& voxel_grid)
-    :   m_voxel_grid(&voxel_grid) {}
+VulkanCommandBuffer& VoxelGridGPUDebugger::command_buffer() noexcept {
+    return m_command_buffer;
+}
 
 void VoxelGridGPUDebugger::print_found_chunks_in_hash_table(glm::ivec3 chunk_pos) {
     std::vector<ChunkHashTableSlot> chunk_hash_table_slot(m_voxel_grid->params().chunk_hash_table_size);
@@ -667,20 +685,16 @@ void VoxelGridGPUDebugger::dispay_debug_window(const Camera& camera) {
     ImGui::End();
 }
 
-void VoxelGridGPUDebugger::display_build_from_dirty_window() {
+void VoxelGridGPUDebugger::display_build_from_dirty_window(VulkanCommandBuffer& command_buffer) {
     ShaderHelper& shader_helper = m_voxel_grid->shader_helper();
-    VulkanCommandBuffer& command_buffer = m_voxel_grid->m_command_buffer;
+    uint32_t vox_per_chunk = static_cast<uint32_t>(m_voxel_grid->vox_per_chunk());
 
     ImGui::Begin("Build mesh from dirty pipeline");
     if (ImGui::Button("Run all pipeline")) {
-        {
-            auto scope = command_buffer.begin_scope();    
-            m_voxel_grid->build_mesh_from_dirty(
-                command_buffer, 
-                math_utils::BITS, 
-                math_utils::OFFSET);
-        }
-        m_voxel_grid->submit_compute_commands();
+        m_voxel_grid->build_mesh_from_dirty(
+            command_buffer, 
+            math_utils::BITS, 
+            math_utils::OFFSET);
     }
 
     ImGui::Spacing();
@@ -689,144 +703,98 @@ void VoxelGridGPUDebugger::display_build_from_dirty_window() {
     ImGui::Separator();
 
     if (ImGui::Button("mesh_reset()")) {
-        {
-            auto scope = command_buffer.begin_scope();   
-            shader_helper.prepare_dispatch_args(
-                command_buffer, 
-                m_voxel_grid->buffers().dispatch_args, 
-                BufferDispatchArg(&m_voxel_grid->buffers().dirty_list, 0u)
-            );
-            m_voxel_grid->mesh_reset(command_buffer, m_voxel_grid->buffers().dispatch_args);
-        }
-        m_voxel_grid->submit_compute_commands();
+        shader_helper.prepare_dispatch_args(
+            command_buffer, 
+            m_voxel_grid->buffers().dispatch_args, 
+            BufferDispatchArg(&m_voxel_grid->buffers().dirty_list, 0u)
+        );
+        m_voxel_grid->mesh_reset(command_buffer, m_voxel_grid->buffers().dispatch_args);
     }
 
     if (ImGui::Button("mesh_count()")) {
-        uint32_t vox_per_chunk = (uint32_t)(m_voxel_grid->params().chunk_size.x * 
-                                            m_voxel_grid->params().chunk_size.y * 
-                                            m_voxel_grid->params().chunk_size.z);
-        {
-            auto scope = command_buffer.begin_scope();
-
-            shader_helper.prepare_dispatch_args(
-                command_buffer,
-                m_voxel_grid->buffers().dispatch_args, 
-                ValueDispatchArg(vox_per_chunk), 
-                BufferDispatchArg(&m_voxel_grid->buffers().dirty_list, 0u)
-            );
-            m_voxel_grid->mesh_count(
-                command_buffer, 
-                m_voxel_grid->buffers().dispatch_args, 
-                math_utils::BITS, 
-                math_utils::OFFSET
-            );
-        }
-        m_voxel_grid->submit_compute_commands();
+        shader_helper.prepare_dispatch_args(
+            command_buffer,
+            m_voxel_grid->buffers().dispatch_args, 
+            ValueDispatchArg(vox_per_chunk), 
+            BufferDispatchArg(&m_voxel_grid->buffers().dirty_list, 0u)
+        );
+        m_voxel_grid->mesh_count(
+            command_buffer, 
+            m_voxel_grid->buffers().dispatch_args, 
+            math_utils::BITS, 
+            math_utils::OFFSET
+        );
     }
 
     if (ImGui::Button("mesh_alloc()")) {
-        {
-            auto scope = command_buffer.begin_scope();
-
-            shader_helper.prepare_dispatch_args(
-                command_buffer, 
-                m_voxel_grid->buffers().dispatch_args, 
-                BufferDispatchArg(&m_voxel_grid->buffers().dirty_list, 0u)
-            );
-            m_voxel_grid->mesh_alloc(
-                command_buffer, 
-                m_voxel_grid->buffers().dispatch_args
-            );
-        }
-        m_voxel_grid->submit_compute_commands();
+        shader_helper.prepare_dispatch_args(
+            command_buffer, 
+            m_voxel_grid->buffers().dispatch_args, 
+            BufferDispatchArg(&m_voxel_grid->buffers().dirty_list, 0u)
+        );
+        m_voxel_grid->mesh_alloc(
+            command_buffer, 
+            m_voxel_grid->buffers().dispatch_args
+        );
     }
 
     if (ImGui::Button("verify_mesh_allocation()")) {
-        {
-            auto scope = command_buffer.begin_scope();
-
-            shader_helper.prepare_dispatch_args(
-                command_buffer,
-                m_voxel_grid->buffers().dispatch_args, 
-                BufferDispatchArg(&m_voxel_grid->buffers().dirty_list, 0u)
-            );
-            m_voxel_grid->verify_mesh_allocation(
-                command_buffer, 
-                m_voxel_grid->buffers().mesh_buffers_status
-            );
-        }
-        m_voxel_grid->submit_compute_commands();
+        shader_helper.prepare_dispatch_args(
+            command_buffer,
+            m_voxel_grid->buffers().dispatch_args, 
+            BufferDispatchArg(&m_voxel_grid->buffers().dirty_list, 0u)
+        );
+        m_voxel_grid->verify_mesh_allocation(
+            command_buffer, 
+            m_voxel_grid->buffers().mesh_buffers_status
+        );
     }
 
     if (ImGui::Button("return_free_alloc_nodes()")) {
-        {
-            auto scope = command_buffer.begin_scope();
-
-            m_voxel_grid->prepare_return_free_alloc_nodes(
-                command_buffer,
-                m_voxel_grid->buffers().mesh_buffers_status
-            );
-            m_voxel_grid->return_free_alloc_nodes(
-                command_buffer,
-                m_voxel_grid->buffers().mesh_buffers_status
-            );
-        }
-        m_voxel_grid->submit_compute_commands();
+        m_voxel_grid->prepare_return_free_alloc_nodes(
+            command_buffer,
+            m_voxel_grid->buffers().mesh_buffers_status
+        );
+        m_voxel_grid->return_free_alloc_nodes(
+            command_buffer,
+            m_voxel_grid->buffers().mesh_buffers_status
+        );
     }
 
     if (ImGui::Button("mesh_emit()")) {
-        uint32_t vox_per_chunk = (uint32_t)(m_voxel_grid->params().chunk_size.x * 
-                                            m_voxel_grid->params().chunk_size.y * 
-                                            m_voxel_grid->params().chunk_size.z);
-        {
-            auto scope = command_buffer.begin_scope();
-
-            shader_helper.prepare_dispatch_args(
-                command_buffer,
-                m_voxel_grid->buffers().dispatch_args, 
-                ValueDispatchArg(vox_per_chunk), 
-                BufferDispatchArg(&m_voxel_grid->buffers().dirty_list, 0u)
-            );
-            m_voxel_grid->mesh_emit(
-                command_buffer, 
-                m_voxel_grid->buffers().dispatch_args, 
-                math_utils::BITS, 
-                math_utils::OFFSET);
-        }
-        m_voxel_grid->submit_compute_commands();
+        shader_helper.prepare_dispatch_args(
+            command_buffer,
+            m_voxel_grid->buffers().dispatch_args, 
+            ValueDispatchArg(vox_per_chunk), 
+            BufferDispatchArg(&m_voxel_grid->buffers().dirty_list, 0u)
+        );
+        m_voxel_grid->mesh_emit(
+            command_buffer, 
+            m_voxel_grid->buffers().dispatch_args, 
+            math_utils::BITS, 
+            math_utils::OFFSET);
     }
 
     if (ImGui::Button("mesh_finalize()")) {
-        {
-            auto scope = command_buffer.begin_scope();
-
-            shader_helper.prepare_dispatch_args(
-                command_buffer,
-                m_voxel_grid->buffers().dispatch_args, 
-                BufferDispatchArg(&m_voxel_grid->buffers().dirty_list, 0u)
-            );
-            m_voxel_grid->mesh_finalize(
-                command_buffer, 
-                m_voxel_grid->buffers().dispatch_args
-            );
-        }
-        m_voxel_grid->submit_compute_commands();
+        shader_helper.prepare_dispatch_args(
+            command_buffer,
+            m_voxel_grid->buffers().dispatch_args, 
+            BufferDispatchArg(&m_voxel_grid->buffers().dirty_list, 0u)
+        );
+        m_voxel_grid->mesh_finalize(
+            command_buffer, 
+            m_voxel_grid->buffers().dispatch_args
+        );
     }
 
     if (ImGui::Button("reset_dirty_count()")) {
-        {
-            auto scope = command_buffer.begin_scope();
-
-            m_voxel_grid->reset_dirty_count(command_buffer);
-        }
-        m_voxel_grid->submit_compute_commands();
+        m_voxel_grid->reset_dirty_count(command_buffer);
     }
     ImGui::End();
 }
 
-void VoxelGridGPUDebugger::display_build_cmd_window(Window& window, const Camera& camera) {
+void VoxelGridGPUDebugger::display_build_cmd_window(VulkanCommandBuffer& command_buffer, Window& window, const Camera& camera) {
     ShaderHelper& shader_helper = m_voxel_grid->shader_helper();
-    VulkanCommandBuffer& command_buffer = m_voxel_grid->m_command_buffer;
 
     ImGui::Begin("Build draw commands pipeline");
     if (ImGui::Button("Run all pipeline")) {
@@ -835,17 +803,13 @@ void VoxelGridGPUDebugger::display_build_cmd_window(Window& window, const Camera
         glm::mat4 proj_matrix = camera.get_projection_matrix(aspect);
         glm::mat4 view_proj_matrix = proj_matrix * view_matrix;
 
-        {
-            auto scope = command_buffer.begin_scope();
-            m_voxel_grid->build_indirect_draw_commands_frustum(
-                command_buffer, 
-                view_proj_matrix, 
-                camera.position, 
-                math_utils::BITS, 
-                math_utils::OFFSET
-            );
-        }
-        m_voxel_grid->submit_compute_commands();
+        m_voxel_grid->build_indirect_draw_commands_frustum(
+            command_buffer, 
+            view_proj_matrix, 
+            camera.position, 
+            math_utils::BITS, 
+            math_utils::OFFSET
+        );
     }
 
     ImGui::Spacing();
@@ -854,11 +818,7 @@ void VoxelGridGPUDebugger::display_build_cmd_window(Window& window, const Camera
     ImGui::Separator();
 
     if (ImGui::Button("reset_cmd_count()")) {
-        {
-            auto scope = command_buffer.begin_scope();
-            m_voxel_grid->buffers().mesh_buffers_status.fill(command_buffer, 0u, sizeof(uint32_t), 2);
-        }
-        m_voxel_grid->submit_compute_commands();
+        m_voxel_grid->buffers().mesh_buffers_status.fill(command_buffer, 0u, sizeof(uint32_t), 2);
     }
 
     if (ImGui::Button("build_draw_commands()")) {
@@ -866,23 +826,18 @@ void VoxelGridGPUDebugger::display_build_cmd_window(Window& window, const Camera
         glm::mat4 view_matrix = camera.get_view_matrix();
         glm::mat4 proj_matrix = camera.get_projection_matrix(aspect);
         glm::mat4 view_proj_matrix = proj_matrix * view_matrix;
-        {
-            auto scope = command_buffer.begin_scope();
-            m_voxel_grid->build_draw_commands(
-                command_buffer, 
-                view_proj_matrix, 
-                camera.position, 
-                math_utils::BITS, 
-                math_utils::OFFSET
-            );
-        }
-        m_voxel_grid->submit_compute_commands();
-        
+        m_voxel_grid->build_draw_commands(
+            command_buffer, 
+            view_proj_matrix, 
+            camera.position, 
+            math_utils::BITS, 
+            math_utils::OFFSET
+        );
     }
     ImGui::End();
 }
 
-void VoxelGridGPUDebugger::display_draw_pipline_window() {
+void VoxelGridGPUDebugger::display_draw_pipline_window(VulkanCommandBuffer& command_buffer) {
     ImGui::Begin("Voxel grid draw pipeline");
     if (ImGui::BeginTable("pipeline_table", 3, ImGuiTableFlags_SizingStretchSame)) {
         ImGui::TableSetupColumn("Step");
@@ -890,52 +845,45 @@ void VoxelGridGPUDebugger::display_draw_pipline_window() {
         ImGui::TableSetupColumn("Run", ImGuiTableColumnFlags_WidthFixed, 100.0f);
         ImGui::TableHeadersRow();
 
-        for (uint32_t i = 0; i < M_COUNT_DRAWING_STEPS; i++) {
+        for (int i = 0; i < m_draw_tasks.size(); i++) {
             ImGui::TableNextRow(); // ----
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted(m_voxel_grid_draw_steps_names[i].c_str());
+            ImGui::TextUnformatted(m_draw_tasks[i].name.c_str());
 
             ImGui::TableNextColumn();
             ImGui::PushID(i);
 
-            ImGui::Checkbox("streaming", &m_voxel_grid_draw_streaming[i]);
+            ImGui::Checkbox("streaming", &m_draw_tasks[i].is_active);
             
             ImGui::TableNextColumn();
             if (ImGui::Button("Run once")) {
-                m_voxel_grid_draw_steps[i]();
+                m_draw_tasks[i].func(command_buffer);
             }
             ImGui::PopID();
         }
         ImGui::EndTable();
     }
 
-    for (uint32_t i = 0; i < M_COUNT_DRAWING_STEPS; i++) {
-        if (m_voxel_grid_draw_streaming[i]) {
-            m_voxel_grid_draw_steps[i]();
+    for (uint32_t i = 0; i < m_draw_tasks.size(); i++) {
+        if (m_draw_tasks[i].is_active) {
+            m_draw_tasks[i].func(command_buffer);
         }
     }
     ImGui::End();
 }
 
-void VoxelGridGPUDebugger::display_chunk_eviction_window(const Camera& camera) {
-    VulkanCommandBuffer& command_buffer = m_voxel_grid->m_command_buffer;
-
+void VoxelGridGPUDebugger::display_chunk_eviction_window(VulkanCommandBuffer& command_buffer, const Camera& camera) {
     ImGui::Begin("Chunk enviction");
 
     if (ImGui::Button("Run all pipeline")) {
-        {
-            auto scope = command_buffer.begin_scope();
-            m_voxel_grid->ensure_free_chunks_gpu(
-                command_buffer, 
-                camera.position, 
-                math_utils::BITS, 
-                math_utils::OFFSET
-            );
-        }
-        m_voxel_grid->submit_compute_commands();
+        m_voxel_grid->ensure_free_chunks_gpu(
+            command_buffer, 
+            camera.position, 
+            math_utils::BITS, 
+            math_utils::OFFSET
+        );
     }
     
-
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::TextDisabled("Debug");
@@ -950,105 +898,68 @@ void VoxelGridGPUDebugger::display_chunk_eviction_window(const Camera& camera) {
     ImGui::Separator();
 
     if (ImGui::Button("reset_heads()")) {
-        {
-            auto scope = command_buffer.begin_scope();
-            m_voxel_grid->reset_heads(command_buffer);
-        }
-        m_voxel_grid->submit_compute_commands();
+        m_voxel_grid->reset_heads(command_buffer);
     }
     if (ImGui::Button("build_bucket_lists()")) {
-        {
-            auto scope = command_buffer.begin_scope();
-            m_voxel_grid->build_bucket_lists(command_buffer, camera.position);
-        }
-        m_voxel_grid->submit_compute_commands();
+        m_voxel_grid->build_bucket_lists(command_buffer, camera.position);
     } 
     if (ImGui::Button("evict_lowpriority_chunks()")) {
-        {
-            auto scope = command_buffer.begin_scope();
-            
-            m_voxel_grid->prepare_evict_lowpriority_chunks(
-                command_buffer, 
-                m_voxel_grid->buffers().dispatch_args
-            );
-            m_voxel_grid->evict_lowpriority_chunks(
-                command_buffer, 
-                m_voxel_grid->buffers().dispatch_args
-            );
-        }
-        m_voxel_grid->submit_compute_commands();
+        m_voxel_grid->prepare_evict_lowpriority_chunks(
+            command_buffer, 
+            m_voxel_grid->buffers().dispatch_args
+        );
+        m_voxel_grid->evict_lowpriority_chunks(
+            command_buffer, 
+            m_voxel_grid->buffers().dispatch_args
+        );
     }
     if (ImGui::Button("free_evicted_chunks_mesh()")) {
-        {
-            auto scope = command_buffer.begin_scope();
-
-            m_voxel_grid->prepare_evict_lowpriority_chunks(
-                command_buffer, 
-                m_voxel_grid->buffers().dispatch_args
-            );
-            m_voxel_grid->free_evicted_chunks_mesh(
-                command_buffer, 
-                m_voxel_grid->buffers().dispatch_args
-            );
-        }
-         m_voxel_grid->submit_compute_commands();
+        m_voxel_grid->prepare_evict_lowpriority_chunks(
+            command_buffer, 
+            m_voxel_grid->buffers().dispatch_args
+        );
+        m_voxel_grid->free_evicted_chunks_mesh(
+            command_buffer, 
+            m_voxel_grid->buffers().dispatch_args
+        );
     }
 
     if (ImGui::Button("reset_evicted_list_and_buckets()"))  {
-        {
-           auto scope = command_buffer.begin_scope();
-           m_voxel_grid->reset_evicted_list_and_buckets(command_buffer);
-        }
-        m_voxel_grid->submit_compute_commands();
+        m_voxel_grid->reset_evicted_list_and_buckets(command_buffer);
     }
 
     if (ImGui::Button("return_free_alloc_nodes()")) {
-        {
-            auto scope = command_buffer.begin_scope();
-
-            m_voxel_grid->prepare_return_free_alloc_nodes(
-                command_buffer, 
-                m_voxel_grid->buffers().dispatch_args
-            );
-            m_voxel_grid->return_free_alloc_nodes(
-                command_buffer, 
-                m_voxel_grid->buffers().dispatch_args
-            );
-        }
-        m_voxel_grid->submit_compute_commands();
+        m_voxel_grid->prepare_return_free_alloc_nodes(
+            command_buffer, 
+            m_voxel_grid->buffers().dispatch_args
+        );
+        m_voxel_grid->return_free_alloc_nodes(
+            command_buffer, 
+            m_voxel_grid->buffers().dispatch_args
+        );
     }
 
     if (ImGui::Button("rebuild_chunk_hash_table()")) {
-        {
-            auto scope = command_buffer.begin_scope();
-            m_voxel_grid->rebuild_chunk_hash_table(
-                command_buffer, 
-                math_utils::BITS, 
-                math_utils::OFFSET
-            );
-        }
-        m_voxel_grid->submit_compute_commands();
+        m_voxel_grid->rebuild_chunk_hash_table(
+            command_buffer, 
+            math_utils::BITS, 
+            math_utils::OFFSET
+        );
     }
 
     ImGui::End();
 }
 
-void VoxelGridGPUDebugger::display_stream_chunks_pipeline_window(const Camera& camera) {
-    VulkanCommandBuffer& command_buffer = m_voxel_grid->m_command_buffer;
-
+void VoxelGridGPUDebugger::display_stream_chunks_pipeline_window(VulkanCommandBuffer& command_buffer, const Camera& camera) {
     ImGui::Begin("Steam chunks pipeline");
     
     if (ImGui::Button("Run all pipeline")) {
-        {
-            auto scope = command_buffer.begin_scope();
-            m_voxel_grid->stream_chunks_sphere(
-                command_buffer, 
-                camera.position, 
-                -1, 
-                45345345u
-            );
-        }
-        m_voxel_grid->submit_compute_commands();
+        m_voxel_grid->stream_chunks_sphere(
+            command_buffer, 
+            camera.position, 
+            -1, 
+            45345345u
+        );
     }
 
     ImGui::Separator();
@@ -1062,28 +973,28 @@ void VoxelGridGPUDebugger::display_stream_chunks_pipeline_window(const Camera& c
         ImGui::TableSetupColumn("Run", ImGuiTableColumnFlags_WidthFixed, 100.0f);
         ImGui::TableHeadersRow();
 
-        for (uint32_t i = 0; i < M_COUNT_GENERATION_STEPS; i++) {
+        for (int i = 0; i < m_generation_tasks.size(); i++) {
             ImGui::TableNextRow(); // ----
             ImGui::TableNextColumn();
-            ImGui::TextUnformatted(m_voxel_grid_generation_steps_names[i].c_str());
+            ImGui::TextUnformatted(m_generation_tasks[i].name.c_str());
 
             ImGui::TableNextColumn();
             ImGui::PushID(i);
 
-            ImGui::Checkbox("streaming", &m_voxel_grid_generation_streaming[i]);
+            ImGui::Checkbox("streaming", &m_generation_tasks[i].is_active);
             
             ImGui::TableNextColumn();
             if (ImGui::Button("Run once")) {
-                m_voxel_grid_generation_steps[i]();
+                m_generation_tasks[i].func(command_buffer);
             }
             ImGui::PopID();
         }
         ImGui::EndTable();
     }
 
-    for (uint32_t i = 0; i < M_COUNT_GENERATION_STEPS; i++) {
-        if (m_voxel_grid_generation_streaming[i]) {
-            m_voxel_grid_generation_steps[i]();
+    for (int i = 0; i < m_generation_tasks.size(); i++) {
+        if (m_generation_tasks[i].is_active) {
+            m_generation_tasks[i].func(command_buffer);
         }
     }
     ImGui::End();
@@ -1104,4 +1015,155 @@ void VoxelGridGPUDebugger::display_hash_table_window() {
         print_found_chunks_in_hash_table(chunk_pos);
     
     ImGui::End();
+}
+
+void VoxelGridGPUDebugger::submit_commands() {
+    LOG_METHOD();
+
+    logger.check(m_queue != nullptr, "Queue pointer specify to null");
+
+    m_fence.reset();
+    m_queue->submit(m_command_buffer, &m_fence);
+    m_fence.wait();
+    m_command_buffer.reset();
+}
+
+std::vector<VoxelGridGPUDebugger::Task> VoxelGridGPUDebugger::create_draw_tasks(
+    const Window& window,
+    const Camera& camera,
+    bool default_tasks_activity_state)
+{
+    LOG_METHOD();
+
+    std::vector<Task> tasks = {
+        Task{
+            "build_mesh_from_dirty()",
+            default_tasks_activity_state,
+            [&](VulkanCommandBuffer& command_buffer){
+                m_voxel_grid->build_mesh_from_dirty(command_buffer, math_utils::BITS, math_utils::OFFSET);
+            }
+        },
+        Task{
+            "build_indirect_draw_commands_frustum_fn()",
+            default_tasks_activity_state,
+            [&](VulkanCommandBuffer& command_buffer){
+                float aspect = float(window.width()) / float(window.height());
+                glm::mat4 vp = camera.get_projection_matrix(aspect) * camera.get_view_matrix();
+
+                m_voxel_grid->build_indirect_draw_commands_frustum(
+                    command_buffer, 
+                    vp, 
+                    camera.position, 
+                    math_utils::BITS, 
+                    math_utils::OFFSET
+                );
+            }
+        }
+    };
+
+    return tasks;
+}
+
+std::vector<VoxelGridGPUDebugger::Task> VoxelGridGPUDebugger::create_generation_tasks(
+    const Camera& camera,
+    bool default_tasks_activity_state)
+{
+    LOG_METHOD();
+
+    std::vector<Task> tasks = {
+        Task{
+            "ensure_free_chunks_gpu()" ,
+            default_tasks_activity_state,
+            [&](VulkanCommandBuffer& command_buffer){
+                m_voxel_grid->ensure_free_chunks_gpu(
+                    command_buffer,
+                    camera.position,
+                    math_utils::BITS,
+                    math_utils::OFFSET
+                );
+            }
+        },
+        Task{
+            "reset_load_list_counter()",
+            default_tasks_activity_state,
+            [&](VulkanCommandBuffer& command_buffer){
+                m_voxel_grid->reset_load_list_counter(command_buffer);
+            }
+        },
+        Task{
+            "mark_chunk_to_generate()",
+            default_tasks_activity_state,
+            [&](VulkanCommandBuffer& command_buffer){
+                m_voxel_grid->mark_chunk_to_generate(
+                    command_buffer,
+                    camera.position,
+                    m_voxel_grid->m_params.generation_distance
+                );
+            }
+        },
+        Task{
+            "merge_voxel_write_lists()",
+            default_tasks_activity_state,
+            [&](VulkanCommandBuffer& command_buffer){
+                m_voxel_grid->merge_voxel_write_lists(
+                    command_buffer,
+                    m_voxel_grid->m_buffers.local_voxel_write_list,
+                    m_voxel_grid->m_buffers.voxel_write_list
+                );
+            }
+        },
+        Task{
+            "reset_voxel_write_list_counter()",
+            default_tasks_activity_state,
+            [&](VulkanCommandBuffer& command_buffer){
+                m_voxel_grid->reset_voxel_write_list_counter(command_buffer, m_voxel_grid->m_buffers.local_voxel_write_list);
+            }
+        },
+        Task{
+            "mark_write_chunks_to_generate()",
+            default_tasks_activity_state,
+            [&](VulkanCommandBuffer& command_buffer){
+                m_voxel_grid->m_shader_helper.prepare_dispatch_args(
+                    command_buffer,
+                    m_voxel_grid->m_buffers.dispatch_args,
+                    BufferDispatchArg(&m_voxel_grid->m_buffers.voxel_write_list, 0)
+                );
+                m_voxel_grid->mark_write_chunks_to_generate(command_buffer, m_voxel_grid->m_buffers.dispatch_args);
+            }
+        },
+        Task{
+            "generate_terrain()",
+            default_tasks_activity_state,
+            [&](VulkanCommandBuffer& command_buffer){
+                m_voxel_grid->m_shader_helper.prepare_dispatch_args(
+                    command_buffer,
+                    m_voxel_grid->m_buffers.dispatch_args, 
+                    ValueDispatchArg(m_voxel_grid->vox_per_chunk()),
+                    BufferDispatchArg(&m_voxel_grid->m_buffers.load_list, 0u)
+                );
+                m_voxel_grid->generate_terrain(command_buffer, m_voxel_grid->m_buffers.dispatch_args, 42);
+            }
+        },
+        Task{
+            "write_voxels_to_grid()",
+            default_tasks_activity_state,
+            [&](VulkanCommandBuffer& command_buffer){
+                m_voxel_grid->m_shader_helper.prepare_dispatch_args(
+                    command_buffer,
+                    m_voxel_grid->m_buffers.dispatch_args,
+                    BufferDispatchArg(&m_voxel_grid->m_buffers.voxel_write_list, 0u)
+                );
+                m_voxel_grid->write_voxels_to_grid(command_buffer, m_voxel_grid->m_buffers.dispatch_args);
+            }
+        },
+        Task{
+            "reset_voxel_write_list_counter()",
+            default_tasks_activity_state,
+            [&](VulkanCommandBuffer& command_buffer){
+                m_voxel_grid->reset_voxel_write_list_counter(command_buffer, m_voxel_grid->m_buffers.voxel_write_list);
+            }
+        }
+    };
+
+    return tasks;
 }

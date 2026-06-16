@@ -177,7 +177,8 @@ public:
         VulkanQueue& queue,
         ComputePassManager& compute_pass_manager,
         MaterialInstanceManager& material_instance_manager,
-        const VoxelGridDesc& desc
+        const VoxelGridDesc& desc,
+        VkMemoryPropertyFlags ssbo_memory_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     );
     ~VoxelGrid() noexcept = default;
 
@@ -276,7 +277,8 @@ private:
     VoxelGridBuffers create_buffers(
         const VulkanPhysicalDevice& physical_device,
         const VulkanDevice& device,
-        VulkanCommandBuffer& command_buffer
+        VulkanCommandBuffer& command_buffer,
+        VkMemoryPropertyFlags ssbo_memory_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     );
 
     void insert_elements_to_voxel_write_list(
