@@ -33,6 +33,7 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         mesh_reset_cp(create_mesh_reset_compute_pass(device, shader_manager.mesh_reset_cs)),
         mesh_count_cp(create_mesh_count_compute_pass(device, shader_manager.mesh_count_cs)),
         mesh_alloc_cp(create_mesh_alloc_compute_pass(device, shader_manager.mesh_alloc_cs)),
+        retry_mesh_alloc_cp(create_retry_mesh_alloc_compute_pass(device, shader_manager.retry_mesh_alloc_cs)),
         verify_mesh_allocation_cp(create_verify_mesh_allocation_compute_pass(device, shader_manager.verify_mesh_allocation_cs)),
         return_free_alloc_nodes_dispatch_adapter_cp(create_return_free_alloc_nodes_dispatch_adapter_compute_pass(device, shader_manager.return_free_alloc_nodes_dispatch_adapter_cs)),
         return_free_alloc_nodes_cp(create_return_free_alloc_nodes_compute_pass(device, shader_manager.return_free_alloc_nodes_cs)),
@@ -243,8 +244,33 @@ ComputePass ComputePassManager::create_mesh_alloc_compute_pass(VulkanDevice& dev
     builder.add_storage_buffer(10, ShaderStages::compute); // BBReturnedNodesList
     builder.add_storage_buffer(11, ShaderStages::compute); // ActiveSplitters
     builder.add_storage_buffer(12, ShaderStages::compute); // DebugCounter
+    builder.add_storage_buffer(13, ShaderStages::compute); // AllocationRetryList
 
     builder.add_push_constantsf(sizeof(MeshAllocPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_retry_mesh_alloc_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.set_descriptor_set_flags(VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // ReadableAllocationRetryList
+    builder.add_storage_buffer(1, ShaderStages::compute); // WritableAllocationRetryList
+    builder.add_storage_buffer(2, ShaderStages::compute); // DirtyListBuf
+    builder.add_storage_buffer(3, ShaderStages::compute); // DirtyQuadCountBuf
+    builder.add_storage_buffer(4, ShaderStages::compute); // ChunkMetaBuf
+    builder.add_storage_buffer(5, ShaderStages::compute); // ChunkMeshAllocLocalBuf
+    builder.add_storage_buffer(6, ShaderStages::compute); // BBHeads
+    builder.add_storage_buffer(7, ShaderStages::compute); // BBState
+    builder.add_storage_buffer(8, ShaderStages::compute); // BBNodes
+    builder.add_storage_buffer(9, ShaderStages::compute); // BBFreeNodesList
+    builder.add_storage_buffer(10, ShaderStages::compute); // BBReturnedNodesList
+
+    builder.add_push_constantsf(sizeof(RetryMeshAllocPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }

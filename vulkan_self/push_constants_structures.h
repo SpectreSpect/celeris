@@ -87,6 +87,14 @@ struct MeshAllocPushConstants {
     uint32_t u_is_vb_phase;
 };
 
+struct RetryMeshAllocPushConstants {
+    uint32_t bb_pages;
+    uint32_t bb_page_elements;
+    uint32_t bb_max_order;
+    uint32_t bb_quad_size;
+    uint32_t u_is_vb_phase;
+};
+
 struct VerifyMeshAllocationPushConstants {
     uint32_t vb_max_order;
     uint32_t ib_max_order;

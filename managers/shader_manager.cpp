@@ -44,6 +44,7 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         mesh_reset_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_reset.comp.spv"),
         mesh_count_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_count.comp.spv"),
         mesh_alloc_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_alloc.comp.spv"),
+        retry_mesh_alloc_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "retry_mesh_alloc.comp.spv"),
         verify_mesh_allocation_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "verify_mesh_allocation.comp.spv"),
         return_free_alloc_nodes_dispatch_adapter_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "return_free_alloc_nodes_dispatch_adapter.comp.spv"),
         return_free_alloc_nodes_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "return_free_alloc_nodes.comp.spv"),

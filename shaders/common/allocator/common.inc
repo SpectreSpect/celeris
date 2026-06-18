@@ -9,7 +9,7 @@
 #define ST_WAIT_TO_FREE 4u
 const uint ST_MASK = (1u << ST_MASK_BITS) - 1u;
 
-#define ZERO_ATTEMPTS 32u
+#define ALLOCATION_ATTEMPTS 128u
 
 // ---- head state packing ----
 #define HEAD_TAG_BITS 4u // 4 бита вроде мало, но пока ABA вроде нет

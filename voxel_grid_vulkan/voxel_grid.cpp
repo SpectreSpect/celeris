@@ -387,6 +387,8 @@ void VoxelGrid::ensure_free_chunks_gpu(VulkanCommandBuffer& command_buffer, glm:
 }
 
 void VoxelGrid::mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args) {
+    LOG_METHOD();
+
     m_pass_instances.mesh_reset_pi.set_storage_buffer(0, m_buffers.dirty_list);
     m_pass_instances.mesh_reset_pi.set_storage_buffer(1, m_buffers.dirty_quad_count);
     m_pass_instances.mesh_reset_pi.set_storage_buffer(2, m_buffers.emit_counters);
@@ -400,6 +402,8 @@ void VoxelGrid::mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuff
 }
 
 void VoxelGrid::mesh_count(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t pack_bits, int pack_offset) {
+    LOG_METHOD();
+
     m_pass_instances.mesh_count_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
     m_pass_instances.mesh_count_pi.set_storage_buffer(1, m_buffers.voxels);
     m_pass_instances.mesh_count_pi.set_storage_buffer(2, m_buffers.dirty_list);
@@ -422,7 +426,16 @@ void VoxelGrid::mesh_count(VulkanCommandBuffer& command_buffer, const VulkanBuff
     m_buffers.dirty_quad_count.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
+void VoxelGrid::reset_allocation_retry_list(VulkanCommandBuffer& command_buffer, VulkanBuffer& allocation_retry_list) {
+    LOG_METHOD();
+
+    allocation_retry_list.fill(command_buffer, 0u, sizeof(uint32_t));
+    allocation_retry_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+}
+
 void VoxelGrid::mesh_alloc_vb(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args) {
+    LOG_METHOD();
+
     m_pass_instances.mesh_alloc_vb_pi.set_storage_buffer(0, m_buffers.mesh_buffers_status);
     m_pass_instances.mesh_alloc_vb_pi.set_storage_buffer(1, m_buffers.dirty_list);
     m_pass_instances.mesh_alloc_vb_pi.set_storage_buffer(2, m_buffers.dirty_quad_count);
@@ -438,6 +451,8 @@ void VoxelGrid::mesh_alloc_vb(VulkanCommandBuffer& command_buffer, const VulkanB
     
     m_pass_instances.mesh_alloc_vb_pi.set_storage_buffer(11, m_buffers.active_splitters);
     m_pass_instances.mesh_alloc_vb_pi.set_storage_buffer(12, m_buffers.debug_counter);
+
+    m_pass_instances.mesh_alloc_vb_pi.set_storage_buffer(13, m_buffers.allocation_retry_list);
 
     m_pass_instances.mesh_alloc_vb_pi.push_constants(command_buffer, MeshAllocPushConstants{
         .bb_pages = m_params.count_vb_pages,
@@ -470,6 +485,8 @@ void VoxelGrid::mesh_alloc_vb(VulkanCommandBuffer& command_buffer, const VulkanB
 }
 
 void VoxelGrid::mesh_alloc_ib(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args) {
+    LOG_METHOD();
+
     m_pass_instances.mesh_alloc_ib_pi.set_storage_buffer(0, m_buffers.mesh_buffers_status);
     m_pass_instances.mesh_alloc_ib_pi.set_storage_buffer(1, m_buffers.dirty_list);
     m_pass_instances.mesh_alloc_ib_pi.set_storage_buffer(2, m_buffers.dirty_quad_count);
@@ -485,6 +502,8 @@ void VoxelGrid::mesh_alloc_ib(VulkanCommandBuffer& command_buffer, const VulkanB
 
     m_pass_instances.mesh_alloc_ib_pi.set_storage_buffer(11, m_buffers.active_splitters);
     m_pass_instances.mesh_alloc_ib_pi.set_storage_buffer(12, m_buffers.debug_counter);
+
+    m_pass_instances.mesh_alloc_ib_pi.set_storage_buffer(13, m_buffers.allocation_retry_list);
 
     m_pass_instances.mesh_alloc_ib_pi.push_constants(command_buffer, MeshAllocPushConstants{
         .bb_pages = m_params.count_ib_pages,
@@ -516,14 +535,121 @@ void VoxelGrid::mesh_alloc_ib(VulkanCommandBuffer& command_buffer, const VulkanB
     );
 }
 
-void VoxelGrid::mesh_alloc(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args) {
-    m_buffers.active_splitters.fill(command_buffer, 0u);
-    m_buffers.active_splitters.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+void VoxelGrid::retry_mesh_alloc_vb(
+    VulkanCommandBuffer& command_buffer,
+    const VulkanBuffer& dispatch_args,
+    VulkanBuffer& readable_retry_list,
+    VulkanBuffer& writable_retry_list)
+{
+    LOG_METHOD();
+
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(0, readable_retry_list);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(1, writable_retry_list);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(2, m_buffers.dirty_list);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(3, m_buffers.dirty_quad_count);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(4, m_buffers.chunk_meta);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(5, m_buffers.chunk_mesh_alloc_local);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(6, m_buffers.vb_heads);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(7, m_buffers.vb_state);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(8, m_buffers.vb_nodes);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(9, m_buffers.vb_free_nodes_list);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(10, m_buffers.vb_returned_nodes_list);
+
+    m_pass_instances.retry_mesh_alloc_pw.bind(command_buffer);
+
+    m_pass_instances.retry_mesh_alloc_pw.push_constants(command_buffer, RetryMeshAllocPushConstants{
+        .bb_pages = m_params.count_vb_pages,
+        .bb_page_elements = m_params.vb_page_size,
+        .bb_max_order = m_params.vb_order,
+        .bb_quad_size = 4u,
+        .u_is_vb_phase = 1u
+    });
+
+    command_buffer.dispatch_indirect(dispatch_args);
+
+    writable_retry_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.chunk_mesh_alloc_local.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.vb_heads.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.vb_state.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.vb_nodes.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.vb_free_nodes_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.vb_returned_nodes_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+}
+
+void VoxelGrid::retry_mesh_alloc_ib(
+    VulkanCommandBuffer& command_buffer,
+    const VulkanBuffer& dispatch_args,
+    VulkanBuffer& readable_retry_list,
+    VulkanBuffer& writable_retry_list)
+{
+    LOG_METHOD();
+
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(0, readable_retry_list);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(1, writable_retry_list);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(2, m_buffers.dirty_list);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(3, m_buffers.dirty_quad_count);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(4, m_buffers.chunk_meta);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(5, m_buffers.chunk_mesh_alloc_local);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(6, m_buffers.ib_heads);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(7, m_buffers.ib_state);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(8, m_buffers.ib_nodes);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(9, m_buffers.ib_free_nodes_list);
+    m_pass_instances.retry_mesh_alloc_pw.set_storage_buffer(10, m_buffers.ib_returned_nodes_list);
+
+    m_pass_instances.retry_mesh_alloc_pw.bind(command_buffer);
+
+    m_pass_instances.retry_mesh_alloc_pw.push_constants(command_buffer, RetryMeshAllocPushConstants{
+        .bb_pages = m_params.count_ib_pages,
+        .bb_page_elements = m_params.ib_page_size,
+        .bb_max_order = m_params.ib_order,
+        .bb_quad_size = 6u,
+        .u_is_vb_phase = 0u
+    });
+
+    command_buffer.dispatch_indirect(dispatch_args);
+
+    writable_retry_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.chunk_mesh_alloc_local.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.ib_heads.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.ib_state.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.ib_nodes.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.ib_free_nodes_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.ib_returned_nodes_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+}
+
+void VoxelGrid::mesh_alloc(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args) {
+    reset_allocation_retry_list(command_buffer, m_buffers.allocation_retry_list);
+    
+    m_shader_helper.prepare_dispatch_args(command_buffer, dispatch_args, BufferDispatchArg(&m_buffers.dirty_list, 0u));
     mesh_alloc_vb(command_buffer, dispatch_args);
 
-    m_buffers.active_splitters.fill(command_buffer, 0u);
-    m_buffers.active_splitters.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    VulkanBuffer* readable_retry_list = &m_buffers.allocation_retry_list;
+    VulkanBuffer* writable_retry_list = &m_buffers.allocation_retry_list_additional;
+    for (uint32_t retry_attempt = 0u; retry_attempt < 10u; retry_attempt++) {
+        reset_allocation_retry_list(command_buffer, *writable_retry_list);
+
+        m_shader_helper.prepare_dispatch_args(command_buffer, dispatch_args, BufferDispatchArg(readable_retry_list));
+        retry_mesh_alloc_vb(command_buffer, dispatch_args, *readable_retry_list, *writable_retry_list);
+
+        std::swap(readable_retry_list, writable_retry_list);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    reset_allocation_retry_list(command_buffer, m_buffers.allocation_retry_list);
+
+    m_shader_helper.prepare_dispatch_args(command_buffer, dispatch_args, BufferDispatchArg(&m_buffers.dirty_list, 0u));
     mesh_alloc_ib(command_buffer, dispatch_args);
+
+    readable_retry_list = &m_buffers.allocation_retry_list;
+    writable_retry_list = &m_buffers.allocation_retry_list_additional;
+    for (uint32_t retry_attempt = 0u; retry_attempt < 10u; retry_attempt++) {
+        reset_allocation_retry_list(command_buffer, *writable_retry_list);
+
+        m_shader_helper.prepare_dispatch_args(command_buffer, dispatch_args, BufferDispatchArg(readable_retry_list));
+        retry_mesh_alloc_ib(command_buffer, dispatch_args, *readable_retry_list, *writable_retry_list);
+
+        std::swap(readable_retry_list, writable_retry_list);
+    }
 }
 
 void VoxelGrid::verify_mesh_allocation(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args) {
@@ -809,7 +935,6 @@ void VoxelGrid::build_mesh_from_dirty(VulkanCommandBuffer& command_buffer, uint3
                                           ValueDispatchArg(vox_per_chunk()), BufferDispatchArg(&m_buffers.dirty_list, 0u));
     mesh_count(command_buffer, m_buffers.dispatch_args, pack_bits, pack_offset);
 
-    m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, BufferDispatchArg(&m_buffers.dirty_list, 0u));
     mesh_alloc(command_buffer, m_buffers.dispatch_args);
 
     m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, BufferDispatchArg(&m_buffers.dirty_list, 0u));
@@ -859,6 +984,7 @@ VoxelGrid::VoxelGridParams VoxelGrid::create_params(const VoxelGridDesc& desc) c
     params.eviction_bucket_shell_thickness = desc.eviction_bucket_shell_thickness;
     params.render_distance = desc.render_distance;
     params.generation_distance = desc.generation_distance;
+    params.allocation_retry_list_size = desc.allocation_retry_list_size;
 
     uint64_t raw = (uint64_t)std::ceil((double)desc.chunk_hash_table_size_factor * (double)desc.count_active_chunks);
     uint32_t base = (raw > UINT32_MAX) ? UINT32_MAX : (uint32_t)raw;
@@ -910,6 +1036,7 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(VulkanDevice&
         .mesh_count_pi = PassInstance(compute_pass_manager.mesh_count_cp, dp),
         .mesh_alloc_vb_pi = PassInstance(compute_pass_manager.mesh_alloc_cp, dp),
         .mesh_alloc_ib_pi = PassInstance(compute_pass_manager.mesh_alloc_cp, dp),
+        .retry_mesh_alloc_pw = PassWriter(device, compute_pass_manager.retry_mesh_alloc_cp),
         .verify_mesh_allocation_pi = PassInstance(compute_pass_manager.verify_mesh_allocation_cp, dp),
         .return_free_alloc_nodes_dispatch_adapter_pw = PassWriter(device, compute_pass_manager.return_free_alloc_nodes_dispatch_adapter_cp),
         .return_free_alloc_nodes_pw = PassWriter(device, compute_pass_manager.return_free_alloc_nodes_cp),
@@ -977,6 +1104,8 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize ib_nodes_size = sizeof(AllocNode) * (size_t)(m_params.count_ib_nodes);
     VkDeviceSize ib_state_size = sizeof(uint32_t) * m_params.count_ib_pages;
     VkDeviceSize ib_free_nodes_list_size = sizeof(uint32_t) * (size_t)(1u + m_params.count_ib_nodes);
+
+    VkDeviceSize allocation_retry_list_size = sizeof(uint32_t) + sizeof(uint32_t) * m_params.allocation_retry_list_size; 
 
     VkDeviceSize chunk_mesh_alloc_size = sizeof(ChunkMeshAlloc) * m_params.count_active_chunks;
 
@@ -1047,6 +1176,22 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
     );
 
+    VulkanBuffer allocation_retry_list = VulkanBuffer(
+        physical_device,
+        device,
+        allocation_retry_list_size,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        ssbo_memory_properties
+    );
+
+    VulkanBuffer allocation_retry_list_additional = VulkanBuffer(
+        physical_device,
+        device,
+        allocation_retry_list_size,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        ssbo_memory_properties
+    );
+
     {
         auto scope = m_command_buffer.begin_scope();
 
@@ -1063,7 +1208,13 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         evicted_chunks_list.fill(m_command_buffer, 0u);
         debug_counter.fill(m_command_buffer, 0u);
 
-        // memory_barrier здесь не нужен, так как мы сразу делаем submit
+        allocation_retry_list.fill(m_command_buffer, 0u, sizeof(uint32_t));
+        allocation_retry_list_additional.fill(m_command_buffer, 0u, sizeof(uint32_t));
+
+        // memory_barrier здесь не нужен, так как мы сразу делаем submit...
+        // Хотя может быть и нужен :/...
+        // На самом деле всё и так вроде работает, но по логике возможно и нужно...
+        // Нужно будет поразмыслить над этим...
     }
     submit_compute_commands();
     
@@ -1201,7 +1352,6 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             ssbo_memory_properties
         ),
-
         .ib_heads = VulkanBuffer(
             physical_device,
             device,
@@ -1230,7 +1380,8 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             ssbo_memory_properties
         ),
-
+        .allocation_retry_list = std::move(allocation_retry_list),
+        .allocation_retry_list_additional = std::move(allocation_retry_list_additional),
         .chunk_mesh_alloc = VulkanBuffer(
             physical_device,
             device,
@@ -1238,7 +1389,6 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             ssbo_memory_properties
         ),
-
         .mesh_pool_clear_uniform = VulkanBuffer(
             physical_device,
             device,

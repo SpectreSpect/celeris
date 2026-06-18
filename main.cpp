@@ -139,10 +139,11 @@ int main() {
         .eviction_bucket_shell_thickness = chunk_size.x * voxel_size.x * 1,
         .vb_page_size_order_of_two = 10,
         .ib_page_size_order_of_two = 10,
+        .allocation_retry_list_size = 10'000, // Не так много занимает, в целом можно не жмотничать
         .buddy_allocator_nodes_factor = 1.0,
         .render_distance = chunk_size.x * voxel_size.x * 30,
         .generation_distance = 5,
-        .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000)
+        .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000),
     };
 
     VoxelGrid voxel_grid(

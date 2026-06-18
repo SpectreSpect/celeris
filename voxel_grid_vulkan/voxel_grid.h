@@ -75,6 +75,7 @@ public:
         float eviction_bucket_shell_thickness;
         uint32_t vb_page_size_order_of_two;
         uint32_t ib_page_size_order_of_two;
+        uint32_t allocation_retry_list_size;
         float buddy_allocator_nodes_factor;
         float render_distance;
         uint32_t generation_distance;
@@ -105,6 +106,8 @@ public:
         uint32_t count_ib_nodes = 0;
         uint32_t ib_order = 0;
         uint32_t max_mesh_indices = 0;
+
+        uint32_t allocation_retry_list_size = 0;
     };
 
     struct VoxelGridBuffers {
@@ -141,6 +144,9 @@ public:
         VulkanBuffer ib_state;
         VulkanBuffer ib_free_nodes_list;
 
+        VulkanBuffer allocation_retry_list;
+        VulkanBuffer allocation_retry_list_additional;
+
         VulkanBuffer chunk_mesh_alloc;
 
         VulkanBuffer mesh_pool_clear_uniform;
@@ -160,16 +166,6 @@ public:
         VulkanBuffer read_chunk_output;
 
         VulkanBuffer debug_counter;
-
-        // vb_heads  vb_heads_ = BufferObject(sizeof(uint32_t) * (size_t)(vb_order_ + 1), GL_DYNAMIC_DRAW);
-        // vb_state  vb_state_ = BufferObject(sizeof(uint32_t) * (size_t)count_vb_pages_, GL_DYNAMIC_DRAW);
-        // vb_free_nodes_list   vb_free_nodes_list_ = BufferObject(sizeof(uint32_t) * (size_t)(1u + count_vb_nodes_), GL_DYNAMIC_DRAW);
-
-        // ib_heads     ib_heads_ = BufferObject(sizeof(uint32_t) * (size_t)(ib_order_ + 1), GL_DYNAMIC_DRAW);
-        // ib_state     ib_state_ = BufferObject(sizeof(uint32_t) * (size_t)count_ib_pages_, GL_DYNAMIC_DRAW);
-        // ib_free_nodes_list   ib_free_nodes_list_ = BufferObject(sizeof(uint32_t) * (size_t)(1u + count_ib_nodes_), GL_DYNAMIC_DRAW);
-
-        // chunk_mesh_alloc
     };
 
 public:
@@ -228,6 +224,7 @@ public:
         PassInstance mesh_count_pi;
         PassInstance mesh_alloc_vb_pi;
         PassInstance mesh_alloc_ib_pi;
+        PassWriter retry_mesh_alloc_pw;
         PassInstance verify_mesh_allocation_pi;
         PassWriter return_free_alloc_nodes_dispatch_adapter_pw;
         // PassInstance return_free_alloc_nodes_pi;
@@ -323,12 +320,27 @@ private:
     void ensure_free_chunks_gpu(VulkanCommandBuffer& command_buffer, glm::vec3 cam_pos, uint32_t pack_bits, int pack_offset);
 
     void mesh_reset(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
-    void mesh_count(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t pack_bits, int pack_offset); // not checked
-    void mesh_alloc_vb(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args); // not checked
-    void mesh_alloc_ib(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args); // not checked
-    void mesh_alloc(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args); // not checked
-    void verify_mesh_allocation(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args); // not checked
-    void prepare_return_free_alloc_nodes(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args); // not checked
+    void mesh_count(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t pack_bits, int pack_offset);
+
+    void reset_allocation_retry_list(VulkanCommandBuffer& command_buffer, VulkanBuffer& allocation_retry_list);
+    void mesh_alloc_vb(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void mesh_alloc_ib(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void retry_mesh_alloc_vb(
+        VulkanCommandBuffer& command_buffer,
+        const VulkanBuffer& dispatch_args,
+        VulkanBuffer& readable_retry_list,
+        VulkanBuffer& writable_retry_list
+    );
+    void retry_mesh_alloc_ib(
+        VulkanCommandBuffer& command_buffer,
+        const VulkanBuffer& dispatch_args,
+        VulkanBuffer& readable_retry_list,
+        VulkanBuffer& writable_retry_list
+    );
+    void mesh_alloc(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args);
+
+    void verify_mesh_allocation(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void prepare_return_free_alloc_nodes(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args);
     void return_free_alloc_nodes(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args);
     void mesh_emit(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args, uint32_t pack_bits, int pack_offset);
     void mesh_finalize(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args);
