@@ -161,7 +161,7 @@ int main() {
         engine.compute_queue(),
         window,
         camera,
-        false
+        true
     );
 
     Voxelizator::VoxelizatorDesc voxelizator_desc {
@@ -238,12 +238,12 @@ int main() {
 
     scan_object.transform.scale = glm::vec3(5.0f);
 
-    voxelizator.voxelize<PBRVertex>(
-        blue_voxelize_prefab,
-        scan_object.mesh_view(),
-        scan_object.transform.get_model_matrix(),
-        &voxel_grid.local_voxel_write_list()
-    );
+    // voxelizator.voxelize<PBRVertex>(
+    //     blue_voxelize_prefab,
+    //     scan_object.mesh_view(),
+    //     scan_object.transform.get_model_matrix(),
+    //     &voxel_grid.local_voxel_write_list()
+    // );
 
     glm::ivec3 block_size = glm::ivec3(1, 5, 5);
     glm::ivec3 block_origin = glm::ivec3(5, 0, 0);
@@ -452,7 +452,7 @@ int main() {
         celeris.update();
         celeris_visualizer.update();
 
-        voxel_grid.update(window, camera);
+        // voxel_grid.update(window, camera);
 
         if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
             place_start_pressed = true;
@@ -525,18 +525,18 @@ int main() {
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
                 
-                // {
-                //     VulkanCommandBuffer& debugger_command_buffer = debugger.command_buffer();
-                //     auto scope = debugger_command_buffer.begin_scope();
-                //     debugger.dispay_debug_window(camera);
-                //     debugger.display_build_from_dirty_window(debugger_command_buffer);
-                //     debugger.display_build_cmd_window(debugger_command_buffer, window, camera);
-                //     debugger.display_draw_pipline_window(debugger_command_buffer);
-                //     debugger.display_chunk_eviction_window(debugger_command_buffer, camera);
-                //     debugger.display_stream_chunks_pipeline_window(debugger_command_buffer, camera);
-                //     debugger.display_hash_table_window();
-                // }
-                // debugger.submit_commands();
+                {
+                    VulkanCommandBuffer& debugger_command_buffer = debugger.command_buffer();
+                    auto scope = debugger_command_buffer.begin_scope();
+                    debugger.dispay_debug_window(camera);
+                    debugger.display_build_from_dirty_window(debugger_command_buffer);
+                    debugger.display_build_cmd_window(debugger_command_buffer, window, camera);
+                    debugger.display_draw_pipline_window(debugger_command_buffer);
+                    debugger.display_chunk_eviction_window(debugger_command_buffer, camera);
+                    debugger.display_stream_chunks_pipeline_window(debugger_command_buffer, camera);
+                    debugger.display_hash_table_window();
+                }
+                debugger.submit_commands();
                 
 
                 // ImGui::Begin("Debug");

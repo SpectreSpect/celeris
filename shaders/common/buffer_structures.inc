@@ -71,6 +71,8 @@ struct Vertex {
     uint pad1;
 };
 
+#define VERTEX_SIZE 32u
+
 struct DrawElementsIndirectCommand {
     uint count;
     uint instanceCount;

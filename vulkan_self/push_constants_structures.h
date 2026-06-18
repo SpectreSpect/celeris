@@ -118,8 +118,9 @@ struct MeshEmitPushConstants {
 
     uint32_t u_pack_bits;
     int32_t  u_pack_offset;
-    uint32_t u_vb_page_verts;
-    uint32_t u_ib_page_inds;
+
+    uint32_t u_vb_page_size_bytes;
+    uint32_t u_ib_page_size_bytes;
 
     uint32_t u_chunk_hash_table_size;
     uint32_t u_voxels_per_chunk;

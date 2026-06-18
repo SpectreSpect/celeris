@@ -82,6 +82,13 @@ public:
         uint32_t max_write_count;
     };
 
+    struct BuddyAllocatorParams {
+        uint32_t page_size = 0;
+        uint32_t count_pages = 0;
+        uint32_t count_nodes = 0;
+        uint32_t max_order = 0;
+    };
+
     struct VoxelGridParams {
         glm::uvec3 chunk_size = {0u, 0u, 0u};
         glm::uvec3 voxel_size = {0u, 0u, 0u};
@@ -95,19 +102,19 @@ public:
         float render_distance = 0.0f;
         float generation_distance = 0.0f;
 
-        uint32_t vb_page_size = 0;
-        uint32_t count_vb_pages = 0;
-        uint32_t count_vb_nodes = 0;
-        uint32_t vb_order = 0;
-        uint32_t max_mesh_vertices = 0;
-        
-        uint32_t ib_page_size = 0;
-        uint32_t count_ib_pages = 0;
-        uint32_t count_ib_nodes = 0;
-        uint32_t ib_order = 0;
-        uint32_t max_mesh_indices = 0;
+        BuddyAllocatorParams vb_allocator_params;
+        BuddyAllocatorParams ib_allocator_params;
 
         uint32_t allocation_retry_list_size = 0;
+        uint32_t count_allocation_retry_attempts = 10;
+    };
+
+    struct AllocatorBuffers {
+        VulkanBuffer heads;
+        VulkanBuffer nodes;
+        VulkanBuffer state;
+        VulkanBuffer free_nodes_list;
+        VulkanBuffer returned_nodes_list;
     };
 
     struct VoxelGridBuffers {
@@ -134,15 +141,8 @@ public:
 
         VulkanBuffer active_splitters;
 
-        VulkanBuffer vb_heads;
-        VulkanBuffer vb_nodes;
-        VulkanBuffer vb_state;
-        VulkanBuffer vb_free_nodes_list;
-
-        VulkanBuffer ib_heads;
-        VulkanBuffer ib_nodes;
-        VulkanBuffer ib_state;
-        VulkanBuffer ib_free_nodes_list;
+        AllocatorBuffers vb_mesh_allocator_buffers;
+        AllocatorBuffers ib_mesh_allocator_buffers;
 
         VulkanBuffer allocation_retry_list;
         VulkanBuffer allocation_retry_list_additional;
@@ -159,8 +159,6 @@ public:
         VulkanBuffer emit_counters;
 
         VulkanBuffer chunk_mesh_alloc_local;
-        VulkanBuffer vb_returned_nodes_list;
-        VulkanBuffer ib_returned_nodes_list;
 
         VulkanBuffer build_indirect_cmds_uniform;
         VulkanBuffer read_chunk_output;
@@ -192,14 +190,8 @@ public:
     VoxelGridBuffers& buffers() noexcept;
     ShaderHelper& shader_helper() noexcept;
 
-    // void apply_writes_to_world_gpu(uint32_t write_count);
-    // void apply_writes_to_world_from_cpu(
-    //     const std::vector<glm::ivec3>& positions,
-    //     const std::vector<VoxelDataGPU>& voxels
-    // );
 
     glm::uvec3 voxel_size();
-    // void voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud);
     void voxelize_point_cloud(VulkanCommandBuffer& command_buffer, VulkanEngine& engine, 
                               PointCloud& point_cloud, VulkanBuffer& voxel_writes, uint32_t max_write_count);
     void voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud, 
@@ -217,17 +209,14 @@ public:
     struct VoxelGridPassInstances {
         PassWriter fill_buffer_pw;
         PassInstance world_init_pi;
-        // PassInstance apply_writes_to_world_pi;
         PassInstance mesh_pool_clear_pi;
         PassInstance mesh_pool_seed_pi;
         PassInstance mesh_reset_pi;
         PassInstance mesh_count_pi;
-        PassInstance mesh_alloc_vb_pi;
-        PassInstance mesh_alloc_ib_pi;
+        PassWriter mesh_alloc_pw;
         PassWriter retry_mesh_alloc_pw;
         PassInstance verify_mesh_allocation_pi;
         PassWriter return_free_alloc_nodes_dispatch_adapter_pw;
-        // PassInstance return_free_alloc_nodes_pi;
         PassWriter return_free_alloc_nodes_pw;
         PassInstance mesh_emit_pi;
         PassInstance mesh_finalize_pi;
@@ -294,7 +283,6 @@ private:
     void merge_voxel_write_lists(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src, VulkanBuffer& voxel_write_list_dsc);
 
     void world_init_gpu();
-    // void init_draw_buffers();
     void init_mesh_pool();
     void submit_compute_commands();
     
@@ -323,21 +311,32 @@ private:
     void mesh_count(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t pack_bits, int pack_offset);
 
     void reset_allocation_retry_list(VulkanCommandBuffer& command_buffer, VulkanBuffer& allocation_retry_list);
-    void mesh_alloc_vb(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
-    void mesh_alloc_ib(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
-    void retry_mesh_alloc_vb(
+    void mesh_alloc_buffer(
+        VulkanCommandBuffer& command_buffer, 
+        const VulkanBuffer& dispatch_args,
+        AllocatorBuffers& mesh_allocator_buffers,
+        BuddyAllocatorParams& mesh_allocator_params,
+        uint32_t quad_size,
+        bool is_vertex_phase
+    );
+    void retry_mesh_alloc(
         VulkanCommandBuffer& command_buffer,
         const VulkanBuffer& dispatch_args,
         VulkanBuffer& readable_retry_list,
-        VulkanBuffer& writable_retry_list
+        VulkanBuffer& writable_retry_list,
+        AllocatorBuffers& mesh_allocator_buffers,
+        BuddyAllocatorParams& mesh_allocator_params,
+        uint32_t quad_size,
+        bool is_vertex_phase
     );
-    void retry_mesh_alloc_ib(
+    void mesh_alloc(
         VulkanCommandBuffer& command_buffer,
-        const VulkanBuffer& dispatch_args,
-        VulkanBuffer& readable_retry_list,
-        VulkanBuffer& writable_retry_list
+        VulkanBuffer& dispatch_args,
+        AllocatorBuffers& mesh_allocator_buffers,
+        BuddyAllocatorParams& mesh_allocator_params,
+        uint32_t quad_size,
+        bool is_vertex_phase
     );
-    void mesh_alloc(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args);
 
     void verify_mesh_allocation(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void prepare_return_free_alloc_nodes(VulkanCommandBuffer& command_buffer, VulkanBuffer& dispatch_args);

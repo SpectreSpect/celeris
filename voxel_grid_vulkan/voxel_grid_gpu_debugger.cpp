@@ -75,8 +75,8 @@ void VoxelGridGPUDebugger::print_counters() {
     VulkanBuffer& free_list = m_voxel_grid->buffers().free_list;
     VulkanBuffer& failed_dirty_list = m_voxel_grid->buffers().failed_dirty_list;
     VulkanBuffer& mesh_buffers_status = m_voxel_grid->buffers().mesh_buffers_status;
-    VulkanBuffer& vb_free_nodes_list = m_voxel_grid->buffers().vb_free_nodes_list;
-    VulkanBuffer& ib_free_nodes_list = m_voxel_grid->buffers().ib_free_nodes_list;
+    VulkanBuffer& vb_free_nodes_list = m_voxel_grid->buffers().vb_mesh_allocator_buffers.free_nodes_list;
+    VulkanBuffer& ib_free_nodes_list = m_voxel_grid->buffers().ib_mesh_allocator_buffers.free_nodes_list;
     VulkanBuffer& debug_counter = m_voxel_grid->buffers().debug_counter;
 
     uint32_t load_list_count = load_list.read_scalar<uint32_t>(0u);
@@ -117,22 +117,22 @@ void VoxelGridGPUDebugger::print_counters() {
 
 void VoxelGridGPUDebugger::print_count_free_mesh_alloc() {
     std::vector<ChunkMeshAlloc> alloc_meta(m_voxel_grid->params().count_active_chunks);
-    std::vector<uint32_t> vb_states(m_voxel_grid->params().count_vb_pages);
-    std::vector<uint32_t> ib_states(m_voxel_grid->params().count_ib_pages);
-    std::vector<uint32_t> vb_heads(m_voxel_grid->params().vb_order + 1);
-    std::vector<uint32_t> ib_heads(m_voxel_grid->params().ib_order + 1);
-    std::vector<AllocNode> vb_nodes(m_voxel_grid->params().count_vb_nodes);
-    std::vector<AllocNode> ib_nodes(m_voxel_grid->params().count_ib_nodes);
+    std::vector<uint32_t> vb_states(m_voxel_grid->params().vb_allocator_params.count_pages);
+    std::vector<uint32_t> ib_states(m_voxel_grid->params().ib_allocator_params.count_pages);
+    std::vector<uint32_t> vb_heads(m_voxel_grid->params().vb_allocator_params.max_order + 1);
+    std::vector<uint32_t> ib_heads(m_voxel_grid->params().ib_allocator_params.max_order + 1);
+    std::vector<AllocNode> vb_nodes(m_voxel_grid->params().vb_allocator_params.count_nodes);
+    std::vector<AllocNode> ib_nodes(m_voxel_grid->params().ib_allocator_params.count_nodes);
     std::vector<uint32_t> dirty_list;
     uint32_t dirty_count;
 
     m_voxel_grid->buffers().chunk_mesh_alloc.read(alloc_meta.data(), sizeof(ChunkMeshAlloc) * m_voxel_grid->params().count_active_chunks, 0);
-    m_voxel_grid->buffers().vb_state.read(vb_states.data(), sizeof(uint32_t) * m_voxel_grid->params().count_vb_pages,  0);
-    m_voxel_grid->buffers().ib_state.read(ib_states.data(), sizeof(uint32_t) * m_voxel_grid->params().count_ib_pages,  0);
-    m_voxel_grid->buffers().vb_heads.read(vb_heads.data(), sizeof(uint32_t) * (m_voxel_grid->params().vb_order + 1), 0);
-    m_voxel_grid->buffers().ib_heads.read(ib_heads.data(), sizeof(uint32_t) * (m_voxel_grid->params().ib_order + 1), 0);
-    m_voxel_grid->buffers().vb_nodes.read(vb_nodes.data(), sizeof(AllocNode) * m_voxel_grid->params().count_vb_nodes, 0);
-    m_voxel_grid->buffers().ib_nodes.read(ib_nodes.data(), sizeof(AllocNode) * m_voxel_grid->params().count_ib_nodes, 0);
+    m_voxel_grid->buffers().vb_mesh_allocator_buffers.state.read(vb_states.data(), sizeof(uint32_t) * m_voxel_grid->params().vb_allocator_params.count_pages,  0);
+    m_voxel_grid->buffers().ib_mesh_allocator_buffers.state.read(ib_states.data(), sizeof(uint32_t) * m_voxel_grid->params().ib_allocator_params.count_pages,  0);
+    m_voxel_grid->buffers().vb_mesh_allocator_buffers.heads.read(vb_heads.data(), sizeof(uint32_t) * (m_voxel_grid->params().vb_allocator_params.max_order + 1), 0);
+    m_voxel_grid->buffers().ib_mesh_allocator_buffers.heads.read(ib_heads.data(), sizeof(uint32_t) * (m_voxel_grid->params().ib_allocator_params.max_order + 1), 0);
+    m_voxel_grid->buffers().vb_mesh_allocator_buffers.nodes.read(vb_nodes.data(), sizeof(AllocNode) * m_voxel_grid->params().vb_allocator_params.count_nodes, 0);
+    m_voxel_grid->buffers().ib_mesh_allocator_buffers.nodes.read(ib_nodes.data(), sizeof(AllocNode) * m_voxel_grid->params().ib_allocator_params.count_nodes, 0);
     m_voxel_grid->buffers().dirty_list.read(&dirty_count, sizeof(uint32_t), 0);
     dirty_list.resize(dirty_count);
     m_voxel_grid->buffers().dirty_list.read(dirty_list.data(), sizeof(uint32_t) * dirty_count, sizeof(uint32_t));
@@ -186,7 +186,7 @@ void VoxelGridGPUDebugger::print_count_free_mesh_alloc() {
     uint32_t count_vb_merging = 0, vb_merging_pages = 0;
     uint32_t count_vb_ready = 0, vb_ready_pages = 0;
     uint32_t count_vb_conceded = 0, vb_conceded_pages = 0;
-    for (uint32_t i = 0; i < m_voxel_grid->params().count_vb_pages; i++) {
+    for (uint32_t i = 0; i < m_voxel_grid->params().vb_allocator_params.count_pages; i++) {
         uint32_t kind = vb_states[i] & ST_MASK;
         uint32_t order = vb_states[i] >> ST_MASK_BITS;
         uint32_t count_pages = 1u << order;
@@ -202,7 +202,7 @@ void VoxelGridGPUDebugger::print_count_free_mesh_alloc() {
     uint32_t count_ib_merging = 0, ib_merging_pages = 0;
     uint32_t count_ib_ready = 0, ib_ready_pages = 0;
     uint32_t count_ib_conceded = 0, ib_conceded_pages = 0;
-    for (uint32_t i = 0; i < m_voxel_grid->params().count_ib_pages; i++) {
+    for (uint32_t i = 0; i < m_voxel_grid->params().ib_allocator_params.count_pages; i++) {
         uint32_t kind = ib_states[i] & ST_MASK;
         uint32_t order = ib_states[i] >> ST_MASK_BITS;
         uint32_t count_pages = 1u << order;
@@ -212,10 +212,10 @@ void VoxelGridGPUDebugger::print_count_free_mesh_alloc() {
     }
 
     //=================РАСЧЁТ ДАННЫХ VB ПО HEADS=================
-    std::vector<uint32_t> count_free_states_by_vb_order(m_voxel_grid->params().vb_order + 1, 0);
-    std::vector<uint32_t> count_free_pages_by_vb_order(m_voxel_grid->params().vb_order + 1, 0);
+    std::vector<uint32_t> count_free_states_by_vb_order(m_voxel_grid->params().vb_allocator_params.max_order + 1, 0);
+    std::vector<uint32_t> count_free_pages_by_vb_order(m_voxel_grid->params().vb_allocator_params.max_order + 1, 0);
     uint32_t count_free_states_by_vb_heads = 0, count_free_pages_by_vb_heads = 0;
-    for (uint32_t order = 0; order <= m_voxel_grid->params().vb_order; order++) {
+    for (uint32_t order = 0; order <= m_voxel_grid->params().vb_allocator_params.max_order; order++) {
         uint32_t head_idx = vb_heads[order] >> HEAD_TAG_BITS;
         uint32_t cur_node = head_idx != INVALID_HEAD_IDX ? head_idx : INVALID_ID;
         uint32_t order_size = 1u << order;
@@ -235,10 +235,10 @@ void VoxelGridGPUDebugger::print_count_free_mesh_alloc() {
     }
 
     //=================РАСЧЁТ ДАННЫХ IB ПО HEADS=================
-    std::vector<uint32_t> count_free_states_by_ib_order(m_voxel_grid->params().ib_order + 1, 0);
-    std::vector<uint32_t> count_free_pages_by_ib_order(m_voxel_grid->params().ib_order + 1, 0);
+    std::vector<uint32_t> count_free_states_by_ib_order(m_voxel_grid->params().ib_allocator_params.max_order + 1, 0);
+    std::vector<uint32_t> count_free_pages_by_ib_order(m_voxel_grid->params().ib_allocator_params.max_order + 1, 0);
     uint32_t count_free_states_by_ib_heads = 0, count_free_pages_by_ib_heads = 0;
-    for (uint32_t order = 0; order <= m_voxel_grid->params().ib_order; order++) {
+    for (uint32_t order = 0; order <= m_voxel_grid->params().ib_allocator_params.max_order; order++) {
         uint32_t head_idx = ib_heads[order] >> HEAD_TAG_BITS;
         uint32_t cur_node = head_idx != INVALID_HEAD_IDX ? head_idx : INVALID_ID;
         uint32_t order_size = 1u << order;
@@ -275,8 +275,8 @@ void VoxelGridGPUDebugger::print_count_free_mesh_alloc() {
     std::cout << "ST_READY:     count states = " << count_vb_ready    << "  count pages = " << vb_ready_pages << std::endl;
     std::cout << "ST_CONCEDED:  count states = " << count_vb_conceded << "  count pages = " << vb_conceded_pages << std::endl;
     std::cout << "SUM (free + alloc): count states = " << count_vb_free + count_vb_alloc << "  count pages = " << vb_free_pages + vb_alloc_pages << std::endl;
-    std::cout << "REAL_COUNT_PAGES: " << m_voxel_grid->params().count_vb_pages << std::endl;
-    std::cout << "LIMBO: " << (int)m_voxel_grid->params().count_vb_pages - (vb_free_pages + vb_alloc_pages) << std::endl;
+    std::cout << "REAL_COUNT_PAGES: " << m_voxel_grid->params().vb_allocator_params.count_pages << std::endl;
+    std::cout << "LIMBO: " << (int)m_voxel_grid->params().vb_allocator_params.count_pages - (vb_free_pages + vb_alloc_pages) << std::endl;
     std::cout << std::endl;
     std::cout << "==Index buffer==" << std::endl;
     std::cout << "ST_FREE:      count states = " << count_ib_free     << "  count pages = " << ib_free_pages << std::endl;
@@ -286,8 +286,8 @@ void VoxelGridGPUDebugger::print_count_free_mesh_alloc() {
     std::cout << "ST_READY:     count states = " << count_ib_ready    << "  count pages = " << ib_ready_pages << std::endl;
     std::cout << "ST_CONCEDED:  count states = " << count_ib_conceded << "  count pages = " << ib_conceded_pages << std::endl;
     std::cout << "SUM (free + alloc): count states = " << count_ib_free + count_ib_alloc << "  count pages = " << ib_free_pages + ib_alloc_pages << std::endl;
-    std::cout << "REAL_COUNT_PAGES: " << m_voxel_grid->params().count_ib_pages << std::endl;
-    std::cout << "LIMBO: " << (int)m_voxel_grid->params().count_ib_pages - (ib_free_pages + ib_alloc_pages) << std::endl;
+    std::cout << "REAL_COUNT_PAGES: " << m_voxel_grid->params().ib_allocator_params.count_pages << std::endl;
+    std::cout << "LIMBO: " << (int)m_voxel_grid->params().ib_allocator_params.count_pages - (ib_free_pages + ib_alloc_pages) << std::endl;
     std::cout << std::endl;
 
     std::cout << "---DATA FROM META---"      << std::endl;
@@ -310,7 +310,7 @@ void VoxelGridGPUDebugger::print_count_free_mesh_alloc() {
     std::cout << "LIMBO (by STATES): " << (int)vb_free_pages - count_free_pages_by_vb_heads << std::endl;
     std::cout << std::endl;
     std::cout << "VB data per order:" << std::endl;
-    for (uint32_t order = 0; order <= m_voxel_grid->params().vb_order; order++) {
+    for (uint32_t order = 0; order <= m_voxel_grid->params().vb_allocator_params.max_order; order++) {
         std::cout << std::left << std::setw(10) << ("ORDER " + std::to_string(order) + ":")
                   << std::right << std::setw(14 + 5) << "count states ="
                   << std::right << std::setw(7) << count_free_states_by_vb_order[order]
@@ -326,7 +326,7 @@ void VoxelGridGPUDebugger::print_count_free_mesh_alloc() {
     std::cout << "LIMBO (by STATES): " << (int)ib_free_pages - count_free_pages_by_ib_heads << std::endl;
     std::cout << std::endl;
     std::cout << "IB data per order:" << std::endl;
-    for (uint32_t order = 0; order <= m_voxel_grid->params().ib_order; order++) {
+    for (uint32_t order = 0; order <= m_voxel_grid->params().ib_allocator_params.max_order; order++) {
         std::cout << std::left << std::setw(10) << ("ORDER " + std::to_string(order) + ":")
                   << std::right << std::setw(14 + 5) << "count states ="
                   << std::right << std::setw(7) << count_free_states_by_ib_order[order]
@@ -514,7 +514,13 @@ void VoxelGridGPUDebugger::print_dirty_list_quad_count() {
     
     m_voxel_grid->buffers().dirty_quad_count.read(dirty_quad_count.data(), sizeof(uint32_t) * dirty_count, 0);
 
-    std::cout << "DIRTY QUAD COUNT: " << dirty_count << std::endl;
+    uint32_t total_quad_count = 0u;
+    for (uint32_t quad_count : dirty_quad_count) {
+        total_quad_count += quad_count;
+    }
+
+    std::cout << "TOTAL QUAD COUNT: " << total_quad_count << std::endl;
+    std::cout << "DIRTY COUNT: " << dirty_count << std::endl;
     std::cout << "DIRTY QUAD COUNTERS: " << std::endl;
     for (uint32_t dirty_id = 0u; dirty_id < dirty_count && dirty_id < 100u; dirty_id++) {
         std::cout << "dirty_id " << dirty_id << ": " << dirty_quad_count[dirty_id] << std::endl;
@@ -645,23 +651,23 @@ void VoxelGridGPUDebugger::dispay_debug_window(const Camera& camera) {
 
     if (ImGui::Button("Print vb free list")) {
         print_free_lists(
-            m_voxel_grid->buffers().vb_heads,
-            m_voxel_grid->buffers().vb_nodes,
-            m_voxel_grid->buffers().vb_state,
-            m_voxel_grid->params().count_vb_nodes,
-            m_voxel_grid->params().count_vb_pages,
-            m_voxel_grid->params().vb_order
+            m_voxel_grid->buffers().vb_mesh_allocator_buffers.heads,
+            m_voxel_grid->buffers().vb_mesh_allocator_buffers.nodes,
+            m_voxel_grid->buffers().vb_mesh_allocator_buffers.state,
+            m_voxel_grid->params().vb_allocator_params.count_nodes,
+            m_voxel_grid->params().vb_allocator_params.count_pages,
+            m_voxel_grid->params().vb_allocator_params.max_order
         );
     }
 
     if (ImGui::Button("Print ib free list")) {
         print_free_lists(
-            m_voxel_grid->buffers().ib_heads,
-            m_voxel_grid->buffers().ib_nodes,
-            m_voxel_grid->buffers().ib_state,
-            m_voxel_grid->params().count_ib_nodes,
-            m_voxel_grid->params().count_ib_pages,
-            m_voxel_grid->params().ib_order
+            m_voxel_grid->buffers().ib_mesh_allocator_buffers.heads,
+            m_voxel_grid->buffers().ib_mesh_allocator_buffers.nodes,
+            m_voxel_grid->buffers().ib_mesh_allocator_buffers.state,
+            m_voxel_grid->params().ib_allocator_params.count_nodes,
+            m_voxel_grid->params().ib_allocator_params.count_pages,
+            m_voxel_grid->params().ib_allocator_params.max_order
         );
     }
 
@@ -735,14 +741,22 @@ void VoxelGridGPUDebugger::display_build_from_dirty_window(VulkanCommandBuffer& 
     }
 
     if (ImGui::Button("mesh_alloc()")) {
-        shader_helper.prepare_dispatch_args(
-            command_buffer, 
-            m_voxel_grid->buffers().dispatch_args, 
-            BufferDispatchArg(&m_voxel_grid->buffers().dirty_list, 0u)
-        );
         m_voxel_grid->mesh_alloc(
-            command_buffer, 
-            m_voxel_grid->buffers().dispatch_args
+            command_buffer,
+            m_voxel_grid->m_buffers.dispatch_args,
+            m_voxel_grid->m_buffers.vb_mesh_allocator_buffers,
+            m_voxel_grid->m_params.vb_allocator_params,
+            4u * sizeof(VertexGPU),
+            true
+        );
+
+        m_voxel_grid->mesh_alloc(
+            command_buffer,
+            m_voxel_grid->m_buffers.dispatch_args,
+            m_voxel_grid->m_buffers.ib_mesh_allocator_buffers,
+            m_voxel_grid->m_params.ib_allocator_params,
+            6u * sizeof(uint32_t),
+            false
         );
     }
 

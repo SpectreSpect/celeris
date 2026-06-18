@@ -231,6 +231,8 @@ ComputePass ComputePassManager::create_mesh_alloc_compute_pass(VulkanDevice& dev
 
     ComputePassBuilder builder;
 
+    builder.set_descriptor_set_flags(VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+
     builder.add_storage_buffer(0, ShaderStages::compute); // MeshBuffersStatusBuf
     builder.add_storage_buffer(1, ShaderStages::compute); // DirtyListBuf
     builder.add_storage_buffer(2, ShaderStages::compute); // DirtyQuadCountBuf
