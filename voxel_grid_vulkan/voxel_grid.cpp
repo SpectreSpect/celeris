@@ -872,7 +872,7 @@ VoxelGrid::VoxelGridParams VoxelGrid::create_params(const VoxelGridDesc& desc) c
     logger.check((params.chunk_hash_table_size & (params.chunk_hash_table_size - 1)) == 0, "chunk_hash_table_size must be 2^n");
 
     // vb_params
-    params.vb_allocator_params.page_size = 1 << desc.vb_page_size_order_of_two;
+    params.vb_allocator_params.page_size = desc.mean_count_quads_in_chunk * 4 * sizeof(VertexGPU);
     params.vb_allocator_params.count_pages = math_utils::next_pow2_u32(
         math_utils::div_up_u32(desc.max_quads * 4u * sizeof(VertexGPU), params.vb_allocator_params.page_size)
     );
@@ -880,7 +880,7 @@ VoxelGrid::VoxelGridParams VoxelGrid::create_params(const VoxelGridDesc& desc) c
     params.vb_allocator_params.max_order = math_utils::log2_floor_u32(params.vb_allocator_params.count_pages);
 
     // ib_params
-    params.ib_allocator_params.page_size = 1 << desc.ib_page_size_order_of_two;
+    params.ib_allocator_params.page_size = desc.mean_count_quads_in_chunk * 6 * sizeof(uint32_t);
     params.ib_allocator_params.count_pages = math_utils::next_pow2_u32(
         math_utils::div_up_u32(desc.max_quads * 6u * sizeof(uint32_t), params.ib_allocator_params.page_size)
     );

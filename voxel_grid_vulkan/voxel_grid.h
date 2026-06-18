@@ -73,8 +73,7 @@ public:
         uint32_t min_free_chunks;
         float tomb_fraction_to_rebuild;
         float eviction_bucket_shell_thickness;
-        uint32_t vb_page_size_order_of_two;
-        uint32_t ib_page_size_order_of_two;
+        uint32_t mean_count_quads_in_chunk;
         uint32_t allocation_retry_list_size;
         float buddy_allocator_nodes_factor;
         float render_distance;

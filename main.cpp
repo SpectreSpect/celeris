@@ -137,8 +137,7 @@ int main() {
         .min_free_chunks = 4'500,
         .tomb_fraction_to_rebuild = 0.2f,
         .eviction_bucket_shell_thickness = chunk_size.x * voxel_size.x * 1,
-        .vb_page_size_order_of_two = 10,
-        .ib_page_size_order_of_two = 10,
+        .mean_count_quads_in_chunk = 200,
         .allocation_retry_list_size = 10'000, // Не так много занимает, в целом можно не жмотничать
         .buddy_allocator_nodes_factor = 1.0,
         .render_distance = chunk_size.x * voxel_size.x * 30,
