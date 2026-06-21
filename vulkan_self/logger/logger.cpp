@@ -1,6 +1,14 @@
 #include "logger.h"
 
-Logger logger;
+#include <unordered_map>
+#include <thread>
+
+// std::unordered_map<std::thread::id, Logger> loggers;
+
+Logger& logger() {
+    thread_local Logger instance;
+    return instance;
+}
 
 void Logger::push_level(const MultiColorString& str) {
     level_stack.push_back(str);

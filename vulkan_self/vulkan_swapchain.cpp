@@ -66,7 +66,7 @@ VulkanSwapchain::VulkanSwapchain(
     create_info.oldSwapchain = VK_NULL_HANDLE;
 
     VkResult result = vkCreateSwapchainKHR(device.handle(), &create_info, nullptr, &m_swapchain);
-    logger.check(result == VK_SUCCESS, "Failed to create swapchain");
+    logger().check(result == VK_SUCCESS, "Failed to create swapchain");
 
     vkGetSwapchainImagesKHR(device.handle(), m_swapchain, &image_count, nullptr);
     m_images.resize(image_count);
@@ -127,8 +127,8 @@ const VkSwapchainKHR& VulkanSwapchain::handle() const noexcept {
 VkImage VulkanSwapchain::image(uint32_t index) const {
     LOG_METHOD();
     
-    logger.check(!m_images.empty(), "There is no available swapchain images");
-    logger.check(index < m_images.size(), "Index is out of bound of the array");
+    logger().check(!m_images.empty(), "There is no available swapchain images");
+    logger().check(index < m_images.size(), "Index is out of bound of the array");
 
     return m_images[index];
 }
@@ -161,7 +161,7 @@ VkResult VulkanSwapchain::acquire_next_image(
         &image_index_out
     );
 
-    logger.check(
+    logger().check(
         acquire_result == VK_SUCCESS ||
         acquire_result == VK_SUBOPTIMAL_KHR ||
         acquire_result == VK_ERROR_OUT_OF_DATE_KHR,
@@ -176,7 +176,7 @@ VkSurfaceFormatKHR VulkanSwapchain::choose_swap_surface_format(
 {
     LOG_METHOD();
 
-    logger.check(!available_formats.empty(), "No available swapchain surface formats");
+    logger().check(!available_formats.empty(), "No available swapchain surface formats");
 
     for (const auto& available_format : available_formats) {
         

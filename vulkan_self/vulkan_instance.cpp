@@ -3,11 +3,11 @@
 VulkanInstance::VulkanInstance(const GlfwContext&, std::string_view app_name) : m_app_name(app_name) {
     LOG_METHOD();
 
-    logger.log() << "glfwVulkanSupported: " << clr(std::to_string(glfwVulkanSupported()), "#2c87ff") << "\n";
-    logger.check(glfwVulkanSupported(), "GLFW reports Vulkan is not supported on this machine");
+    logger().log() << "glfwVulkanSupported: " << clr(std::to_string(glfwVulkanSupported()), "#2c87ff") << "\n";
+    logger().check(glfwVulkanSupported(), "GLFW reports Vulkan is not supported on this machine");
 
     if (enable_validation_layers) {
-        logger.check(
+        logger().check(
             check_validation_layer_support(),
             "Validation layers requested, but not available"
         );
@@ -43,7 +43,7 @@ VulkanInstance::VulkanInstance(const GlfwContext&, std::string_view app_name) : 
     }
 
     VkResult result = vkCreateInstance(&create_info, nullptr, &m_instance);
-    logger.check(result == VK_SUCCESS, "Failed to create Vulkan instance");
+    logger().check(result == VK_SUCCESS, "Failed to create Vulkan instance");
 
     setup_debug_messenger();
 }
@@ -110,7 +110,7 @@ void VulkanInstance::setup_debug_messenger() {
         &m_debug_messenger
     );
 
-    logger.check(result == VK_SUCCESS, "Failed to set up debug messenger");
+    logger().check(result == VK_SUCCESS, "Failed to set up debug messenger");
 }
 
 bool VulkanInstance::check_validation_layer_support() const {
@@ -143,13 +143,13 @@ bool VulkanInstance::check_validation_layer_support() const {
 std::vector<const char*> VulkanInstance::get_required_extensions() const {
     LOG_METHOD();
 
-    logger.check(glfwVulkanSupported(), "GLFW reports Vulkan is not supported on this machine");
+    logger().check(glfwVulkanSupported(), "GLFW reports Vulkan is not supported on this machine");
 
     uint32_t glfw_extension_count = 0;
     const char** glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
 
-    logger.check(glfw_extensions != nullptr, "glfwGetRequiredInstanceExtensions returned nullptr");
-    logger.check(glfw_extension_count > 0, "GLFW returned zero required Vulkan extensions");
+    logger().check(glfw_extensions != nullptr, "glfwGetRequiredInstanceExtensions returned nullptr");
+    logger().check(glfw_extension_count > 0, "GLFW returned zero required Vulkan extensions");
 
     std::vector<const char*> extensions(glfw_extensions, glfw_extensions + glfw_extension_count);
 

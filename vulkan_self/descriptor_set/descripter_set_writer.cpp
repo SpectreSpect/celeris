@@ -11,8 +11,8 @@ DescriptorSetWriter::DescriptorSetWriter(VulkanDevice& device) : m_device(device
 DescriptorSetWriter& DescriptorSetWriter::write_buffer(uint32_t binding, const VulkanBuffer& buffer, VkDescriptorType descriptor_type) {
     LOG_METHOD();
 
-    logger.check(buffer.handle() != VK_NULL_HANDLE, "Buffer is not initialized");
-    logger.check(buffer.size() > 0, "Video buffer size must be greater than 0");
+    logger().check(buffer.handle() != VK_NULL_HANDLE, "Buffer is not initialized");
+    logger().check(buffer.size() > 0, "Video buffer size must be greater than 0");
 
     VkDescriptorBufferInfo buffer_info{};
     buffer_info.buffer = buffer.handle();
@@ -46,9 +46,9 @@ DescriptorSetWriter& DescriptorSetWriter::write_storage_buffer(uint32_t binding,
 DescriptorSetWriter& DescriptorSetWriter::write_texture(uint32_t binding, const VulkanTexture2D& texture) {
     LOG_METHOD();
 
-    logger.check(texture.view().handle() != VK_NULL_HANDLE, "Texture image view is not initialized");
-    logger.check(texture.sampler().handle() != VK_NULL_HANDLE, "Texture sampler is not initialized");
-    logger.check(
+    logger().check(texture.view().handle() != VK_NULL_HANDLE, "Texture image view is not initialized");
+    logger().check(texture.sampler().handle() != VK_NULL_HANDLE, "Texture sampler is not initialized");
+    logger().check(
         texture.texture_layout() == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         "Texture image layout must be VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL"
     );
@@ -83,9 +83,9 @@ void DescriptorSetWriter::clear_writes() {
 void DescriptorSetWriter::push_descriptor_set(VulkanCommandBuffer& command_buffer, const Pipeline& pipeline, uint32_t set_index) const {
     LOG_METHOD();
 
-    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
-    logger.check(pipeline.layout() != VK_NULL_HANDLE, "Pipeline layout is not initialized");
-    logger.check(m_pending_writes.size() > 0, "Attempt to push descripter set with 0 writes");
+    logger().check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+    logger().check(pipeline.layout() != VK_NULL_HANDLE, "Pipeline layout is not initialized");
+    logger().check(m_pending_writes.size() > 0, "Attempt to push descripter set with 0 writes");
 
     std::vector<VkWriteDescriptorSet> writes;
     writes.reserve(m_pending_writes.size());

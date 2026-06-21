@@ -18,26 +18,26 @@ GraphicsPipeline::GraphicsPipeline(const GraphicsPipelineBuilder& builder)
 
     LOG_METHOD();
 
-    logger.check(device != VK_NULL_HANDLE)
+    logger().check(device != VK_NULL_HANDLE)
         << "Device is not initialized. Init it or specify in methods "
         << VSCODE_CLR_STREAM("PipelineBulider", "set_device") << " or "
         << VSCODE_CLR_STREAM("PipelineBulider", "set_graphic_objects") << "\n";
     
-    logger.check(builder.desc().pipeline_layout)
+    logger().check(builder.desc().pipeline_layout)
         << "Layout is not initialized. Init it or specify in methods "
         << VSCODE_CLR_STREAM("PipelineBulider", "set_layout") << " or "
         << VSCODE_CLR_STREAM("PipelineBulider", "set_graphic_objects") << "\n";
     
-    logger.check(builder.desc().render_pass)
+    logger().check(builder.desc().render_pass)
         << "RenderPass is not initialized. Init it or specify in methods "
         << VSCODE_CLR_STREAM("PipelineBulider", "set_render_pass") << " or "
         << VSCODE_CLR_STREAM("PipelineBulider", "set_graphic_objects") << "\n";
 
-    logger.check(builder.desc().vertex_shader_module != VK_NULL_HANDLE) 
+    logger().check(builder.desc().vertex_shader_module != VK_NULL_HANDLE) 
         << "Vertex shader module is not initialized. Use "
         << VSCODE_CLR_STREAM("PipelineBulider", "add_vert_shader_stage") << ".\n";
 
-    logger.check(builder.desc().fragment_shader_module != VK_NULL_HANDLE)
+    logger().check(builder.desc().fragment_shader_module != VK_NULL_HANDLE)
         << "Fragment shader module is not initialized. Use "
         << VSCODE_CLR_STREAM("PipelineBulider", "add_frag_shader_stage") << ".\n";
     
@@ -157,7 +157,7 @@ GraphicsPipeline::GraphicsPipeline(const GraphicsPipelineBuilder& builder)
         &pipeline
     );
 
-    logger.check(result == VK_SUCCESS, "Failed to create graphics pipeline");
+    logger().check(result == VK_SUCCESS, "Failed to create graphics pipeline");
 
     set_pipeline(device, pipeline, builder.desc().pipeline_layout);
 }
@@ -179,7 +179,7 @@ void GraphicsPipeline::set_y_down_viewport(
 {
     LOG_NAMED("GraphicsPipeline");
 
-    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+    logger().check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
 
     VkViewport viewport{};
     viewport.x = origin.x;
@@ -247,7 +247,7 @@ void GraphicsPipeline::set_scissor(
 {
     LOG_NAMED("GraphicsPipeline");
 
-    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+    logger().check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
 
     VkRect2D scissor{};
     scissor.offset = offset;

@@ -10,7 +10,7 @@
 VulkanFence::VulkanFence(const VulkanDevice& device, VkFenceCreateFlags flags) : m_device(device.handle()) {
     LOG_METHOD();
 
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
 
     VkFenceCreateInfo fence_info{};
     fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -23,7 +23,7 @@ VulkanFence::VulkanFence(const VulkanDevice& device, VkFenceCreateFlags flags) :
         &m_fence
     );
 
-    logger.check(result == VK_SUCCESS, "Failed to create a fence");
+    logger().check(result == VK_SUCCESS, "Failed to create a fence");
 }
 
 VulkanFence::~VulkanFence() noexcept {
@@ -61,11 +61,11 @@ VkFence VulkanFence::handle() const noexcept {
 void VulkanFence::check_correctness(std::span<const VkFence> fences) {
     LOG_NAMED("VulkanFence");
 
-    logger.check(!fences.empty(), "Fence list is empty");
+    logger().check(!fences.empty(), "Fence list is empty");
 
     for (size_t i = 0; i < fences.size(); i++) {
         if (fences[i] == VK_NULL_HANDLE) {
-            logger.throw_error() 
+            logger().throw_error() 
                 << "In a list of " << clr(std::to_string(fences.size()), LoggerPalette::orange) 
                 << " fences, at least fence number " << clr(std::to_string(i), LoggerPalette::orange)
                 << " was not initialized" << "\n";
@@ -76,10 +76,10 @@ void VulkanFence::check_correctness(std::span<const VkFence> fences) {
 void VulkanFence::check_device_consistency(VkDevice device, const std::vector<VulkanFence>& fences) {
     LOG_NAMED("VulkanFence");
     
-    logger.check(device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(device != VK_NULL_HANDLE, "Device is not initialized");
 
     for (const VulkanFence& fence : fences) {
-        logger.check(
+        logger().check(
             fence.m_device == device,
             "Fence belongs to another device"
         );
@@ -89,7 +89,7 @@ void VulkanFence::check_device_consistency(VkDevice device, const std::vector<Vu
 bool VulkanFence::wait(VkDevice device, std::span<const VkFence> fences, VkBool32 wait_all, uint64_t timeout) {
     LOG_NAMED("VulkanFence");
 
-    logger.check(device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(device != VK_NULL_HANDLE, "Device is not initialized");
     VulkanFence::check_correctness(fences);
 
     VkResult result = vkWaitForFences(
@@ -103,7 +103,7 @@ bool VulkanFence::wait(VkDevice device, std::span<const VkFence> fences, VkBool3
     if (result == VK_TIMEOUT)
         return false;
 
-    logger.check(result == VK_SUCCESS)
+    logger().check(result == VK_SUCCESS)
     << "Failed to wait fences: "
     << clr(string_VkResult(result), LoggerPalette::blue)
     << "\n";
@@ -125,12 +125,12 @@ bool VulkanFence::wait(uint64_t timeout) const {
 void VulkanFence::reset(VkDevice device, std::span<const VkFence> fences) {
     LOG_NAMED("VulkanFence");
 
-    logger.check(device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(device != VK_NULL_HANDLE, "Device is not initialized");
     VulkanFence::check_correctness(fences);
 
     VkResult result = vkResetFences(device, static_cast<uint32_t>(fences.size()), fences.data());
 
-    logger.check(result == VK_SUCCESS, "Failed to reset fences");
+    logger().check(result == VK_SUCCESS, "Failed to reset fences");
 }
 
 void VulkanFence::reset() {

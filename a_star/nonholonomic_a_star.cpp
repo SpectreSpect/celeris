@@ -356,7 +356,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
     // LOG_METHOD();
 
     if (m_state.pq.empty()) {
-        // logger.log("1. Priotirty queue is empty");
+        // logger().log("1. Priotirty queue is empty");
         return true;
     }
 
@@ -381,7 +381,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
         }
 
     if (m_state.counter >= m_params.iteration_limit) {
-        // logger.log("Limit exceeded");
+        // logger().log("Limit exceeded");
         return true;
     }
     
@@ -397,14 +397,14 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
         m_state.path = reconstruct_path(m_state.closed_heap, cur_cell.pos);
 
         if (!m_params.use_reed_shepps_fallback) {
-            // logger.log("2. Almost equal = true");
+            // logger().log("2. Almost equal = true");
             return true;
         }
 
         bool status = try_finish_with_reeds_shepp(cur_cell.pos, m_state.end_pos);
         
         // if (status)
-        //     logger.log("3. Almost equal = true (with reeds-shepp fallback)");
+        //     logger().log("3. Almost equal = true (with reeds-shepp fallback)");
         
         return true;
     }
@@ -414,7 +414,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
             m_params.force_reeds_shepp_shot = false;
             bool status = try_finish_with_reeds_shepp(cur_cell.pos, m_state.end_pos);
             if (status) {
-                // logger.log("4. Reeds-shepp shot succeeded");
+                // logger().log("4. Reeds-shepp shot succeeded");
                 return true;
             }
         }

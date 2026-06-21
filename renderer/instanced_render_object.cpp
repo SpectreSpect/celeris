@@ -42,7 +42,7 @@ uint32_t InstancedRenderObject::instance_count() const {
 void InstancedRenderObject::set_instance_count(uint32_t count) {
     LOG_METHOD();
 
-    logger.check(instance_buffer_view_valid(), "Instance buffer must be valid");
+    logger().check(instance_buffer_view_valid(), "Instance buffer must be valid");
     
     m_instance_buffer_view.set_instance_count(count);
 }

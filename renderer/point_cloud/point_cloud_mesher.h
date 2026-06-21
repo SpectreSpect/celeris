@@ -129,7 +129,7 @@ public:
         uint32_t count_rings = point_cloud.point_count() / m_count_points_in_lidar_ring;
         uint32_t count_rings_reminder = point_cloud.point_count() % m_count_points_in_lidar_ring;
 
-        logger.check(count_rings_reminder == 0)
+        logger().check(count_rings_reminder == 0)
             << "The point cloud contains a non-integer number of rings ("
             << clr(std::to_string(count_rings), LoggerPalette::blue) << "integers and "
             << clr(std::to_string(count_rings_reminder), LoggerPalette::orange) << " remainder)."

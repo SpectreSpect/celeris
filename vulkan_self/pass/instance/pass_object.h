@@ -32,7 +32,7 @@ public:
     void push_constants(VulkanCommandBuffer& command_buffer, Args&&... args) const {
         LOG_METHOD();
 
-        logger.check(m_pipeline_pass != nullptr, "Compute pass pointer specify to null");
+        logger().check(m_pipeline_pass != nullptr, "Compute pass pointer specify to null");
 
         m_pipeline_pass->pipeline_layout().push_constants(command_buffer, std::forward<Args>(args)...);
     }

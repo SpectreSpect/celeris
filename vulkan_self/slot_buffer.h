@@ -112,13 +112,13 @@ public:
     uint32_t allocate_slot() {
         LOG_METHOD();
 
-        logger.check(!m_free_slots.empty(), "SlotBuffer is out of free slots");
+        logger().check(!m_free_slots.empty(), "SlotBuffer is out of free slots");
 
         uint32_t slot_id = m_free_slots.back();
         m_free_slots.pop_back();
 
-        logger.check(slot_id < m_slot_alive.size(), "Slot id was out of bounds");
-        logger.check(!m_slot_alive[slot_id], "Slot was in free_slots but is already alive");
+        logger().check(slot_id < m_slot_alive.size(), "Slot id was out of bounds");
+        logger().check(!m_slot_alive[slot_id], "Slot was in free_slots but is already alive");
 
         m_slot_alive[slot_id] = true;
 
@@ -128,8 +128,8 @@ public:
     void free_slot(uint32_t slot_id) {
         LOG_METHOD();
 
-        logger.check(slot_id < m_slot_alive.size(), "Slot id was out of bounds");
-        logger.check(m_slot_alive[slot_id], "Double free or invalid free");
+        logger().check(slot_id < m_slot_alive.size(), "Slot id was out of bounds");
+        logger().check(m_slot_alive[slot_id], "Double free or invalid free");
 
         m_slot_alive[slot_id] = false;
         m_free_slots.push_back(slot_id);
@@ -139,7 +139,7 @@ public:
         LOG_METHOD();
 
         for (uint32_t slot_id : m_dirty_slots) {
-            logger.check(slot_id < m_slot_dirty.size(), "Slot id was out of bounds");
+            logger().check(slot_id < m_slot_dirty.size(), "Slot id was out of bounds");
 
             if (m_slot_alive[slot_id]) {
                 sync_slot(slot_id);
@@ -183,15 +183,15 @@ private:
 private:
     template<class SlotType>
     void check_slot_type() const {
-        logger.check(
+        logger().check(
             sizeof(SlotType) == m_slot_size,
             "Wrong material slot type used with this SlotBuffer"
         );
     }
 
     void check_alive_slot(uint32_t slot_id, std::string_view message) const {
-        logger.check(slot_id < m_num_slots, "Slot id was out of bounds");
-        logger.check(m_slot_alive[slot_id], message);
+        logger().check(slot_id < m_num_slots, "Slot id was out of bounds");
+        logger().check(m_slot_alive[slot_id], message);
     }
 
     std::byte* slot_ptr(uint32_t slot_id) {
@@ -205,7 +205,7 @@ private:
     void mark_dirty(uint32_t slot_id) {
         LOG_METHOD();
 
-        logger.check(slot_id < m_num_slots, "Slot id was out of bounds");
+        logger().check(slot_id < m_num_slots, "Slot id was out of bounds");
 
         if (!m_slot_dirty[slot_id]) {
             m_slot_dirty[slot_id] = true;

@@ -21,7 +21,7 @@ void VoxelMapPointInserter::insert(VoxelPointMap& voxel_point_map, PointCloud& s
     // if (!this->engine)
     //     throw std::runtime_error("engine was null")
 
-    logger.check(source_point_cloud.instance_buffer_view_valid(), "Source point cloud instance view was invalid");
+    logger().check(source_point_cloud.instance_buffer_view_valid(), "Source point cloud instance view was invalid");
 
 
     // std::vector<PointInstance> points;

@@ -24,7 +24,7 @@ uint32_t InstanceBufferView::instance_count() const noexcept {
 void InstanceBufferView::set_instance_count(uint32_t instance_count) {
     LOG_METHOD();
 
-    logger.check(valid(), "Instance buffer is not valid. Maybe you're doing something wrong?");
+    logger().check(valid(), "Instance buffer is not valid. Maybe you're doing something wrong?");
 
     m_instance_count = instance_count;
 }
@@ -36,7 +36,7 @@ uint32_t InstanceBufferView::instance_size() const noexcept {
 const VulkanBuffer& InstanceBufferView::buffer() const {
     LOG_METHOD();
 
-    logger.check(m_buffer != nullptr, "The instance buffer pointer specify to null");
+    logger().check(m_buffer != nullptr, "The instance buffer pointer specify to null");
 
     return *m_buffer;
 }
@@ -44,7 +44,7 @@ const VulkanBuffer& InstanceBufferView::buffer() const {
 VulkanBuffer& InstanceBufferView::buffer() {
     LOG_METHOD();
 
-    logger.check(m_buffer != nullptr, "The instance buffer pointer specify to null");
+    logger().check(m_buffer != nullptr, "The instance buffer pointer specify to null");
 
     return *m_buffer;
 }

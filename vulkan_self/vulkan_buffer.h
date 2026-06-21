@@ -409,9 +409,9 @@ public:
 
         static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
         
-        logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
-        logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
-        logger.check(buffer_size_bytes != 0, "Attempt to create a buffer with zero size");
+        logger().check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+        logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+        logger().check(buffer_size_bytes != 0, "Attempt to create a buffer with zero size");
 
         VulkanBuffer buffer(physical_device, device, buffer_size_bytes, usage, memory_properties);
         

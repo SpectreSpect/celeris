@@ -78,7 +78,7 @@ void CelerisVisualizer::set_goal(const Transform& transform) {
 void CelerisVisualizer::update() {
     LOG_METHOD();
 
-    logger.check(m_celeris, "Celeris was null");
+    logger().check(m_celeris, "Celeris was null");
 
     set_start(m_celeris->start_position());
     set_goal(m_celeris->goal_position());

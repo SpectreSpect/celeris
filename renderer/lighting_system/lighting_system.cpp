@@ -33,7 +33,7 @@ LightingSystem::LightingSystem(VulkanEngine& engine, ComputePassManager& compute
 void LightingSystem::set_light_source(uint32_t slot_id, LightSource light_source) {
     LOG_METHOD();
 
-    logger.check(slot_id < m_light_sources.size(), "Light source slot index was out of bounds");
+    logger().check(slot_id < m_light_sources.size(), "Light source slot index was out of bounds");
 
     m_active_light_count = std::max<size_t>(
         m_active_light_count,
@@ -153,8 +153,8 @@ bool LightingSystem::sphere_intersects_aabb_view_space(const glm::vec3 &center_v
 void LightingSystem::compute_slice_distances_linear(float near_plane, float far_plane, unsigned z_slices, std::vector<float>& out) {
     LOG_METHOD();
 
-    logger.check(z_slices > 0, "z_slices must be greater than zero");
-    logger.check(near_plane < far_plane, "near_plane must be less than far_plane");
+    logger().check(z_slices > 0, "z_slices must be greater than zero");
+    logger().check(near_plane < far_plane, "near_plane must be less than far_plane");
     
     out.resize(z_slices + 1);
 
@@ -167,10 +167,10 @@ void LightingSystem::compute_slice_distances_linear(float near_plane, float far_
 void LightingSystem::compute_slice_distances_log(float near_plane, float far_plane, unsigned z_slices, std::vector<float>& out) {
     LOG_METHOD();
     
-    logger.check(z_slices > 0, "z_slices must be greater than zero");
-    logger.check(near_plane > 0.0f, "near_plane must be greater than zero for logarithmic slicing");
-    logger.check(far_plane > 0.0f, "far_plane must be greater than zero for logarithmic slicing");
-    logger.check(near_plane < far_plane, "near_plane must be less than far_plane");
+    logger().check(z_slices > 0, "z_slices must be greater than zero");
+    logger().check(near_plane > 0.0f, "near_plane must be greater than zero for logarithmic slicing");
+    logger().check(far_plane > 0.0f, "far_plane must be greater than zero for logarithmic slicing");
+    logger().check(near_plane < far_plane, "near_plane must be less than far_plane");
 
     out.resize(z_slices + 1);
 
@@ -193,18 +193,18 @@ void LightingSystem::create_clusters_full(std::vector<AABB>& out_cluster_cells,
     unsigned y_tiles = num_clusters.y;
     unsigned z_slices = num_clusters.z;
 
-    logger.check(x_tiles > 0, "x cluster count must be greater than zero");
-    logger.check(y_tiles > 0, "y cluster count must be greater than zero");
-    logger.check(z_slices > 0, "z cluster count must be greater than zero");
+    logger().check(x_tiles > 0, "x cluster count must be greater than zero");
+    logger().check(y_tiles > 0, "y cluster count must be greater than zero");
+    logger().check(z_slices > 0, "z cluster count must be greater than zero");
 
-    logger.check(
+    logger().check(
         slice_distances.size() == static_cast<size_t>(z_slices) + 1,
         "slice_distances size must be equal to z_slices + 1"
     );
 
-    logger.check(aspect > 0.0f, "aspect ratio must be greater than zero");
-    logger.check(fov_y_radians > 0.0f, "vertical field of view must be greater than zero");
-    logger.check(fov_y_radians < glm::pi<float>(), "vertical field of view must be less than pi radians");
+    logger().check(aspect > 0.0f, "aspect ratio must be greater than zero");
+    logger().check(fov_y_radians > 0.0f, "vertical field of view must be greater than zero");
+    logger().check(fov_y_radians < glm::pi<float>(), "vertical field of view must be less than pi radians");
 
     out_cluster_cells.clear();
     out_cluster_cells.resize((size_t)x_tiles * y_tiles * z_slices);
@@ -370,7 +370,7 @@ uint32_t LightingSystem::total_clusters_count() const noexcept {
 FrameData& LightingSystem::get_frame_data(uint32_t frame_id) {
     LOG_METHOD();
 
-    logger.check(m_frame_resources != nullptr, "Frame resources aren't set");
+    logger().check(m_frame_resources != nullptr, "Frame resources aren't set");
 
     return m_frame_resources->frame_data(frame_id);
 }

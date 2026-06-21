@@ -147,7 +147,7 @@ bool OccupancyGrid3D::is_solid(glm::ivec3 pos) {
     // // LOG_METHOD();
     // return pos.y <= 0;
     
-    // logger.check(m_voxel_grid, "Voxel grid was null");
+    // logger().check(m_voxel_grid, "Voxel grid was null");
 
     glm::ivec3 chunk_pos = m_voxel_grid->chunk_pos_from_voxel_pos(pos);
 

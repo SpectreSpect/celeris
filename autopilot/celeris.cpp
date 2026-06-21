@@ -29,11 +29,11 @@ Celeris::Celeris(VulkanEngine& engine,
     LOG_METHOD();
 
     
-    logger.check(desc.voxel_point_map_num_hash_table_slots > 0, 
+    logger().check(desc.voxel_point_map_num_hash_table_slots > 0, 
                  "The number of voxel point map hash table slots must be greater than 0");
-    logger.check(desc.voxel_point_map_max_map_point_count > 0, 
+    logger().check(desc.voxel_point_map_max_map_point_count > 0, 
                  "The maximum number of voxel point map points must be greater than 0");                 
-    logger.check(desc.max_write_count > 0, "Max write count must be greater than 0");
+    logger().check(desc.max_write_count > 0, "Max write count must be greater than 0");
 
     m_voxel_map_reseter.reset(m_voxel_point_map);
 }
@@ -53,9 +53,9 @@ void Celeris::start() {
 void Celeris::update() {
     LOG_METHOD();
 
-    logger.check(m_engine, "Engine was null");
-    logger.check(m_manager_bundle, "Manager bundle was null");
-    logger.check(m_voxel_grid, "Voxel grid was null");
+    logger().check(m_engine, "Engine was null");
+    logger().check(m_manager_bundle, "Manager bundle was null");
+    logger().check(m_voxel_grid, "Voxel grid was null");
 
     if (auto scan = m_scan_receiver.try_pop_scan(*m_manager_bundle)) {
         if (m_network_scan)
