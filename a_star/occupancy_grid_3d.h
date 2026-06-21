@@ -52,21 +52,24 @@ public:
         std::vector<glm::ivec3>& output, 
         int max_step_up = 500, 
         int max_drop = 500, 
-        int max_y_diff = -1
+        int max_y_diff = -1,
+        bool allow_flying_over_precepices = false
     );
     bool get_ground_positions(
         std::vector<glm::vec3> polyline, 
         std::vector<glm::ivec3>& output, 
         int max_step_up = 500, 
         int max_drop = 500, 
-        int max_y_diff = -1
+        int max_y_diff = -1,
+        bool allow_flying_over_precepices = false
     );
     bool get_ground_positions(
         std::vector<NonholonomicPos> polyline, 
         std::vector<glm::ivec3>& output, 
         int max_step_up = 500, 
         int max_drop = 500, 
-        int max_y_diff = -1
+        int max_y_diff = -1,
+        bool allow_flying_over_precepices = false
     );
     std::vector<glm::ivec3> line_intersects_xz(glm::vec3 pos1, glm::vec3 pos2);
 

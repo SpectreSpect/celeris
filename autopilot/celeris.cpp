@@ -123,6 +123,13 @@ void Celeris::update() {
 void Celeris::find_path() {
     m_planner.initialize(m_start_position, m_goal_position);
     m_planner.find_nonholomic_path(); // state_explored_paths
+    {
+        std::lock_guard<std::mutex> lock(m_planner_mutex);    
+        plain_astar_path = m_planner.state().plain_astar_path;
+        nonholonomic_astar_path = m_planner.state().path;
+        explored_paths = m_planner.state().explored_paths;
+        unimpended_path = m_planner.state().unimpended_astar_positions;
+    }
 }
 
 void Celeris::set_start(const NonholonomicPos& position) {
@@ -176,13 +183,6 @@ void Celeris::planner_loop() {
             continue;
         m_replan_requested.exchange(false);
 
-        m_planner.initialize(m_start_position, m_goal_position);
-        m_planner.find_nonholomic_path();
-
-        {
-            std::lock_guard<std::mutex> lock(m_planner_mutex);    
-            plain_astar_path = m_planner.state().plain_astar_path;
-            nonholonomic_astar_path = m_planner.state().path;
-        }
+        find_path();
     }
 }

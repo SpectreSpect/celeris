@@ -55,6 +55,8 @@ public:
 
     PlainAstarData plain_astar_path;
     std::vector<NonholonomicPos> nonholonomic_astar_path;
+    std::vector<LineInstance> explored_paths;
+    std::vector<NonholonomicPos> unimpended_path;
 
 private:
     VulkanEngine* m_engine = nullptr;

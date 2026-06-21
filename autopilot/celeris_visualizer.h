@@ -42,9 +42,11 @@ private:
 
     LineCloud m_path_line_cloud;
     LineCloud m_guide_path_line_cloud;
+    LineCloud m_explored_paths_line_cloud;
+    LineCloud m_unimpended_path_line_cloud;
 
     void set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position);
-    std::vector<LineInstance> make_path_lines(const std::vector<NonholonomicPos>& path);
+    std::vector<LineInstance> make_path_lines(const std::vector<NonholonomicPos>& path, bool override_color = false);
     std::vector<LineInstance> make_path_lines(const std::vector<glm::vec3>& path);
     std::vector<LineInstance> make_path_lines(const std::vector<glm::ivec3>& path);
 };

@@ -11,7 +11,7 @@ float AStar::get_heuristic(glm::ivec3 a, glm::ivec3 b) {
 }
 
 std::vector<glm::ivec3> AStar::get_straight_path(glm::ivec3& start, glm::ivec3& end, std::vector<glm::ivec3>& out_path) {
-    // LOG_METHOD();
+    LOG_METHOD();
 
     glm::ivec3 delta = end - start;
     int steps = std::max({std::abs(delta.x), std::abs(delta.y), std::abs(delta.z)});
@@ -36,7 +36,7 @@ std::vector<glm::ivec3> AStar::get_straight_path(glm::ivec3& start, glm::ivec3& 
 }
 
 bool AStar::try_straight_shot(glm::ivec3& start, glm::ivec3& end, std::vector<glm::ivec3>& out_path) {
-    // LOG_METHOD();
+    LOG_METHOD();
 
     get_straight_path(start, end, out_path);
 
@@ -50,7 +50,7 @@ bool AStar::try_straight_shot(glm::ivec3& start, glm::ivec3& end, std::vector<gl
 }
 
 PlainAstarData AStar::reconstruct_path(std::unordered_map<uint64_t, AStarCell> closed_heap, glm::ivec3 pos) {
-    // LOG_METHOD();
+    LOG_METHOD();
     
     PlainAstarData plain_astar_data;
     glm::ivec3 cur_pos = pos;
@@ -83,7 +83,7 @@ PlainAstarData AStar::reconstruct_path(std::unordered_map<uint64_t, AStarCell> c
 }
 
 PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
-    // LOG_METHOD();
+    LOG_METHOD();
 
     std::priority_queue<AStarCell, std::vector<AStarCell>, ByPriority> pq;
     std::unordered_map<uint64_t, AStarCell> closed_heap;
@@ -143,7 +143,18 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
 
         counter++;
 
-        if (cur_cell.pos == end_pos) {
+        // if (cur_cell.pos == end_pos) {
+        //     return reconstruct_path(closed_heap, cur_cell.pos);
+        // }
+
+        bool reached_goal = false;
+
+        if (m_params.allow_flying_over_precepices)
+            reached_goal = (cur_cell.pos.x == end_pos.x) && (cur_cell.pos.z == end_pos.z);
+        else
+            reached_goal = cur_cell.pos == end_pos;
+
+        if (reached_goal) {
             return reconstruct_path(closed_heap, cur_cell.pos);
         }
             
@@ -171,7 +182,7 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
                         m_params.max_step_up, 
                         m_params.max_drop, 
                         m_params.max_y_diff, 
-                        false, 
+                        m_params.allow_flying_over_precepices, 
                         &status)
                     ) {
                     continue;
@@ -181,7 +192,6 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
                 auto heap_it = closed_heap.find(new_key);
                 if (heap_it != closed_heap.end())
                     continue;
-                
 
                 float new_g = cur_cell.g + glm::distance((glm::vec3)cur_cell.pos, (glm::vec3)new_pos);
 

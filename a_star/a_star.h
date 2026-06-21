@@ -22,7 +22,7 @@ public:
         int max_step_up = 2;
         int max_drop = 6;
         int max_y_diff = 1;
-        int iteration_limit = 20000;
+        int iteration_limit = 50000;
         bool allow_diagonal_moves = false;
         bool allow_flying_over_precepices = true;
         bool use_straight_fallback = true;
