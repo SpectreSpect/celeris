@@ -1637,6 +1637,7 @@ void VoxelGrid::voxelize_point_cloud(VulkanCommandBuffer& command_buffer, Vulkan
 void VoxelGrid::voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud, 
                                      VulkanBuffer& voxel_writes, uint32_t max_write_count) {
     LOG_METHOD();
+    std::lock_guard lock(m_compute_mutex);
     {
         auto scope = m_command_buffer.begin_scope();
         voxelize_point_cloud(m_command_buffer, engine, point_cloud, voxel_writes, max_write_count);
