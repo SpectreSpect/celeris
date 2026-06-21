@@ -5,6 +5,10 @@
 
 OccupancyGrid3D::OccupancyGrid3D(VoxelGrid& voxel_grid) : m_voxel_grid(&voxel_grid) {}
 
+void OccupancyGrid3D::clear_cache() {
+    m_chunk_cache.clear();
+}
+
 glm::ivec3 OccupancyGrid3D::floor_pos(const glm::vec3& p) {
     // LOG_NAMED("OccupancyGrid3D");
     return glm::ivec3((int)std::floor(p.x), (int)std::floor(p.y), (int)std::floor(p.z));

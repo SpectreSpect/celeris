@@ -12,6 +12,8 @@ public:
 
     OccupancyGrid3D(VoxelGrid& voxel_grid);
 
+    void clear_cache();
+
     static glm::ivec3 floor_pos(const glm::vec3& p);
     static std::vector<glm::ivec3> line_intersects(glm::vec3 pos1, glm::vec3 pos2);
     bool is_solid(glm::ivec3 pos);

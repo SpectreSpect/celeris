@@ -262,6 +262,8 @@ float NonholonomicAStar::get_nonholonomic_f(NonholonomicPos& new_pos, Nonholonom
 void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos end_pos) {
     LOG_METHOD();
 
+    m_grid->clear_cache();
+
     m_state = NonholonomicAStarState();
     
     m_state.start_pos = start_pos;
