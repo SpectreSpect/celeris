@@ -550,6 +550,12 @@ int main() {
                 ImGui::SameLine();
                 ImGui::TextColored(ImVec4(0.0f, 0.35f, 1.0f, 1.0f), "z: %.2f", camera.position.z);
 
+                // if (footprint_result)
+                //     ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Footprint succeeded");
+                // else
+                //     ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Footprint failed");
+                
+
                 if (ImGui::Button("Next frame")) {
                     // next_frame();
                 }

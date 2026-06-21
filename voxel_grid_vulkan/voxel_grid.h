@@ -161,6 +161,8 @@ public:
 
         VulkanBuffer build_indirect_cmds_uniform;
         VulkanBuffer read_chunk_output;
+        VulkanBuffer check_footprint_result;
+        VulkanBuffer read_and_inflate_chunk_output;
 
         VulkanBuffer debug_counter;
     };
@@ -200,6 +202,8 @@ public:
     void set_voxels(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src);
     void set_render_distance(float value);
     VoxelGridChunk read_chunk(glm::ivec3 chunk_pos);
+    bool check_footprint(glm::vec3 origin, glm::vec3 offsets, uint32_t max_step_up);
+    std::vector<VoxelGridChunk> read_and_inflate_chunk(glm::ivec3 chunk_pos, uint32_t inflation_size);
     glm::ivec3 chunk_pos_from_voxel_pos(glm::ivec3 voxel_pos);
     glm::ivec3 pos_in_chunk_from_global_voxel_pos(glm::ivec3 voxel_pos);
     glm::ivec3 pos_in_chunk_from_global_voxel_pos(glm::ivec3 chunk_pos, glm::ivec3 voxel_pos);
@@ -236,6 +240,8 @@ public:
         PassInstance clear_chunk_hash_table_pi;
         PassInstance fill_chunk_hash_table_pi;
         PassInstance read_voxel_grid_chunk_pi;
+        PassInstance check_footprint_pi;
+        PassInstance read_and_inflate_voxel_grid_chunk_pi;
         
         PassInstance voxel_writes_from_point_cloud_pi;
     };

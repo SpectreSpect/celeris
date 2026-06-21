@@ -19,7 +19,7 @@ public:
     _XCLASS_NAME(AStar);
 
     struct AStarParams {
-        int max_step_up = 2;
+        int max_step_up = 1;
         int max_drop = 6;
         int max_y_diff = 1;
         int iteration_limit = 50000;

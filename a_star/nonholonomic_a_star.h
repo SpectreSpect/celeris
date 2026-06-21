@@ -37,7 +37,7 @@ public:
         bool allow_flying_over_precipices = true;
         int iteration_limit = 20000;
         bool track_explored_paths = true;
-        int max_step_up = 2;
+        int max_step_up = 1;
         int max_drop = 6;
         int max_y_diff = 1;
         float max_goal_position_error = 0.7f;

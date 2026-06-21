@@ -17,6 +17,7 @@ public:
     static glm::ivec3 floor_pos(const glm::vec3& p);
     static std::vector<glm::ivec3> line_intersects(glm::vec3 pos1, glm::vec3 pos2);
     bool is_solid(glm::ivec3 pos);
+    bool check_footprint(glm::ivec3 origin, glm::ivec3 offsets, uint32_t max_step_up);
     bool adjust_to_ground(
         std::vector<glm::vec3>& output, 
         int max_step_up = 500, 
@@ -106,4 +107,5 @@ public:
 private:
     VoxelGrid* m_voxel_grid = nullptr;
     std::unordered_map<uint64_t, VoxelGridChunk> m_chunk_cache;
+    std::unordered_map<uint64_t, bool> m_is_chunk_read;
 };
