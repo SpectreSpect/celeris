@@ -23,7 +23,7 @@ VulkanResourceLoader::VulkanResourceLoader(
 {
     LOG_METHOD();
 
-    logger.check(m_queue->handle() != VK_NULL_HANDLE, "Queue is not initialized");
+    logger().check(m_queue->handle() != VK_NULL_HANDLE, "Queue is not initialized");
 }
 
 VulkanResourceLoader::VulkanResourceLoader(VulkanEngine& engine, VkDeviceSize size_bytes)
@@ -44,10 +44,10 @@ void VulkanResourceLoader::upload(
 {
     LOG_METHOD();
 
-    logger.check(src_data != nullptr, "Pointer to the source data is null");
-    logger.check(size_bytes != 0, "Attempt to load data of zero size");
+    logger().check(src_data != nullptr, "Pointer to the source data is null");
+    logger().check(size_bytes != 0, "Attempt to load data of zero size");
 
-    logger.check(size_bytes <= m_staging_buffer.size())
+    logger().check(size_bytes <= m_staging_buffer.size())
         << "There is not enough space in the resource loader to load this much data "
         << "(" << clr("size_bytes", LoggerPalette::blue) << " = "
         << clr(std::to_string(size_bytes), LoggerPalette::orange)
@@ -55,20 +55,20 @@ void VulkanResourceLoader::upload(
         << clr(std::to_string(m_staging_buffer.size()), LoggerPalette::orange)
         << ")\n";
 
-    logger.check(dst_stage != 0, "Destination pipeline stage must not be zero");
-    logger.check(dst_access != 0, "Destination access mask must not be zero");
+    logger().check(dst_stage != 0, "Destination pipeline stage must not be zero");
+    logger().check(dst_access != 0, "Destination access mask must not be zero");
 
-    logger.check(dst_buffer.handle() != VK_NULL_HANDLE, "Destination buffer is not initialized");
+    logger().check(dst_buffer.handle() != VK_NULL_HANDLE, "Destination buffer is not initialized");
 
-    logger.check(
+    logger().check(
         dst_buffer.has_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT),
         "Destination buffer must be created with VK_BUFFER_USAGE_TRANSFER_DST_BIT"
     );
 
-    logger.check(m_staging_buffer.handle() != VK_NULL_HANDLE, "Staging buffer is not initialized");
+    logger().check(m_staging_buffer.handle() != VK_NULL_HANDLE, "Staging buffer is not initialized");
 
-    logger.check(dst_offset <= dst_buffer.size(), "Destination offset is out of bounds");
-    logger.check(size_bytes <= dst_buffer.size() - dst_offset, "Destination upload range is out of bounds");
+    logger().check(dst_offset <= dst_buffer.size(), "Destination offset is out of bounds");
+    logger().check(size_bytes <= dst_buffer.size() - dst_offset, "Destination upload range is out of bounds");
 
     if (size_bytes > m_staging_buffer.size() - m_loaded_data_size) {
         submit();
@@ -112,11 +112,11 @@ void VulkanResourceLoader::upload(
 {
     LOG_METHOD();
 
-    logger.check(src_data != nullptr, "Pointer to the source image data is null");
-    logger.check(src_data_extent.width != 0, "Source image width is zero");
-    logger.check(src_data_extent.height != 0, "Source image height is zero");
-    logger.check(src_data_extent.depth != 0, "Source image depth is zero");
-    logger.check(src_count_array_layers != 0, "Source array layer count is zero");
+    logger().check(src_data != nullptr, "Pointer to the source image data is null");
+    logger().check(src_data_extent.width != 0, "Source image width is zero");
+    logger().check(src_data_extent.height != 0, "Source image height is zero");
+    logger().check(src_data_extent.depth != 0, "Source image depth is zero");
+    logger().check(src_count_array_layers != 0, "Source array layer count is zero");
 
     VkDeviceSize src_size_bytes = Utils::image_size_bytes(
         src_data_extent,
@@ -125,7 +125,7 @@ void VulkanResourceLoader::upload(
         src_count_array_layers
     );
 
-    logger.check(src_size_bytes <= m_staging_buffer.size())
+    logger().check(src_size_bytes <= m_staging_buffer.size())
         << "There is not enough space in the resource loader to upload this image "
         << "(" << clr("src_size_bytes", LoggerPalette::blue) << " = "
         << clr(std::to_string(src_size_bytes), LoggerPalette::orange)
@@ -133,19 +133,19 @@ void VulkanResourceLoader::upload(
         << clr(std::to_string(m_staging_buffer.size()), LoggerPalette::orange)
         << ")\n";
 
-    logger.check(dst_mip_level < dst_image.mip_levels(), "Destination mip level is out of range");
-    logger.check(dst_base_array_layer < dst_image.array_layers(), "Destination base array layer is out of range");
-    logger.check(src_count_array_layers <= dst_image.array_layers() - dst_base_array_layer, "Destination array layer range is out of bounds");
+    logger().check(dst_mip_level < dst_image.mip_levels(), "Destination mip level is out of range");
+    logger().check(dst_base_array_layer < dst_image.array_layers(), "Destination base array layer is out of range");
+    logger().check(src_count_array_layers <= dst_image.array_layers() - dst_base_array_layer, "Destination array layer range is out of bounds");
 
-    logger.check(dst_old_stage != 0, "Destination old pipeline stage must not be zero");
-    logger.check(dst_finish_stage != 0, "Destination finish pipeline stage must not be zero");
-    logger.check(dst_finish_access != 0, "Destination finish access mask must not be zero");
-    logger.check(dst_finish_layout != VK_IMAGE_LAYOUT_UNDEFINED, "Destination finish image layout must not be UNDEFINED");
-    logger.check(dst_aspect_mask != 0, "Destination image aspect mask must not be zero");
+    logger().check(dst_old_stage != 0, "Destination old pipeline stage must not be zero");
+    logger().check(dst_finish_stage != 0, "Destination finish pipeline stage must not be zero");
+    logger().check(dst_finish_access != 0, "Destination finish access mask must not be zero");
+    logger().check(dst_finish_layout != VK_IMAGE_LAYOUT_UNDEFINED, "Destination finish image layout must not be UNDEFINED");
+    logger().check(dst_aspect_mask != 0, "Destination image aspect mask must not be zero");
 
-    logger.check(dst_image.handle() != VK_NULL_HANDLE, "Destination image is not initialized");
+    logger().check(dst_image.handle() != VK_NULL_HANDLE, "Destination image is not initialized");
 
-    logger.check(
+    logger().check(
         dst_image.has_usage(VK_IMAGE_USAGE_TRANSFER_DST_BIT),
         "Destination image must be created with VK_IMAGE_USAGE_TRANSFER_DST_BIT"
     );
@@ -223,32 +223,32 @@ void VulkanResourceLoader::upload_sampled_texture_2d(
 {
     LOG_METHOD();
 
-    logger.check(texture.image().handle() != VK_NULL_HANDLE, "Texture image is not initialized");
+    logger().check(texture.image().handle() != VK_NULL_HANDLE, "Texture image is not initialized");
 
-    logger.check(cpu_image.format() == texture.format())
+    logger().check(cpu_image.format() == texture.format())
         << "CpuImage format does not match texture format\n";
 
-    logger.check(
+    logger().check(
         cpu_image.extent().width == texture.extent().width &&
         cpu_image.extent().height == texture.extent().height &&
         cpu_image.extent().depth == texture.extent().depth
     ) << "CpuImage extent does not match texture extent\n";
 
     VkExtent3D cpu_image_extent = cpu_image.extent();
-    logger.check(cpu_image_extent.width != 0 && cpu_image_extent.height != 0 && cpu_image_extent.depth != 0)
+    logger().check(cpu_image_extent.width != 0 && cpu_image_extent.height != 0 && cpu_image_extent.depth != 0)
         << "Incorrect" << clr("cpu_image", LoggerPalette::orange) << "extent "
         << "(" << clr(std::to_string(cpu_image_extent.width), LoggerPalette::blue) << ", "
         << clr(std::to_string(cpu_image_extent.height), LoggerPalette::blue) << ", "
         << clr(std::to_string(cpu_image_extent.depth), LoggerPalette::blue) << ")\n";
 
-    logger.check(cpu_image.format() != VK_FORMAT_UNDEFINED)
+    logger().check(cpu_image.format() != VK_FORMAT_UNDEFINED)
         << clr("Cpu image", LoggerPalette::orange) << "format is undefined\n";
 
-    logger.check(shader_stage != 0, "Shader stage must not be zero");
+    logger().check(shader_stage != 0, "Shader stage must not be zero");
 
     bool should_generate_mipmaps = generate_mipmaps && texture.mip_levels() > 1;
 
-    logger.check(should_generate_mipmaps || texture.mip_levels() == 1)
+    logger().check(should_generate_mipmaps || texture.mip_levels() == 1)
         << "Texture has more than one mip level, but mipmap generation is disabled\n";
 
     VkImageLayout old_layout = texture.layout();
@@ -319,13 +319,13 @@ void VulkanResourceLoader::upload_sampled_cubemap(
 {
     LOG_METHOD();
 
-    logger.check(cubemap.image().handle() != VK_NULL_HANDLE, "Cubemap image is not initialized");
-    logger.check(cubemap.array_layers() == Cubemap::face_count, "Cubemap must have 6 array layers");
-    logger.check(shader_stage != 0, "Shader stage must not be zero");
+    logger().check(cubemap.image().handle() != VK_NULL_HANDLE, "Cubemap image is not initialized");
+    logger().check(cubemap.array_layers() == Cubemap::face_count, "Cubemap must have 6 array layers");
+    logger().check(shader_stage != 0, "Shader stage must not be zero");
 
     bool should_generate_mipmaps = generate_mipmaps && cubemap.mip_levels() > 1;
 
-    logger.check(should_generate_mipmaps || cubemap.mip_levels() == 1)
+    logger().check(should_generate_mipmaps || cubemap.mip_levels() == 1)
         << "Cubemap has more than one mip level, but mipmap generation is disabled\n";
 
     VkImageLayout old_layout = cubemap.layout();
@@ -347,12 +347,12 @@ void VulkanResourceLoader::upload_sampled_cubemap(
     for (uint32_t face = 0; face < Cubemap::face_count; face++) {
         const CpuImage& cpu_image = face_images[face];
 
-        logger.check(cpu_image.format() == cubemap.format())
+        logger().check(cpu_image.format() == cubemap.format())
             << "CpuImage format does not match cubemap format for face "
             << clr(std::to_string(face), LoggerPalette::blue)
             << "\n";
 
-        logger.check(
+        logger().check(
             cpu_image.extent().width == cubemap.extent().width &&
             cpu_image.extent().height == cubemap.extent().height &&
             cpu_image.extent().depth == cubemap.extent().depth
@@ -360,7 +360,7 @@ void VulkanResourceLoader::upload_sampled_cubemap(
           << clr(std::to_string(face), LoggerPalette::blue)
           << "\n";
 
-        logger.check(cpu_image.format() != VK_FORMAT_UNDEFINED)
+        logger().check(cpu_image.format() != VK_FORMAT_UNDEFINED)
             << "CpuImage format is undefined for cubemap face "
             << clr(std::to_string(face), LoggerPalette::blue)
             << "\n";
@@ -418,7 +418,7 @@ void VulkanResourceLoader::upload_vertex_buffer(
 {
     LOG_METHOD();
 
-    logger.check(dst_buffer.has_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT), "Destinition buffer must be a vertex buffer");
+    logger().check(dst_buffer.has_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT), "Destinition buffer must be a vertex buffer");
 
     upload(
         src_data,
@@ -438,7 +438,7 @@ void VulkanResourceLoader::upload_index_buffer(
 {
     LOG_METHOD();
 
-    logger.check(dst_buffer.has_usage(VK_BUFFER_USAGE_INDEX_BUFFER_BIT), "Destinition buffer must be a index buffer");
+    logger().check(dst_buffer.has_usage(VK_BUFFER_USAGE_INDEX_BUFFER_BIT), "Destinition buffer must be a index buffer");
 
     upload(
         src_data,
@@ -460,7 +460,7 @@ void VulkanResourceLoader::upload_storage_buffer(
 {
     LOG_METHOD();
 
-    logger.check(dst_buffer.has_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), "Destination buffer must be a storage buffer");
+    logger().check(dst_buffer.has_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), "Destination buffer must be a storage buffer");
 
     upload(
         src_data,
@@ -500,11 +500,11 @@ void VulkanResourceLoader::submit() {
         return;
     }
 
-    logger.check(m_staging_buffer.handle() != VK_NULL_HANDLE, "Staging buffer is not initialized");
-    logger.check(m_command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initizlied");
-    logger.check(m_queue != nullptr, "Queue pointer specify to null");
-    logger.check(m_queue->handle() != VK_NULL_HANDLE, "Queue is not initialized");
-    logger.check(m_fence.handle() != VK_NULL_HANDLE, "Fence is not initialized");
+    logger().check(m_staging_buffer.handle() != VK_NULL_HANDLE, "Staging buffer is not initialized");
+    logger().check(m_command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initizlied");
+    logger().check(m_queue != nullptr, "Queue pointer specify to null");
+    logger().check(m_queue->handle() != VK_NULL_HANDLE, "Queue is not initialized");
+    logger().check(m_fence.handle() != VK_NULL_HANDLE, "Fence is not initialized");
 
     m_fence.reset();
     m_command_buffer.reset();
@@ -513,8 +513,8 @@ void VulkanResourceLoader::submit() {
         auto upload_scope = m_command_buffer.begin_scope();
 
         for (const BufferUploadRequest& request : m_buffer_upload_requests) {
-            logger.check(request.dst_buffer != nullptr, "Destination buffer pointer is null");
-            logger.check(request.dst_buffer->handle() != VK_NULL_HANDLE, "Destination buffer is not initialized or was destroyed");
+            logger().check(request.dst_buffer != nullptr, "Destination buffer pointer is null");
+            logger().check(request.dst_buffer->handle() != VK_NULL_HANDLE, "Destination buffer is not initialized or was destroyed");
 
             m_staging_buffer.copy_to(
                 m_command_buffer,
@@ -536,8 +536,8 @@ void VulkanResourceLoader::submit() {
         }
 
         for (const ImageUploadRequest& request : m_image_upload_requests) {
-            logger.check(request.dst_image != nullptr, "Destination image pointer is null");
-            logger.check(request.dst_image->handle() != VK_NULL_HANDLE, "Destination image is not initialized or was destroyed");
+            logger().check(request.dst_image != nullptr, "Destination image pointer is null");
+            logger().check(request.dst_image->handle() != VK_NULL_HANDLE, "Destination image is not initialized or was destroyed");
 
             request.dst_image->memory_barrier(
                 m_command_buffer,
@@ -583,7 +583,7 @@ void VulkanResourceLoader::submit() {
         }
 
         for (const MipmapGenerationRequest& request : m_mipmap_generation_requests) {
-            logger.check(request.image != nullptr, "Mipmap generation image pointer is null");
+            logger().check(request.image != nullptr, "Mipmap generation image pointer is null");
 
             record_generate_mipmaps(
                 m_command_buffer,
@@ -605,12 +605,12 @@ void VulkanResourceLoader::submit() {
     m_fence.wait();
 
     for (const TextureLayoutUpdate& request : m_texture_layout_updates) {
-        logger.check(request.texture != nullptr, "Pointer to texture specify to null");
+        logger().check(request.texture != nullptr, "Pointer to texture specify to null");
         request.texture->set_layout(request.final_layout);
     }
 
     for (const CubemapLayoutUpdate& request : m_cubemap_layout_updates) {
-        logger.check(request.cubemap != nullptr, "Pointer to cubemap specify to null");
+        logger().check(request.cubemap != nullptr, "Pointer to cubemap specify to null");
         request.cubemap->set_layout(request.final_layout);
     }
 
@@ -672,31 +672,31 @@ void VulkanResourceLoader::record_generate_mipmaps(
 {
     LOG_NAMED("VulkanResourceLoader");
 
-    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
-    logger.check(image.handle() != VK_NULL_HANDLE, "Image is not initialized");
+    logger().check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+    logger().check(image.handle() != VK_NULL_HANDLE, "Image is not initialized");
 
-    logger.check(aspect_mask != 0, "Image aspect mask is zero");
-    logger.check(layer_count != 0, "Layer count is zero");
-    logger.check(base_array_layer < image.array_layers(), "Base array layer is out of range");
-    logger.check(layer_count <= image.array_layers() - base_array_layer, "Array layer range is out of bounds");
+    logger().check(aspect_mask != 0, "Image aspect mask is zero");
+    logger().check(layer_count != 0, "Layer count is zero");
+    logger().check(base_array_layer < image.array_layers(), "Base array layer is out of range");
+    logger().check(layer_count <= image.array_layers() - base_array_layer, "Array layer range is out of bounds");
 
-    logger.check(image.mip_levels() != 0, "Image mip levels count is zero");
-    logger.check(final_layout != VK_IMAGE_LAYOUT_UNDEFINED, "Final image layout must not be UNDEFINED");
-    logger.check(final_stage != 0, "Final stage must not be zero");
-    logger.check(final_access != 0, "Final access must not be zero");
+    logger().check(image.mip_levels() != 0, "Image mip levels count is zero");
+    logger().check(final_layout != VK_IMAGE_LAYOUT_UNDEFINED, "Final image layout must not be UNDEFINED");
+    logger().check(final_stage != 0, "Final stage must not be zero");
+    logger().check(final_access != 0, "Final access must not be zero");
 
-    logger.check(
+    logger().check(
         image.has_usage(VK_IMAGE_USAGE_TRANSFER_SRC_BIT),
         "Image must be created with VK_IMAGE_USAGE_TRANSFER_SRC_BIT to generate mipmaps"
     );
 
-    logger.check(
+    logger().check(
         image.has_usage(VK_IMAGE_USAGE_TRANSFER_DST_BIT),
         "Image must be created with VK_IMAGE_USAGE_TRANSFER_DST_BIT to generate mipmaps"
     );
 
-    logger.check(image.extent().width != 0, "Image width is zero");
-    logger.check(image.extent().height != 0, "Image height is zero");
+    logger().check(image.extent().width != 0, "Image width is zero");
+    logger().check(image.extent().height != 0, "Image height is zero");
 
     if (image.mip_levels() == 1) {
         image.memory_barrier(

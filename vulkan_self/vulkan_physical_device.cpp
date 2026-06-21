@@ -14,7 +14,7 @@ VulkanPhysicalDevice::VulkanPhysicalDevice(
     uint32_t device_count = 0;
     vkEnumeratePhysicalDevices(instance.handle(), &device_count, nullptr);
 
-    logger.check(device_count > 0, "Failed to find GPUs with Vulkan support");
+    logger().check(device_count > 0, "Failed to find GPUs with Vulkan support");
 
     std::vector<VkPhysicalDevice> devices(device_count);
     vkEnumeratePhysicalDevices(instance.handle(), &device_count, devices.data());
@@ -29,7 +29,7 @@ VulkanPhysicalDevice::VulkanPhysicalDevice(
         }
     }
 
-    logger.check(
+    logger().check(
         m_physical_device != VK_NULL_HANDLE,
         "Failed to find a suitable GPU"
     );
@@ -66,7 +66,7 @@ bool VulkanPhysicalDevice::find_queue_families(
 {
     LOG_METHOD();
 
-    logger.check(queue_allocation != nullptr, "QueueAllocation pointer is null");
+    logger().check(queue_allocation != nullptr, "QueueAllocation pointer is null");
 
     *queue_allocation = QueueAllocation{};
 

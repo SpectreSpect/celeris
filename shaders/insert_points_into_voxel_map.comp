@@ -255,8 +255,13 @@ bool voxel_insert_point_and_normal(
     uint idx = hash_voxel_key(key) % slot_count;
 
     uint probes = 0u;
+    uint attempt_count = 0u;
 
     while (probes < max_probes) {
+        if (attempt_count > 5u)
+            break;
+
+
         uint state = atomicAdd(voxel_table.slots[idx].state, 0u);
 
         if (state == VOXEL_SLOT_OCCUPIED) {
@@ -292,6 +297,7 @@ bool voxel_insert_point_and_normal(
 
                 // Somebody else locked it before us.
                 // Retry the same slot, do not move to the next one.
+                attempt_count++;
                 continue;
             }
 
@@ -348,6 +354,7 @@ bool voxel_insert_point_and_normal(
 
             // Someone changed this slot.
             // Retry the same slot.
+            attempt_count++;
             continue;
         }
 
@@ -366,6 +373,7 @@ bool voxel_insert_point_and_normal(
             // Important:
             // Do NOT move to the next slot here.
             // The slot may now contain exactly our key.
+            attempt_count++;
             continue;
         }
 

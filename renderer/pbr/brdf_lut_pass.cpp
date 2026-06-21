@@ -17,8 +17,8 @@ BrdfLutPass::BrdfLutPass(VulkanEngine& engine, ComputePassManager& compute_pass_
 VulkanTexture2D BrdfLutPass::generate(uint32_t width, uint32_t height) {
     LOG_METHOD();
 
-    logger.check(width != 0, "Width must be greater than 0");
-    logger.check(height != 0, "Height must be greater than 0");
+    logger().check(width != 0, "Width must be greater than 0");
+    logger().check(height != 0, "Height must be greater than 0");
 
     // uint32_t mip_levels = Cubemap::calculate_mip_levels({face_size, face_size});
 
@@ -95,16 +95,16 @@ VulkanTexture2D BrdfLutPass::generate(uint32_t width, uint32_t height) {
 // {
 //     LOG_METHOD();
 
-//     logger.check(cubemap.image().handle() != VK_NULL_HANDLE, "Cubemap image is not initialized");
-//     logger.check(cubemap.mip_levels() != 0, "Cubemap mip levels count is zero");
-//     logger.check(cubemap.array_layers() == Cubemap::face_count, "Cubemap must have 6 faces");
+//     logger().check(cubemap.image().handle() != VK_NULL_HANDLE, "Cubemap image is not initialized");
+//     logger().check(cubemap.mip_levels() != 0, "Cubemap mip levels count is zero");
+//     logger().check(cubemap.array_layers() == Cubemap::face_count, "Cubemap must have 6 faces");
 
-//     logger.check(
+//     logger().check(
 //         cubemap.image().has_usage(VK_IMAGE_USAGE_TRANSFER_SRC_BIT),
 //         "Cubemap image must have VK_IMAGE_USAGE_TRANSFER_SRC_BIT for mip generation"
 //     );
 
-//     logger.check(
+//     logger().check(
 //         cubemap.image().has_usage(VK_IMAGE_USAGE_TRANSFER_DST_BIT),
 //         "Cubemap image must have VK_IMAGE_USAGE_TRANSFER_DST_BIT for mip generation"
 //     );

@@ -4,7 +4,7 @@ Window::Window(const GlfwContext&, uint32_t width, uint32_t height, std::string_
     :   m_width(width), m_height(height), m_title(title) {
     LOG_METHOD();
 
-    logger.log() << "GLFW version: " << clr(glfwGetVersionString(), "#ffaa2c") << "\n";
+    logger().log() << "GLFW version: " << clr(glfwGetVersionString(), "#ffaa2c") << "\n";
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
@@ -22,7 +22,7 @@ Window::Window(const GlfwContext&, uint32_t width, uint32_t height, std::string_
     glfwSetCursorPosCallback(m_window, mouse_callback);
     glfwSetMouseButtonCallback(m_window, mouse_button_callback);
 
-    logger.check(m_window, "Failed to create GLFW window");
+    logger().check(m_window, "Failed to create GLFW window");
 }
 
 Window::~Window() noexcept {

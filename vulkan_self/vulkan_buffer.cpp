@@ -17,9 +17,9 @@ VulkanBuffer::VulkanBuffer(
 {
     LOG_METHOD();
 
-    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(size_bytes != 0, "Attempt to create a buffer with zero size");
+    logger().check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(size_bytes != 0, "Attempt to create a buffer with zero size");
 
     realloc(physical_device, device, size_bytes, usage, memory_properties);
 }
@@ -103,9 +103,9 @@ void VulkanBuffer::realloc(
     m_size = size_bytes;
     m_usage = usage;
 
-    logger.check(m_physical_device != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(size_bytes != 0, "Attempt to create a buffer with zero size");
+    logger().check(m_physical_device != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(size_bytes != 0, "Attempt to create a buffer with zero size");
 
     VkBufferCreateInfo buffer_info{};
     buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -120,7 +120,7 @@ void VulkanBuffer::realloc(
         &m_buffer
     );
 
-    logger.check(result == VK_SUCCESS, "Failed to create buffer");
+    logger().check(result == VK_SUCCESS, "Failed to create buffer");
 
     try {
         VkMemoryRequirements memory_requirements{};
@@ -173,9 +173,9 @@ void VulkanBuffer::realloc(
 void VulkanBuffer::ensure_capacity(VkDeviceSize size_bytes) {
     LOG_METHOD();
 
-    logger.check(m_physical_device != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(m_memory.has_value(), "Buffer memory is not initialized");
+    logger().check(m_physical_device != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(m_memory.has_value(), "Buffer memory is not initialized");
 
     if (m_size < size_bytes) {
         realloc(m_physical_device, m_device, size_bytes, m_usage, m_memory->properties());
@@ -185,9 +185,9 @@ void VulkanBuffer::ensure_capacity(VkDeviceSize size_bytes) {
 void VulkanBuffer::fill(VulkanCommandBuffer& command_buffer, uint32_t data) {
     LOG_METHOD();
 
-    logger.check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
-    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
-    logger.check(has_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT),
+    logger().check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
+    logger().check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+    logger().check(has_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT),
                  "Buffer must have VK_BUFFER_USAGE_TRANSFER_DST_BIT for vkCmdFillBuffer");
 
     vkCmdFillBuffer(command_buffer.handle(), m_buffer, 0, m_size, data);
@@ -196,18 +196,18 @@ void VulkanBuffer::fill(VulkanCommandBuffer& command_buffer, uint32_t data) {
 void VulkanBuffer::fill(VulkanCommandBuffer& command_buffer, uint32_t data, VkDeviceSize size_bytes, VkDeviceSize offset) {
     LOG_METHOD();
 
-    logger.check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
-    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+    logger().check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
+    logger().check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
 
-    logger.check(has_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT),
+    logger().check(has_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT),
                 "Buffer must have VK_BUFFER_USAGE_TRANSFER_DST_BIT for vkCmdFillBuffer");
 
-    logger.check(size_bytes > 0, "Size bytes should be greater than 0");
-    logger.check(offset <= m_size, "Offset was out of bounds");
-    logger.check(size_bytes <= m_size - offset, "Fill range was out of bounds");
+    logger().check(size_bytes > 0, "Size bytes should be greater than 0");
+    logger().check(offset <= m_size, "Offset was out of bounds");
+    logger().check(size_bytes <= m_size - offset, "Fill range was out of bounds");
 
-    logger.check((offset & 3ull) == 0, "vkCmdFillBuffer offset must be 4-byte aligned");
-    logger.check((size_bytes & 3ull) == 0, "vkCmdFillBuffer size must be 4-byte aligned");
+    logger().check((offset & 3ull) == 0, "vkCmdFillBuffer offset must be 4-byte aligned");
+    logger().check((size_bytes & 3ull) == 0, "vkCmdFillBuffer size must be 4-byte aligned");
 
     vkCmdFillBuffer(command_buffer.handle(), m_buffer, offset, size_bytes, data);
 }
@@ -227,13 +227,13 @@ VulkanBuffer& VulkanBuffer::fill(
         return *this;
     }
 
-    logger.check(prefab != nullptr, "prifab must not be nullptr");
-    logger.check(prifab_size_bytes != 0, "prifab_size_bytes must not be 0");
-    logger.check(prifab_size_bytes <= PREFAB_MAX_UINTS * static_cast<uint32_t>(sizeof(uint32_t)), "The maximum size of the prefab has been exceeded");
-    logger.check(invocation_stride != 0u, "invocation_stride must not be 0");
-    logger.check(fillable_area_offset <= m_size, "Fillable area offset is out of bounds");
-    logger.check(fillable_area_size_bytes <= m_size - fillable_area_offset, "Fill area exceeded the buffer size");
-    logger.check(has_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), "Destination buffer must have VK_BUFFER_USAGE_STORAGE_BUFFER_BIT");
+    logger().check(prefab != nullptr, "prifab must not be nullptr");
+    logger().check(prifab_size_bytes != 0, "prifab_size_bytes must not be 0");
+    logger().check(prifab_size_bytes <= PREFAB_MAX_UINTS * static_cast<uint32_t>(sizeof(uint32_t)), "The maximum size of the prefab has been exceeded");
+    logger().check(invocation_stride != 0u, "invocation_stride must not be 0");
+    logger().check(fillable_area_offset <= m_size, "Fillable area offset is out of bounds");
+    logger().check(fillable_area_size_bytes <= m_size - fillable_area_offset, "Fill area exceeded the buffer size");
+    logger().check(has_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), "Destination buffer must have VK_BUFFER_USAGE_STORAGE_BUFFER_BIT");
 
     const uint32_t total_count_invocations = math_utils::div_up_u32(fillable_area_size_bytes, invocation_stride);
 
@@ -308,12 +308,12 @@ VulkanBuffer&& VulkanBuffer::fill(
 void VulkanBuffer::upload(const void* data, VkDeviceSize size_bytes, VkDeviceSize offset_bytes) {
     LOG_METHOD();
 
-    logger.check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
-    logger.check(m_memory.has_value(), "Buffer memory is not initialized");
-    logger.check(data != nullptr, "Attempt to upload data from nullptr");
-    logger.check(size_bytes != 0, "Attempt to upload zero bytes");
-    logger.check(offset_bytes <= m_size, "Upload offset is out of bounds");
-    logger.check(size_bytes <= m_size - offset_bytes, "Upload range is out of bounds");
+    logger().check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
+    logger().check(m_memory.has_value(), "Buffer memory is not initialized");
+    logger().check(data != nullptr, "Attempt to upload data from nullptr");
+    logger().check(size_bytes != 0, "Attempt to upload zero bytes");
+    logger().check(offset_bytes <= m_size, "Upload offset is out of bounds");
+    logger().check(size_bytes <= m_size - offset_bytes, "Upload range is out of bounds");
 
     m_memory->upload(data, size_bytes, offset_bytes);
 }
@@ -323,12 +323,12 @@ void VulkanBuffer::read(void* data, VkDeviceSize size_bytes, VkDeviceSize offset
 
     if (size_bytes == 0) return;
 
-    logger.check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
-    logger.check(m_memory.has_value(), "Buffer memory is not initialized");
-    logger.check(data != nullptr, "Attempt to read data into nullptr");
-    // logger.check(size_bytes != 0, "Attempt to read zero bytes");
-    logger.check(offset_bytes <= size(), "Read offset is out of bounds");
-    logger.check(size_bytes <= size() - offset_bytes, "Read range is out of bounds");
+    logger().check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
+    logger().check(m_memory.has_value(), "Buffer memory is not initialized");
+    logger().check(data != nullptr, "Attempt to read data into nullptr");
+    // logger().check(size_bytes != 0, "Attempt to read zero bytes");
+    logger().check(offset_bytes <= size(), "Read offset is out of bounds");
+    logger().check(size_bytes <= size() - offset_bytes, "Read range is out of bounds");
 
     m_memory->read(data, size_bytes, offset_bytes);
 }
@@ -352,17 +352,17 @@ void VulkanBuffer::memory_barrier(
 {
     LOG_METHOD();
 
-    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
-    logger.check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
+    logger().check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+    logger().check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
 
-    logger.check(src_stage != 0, "Source pipeline stage mask is empty");
-    logger.check(dst_stage != 0, "Destination pipeline stage mask is empty");
+    logger().check(src_stage != 0, "Source pipeline stage mask is empty");
+    logger().check(dst_stage != 0, "Destination pipeline stage mask is empty");
 
-    logger.check(offset_bytes <= size(), "Barrier offset is out of bounds");
+    logger().check(offset_bytes <= size(), "Barrier offset is out of bounds");
 
     if (size_bytes != VK_WHOLE_SIZE) {
-        logger.check(size_bytes != 0, "Attempt to create barrier for zero bytes");
-        logger.check(size_bytes <= size() - offset_bytes, "Barrier range is out of bounds");
+        logger().check(size_bytes != 0, "Attempt to create barrier for zero bytes");
+        logger().check(size_bytes <= size() - offset_bytes, "Barrier range is out of bounds");
     }
 
     VkBufferMemoryBarrier barrier{};
@@ -406,12 +406,12 @@ void VulkanBuffer::transfer_write_to_vertex_read_barrier(
 {
     LOG_METHOD();
 
-    logger.check(
+    logger().check(
         has_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT),
         "Buffer was not created with VK_BUFFER_USAGE_TRANSFER_DST_BIT"
     );
 
-    logger.check(
+    logger().check(
         has_usage(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT),
         "Buffer was not created with VK_BUFFER_USAGE_VERTEX_BUFFER_BIT"
     );
@@ -434,12 +434,12 @@ void VulkanBuffer::transfer_write_to_compute_read_write_barrier(
 ) const {
     LOG_METHOD();
 
-    logger.check(
+    logger().check(
         has_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT),
         "Buffer was not created with VK_BUFFER_USAGE_TRANSFER_DST_BIT"
     );
 
-    logger.check(
+    logger().check(
         has_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT),
         "Buffer was not created with VK_BUFFER_USAGE_STORAGE_BUFFER_BIT"
     );
@@ -462,7 +462,7 @@ void VulkanBuffer::compute_write_to_fragment_read_barrier(
 ) const {
     LOG_METHOD();
 
-    logger.check(
+    logger().check(
         has_usage(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT),
         "Buffer was not created with VK_BUFFER_USAGE_STORAGE_BUFFER_BIT"
     );
@@ -487,28 +487,28 @@ void VulkanBuffer::copy_to(
 ) const {
     LOG_METHOD();
 
-    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+    logger().check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
 
-    logger.check(m_buffer != VK_NULL_HANDLE, "Source buffer is not initialized");
-    logger.check(dst_buffer.handle() != VK_NULL_HANDLE, "Destination buffer is not initialized");
+    logger().check(m_buffer != VK_NULL_HANDLE, "Source buffer is not initialized");
+    logger().check(dst_buffer.handle() != VK_NULL_HANDLE, "Destination buffer is not initialized");
 
-    logger.check(
+    logger().check(
         has_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT),
         "Source buffer was not created with VK_BUFFER_USAGE_TRANSFER_SRC_BIT"
     );
 
-    logger.check(
+    logger().check(
         dst_buffer.has_usage(VK_BUFFER_USAGE_TRANSFER_DST_BIT),
         "Destination buffer was not created with VK_BUFFER_USAGE_TRANSFER_DST_BIT"
     );
 
-    logger.check(size_bytes != 0, "Attempt to copy zero bytes");
+    logger().check(size_bytes != 0, "Attempt to copy zero bytes");
 
-    logger.check(src_offset_bytes <= size(), "Source copy offset is out of bounds");
-    logger.check(size_bytes <= size() - src_offset_bytes, "Source copy range is out of bounds");
+    logger().check(src_offset_bytes <= size(), "Source copy offset is out of bounds");
+    logger().check(size_bytes <= size() - src_offset_bytes, "Source copy range is out of bounds");
 
-    logger.check(dst_offset_bytes <= dst_buffer.size(), "Destination copy offset is out of bounds");
-    logger.check(size_bytes <= dst_buffer.size() - dst_offset_bytes, "Destination copy range is out of bounds");
+    logger().check(dst_offset_bytes <= dst_buffer.size(), "Destination copy offset is out of bounds");
+    logger().check(size_bytes <= dst_buffer.size() - dst_offset_bytes, "Destination copy range is out of bounds");
 
     VkBufferCopy copy_region{};
     copy_region.srcOffset = src_offset_bytes;
@@ -531,12 +531,12 @@ void VulkanBuffer::bind_as_vertex_buffer(
 {
     LOG_METHOD();
 
-    logger.check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
-    logger.check(
+    logger().check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
+    logger().check(
         (m_usage & VK_BUFFER_USAGE_VERTEX_BUFFER_BIT) != 0,
         "Attempt to bind buffer as vertex buffer, but it was not created with VK_BUFFER_USAGE_VERTEX_BUFFER_BIT"
     );
-    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+    logger().check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
 
     // Позже сделать возможность использовать несколько биндингов. #TODO
     vkCmdBindVertexBuffers(command_buffer.handle(), buffer_binding, 1, &m_buffer, &offset);
@@ -549,12 +549,12 @@ void VulkanBuffer::bind_as_index_buffer(
 {
     LOG_METHOD();
 
-    logger.check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
-    logger.check(
+    logger().check(m_buffer != VK_NULL_HANDLE, "Buffer is not initialized");
+    logger().check(
         (m_usage & VK_BUFFER_USAGE_INDEX_BUFFER_BIT) != 0,
         "Attempt to bind buffer as index buffer, but it was not created with VK_BUFFER_USAGE_INDEX_BUFFER_BIT"
     );
-    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+    logger().check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
 
     // Позже сделать возможность использовать несколько биндингов. #TODO
     vkCmdBindIndexBuffer(command_buffer.handle(), m_buffer, offset, index_type);
@@ -567,9 +567,9 @@ VulkanBuffer VulkanBuffer::create_vertex_buffer(
 {
     LOG_NAMED("VulkanBuffer");
 
-    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(size_bytes != 0, "Attempt to create buffer with zero size");
+    logger().check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(size_bytes != 0, "Attempt to create buffer with zero size");
 
     return VulkanBuffer(
         physical_device, 
@@ -598,9 +598,9 @@ VulkanBuffer VulkanBuffer::create_staging_buffer(
 {
     LOG_NAMED("VulkanBuffer");
 
-    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(size_bytes != 0, "Attempt to create buffer with zero size");
+    logger().check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(size_bytes != 0, "Attempt to create buffer with zero size");
 
     return VulkanBuffer(
         physical_device, 
@@ -629,9 +629,9 @@ VulkanBuffer VulkanBuffer::create_index_buffer(
 {
     LOG_NAMED("VulkanBuffer");
 
-    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(size_bytes != 0, "Attempt to create buffer with zero size");
+    logger().check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(size_bytes != 0, "Attempt to create buffer with zero size");
 
     return VulkanBuffer(
         physical_device, 
@@ -660,9 +660,9 @@ VulkanBuffer VulkanBuffer::create_host_visible_storage_index_buffer(
 {
     LOG_NAMED("VulkanBuffer");
 
-    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(size_bytes != 0, "Attempt to create buffer with zero size");
+    logger().check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(size_bytes != 0, "Attempt to create buffer with zero size");
 
     return VulkanBuffer(
         physical_device,
@@ -692,9 +692,9 @@ VulkanBuffer VulkanBuffer::create_storage_buffer(
 {
     LOG_NAMED("VulkanBuffer");
 
-    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(size_bytes != 0, "Attempt to create buffer with zero size");
+    logger().check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(size_bytes != 0, "Attempt to create buffer with zero size");
 
     return VulkanBuffer(
         physical_device, 
@@ -723,9 +723,9 @@ VulkanBuffer VulkanBuffer::create_host_visible_uniform_buffer(
 {
     LOG_NAMED("VulkanBuffer");
 
-    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(size_bytes != 0, "Attempt to create buffer with zero size");
+    logger().check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(size_bytes != 0, "Attempt to create buffer with zero size");
 
     return VulkanBuffer(
         physical_device, 
@@ -753,9 +753,9 @@ VulkanBuffer VulkanBuffer::create_host_visible_storage_buffer(
         VkDeviceSize size_bytes) {
     LOG_NAMED("VulkanBuffer");
 
-    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(size_bytes != 0, "Attempt to create buffer with zero size");
+    logger().check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(size_bytes != 0, "Attempt to create buffer with zero size");
 
     return VulkanBuffer(
         physical_device, 
@@ -783,17 +783,17 @@ VulkanBuffer VulkanBuffer::create_host_visible_indirect_storage_buffer(
 ) {
     LOG_NAMED("VulkanBuffer");
 
-    logger.check(
+    logger().check(
         physical_device.handle() != VK_NULL_HANDLE,
         "Physical device is not initialized"
     );
 
-    logger.check(
+    logger().check(
         device.handle() != VK_NULL_HANDLE,
         "Device is not initialized"
     );
 
-    logger.check(
+    logger().check(
         size_bytes != 0,
         "Attempt to create buffer with zero size"
     );
@@ -827,17 +827,17 @@ VulkanBuffer VulkanBuffer::create_host_visible_transfer_dst_storage_buffer(
 ) {
     LOG_NAMED("VulkanBuffer");
 
-    logger.check(
+    logger().check(
         physical_device.handle() != VK_NULL_HANDLE,
         "Physical device is not initialized"
     );
 
-    logger.check(
+    logger().check(
         device.handle() != VK_NULL_HANDLE,
         "Device is not initialized"
     );
 
-    logger.check(
+    logger().check(
         size_bytes != 0,
         "Attempt to create buffer with zero size"
     );
@@ -872,9 +872,9 @@ VulkanBuffer VulkanBuffer::create_host_visible_vertex_buffer(
 {
     LOG_NAMED("VulkanBuffer");
 
-    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(size_bytes != 0, "Attempt to create buffer with zero size");
+    logger().check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(size_bytes != 0, "Attempt to create buffer with zero size");
 
     return VulkanBuffer(
         physical_device,
@@ -904,9 +904,9 @@ VulkanBuffer VulkanBuffer::create_host_visible_storage_vertex_buffer(
 {
     LOG_NAMED("VulkanBuffer");
 
-    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(size_bytes != 0, "Attempt to create buffer with zero size");
+    logger().check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(size_bytes != 0, "Attempt to create buffer with zero size");
 
     return VulkanBuffer(
         physical_device,

@@ -273,7 +273,7 @@ void LidarVideo::previous_frame() {
 void LidarVideo::set_frame(uint32_t id) {
     LOG_METHOD();
 
-    logger.check(id >= 0 && id < m_scans.size(), "Lidar video frame index was out of bounds");
+    logger().check(id >= 0 && id < m_scans.size(), "Lidar video frame index was out of bounds");
 
     m_current_frame_id = id;
 
@@ -283,7 +283,7 @@ void LidarVideo::set_frame(uint32_t id) {
 LidarScan& LidarVideo::get_scan(uint32_t scan_id) {
     LOG_METHOD();
 
-    logger.check(scan_id >= 0 && scan_id < m_scans.size(), "Lidar video frame index was out of bounds");
+    logger().check(scan_id >= 0 && scan_id < m_scans.size(), "Lidar video frame index was out of bounds");
 
     return m_scans[scan_id];
 }
@@ -295,7 +295,7 @@ uint32_t LidarVideo::get_scan_count() {
 void LidarVideo::sync() {
     LOG_METHOD();
 
-    logger.check(m_current_frame_id >= 0 && m_current_frame_id < m_scans.size(), "Lidar video frame index was out of bounds");
+    logger().check(m_current_frame_id >= 0 && m_current_frame_id < m_scans.size(), "Lidar video frame index was out of bounds");
 
     if (children.empty())
         children.push_back(&m_scans[m_current_frame_id]);

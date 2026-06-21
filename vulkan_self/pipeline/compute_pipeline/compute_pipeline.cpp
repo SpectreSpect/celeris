@@ -17,9 +17,9 @@ ComputePipeline::ComputePipeline(
 
     std::string entry_point_str = std::string(entry_point);
 
-    logger.check(compute_shader.handle() != VK_NULL_HANDLE, "compute_shader was null");
-    logger.check(pipeline_layout.handle() != VK_NULL_HANDLE, "pipeline_layout was null");
-    logger.check(device.handle() != VK_NULL_HANDLE, "device was null");
+    logger().check(compute_shader.handle() != VK_NULL_HANDLE, "compute_shader was null");
+    logger().check(pipeline_layout.handle() != VK_NULL_HANDLE, "pipeline_layout was null");
+    logger().check(device.handle() != VK_NULL_HANDLE, "device was null");
 
     VkPipelineShaderStageCreateInfo shaderStageInfo{};
     shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -35,7 +35,7 @@ ComputePipeline::ComputePipeline(
     VkPipeline pipeline = VK_NULL_HANDLE;
 
     VkResult result = vkCreateComputePipelines(device.handle(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline);
-    logger.check(result == VK_SUCCESS) 
+    logger().check(result == VK_SUCCESS) 
         << "Failed to create compute pipeline: " 
         << clr(string_VkResult(result), LoggerPalette::blue) << "\n";
 

@@ -8,7 +8,7 @@
 class ReedsShepp {
 public:
     ReedsShepp() = default;
-    // std::vector<NonholonomicPos> find_path(NonholonomicPos& start, NonholonomicPos& end);
+    
     static glm::vec3 change_of_basis_r(glm::vec3& p1, glm::vec3& p2, float min_radius);
     static NonholonomicPos change_of_basis_r(NonholonomicPos& p1, NonholonomicPos& p2, float min_radius);
     static glm::vec2 cart_to_polar(glm::vec2 pos);

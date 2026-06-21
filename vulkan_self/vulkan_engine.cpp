@@ -101,13 +101,13 @@ const VulkanPhysicalDevice& VulkanEngine::physical_device() const noexcept {
 
 SwapchainResources& VulkanEngine::swapchain_resources() {
     LOG_METHOD();
-    logger.check(m_swapchain_resources.has_value(), "Swapchain resources are not initialized");
+    logger().check(m_swapchain_resources.has_value(), "Swapchain resources are not initialized");
     return *m_swapchain_resources;
 }
 
 const SwapchainResources& VulkanEngine::swapchain_resources() const {
     LOG_METHOD();
-    logger.check(m_swapchain_resources.has_value(), "Swapchain resources are not initialized");
+    logger().check(m_swapchain_resources.has_value(), "Swapchain resources are not initialized");
     return *m_swapchain_resources;
 }
 
@@ -214,7 +214,7 @@ uint32_t VulkanEngine::num_frames_in_flight() const noexcept {
 bool VulkanEngine::aquire_free_resources(uint32_t& free_swapchain_image_index) {
     LOG_METHOD();
 
-    logger.check(m_current_frame < MAX_FRAMES_IN_FLIGHT, "The frame index is out of array bounds");
+    logger().check(m_current_frame < MAX_FRAMES_IN_FLIGHT, "The frame index is out of array bounds");
 
     m_in_flight_fences[m_current_frame].wait();
 
@@ -225,7 +225,7 @@ bool VulkanEngine::aquire_free_resources(uint32_t& free_swapchain_image_index) {
         return false;
     }
 
-    logger.check(
+    logger().check(
         result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR,
         "Failed to acquire next image"
     );
@@ -239,7 +239,7 @@ bool VulkanEngine::aquire_free_resources(uint32_t& free_swapchain_image_index) {
 VulkanCommandBuffer& VulkanEngine::get_active_command_buffer() {
     LOG_METHOD();
 
-    logger.check(m_current_frame < MAX_FRAMES_IN_FLIGHT, "The frame index is out of array bounds");
+    logger().check(m_current_frame < MAX_FRAMES_IN_FLIGHT, "The frame index is out of array bounds");
 
     return m_frame_command_buffers[m_current_frame];
 }
@@ -271,7 +271,7 @@ void VulkanEngine::present(uint32_t current_swapchain_image_index) {
     {
         recreate_swapchain();
     } else {
-        logger.check(result == VK_SUCCESS, "Failed to present image");
+        logger().check(result == VK_SUCCESS, "Failed to present image");
     }
 
     m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;

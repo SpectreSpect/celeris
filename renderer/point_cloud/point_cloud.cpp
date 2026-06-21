@@ -68,7 +68,7 @@ PointCloud::PointCloud(ManagerBundle& manager_bundle, const std::vector<PointIns
 void PointCloud::set_points(const std::vector<PointInstance>& points) {
     LOG_METHOD();
 
-    logger.check(!points.empty(), "Points vector was empty");
+    logger().check(!points.empty(), "Points vector was empty");
 
     // m_instance_batch->set_instance_count(points.size());
     // m_instance_batch->buffer().upload(points.data(), points.size() * sizeof(PointInstance));

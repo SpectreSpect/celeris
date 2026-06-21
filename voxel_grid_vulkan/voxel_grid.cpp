@@ -849,7 +849,7 @@ uint64_t VoxelGrid::vox_per_chunk() const noexcept {
 VoxelGrid::VoxelGridParams VoxelGrid::create_params(const VoxelGridDesc& desc) const {
     LOG_METHOD();
 
-    logger.check(desc.chunk_hash_table_size_factor >= 1.0f, "chunk_hash_table_size_factor must be >= 1.0");
+    logger().check(desc.chunk_hash_table_size_factor >= 1.0f, "chunk_hash_table_size_factor must be >= 1.0");
 
     VoxelGridParams params;
 
@@ -869,7 +869,7 @@ VoxelGrid::VoxelGridParams VoxelGrid::create_params(const VoxelGridDesc& desc) c
     uint32_t base = (raw > UINT32_MAX) ? UINT32_MAX : (uint32_t)raw;
     params.chunk_hash_table_size = math_utils::next_pow2_u32(base);
 
-    logger.check((params.chunk_hash_table_size & (params.chunk_hash_table_size - 1)) == 0, "chunk_hash_table_size must be 2^n");
+    logger().check((params.chunk_hash_table_size & (params.chunk_hash_table_size - 1)) == 0, "chunk_hash_table_size must be 2^n");
 
     // vb_params
     params.vb_allocator_params.page_size = desc.mean_count_quads_in_chunk * 4 * sizeof(VertexGPU);
@@ -1392,6 +1392,8 @@ void VoxelGrid::set_render_distance(float value) {
 VoxelGridChunk VoxelGrid::read_chunk(glm::ivec3 chunk_pos) {
     LOG_METHOD();
 
+    std::lock_guard lock(m_compute_mutex);
+
     {
         auto scope = m_command_buffer.begin_scope();
 
@@ -1607,8 +1609,8 @@ void VoxelGrid::voxelize_point_cloud(VulkanCommandBuffer& command_buffer, Vulkan
                                      PointCloud& point_cloud, VulkanBuffer& voxel_writes, uint32_t max_write_count) {
     LOG_METHOD();
 
-    logger.check(point_cloud.point_count() < max_write_count, "Point count was greater than max write count");
-    logger.check(point_cloud.point_count() < m_params.max_write_count, "Point count was greater than max write count");
+    logger().check(point_cloud.point_count() < max_write_count, "Point count was greater than max write count");
+    logger().check(point_cloud.point_count() < m_params.max_write_count, "Point count was greater than max write count");
 
     m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(0, point_cloud.instance_buffer());
     m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(1, voxel_writes);
@@ -1635,6 +1637,7 @@ void VoxelGrid::voxelize_point_cloud(VulkanCommandBuffer& command_buffer, Vulkan
 void VoxelGrid::voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud, 
                                      VulkanBuffer& voxel_writes, uint32_t max_write_count) {
     LOG_METHOD();
+    std::lock_guard lock(m_compute_mutex);
     {
         auto scope = m_command_buffer.begin_scope();
         voxelize_point_cloud(m_command_buffer, engine, point_cloud, voxel_writes, max_write_count);
@@ -1646,19 +1649,22 @@ void VoxelGrid::update(Window& window, Camera& camera) {
     float aspect = float(window.width()) / float(window.height());
     glm::mat4 vp = camera.get_projection_matrix(aspect) * camera.get_view_matrix();
 
+    std::lock_guard lock(m_compute_mutex);
+
     {
         auto scope = m_command_buffer.begin_scope();
         stream_chunks_sphere(m_command_buffer, camera.position, -1, 42);
         build_mesh_from_dirty(m_command_buffer, math_utils::BITS, math_utils::OFFSET);
         build_indirect_draw_commands_frustum(m_command_buffer, vp, camera.position, math_utils::BITS, math_utils::OFFSET);
     }
+    
     submit_compute_commands();
 }
 
 void VoxelGrid::submit_compute_commands() {
     LOG_METHOD();
 
-    logger.check(m_queue != nullptr, "VoxelGrid queue was not initialized");
+    logger().check(m_queue != nullptr, "VoxelGrid queue was not initialized");
 
     m_fence.reset();
     m_queue->submit(m_command_buffer, &m_fence);

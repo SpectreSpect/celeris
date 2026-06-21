@@ -30,10 +30,10 @@ GICPPass::GICPPass(VulkanEngine& engine, ComputePassManager& compute_pass_manage
 double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_cloud, VulkanBuffer& source_normal_buffer) {
     LOG_METHOD();
 
-    logger.check(source_point_cloud.instance_buffer_view_valid(), "Source point cloud instance view was invalid");
-    logger.check(source_point_cloud.instance_count() > 0, "Source point cloud was empty");
-    logger.check(voxel_point_map.m_map_point_count > 0, "The voxel point map didn't have any points");
-    logger.check(voxel_point_map.m_num_hash_table_slots > 0, "The voxel point map has table has 0 slots");
+    logger().check(source_point_cloud.instance_buffer_view_valid(), "Source point cloud instance view was invalid");
+    logger().check(source_point_cloud.instance_count() > 0, "Source point cloud was empty");
+    logger().check(voxel_point_map.m_map_point_count > 0, "The voxel point map didn't have any points");
+    logger().check(voxel_point_map.m_num_hash_table_slots > 0, "The voxel point map has table has 0 slots");
     
     glm::quat q = glm::normalize(source_point_cloud.transform.rotation);
 

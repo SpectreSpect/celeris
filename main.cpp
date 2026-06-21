@@ -324,8 +324,10 @@ int main() {
                     manager_bundle, 
                     voxel_grid, 
                     Celeris::CelerisDesc());
-    celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69, 1.92, -51.30)});   
-    celeris.start_lidar_receiver();
+    celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69, 1.92, -51.30)});
+    // celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-50.69, 1.92, 0)});
+    celeris.start();
+    // celeris.start_lidar_receiver();
 
     CelerisVisualizer celeris_visualizer(mesh_manager, 
                                          material_instance_manager, 
@@ -336,7 +338,7 @@ int main() {
     auto start_path_planning = [&]() {
         if (has_start_pos && has_end_pos) {
             celeris.find_path();
-            has_planned_path = !celeris.planner().state_path.empty();
+            has_planned_path = !celeris.planner().state().path.empty();
         }
     };
 

@@ -9,7 +9,6 @@
 #include <type_traits>
 #include <string_view>
 
-
 #include "palette.h"
 #include "../colored_string/colored_string.h"
 #include "../colored_string/multicolor_string.h"

@@ -6,6 +6,7 @@
 #include "../renderer/point_cloud/gicp/voxel_map_point_reseter.h"
 #include "../renderer/point_cloud/gicp/voxel_map_point_inserter.h"
 #include "../a_star/nonholonomic_a_star.h"
+#include "../a_star/occupancy_grid_3d.h"
 #include "../renderer/point_cloud/gicp/gicp_pass.h"
 #include "../vulkan_self/vulkan_engine.h"
 #include "../vulkan_self/logger/logger_header.h"
@@ -25,6 +26,7 @@ public:
         uint32_t voxel_point_map_max_map_point_count = 1500000;
         uint32_t max_write_count = 100000;
         uint32_t max_gicp_iterations = 10;
+        NonholonomicAStar::NonholonomicAStarDesc nonholonomic_astar_desc;
     };
 
     Celeris(VulkanEngine& engine, 
@@ -34,6 +36,7 @@ public:
             CelerisDesc desc);
             
     void start_lidar_receiver();
+    void start();
     void update();
 
     void find_path();
@@ -46,7 +49,12 @@ public:
     NonholonomicAStar& planner();
     uint32_t received_scan_count() const noexcept;
 
+    std::mutex& planner_mutex() noexcept;
+
     VulkanEngine* engine();
+
+    PlainAstarData plain_astar_path;
+    std::vector<NonholonomicPos> nonholonomic_astar_path;
 
 private:
     VulkanEngine* m_engine = nullptr;
@@ -58,6 +66,7 @@ private:
 
     PointCloudPreprocessor m_point_cloud_preprocessor;
     LidarScanReceiver m_scan_receiver;
+    OccupancyGrid3D m_occupancy_grid;
     NonholonomicAStar m_planner;
     
     VoxelPointMap m_voxel_point_map;
@@ -73,4 +82,13 @@ private:
     std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;
     uint32_t m_received_scan_count = 0;
     uint32_t path_replanning_interval = 5;
+
+    std::atomic<bool> m_planner_running{false};
+    std::atomic<bool> m_replan_requested{false};
+    std::mutex m_planner_mutex;
+    std::thread m_planner_thread;
+    
+    void start_planner_thread();
+    void request_path_replan(const NonholonomicPos& start_pos, const NonholonomicPos& end_pos);
+    void planner_loop();
 };

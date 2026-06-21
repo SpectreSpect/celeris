@@ -15,8 +15,8 @@ VulkanShaderModule::VulkanShaderModule(
 
     std::vector<char> code = read_file(file_path);
 
-    logger.check(!code.empty(), "Shader file is empty");
-    logger.check(code.size() % 4 == 0, "Shader file size is not multiple of 4");
+    logger().check(!code.empty(), "Shader file is empty");
+    logger().check(code.size() % 4 == 0, "Shader file size is not multiple of 4");
 
     VkShaderModuleCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -30,7 +30,7 @@ VulkanShaderModule::VulkanShaderModule(
         &m_shader_module
     );
 
-    logger.check(result == VK_SUCCESS, "Failed to create shader module");
+    logger().check(result == VK_SUCCESS, "Failed to create shader module");
 }
 
 VulkanShaderModule::~VulkanShaderModule() noexcept {
@@ -70,7 +70,7 @@ std::vector<char> VulkanShaderModule::read_file(std::filesystem::path filename) 
 
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
-    logger.check(file.is_open())
+    logger().check(file.is_open())
         << "Failed to open file: "
         <<  clr(filename.filename().string(), LoggerPalette::blue) << "\n";
 

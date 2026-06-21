@@ -104,7 +104,7 @@ Voxelizator::VoxelizatorPassInstances Voxelizator::create_pass_instances(
 void Voxelizator::submit_compute_commands() {
     LOG_METHOD();
 
-    logger.check(m_queue != nullptr, "VoxelGrid queue was not initialized");
+    logger().check(m_queue != nullptr, "VoxelGrid queue was not initialized");
 
     m_fence.reset();
     m_queue->submit(m_command_buffer, &m_fence);
