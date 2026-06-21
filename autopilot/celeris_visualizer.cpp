@@ -82,9 +82,16 @@ void CelerisVisualizer::update() {
 
     set_start(m_celeris->start_position());
     set_goal(m_celeris->goal_position());
-    m_path_line_cloud.set_lines(make_path_lines(m_celeris->planner().state().path));
+
+    {
+        std::lock_guard<std::mutex> lock(m_celeris->planner_mutex());
+        m_guide_path_line_cloud.set_lines(make_path_lines(m_celeris->plain_astar_path.path));
+        m_path_line_cloud.set_lines(make_path_lines(m_celeris->nonholonomic_astar_path));
+    }
+
+    
     // if (m_celeris->planner().state_explored_paths.size() > 0)
-    m_guide_path_line_cloud.set_lines(make_path_lines(m_celeris->planner().state().plain_astar_path.path));
+    
 
     // if (scan_generation != m_celeris->received_scan_count()) {
     //     scan_generation = m_celeris->received_scan_count();

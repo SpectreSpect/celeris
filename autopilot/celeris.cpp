@@ -108,11 +108,13 @@ void Celeris::update() {
         // }
 
         
-        m_voxel_map_inserter.insert(m_voxel_point_map, m_network_scan->point_cloud(), m_network_scan->normal_buffer());
+        // m_voxel_map_inserter.insert(m_voxel_point_map, m_network_scan->point_cloud(), m_network_scan->normal_buffer());
         // m_voxel_grid->voxelize_point_cloud(*m_engine, 
         //                                    m_network_scan->point_cloud(), 
         //                                    voxel_write_list, 
         //                                    m_desc.max_write_count);
+
+        request_path_replan(m_start_position, m_goal_position);
 
         m_received_scan_count++;
     }
@@ -155,6 +157,10 @@ uint32_t Celeris::received_scan_count() const noexcept {
     return m_received_scan_count;
 }
 
+std::mutex& Celeris::planner_mutex() noexcept {
+    return m_planner_mutex;
+}
+
 void Celeris::start_planner_thread() {
     m_planner_running.exchange(true);
     m_planner_thread = std::thread(&Celeris::planner_loop, this);
@@ -168,8 +174,14 @@ void Celeris::planner_loop() {
     while (m_planner_running.load()) {
         if (!m_replan_requested.load())
             continue;
-        
-        // m_planner.initialize(m_start_position, m_goal_position);
-        // m_planner.find_nonholomic_path();
+
+        m_planner.initialize(m_start_position, m_goal_position);
+        m_planner.find_nonholomic_path();
+
+        {
+            std::lock_guard<std::mutex> lock(m_planner_mutex);    
+            plain_astar_path = m_planner.state().plain_astar_path;
+            nonholonomic_astar_path = m_planner.state().path;
+        }
     }
 }

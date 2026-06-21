@@ -273,12 +273,16 @@ bool voxel_insert_point_and_normal(
                 if (prev == VOXEL_SLOT_OCCUPIED) {
                     uint surfel_id = voxel_table.slots[idx].value;
 
-                    update_voxel_surfel(
-                        surfel_id,
-                        world_position,
-                        world_normal,
-                        color
-                    );
+                    // A corrupt/stale hash-table value must never turn into an
+                    // out-of-bounds buffer access.
+                    if (surfel_id < params.max_map_point_count) {
+                        update_voxel_surfel(
+                            surfel_id,
+                            world_position,
+                            world_normal,
+                            color
+                        );
+                    }
 
                     memoryBarrierBuffer();
 
@@ -290,9 +294,10 @@ bool voxel_insert_point_and_normal(
                     return true;
                 }
 
-                // Somebody else locked it before us.
-                // Retry the same slot, do not move to the next one.
-                continue;
+                // Never spin on a lock owned by another invocation. Across
+                // workgroups, spinning can prevent the lock owner from being
+                // scheduled and hang the entire GPU dispatch.
+                return false;
             }
 
             idx = (idx + 1u) % slot_count;
@@ -346,27 +351,15 @@ bool voxel_insert_point_and_normal(
                 return true;
             }
 
-            // Someone changed this slot.
-            // Retry the same slot.
-            continue;
+            // Another invocation won this slot. Let it finish without waiting
+            // for it; this point can be observed again in a later scan.
+            return false;
         }
 
         if (state == VOXEL_SLOT_LOCKED) {
-            uint spin_count = 0u;
-
-            while (spin_count < 1024u) {
-                uint s = atomicAdd(voxel_table.slots[idx].state, 0u);
-
-                if (s != VOXEL_SLOT_LOCKED)
-                    break;
-
-                spin_count++;
-            }
-
-            // Important:
-            // Do NOT move to the next slot here.
-            // The slot may now contain exactly our key.
-            continue;
+            // A locked slot may eventually contain our key, so probing past it
+            // could create a duplicate entry. Drop this insertion instead.
+            return false;
         }
 
         idx = (idx + 1u) % slot_count;

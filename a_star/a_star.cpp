@@ -11,7 +11,7 @@ float AStar::get_heuristic(glm::ivec3 a, glm::ivec3 b) {
 }
 
 std::vector<glm::ivec3> AStar::get_straight_path(glm::ivec3& start, glm::ivec3& end, std::vector<glm::ivec3>& out_path) {
-    LOG_METHOD();
+    // LOG_METHOD();
 
     glm::ivec3 delta = end - start;
     int steps = std::max({std::abs(delta.x), std::abs(delta.y), std::abs(delta.z)});
@@ -36,7 +36,7 @@ std::vector<glm::ivec3> AStar::get_straight_path(glm::ivec3& start, glm::ivec3& 
 }
 
 bool AStar::try_straight_shot(glm::ivec3& start, glm::ivec3& end, std::vector<glm::ivec3>& out_path) {
-    LOG_METHOD();
+    // LOG_METHOD();
 
     get_straight_path(start, end, out_path);
 
@@ -50,7 +50,7 @@ bool AStar::try_straight_shot(glm::ivec3& start, glm::ivec3& end, std::vector<gl
 }
 
 PlainAstarData AStar::reconstruct_path(std::unordered_map<uint64_t, AStarCell> closed_heap, glm::ivec3 pos) {
-    LOG_METHOD();
+    // LOG_METHOD();
     
     PlainAstarData plain_astar_data;
     glm::ivec3 cur_pos = pos;
@@ -83,7 +83,7 @@ PlainAstarData AStar::reconstruct_path(std::unordered_map<uint64_t, AStarCell> c
 }
 
 PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
-    LOG_METHOD();
+    // LOG_METHOD();
 
     std::priority_queue<AStarCell, std::vector<AStarCell>, ByPriority> pq;
     std::unordered_map<uint64_t, AStarCell> closed_heap;

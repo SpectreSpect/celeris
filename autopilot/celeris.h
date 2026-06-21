@@ -49,7 +49,12 @@ public:
     NonholonomicAStar& planner();
     uint32_t received_scan_count() const noexcept;
 
+    std::mutex& planner_mutex() noexcept;
+
     VulkanEngine* engine();
+
+    PlainAstarData plain_astar_path;
+    std::vector<NonholonomicPos> nonholonomic_astar_path;
 
 private:
     VulkanEngine* m_engine = nullptr;
@@ -80,6 +85,7 @@ private:
 
     std::atomic<bool> m_planner_running{false};
     std::atomic<bool> m_replan_requested{false};
+    std::mutex m_planner_mutex;
     std::thread m_planner_thread;
     
     void start_planner_thread();

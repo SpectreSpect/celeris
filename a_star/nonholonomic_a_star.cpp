@@ -8,7 +8,7 @@ NonholonomicAStar::NonholonomicAStar(OccupancyGrid3D& occupancy_grid, const Nonh
 
 std::vector<NonholonomicPos> NonholonomicAStar::simulate_motion(NonholonomicPos start, int steer, int direction)
 {
-    LOG_METHOD();
+    // LOG_METHOD();
 
     steer = std::clamp(steer, -1, 1);
     direction = (direction < 0) ? -1 : 1; // only -1 or +1
@@ -59,7 +59,7 @@ bool NonholonomicAStar::almost_equal(
         float max_goal_position_error, 
         float max_goal_heading_error_radians, 
         bool allow_flying_over_precipices) {        
-    LOG_NAMED("NonholonomicAStar");
+    // LOG_NAMED("NonholonomicAStar");
 
     if (allow_flying_over_precipices) {
         a.pos.y = 0;
@@ -76,7 +76,7 @@ bool NonholonomicAStar::almost_equal(
 }
 
 std::vector<NonholonomicPos> NonholonomicAStar::reconstruct_path(std::unordered_map<uint64_t, NonholonomicAStarCell> closed_heap, NonholonomicPos pos) {
-    LOG_METHOD();
+    // LOG_METHOD();
 
     std::vector<NonholonomicPos> path;
     NonholonomicPos cur_pos = pos;
@@ -105,7 +105,7 @@ std::vector<NonholonomicPos> NonholonomicAStar::reconstruct_path(std::unordered_
 }
 
 uint64_t NonholonomicAStar::state_key(const NonholonomicPos& s) const {
-    LOG_METHOD();
+    // LOG_METHOD();
 
     constexpr float POS_RES = 0.5f;
 
@@ -117,7 +117,7 @@ uint64_t NonholonomicAStar::state_key(const NonholonomicPos& s) const {
 }
 
 float NonholonomicAStar::angle_diff(float a, float b) {
-    LOG_NAMED("NonholonomicAStar");
+    // LOG_NAMED("NonholonomicAStar");
 
     constexpr float pi = std::numbers::pi_v<float>;
     float d = std::fmod(b - a, 2.0f * pi);
@@ -127,7 +127,7 @@ float NonholonomicAStar::angle_diff(float a, float b) {
 }
 
 DistToPathData NonholonomicAStar::max_unimpended_dist_to_path(glm::vec3 pos, std::vector<glm::ivec3>& path, int start_id, glm::vec3 last_pos, bool replace_last_pos) {
-    LOG_METHOD();
+    // LOG_METHOD();
 
     int id = -1;
     float max_dist = 0;
@@ -167,7 +167,7 @@ DistToPathData NonholonomicAStar::max_unimpended_dist_to_path(glm::vec3 pos, std
 }
 
 int NonholonomicAStar::discretize_angle(float value, int num_bins) {
-    LOG_NAMED("NonholonomicAStar");
+    // LOG_NAMED("NonholonomicAStar");
 
     if (num_bins <= 0) return 0;
 
@@ -183,7 +183,7 @@ int NonholonomicAStar::discretize_angle(float value, int num_bins) {
 }
 
 float NonholonomicAStar::get_nonholonomic_f(NonholonomicPos& new_pos, NonholonomicPos end_pos, NonholonomicPos cur_pos, PlainAstarData plain_a_star_path) {
-    LOG_METHOD();
+    // LOG_METHOD();
 
     if (m_state.unimpended_astar_positions.empty())
         return glm::distance(new_pos.pos, end_pos.pos);
@@ -221,7 +221,7 @@ float NonholonomicAStar::get_nonholonomic_f(NonholonomicPos& new_pos, Nonholonom
 }
 
 void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos end_pos) {
-    LOG_METHOD();
+    // LOG_METHOD();
 
     m_state = NonholonomicAStarState();
     
@@ -327,7 +327,7 @@ void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos en
 }
 
 bool NonholonomicAStar::try_reeds_shepp_shot(NonholonomicPos& start, NonholonomicPos& end, std::vector<NonholonomicPos>& out_path) {
-    LOG_METHOD();
+    // LOG_METHOD();
 
     out_path = ReedsShepp::get_optimal_path_discretized(start, end, 8, m_params.min_radius);
 
@@ -341,7 +341,7 @@ bool NonholonomicAStar::try_reeds_shepp_shot(NonholonomicPos& start, Nonholonomi
 }
 
 bool NonholonomicAStar::try_finish_with_reeds_shepp(NonholonomicPos& from, NonholonomicPos& to) {
-    LOG_METHOD();
+    // LOG_METHOD();
 
     std::vector<NonholonomicPos> reeds_shepp_path;
     if (try_reeds_shepp_shot(from, to, reeds_shepp_path)) {
@@ -353,10 +353,10 @@ bool NonholonomicAStar::try_finish_with_reeds_shepp(NonholonomicPos& from, Nonho
 }
 
 bool NonholonomicAStar::find_nonholomic_path_step() {
-    LOG_METHOD();
+    // LOG_METHOD();
 
     if (m_state.pq.empty()) {
-        logger.log("1. Priotirty queue is empty");
+        // logger.log("1. Priotirty queue is empty");
         return true;
     }
 
@@ -381,7 +381,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
         }
 
     if (m_state.counter >= m_params.iteration_limit) {
-        logger.log("Limit exceeded");
+        // logger.log("Limit exceeded");
         return true;
     }
     
@@ -397,14 +397,14 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
         m_state.path = reconstruct_path(m_state.closed_heap, cur_cell.pos);
 
         if (!m_params.use_reed_shepps_fallback) {
-            logger.log("2. Almost equal = true");
+            // logger.log("2. Almost equal = true");
             return true;
         }
 
         bool status = try_finish_with_reeds_shepp(cur_cell.pos, m_state.end_pos);
         
-        if (status)
-            logger.log("3. Almost equal = true (with reeds-shepp fallback)");
+        // if (status)
+        //     logger.log("3. Almost equal = true (with reeds-shepp fallback)");
         
         return true;
     }
@@ -414,7 +414,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
             m_params.force_reeds_shepp_shot = false;
             bool status = try_finish_with_reeds_shepp(cur_cell.pos, m_state.end_pos);
             if (status) {
-                logger.log("4. Reeds-shepp shot succeeded");
+                // logger.log("4. Reeds-shepp shot succeeded");
                 return true;
             }
         }
@@ -485,7 +485,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
 }
 
 void NonholonomicAStar::find_nonholomic_path() {
-    LOG_METHOD();
+    // LOG_METHOD();
 
     while (true) {
         if (find_nonholomic_path_step())
