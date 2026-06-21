@@ -6,6 +6,7 @@
 #include "../renderer/point_cloud/gicp/voxel_map_point_reseter.h"
 #include "../renderer/point_cloud/gicp/voxel_map_point_inserter.h"
 #include "../a_star/nonholonomic_a_star.h"
+#include "../a_star/occupancy_grid_3d.h"
 #include "../renderer/point_cloud/gicp/gicp_pass.h"
 #include "../vulkan_self/vulkan_engine.h"
 #include "../vulkan_self/logger/logger_header.h"
@@ -25,6 +26,7 @@ public:
         uint32_t voxel_point_map_max_map_point_count = 1500000;
         uint32_t max_write_count = 100000;
         uint32_t max_gicp_iterations = 10;
+        NonholonomicAStar::NonholonomicAStarDesc nonholonomic_astar_desc;
     };
 
     Celeris(VulkanEngine& engine, 
@@ -58,6 +60,7 @@ private:
 
     PointCloudPreprocessor m_point_cloud_preprocessor;
     LidarScanReceiver m_scan_receiver;
+    OccupancyGrid3D m_occupancy_grid;
     NonholonomicAStar m_planner;
     
     VoxelPointMap m_voxel_point_map;

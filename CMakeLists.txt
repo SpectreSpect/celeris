@@ -137,6 +137,7 @@ add_executable(app
   autopilot/celeris.cpp
   autopilot/celeris_visualizer.cpp
   voxel_grid_vulkan/voxel_grid_gpu_debugger.cpp
+  utils/avg_timer.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

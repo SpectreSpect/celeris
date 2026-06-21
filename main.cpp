@@ -336,7 +336,7 @@ int main() {
     auto start_path_planning = [&]() {
         if (has_start_pos && has_end_pos) {
             celeris.find_path();
-            has_planned_path = !celeris.planner().state_path.empty();
+            has_planned_path = !celeris.planner().state().path.empty();
         }
     };
 
