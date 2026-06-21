@@ -23,11 +23,12 @@ layout(push_constant) uniform MeshEmitPushConstants {
 
     uint u_pack_bits;
     int  u_pack_offset;
-    uint u_vb_page_verts;
-    uint u_ib_page_inds;
 
-    uint  u_chunk_hash_table_size;
-    uint  u_voxels_per_chunk;
+    uint u_vb_page_size_bytes;
+    uint u_ib_page_size_bytes;
+
+    uint u_chunk_hash_table_size;
+    uint u_voxels_per_chunk;
 };
 
 // ===== uniforms =====
@@ -77,12 +78,15 @@ uint ao_corner(uint chunkId, ivec3 chunkCoord, ivec3 p,
 
 // ===== emit quad =====
 void emit_quad(uint chunkId, ivec3 chunkCoord, ivec3 p, uint face, uint colorRGB) {
-    uint maxQuads = chunk_alloc[chunkId].needI / 6u;
+    uint maxQuads = chunk_alloc[chunkId].needI / (6u * 4u);
     uint q = atomicAdd(emit_counter[chunkId], 1u);
     if (q >= maxQuads) return;
 
-    uint baseV = chunk_alloc[chunkId].v_startPage * u_vb_page_verts + q * 4u;
-    uint baseI = chunk_alloc[chunkId].i_startPage * u_ib_page_inds + q * 6u;
+    uint baseV_bytes = chunk_alloc[chunkId].v_startPage * u_vb_page_size_bytes + q * 4u * VERTEX_SIZE;
+    uint baseV = baseV_bytes / VERTEX_SIZE;
+
+    uint baseI_bytes = chunk_alloc[chunkId].i_startPage * u_ib_page_size_bytes + q * 6u * 4u;
+    uint baseI = baseI_bytes / 4u;
 
     vec3 wp = vec3(chunkCoord * u_chunk_dim.xyz + p) * u_voxel_size.xyz;
 

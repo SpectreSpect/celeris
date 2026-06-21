@@ -22,9 +22,6 @@ layout(std430, set = 0, binding=10) coherent buffer BBReturnedNodesList  { uint 
 layout(std430, set = 0, binding=11) buffer ActiveSplitters { uint bb_active_splitters; };
 layout(std430, set = 0, binding=12) buffer DebugCounter { uint debug_counter[]; };
 
-layout(std430, set = 0, binding=13) buffer AllocationRetryList { uint retry_list_counter; uint retry_list[]; };
-
-
 layout(push_constant) uniform MeshAllocPushConstants {
     uint bb_pages;
     uint bb_page_elements;  // например 256
@@ -115,8 +112,19 @@ void main() {
 
     uint bStart = bb_alloc_pages(bOrder);
     if (bStart == INVALID_ID) {
-        uint retry_list_id = atomicAdd(retry_list_counter, 1u);
-        retry_list[retry_list_id] = dirtyIdx;
+        if (is_vb_phase){
+            // atomicExchange(is_vb_full, 1u);
+            chunk_alloc_local[dirtyIdx].v_startPage = INVALID_ID;
+            chunk_alloc_local[dirtyIdx].v_order = 0u;
+            chunk_alloc_local[dirtyIdx].needV = 0u;
+        } else {
+            // atomicExchange(is_ib_full, 1u);
+            chunk_alloc_local[dirtyIdx].i_startPage = INVALID_ID;
+            chunk_alloc_local[dirtyIdx].i_order = 0u;
+            chunk_alloc_local[dirtyIdx].needI = 0u;
+        }
+        
+        chunk_alloc_local[dirtyIdx].is_valid = 0u;
         return;
     }
 

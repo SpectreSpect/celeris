@@ -195,31 +195,18 @@ struct MeshPoolSeedUniform {
 };
 
 struct alignas(16) BuildIndirectCmdsUniform {
-    uint32_t u_max_chunks;
-    uint32_t _pad0;
-    uint32_t _pad1;
-    uint32_t _pad2;
-
     glm::ivec4 u_chunk_dim;
     glm::vec4  u_voxel_size;
 
+    uint32_t u_max_chunks;
+    uint32_t u_ib_page_size_bytes;
     uint32_t u_pack_bits;
     int32_t  u_pack_offset;
-    uint32_t u_vb_page_verts;
-    uint32_t u_ib_page_inds;
 
     float render_distance;
-    uint32_t _pad3;
-    uint32_t _pad4;
-    uint32_t _pad5;
+    uint32_t _pad0;
+    uint32_t _pad1;
+    uint32_t _pad2;
 };
 
-static_assert(offsetof(BuildIndirectCmdsUniform, u_max_chunks) == 0);
-static_assert(offsetof(BuildIndirectCmdsUniform, u_chunk_dim) == 16);
-static_assert(offsetof(BuildIndirectCmdsUniform, u_voxel_size) == 32);
-static_assert(offsetof(BuildIndirectCmdsUniform, u_pack_bits) == 48);
-static_assert(offsetof(BuildIndirectCmdsUniform, u_pack_offset) == 52);
-static_assert(offsetof(BuildIndirectCmdsUniform, u_vb_page_verts) == 56);
-static_assert(offsetof(BuildIndirectCmdsUniform, u_ib_page_inds) == 60);
-static_assert(offsetof(BuildIndirectCmdsUniform, render_distance) == 64);
-static_assert(sizeof(BuildIndirectCmdsUniform) == 80);
+static_assert(sizeof(BuildIndirectCmdsUniform) == 64);

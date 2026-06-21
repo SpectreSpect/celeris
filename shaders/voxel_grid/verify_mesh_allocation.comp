@@ -34,10 +34,13 @@ layout(push_constant) uniform VerifyMeshAllocationPushConstants {
 #include "../common/utils.inc"
 
 #define PREFIX vb
-#include "../common/allocator.inc"
+#include "../common/allocator/free_pages_impl.inc"
+#undef PREFIX
 
 #define PREFIX ib
-#include "../common/allocator.inc"
+#include "../common/allocator/free_pages_impl.inc"
+#undef PREFIX
+
 // -------------------
 
 void free_chunk_mesh(uint chunk_id_global) {
@@ -47,7 +50,6 @@ void free_chunk_mesh(uint chunk_id_global) {
 }
 
 void main() {
-
     uint dirtyIdx = gl_GlobalInvocationID.x;
     uint dirtyCount = dirty_count;
     if (dirtyIdx >= dirtyCount) return;

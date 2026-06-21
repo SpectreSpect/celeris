@@ -5,14 +5,32 @@
 #include <string>
 #include <array>
 
+#include "../vulkan_self/logger/logger_header.h"
+#include "../vulkan_self/vulkan_command_buffer.h"
+#include "../vulkan_self/vulkan_command_pool.h"
+#include "../vulkan_self/vulkan_fence.h"
+
 class VulkanBuffer;
 class VoxelGrid;
 class Window;
 class Camera;
+class VulkanQueue;
+class VulkanDevice;
 
 class VoxelGridGPUDebugger {
 public:
-    VoxelGridGPUDebugger(VoxelGrid& voxel_grid);
+    _XCLASS_NAME(VoxelGridGPUDebugger);
+
+    VoxelGridGPUDebugger(
+        VoxelGrid& voxel_grid,
+        VulkanDevice& device,
+        VulkanQueue& queue,
+        const Window& window,
+        const Camera& camera,
+        bool default_tasks_activity_state
+    );
+
+    VulkanCommandBuffer& command_buffer() noexcept;
 
     void print_found_chunks_in_hash_table(glm::ivec3 chunk_pos);
 
@@ -40,37 +58,42 @@ public:
     );
 
     void dispay_debug_window(const Camera& camera);
-    void display_build_from_dirty_window();
-    void display_build_cmd_window(Window& window, const Camera& camera);
-    void display_draw_pipline_window();
-    void display_chunk_eviction_window(const Camera& camera);
-    void display_stream_chunks_pipeline_window(const Camera& camera);
+    void display_build_from_dirty_window(VulkanCommandBuffer& command_buffer);
+    void display_build_cmd_window(VulkanCommandBuffer& command_buffer, Window& window, const Camera& camera);
+    void display_draw_pipline_window(VulkanCommandBuffer& command_buffer);
+    void display_chunk_eviction_window(VulkanCommandBuffer& command_buffer, const Camera& camera);
+    void display_stream_chunks_pipeline_window(VulkanCommandBuffer& command_buffer, const Camera& camera);
     void display_hash_table_window();
+
+    void submit_commands();
+
+private:
+struct Task {
+    std::string name;
+    bool is_active;
+    std::function<void(VulkanCommandBuffer&)> func;
+};
 
 private:
     VoxelGrid* m_voxel_grid = nullptr;
 
-    static constexpr int M_COUNT_DRAWING_STEPS = 3;
-    std::string m_voxel_grid_draw_steps_names[M_COUNT_DRAWING_STEPS] = {
-        "build_mesh_from_dirty()", 
-        "build_indirect_draw_commands_frustum_fn()", 
-        "draw_indirect()"};
-    bool m_voxel_grid_draw_streaming[M_COUNT_DRAWING_STEPS] = {false};
-    std::array<std::function<void()>, M_COUNT_DRAWING_STEPS> m_voxel_grid_draw_steps;
+    VulkanQueue* m_queue = nullptr;
     
-    static constexpr int M_COUNT_GENERATION_STEPS = 9; 
-    bool m_voxel_grid_generation_streaming[M_COUNT_GENERATION_STEPS] = {false};
-    std::array<std::function<void()>, M_COUNT_GENERATION_STEPS> m_voxel_grid_generation_steps;
+    VulkanCommandPool m_command_pool;
+    VulkanCommandBuffer m_command_buffer;
+    VulkanFence m_fence;
+    
 
-    std::string m_voxel_grid_generation_steps_names[M_COUNT_GENERATION_STEPS] = {
-        "ensure_free_chunks_gpu()",
-        "reset_load_list_counter()",
-        "mark_chunk_to_generate()",
-        "merge_voxel_write_lists()",
-        "reset_voxel_write_list_counter()",
-        "mark_write_chunks_to_generate()",
-        "generate_terrain()",
-        "write_voxels_to_grid()",
-        "reset_voxel_write_list_counter()"
-    };
+    std::vector<Task> m_draw_tasks;
+    std::vector<Task> m_generation_tasks; 
+
+    std::vector<Task> create_draw_tasks(
+        const Window& window,
+        const Camera& camera,
+        bool default_tasks_activity_state = true
+    );
+    std::vector<Task> create_generation_tasks(
+        const Camera& camera,
+        bool default_tasks_activity_state = true
+    );
 };

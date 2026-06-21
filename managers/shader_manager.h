@@ -51,6 +51,7 @@ public:
     VulkanShaderModule mesh_reset_cs;
     VulkanShaderModule mesh_count_cs;
     VulkanShaderModule mesh_alloc_cs;
+    VulkanShaderModule retry_mesh_alloc_cs;
     VulkanShaderModule verify_mesh_allocation_cs;
     VulkanShaderModule return_free_alloc_nodes_dispatch_adapter_cs;
     VulkanShaderModule return_free_alloc_nodes_cs;

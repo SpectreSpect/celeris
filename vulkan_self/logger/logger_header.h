@@ -1,4 +1,6 @@
 #pragma once
+#include <type_traits>
+
 #include "logger.h"
 #include "palette.h"
 #include "level_marker.h"

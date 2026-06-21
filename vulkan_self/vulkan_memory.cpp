@@ -279,8 +279,10 @@ void VulkanMemory::invalidate() const {
 void VulkanMemory::read(void* data, VkDeviceSize size_bytes, VkDeviceSize offset_bytes) {
     LOG_METHOD();
 
+    if (size_bytes == 0) return;
+
     logger.check(data != nullptr, "Attempt to read data into nullptr");
-    logger.check(size_bytes != 0, "Attempt to read zero bytes");
+    // logger.check(size_bytes != 0, "Attempt to read zero bytes");
     logger.check(offset_bytes <= m_size, "Read offset is out of bounds");
     logger.check(size_bytes <= m_size - offset_bytes, "Read range is out of bounds");
     logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");

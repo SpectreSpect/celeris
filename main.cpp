@@ -131,18 +131,18 @@ int main() {
         .chunk_size = chunk_size,
         .voxel_size = voxel_size,
         .count_active_chunks = 8'000,
-        .max_quads = 500'000,
+        .max_quads = 1'000'000,
         .chunk_hash_table_size_factor = 1.0f,
         .count_evict_buckets = 32,
         .min_free_chunks = 4'500,
         .tomb_fraction_to_rebuild = 0.2f,
         .eviction_bucket_shell_thickness = chunk_size.x * voxel_size.x * 1,
-        .vb_page_size_order_of_two = 10,
-        .ib_page_size_order_of_two = 10,
+        .mean_count_quads_in_chunk = 200,
+        .allocation_retry_list_size = 10'000, // Не так много занимает, в целом можно не жмотничать
         .buddy_allocator_nodes_factor = 1.0,
         .render_distance = chunk_size.x * voxel_size.x * 30,
         .generation_distance = 5,
-        .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000)
+        .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000),
     };
 
     VoxelGrid voxel_grid(
@@ -151,9 +151,17 @@ int main() {
         engine.compute_queue(),
         compute_pass_manager,
         material_instance_manager,
-        voxel_grid_desc
+        voxel_grid_desc,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
     );
-    VoxelGridGPUDebugger debugger(voxel_grid);
+    VoxelGridGPUDebugger debugger(
+        voxel_grid,
+        engine.device(),
+        engine.compute_queue(),
+        window,
+        camera,
+        true
+    );
 
     Voxelizator::VoxelizatorDesc voxelizator_desc {
         .chunk_size = chunk_size,
@@ -229,12 +237,12 @@ int main() {
 
     scan_object.transform.scale = glm::vec3(5.0f);
 
-    voxelizator.voxelize<PBRVertex>(
-        blue_voxelize_prefab,
-        scan_object.mesh_view(),
-        scan_object.transform.get_model_matrix(),
-        &voxel_grid.local_voxel_write_list()
-    );
+    // voxelizator.voxelize<PBRVertex>(
+    //     blue_voxelize_prefab,
+    //     scan_object.mesh_view(),
+    //     scan_object.transform.get_model_matrix(),
+    //     &voxel_grid.local_voxel_write_list()
+    // );
 
     glm::ivec3 block_size = glm::ivec3(1, 5, 5);
     glm::ivec3 block_origin = glm::ivec3(5, 0, 0);
@@ -269,7 +277,7 @@ int main() {
     engine.compute_submit(compute_command_buffer, &compute_fence);
     compute_fence.wait();
 
-    voxel_grid.update(window, camera);
+    // voxel_grid.update(window, camera);
 
 
     // VoxelGridChunk chunk = voxel_grid.read_chunk(glm::ivec3(0, 0, 0));
@@ -443,7 +451,7 @@ int main() {
         celeris.update();
         celeris_visualizer.update();
 
-        voxel_grid.update(window, camera);
+        // voxel_grid.update(window, camera);
 
         if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
             place_start_pressed = true;
@@ -515,42 +523,56 @@ int main() {
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
-
-                ImGui::Begin("Debug");
-
-                ImGui::TextUnformatted("Camera position:");
-                ImGui::SameLine();
-                ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "x: %.2f", camera.position.x);
-                ImGui::SameLine();
-                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "y: %.2f", camera.position.y);
-                ImGui::SameLine();
-                ImGui::TextColored(ImVec4(0.0f, 0.35f, 1.0f, 1.0f), "z: %.2f", camera.position.z);
-
-                if (ImGui::Button("Next frame")) {
-                    // next_frame();
+                
+                {
+                    VulkanCommandBuffer& debugger_command_buffer = debugger.command_buffer();
+                    auto scope = debugger_command_buffer.begin_scope();
+                    debugger.dispay_debug_window(camera);
+                    debugger.display_build_from_dirty_window(debugger_command_buffer);
+                    debugger.display_build_cmd_window(debugger_command_buffer, window, camera);
+                    debugger.display_draw_pipline_window(debugger_command_buffer);
+                    debugger.display_chunk_eviction_window(debugger_command_buffer, camera);
+                    debugger.display_stream_chunks_pipeline_window(debugger_command_buffer, camera);
+                    debugger.display_hash_table_window();
                 }
+                debugger.submit_commands();
+                
 
-                if (ImGui::Button("Place start")) {
-                    place_start();
-                }
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Key: 1");
+                // ImGui::Begin("Debug");
 
-                if (ImGui::Button("Place end")) {
-                    place_end();
-                }
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Key: 2");
+                // ImGui::TextUnformatted("Camera position:");
+                // ImGui::SameLine();
+                // ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "x: %.2f", camera.position.x);
+                // ImGui::SameLine();
+                // ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "y: %.2f", camera.position.y);
+                // ImGui::SameLine();
+                // ImGui::TextColored(ImVec4(0.0f, 0.35f, 1.0f, 1.0f), "z: %.2f", camera.position.z);
 
-                if (ImGui::Button("Start path planning")) {
-                    start_path_planning();
-                }
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Key: 3");
+                // if (ImGui::Button("Next frame")) {
+                //     // next_frame();
+                // }
 
-                // ImGui::Text("Path: %s", path_planning_status.c_str());
+                // if (ImGui::Button("Place start")) {
+                //     place_start();
+                // }
+                // ImGui::SameLine();
+                // ImGui::TextUnformatted("Key: 1");
 
-                ImGui::End();
+                // if (ImGui::Button("Place end")) {
+                //     place_end();
+                // }
+                // ImGui::SameLine();
+                // ImGui::TextUnformatted("Key: 2");
+
+                // if (ImGui::Button("Start path planning")) {
+                //     start_path_planning();
+                // }
+                // ImGui::SameLine();
+                // ImGui::TextUnformatted("Key: 3");
+
+                // // ImGui::Text("Path: %s", path_planning_status.c_str());
+
+                // ImGui::End();
                 
                 ui.end_frame(command_buffer);
             }
