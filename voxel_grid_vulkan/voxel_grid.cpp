@@ -1392,6 +1392,8 @@ void VoxelGrid::set_render_distance(float value) {
 VoxelGridChunk VoxelGrid::read_chunk(glm::ivec3 chunk_pos) {
     LOG_METHOD();
 
+    std::lock_guard lock(m_compute_mutex);
+
     {
         auto scope = m_command_buffer.begin_scope();
 
@@ -1646,12 +1648,15 @@ void VoxelGrid::update(Window& window, Camera& camera) {
     float aspect = float(window.width()) / float(window.height());
     glm::mat4 vp = camera.get_projection_matrix(aspect) * camera.get_view_matrix();
 
+    std::lock_guard lock(m_compute_mutex);
+
     {
         auto scope = m_command_buffer.begin_scope();
         stream_chunks_sphere(m_command_buffer, camera.position, -1, 42);
         build_mesh_from_dirty(m_command_buffer, math_utils::BITS, math_utils::OFFSET);
         build_indirect_draw_commands_frustum(m_command_buffer, vp, camera.position, math_utils::BITS, math_utils::OFFSET);
     }
+    
     submit_compute_commands();
 }
 

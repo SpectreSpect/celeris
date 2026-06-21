@@ -245,6 +245,8 @@ private:
     VulkanCommandBuffer m_command_buffer;
     VulkanFence m_fence;
 
+    std::mutex m_compute_mutex;
+
     VulkanQueue* m_queue = nullptr;
 
     VoxelGridParams m_params;
@@ -352,5 +354,5 @@ private:
         const glm::vec3& cam_pos,
         uint32_t pack_bits,
         int pack_offset
-    ); 
+    );
 };

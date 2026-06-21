@@ -174,6 +174,7 @@ void Celeris::planner_loop() {
     while (m_planner_running.load()) {
         if (!m_replan_requested.load())
             continue;
+        m_replan_requested.exchange(false);
 
         m_planner.initialize(m_start_position, m_goal_position);
         m_planner.find_nonholomic_path();
