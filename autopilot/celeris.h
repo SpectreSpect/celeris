@@ -36,6 +36,7 @@ public:
             CelerisDesc desc);
             
     void start_lidar_receiver();
+    void start();
     void update();
 
     void find_path();
@@ -76,4 +77,12 @@ private:
     std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;
     uint32_t m_received_scan_count = 0;
     uint32_t path_replanning_interval = 5;
+
+    std::atomic<bool> m_planner_running{false};
+    std::atomic<bool> m_replan_requested{false};
+    std::thread m_planner_thread;
+    
+    void start_planner_thread();
+    void request_path_replan(const NonholonomicPos& start_pos, const NonholonomicPos& end_pos);
+    void planner_loop();
 };

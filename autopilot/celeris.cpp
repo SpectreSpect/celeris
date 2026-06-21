@@ -45,6 +45,11 @@ void Celeris::start_lidar_receiver() {
     m_received_scan_count = 0;
 }
 
+void Celeris::start() {
+    start_lidar_receiver();
+    start_planner_thread();
+}
+
 void Celeris::update() {
     LOG_METHOD();
 
@@ -62,11 +67,11 @@ void Celeris::update() {
         while (m_retired_network_scans.size() > m_engine->num_frames_in_flight())
             m_retired_network_scans.pop_front();
 
-        if (m_received_scan_count > 0)
-            m_gicp_pass.fit(m_voxel_point_map, 
-                            m_network_scan->point_cloud(), 
-                            m_network_scan->normal_buffer(), 
-                            m_desc.max_gicp_iterations);
+        // if (m_received_scan_count > 0)
+        //     m_gicp_pass.fit(m_voxel_point_map, 
+        //                     m_network_scan->point_cloud(), 
+        //                     m_network_scan->normal_buffer(), 
+        //                     m_desc.max_gicp_iterations);
         
         m_start_position.from_transform(m_network_scan->point_cloud().transform);        
 
@@ -78,10 +83,10 @@ void Celeris::update() {
         // start_sphere.transform.position = m_network_scan->point_cloud().transform.position;
         // start_direction_sphere.transform.position = start_pos.pos + direction_offset(start_pos.theta) * 0.85f + glm::vec3(0, 0.4f, 0);
 
-        if (m_received_scan_count % path_replanning_interval == 0) {
-            m_planner.initialize(m_start_position, m_goal_position);
-            m_planner.find_nonholomic_path(); // state_explored_paths    
-        }
+        // if (m_received_scan_count % path_replanning_interval == 0) {
+        //     m_planner.initialize(m_start_position, m_goal_position);
+        //     m_planner.find_nonholomic_path(); // state_explored_paths    
+        // }
 
         // lines = make_path_lines(planner.state_path);
         // line_cloud.set_lines(lines);
@@ -101,12 +106,13 @@ void Celeris::update() {
         // } else {
         //     path_planning_status = "Could not place start: no ground found near camera.";
         // }
+
         
         m_voxel_map_inserter.insert(m_voxel_point_map, m_network_scan->point_cloud(), m_network_scan->normal_buffer());
-        m_voxel_grid->voxelize_point_cloud(*m_engine, 
-                                           m_network_scan->point_cloud(), 
-                                           voxel_write_list, 
-                                           m_desc.max_write_count);
+        // m_voxel_grid->voxelize_point_cloud(*m_engine, 
+        //                                    m_network_scan->point_cloud(), 
+        //                                    voxel_write_list, 
+        //                                    m_desc.max_write_count);
 
         m_received_scan_count++;
     }
@@ -147,4 +153,23 @@ NonholonomicAStar& Celeris::planner() {
 
 uint32_t Celeris::received_scan_count() const noexcept {
     return m_received_scan_count;
+}
+
+void Celeris::start_planner_thread() {
+    m_planner_running.exchange(true);
+    m_planner_thread = std::thread(&Celeris::planner_loop, this);
+}
+
+void Celeris::request_path_replan(const NonholonomicPos& start_pos, const NonholonomicPos& end_pos) {
+    m_replan_requested.exchange(true);
+}
+
+void Celeris::planner_loop() {
+    while (m_planner_running.load()) {
+        if (!m_replan_requested.load())
+            continue;
+        
+        // m_planner.initialize(m_start_position, m_goal_position);
+        // m_planner.find_nonholomic_path();
+    }
 }

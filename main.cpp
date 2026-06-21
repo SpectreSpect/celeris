@@ -324,8 +324,9 @@ int main() {
                     manager_bundle, 
                     voxel_grid, 
                     Celeris::CelerisDesc());
-    celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69, 1.92, -51.30)});   
-    celeris.start_lidar_receiver();
+    celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69, 1.92, -51.30)});
+    celeris.start();
+    // celeris.start_lidar_receiver();
 
     CelerisVisualizer celeris_visualizer(mesh_manager, 
                                          material_instance_manager, 
@@ -449,7 +450,7 @@ int main() {
         lighting_system.update(engine.current_frame(), window, camera);
 
         celeris.update();
-        celeris_visualizer.update();
+        // celeris_visualizer.update();
 
         voxel_grid.update(window, camera);
 
