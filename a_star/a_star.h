@@ -20,13 +20,14 @@ public:
 
     struct AStarParams {
         int max_step_up = 1;
-        int max_drop = 6;
+        int max_drop = 1;
         int max_y_diff = 1;
         int iteration_limit = 50000;
-        bool allow_diagonal_moves = false;
+        bool allow_diagonal_moves = true;
         bool allow_flying_over_precepices = true;
         bool use_straight_fallback = true;
         uint32_t try_straight_interval = 100;
+        float heuristic_weight = 1.01f;
     };
 
     typedef AStarParams AStarDesc;

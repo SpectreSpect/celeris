@@ -277,6 +277,7 @@ void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos en
 
     m_state.plain_astar_path = m_plain_astar.find_path(glm::ivec3(glm::floor(start_pos.pos)), glm::ivec3(glm::floor(end_pos.pos)));
 
+    std::cout << "Plain A* is solid time: " << m_grid->is_solid_time.total_ms() << " ms" << std::endl;
     std::cout << "Is solid count: " << m_grid->is_solid_count << std::endl;
 
     logger().log() << std::to_string(m_state.plain_astar_path.path.size()) << "\n";

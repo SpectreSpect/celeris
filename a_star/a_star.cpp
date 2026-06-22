@@ -6,8 +6,25 @@ AStar::AStar(OccupancyGrid3D& occupancy_grid, const AStarDesc& desc)
     :   m_grid(&occupancy_grid),
         m_params(desc) {}
 
-float AStar::get_heuristic(glm::ivec3 a, glm::ivec3 b) {
-    return glm::distance(glm::vec3(a), glm::vec3(b));
+
+
+
+// float AStar::get_heuristic(glm::ivec3 a, glm::ivec3 b) {
+//     return glm::distance(glm::vec3(a), glm::vec3(b));
+// }
+
+float AStar::get_heuristic(glm::ivec3 a, glm::ivec3 b)
+{
+    float dx = std::abs(a.x - b.x);
+    float dz = std::abs(a.z - b.z);
+
+    if (!m_params.allow_diagonal_moves)
+        return dx + dz; // Manhattan distance
+
+    float diagonal = std::min(dx, dz);
+    float straight = std::max(dx, dz) - diagonal;
+
+    return diagonal * std::sqrt(2.0f) + straight; // Octile distance
 }
 
 std::vector<glm::ivec3> AStar::get_straight_path(glm::ivec3& start, glm::ivec3& end, std::vector<glm::ivec3>& out_path) {
@@ -93,7 +110,7 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
     start.pos = start_pos;
     start.no_parent = true;
     start.g = 0;
-    start.f = 0;
+    start.f = get_heuristic(start_pos, end_pos);
 
     int counter = 0;
 
@@ -249,7 +266,7 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
                 new_cell.no_parent = false;
                 new_cell.g = new_g;
                 
-                new_cell.f = new_g + get_heuristic(new_pos, end_pos);
+                new_cell.f = new_g + m_params.heuristic_weight * get_heuristic(new_pos, end_pos);
 
                 pq.push(new_cell);
             }
