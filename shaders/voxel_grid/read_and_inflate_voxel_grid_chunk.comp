@@ -60,7 +60,8 @@ ivec3 local_voxel_pos_from_index(uint voxel_id)
 void mark_inflated_voxel(
     ivec2 source_chunk_offset,
     ivec3 source_local_pos,
-    ivec2 inflation_offset)
+    ivec2 inflation_offset,
+    int height_offset)
 {
     // Express the source voxel in the coordinate system of the 3x3 output.
     ivec2 output_xz = ivec2(
@@ -85,9 +86,16 @@ void mark_inflated_voxel(
     bool output_is_center = all(equal(output_chunk_pos, ivec2(1)));
     if (!source_is_center && !output_is_center) return;
 
+    int output_y = source_local_pos.y - height_offset;
+
+    // Only the nine chunks in the requested chunk's XZ plane are emitted.
+    // Obstacles in the chunks above/below, and inflation that would cross a
+    // vertical chunk boundary, are intentionally ignored for now.
+    if (output_y < 0 || output_y >= u_chunk_dim.y) return;
+
     ivec3 output_local_pos = ivec3(
         output_xz.x % u_chunk_dim.x,
-        source_local_pos.y,
+        output_y,
         output_xz.y % u_chunk_dim.z
     );
 
@@ -127,14 +135,23 @@ void main()
 
     ivec3 source_local_pos = local_voxel_pos_from_index(voxel_id);
     int radius = int(inflation_size);
+    const int car_height_voxels = 3;
 
-    for (int z = -radius; z <= radius; ++z) {
-        for (int x = -radius; x <= radius; ++x) {
-            mark_inflated_voxel(
-                source_chunk_offset,
-                source_local_pos,
-                ivec2(x, z)
-            );
+    // A solid voxel blocks every possible car-base voxel whose vertical
+    // footprint would contain it. Marking downward is equivalent to checking
+    // car_height_voxels upward from each possible car position.
+    for (int height_offset = 0;
+         height_offset < car_height_voxels;
+         ++height_offset) {
+        for (int z = -radius; z <= radius; ++z) {
+            for (int x = -radius; x <= radius; ++x) {
+                mark_inflated_voxel(
+                    source_chunk_offset,
+                    source_local_pos,
+                    ivec2(x, z),
+                    height_offset
+                );
+            }
         }
     }
 }

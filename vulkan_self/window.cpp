@@ -21,6 +21,7 @@ Window::Window(const GlfwContext&, uint32_t width, uint32_t height, std::string_
     glfwSetFramebufferSizeCallback(m_window, resize_callback);
     glfwSetCursorPosCallback(m_window, mouse_callback);
     glfwSetMouseButtonCallback(m_window, mouse_button_callback);
+    glfwSetScrollCallback(m_window, scroll_callback);
 
     logger().check(m_window, "Failed to create GLFW window");
 }
@@ -105,6 +106,10 @@ MouseState Window::mouse_state() const noexcept {
     return m_mouse_state;
 }
 
+double Window::consume_scroll_y() noexcept {
+    return std::exchange(m_mouse_state.scroll_y, 0.0);
+}
+
 void Window::wait_until_framebuffer_available() {
     LOG_METHOD();
 
@@ -149,4 +154,13 @@ void Window::mouse_button_callback(GLFWwindow* handle, int button, int action, i
         case GLFW_MOUSE_BUTTON_MIDDLE: window->m_mouse_state.middle_pressed = (action == GLFW_PRESS); break;
         default: break;
     }
+}
+
+void Window::scroll_callback(GLFWwindow* handle, double xoffset, double yoffset) {
+    LOG_NAMED("Window");
+    Window* window = static_cast<Window*>(glfwGetWindowUserPointer(handle));
+    if (!window) return;
+
+    window->m_mouse_state.scroll_x += xoffset;
+    window->m_mouse_state.scroll_y += yoffset;
 }

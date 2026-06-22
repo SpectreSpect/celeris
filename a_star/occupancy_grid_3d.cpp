@@ -266,8 +266,6 @@ bool OccupancyGrid3D::is_solid(glm::ivec3 pos) {
 
     is_solid_time.start();
 
-    
-
     uint32_t inflation_size = 3;
 
     glm::ivec3 chunk_pos = m_voxel_grid->chunk_pos_from_voxel_pos(pos);

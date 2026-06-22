@@ -68,6 +68,7 @@ add_executable(app
   renderer/resources/frame_resources.cpp
   camera/camera.cpp
   camera/controllers/fps_camera_controller.cpp
+  camera/controllers/third_person_camera_controller.cpp
   vulkan_self/vulkan_image_temp.cpp
   renderer/transform.cpp
   renderer/mesh.cpp

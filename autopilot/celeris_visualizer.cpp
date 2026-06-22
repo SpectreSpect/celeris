@@ -8,6 +8,9 @@
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+#include <algorithm>
+#include <cmath>
+
 // namespace {
 //     void set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position) {
 //         marker.transform.position = nonholonomic_position.pos;
@@ -68,8 +71,6 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
         .line_width_pixels = 5
     });
 
-    
-
     add_child(m_start_marker);
     add_child(m_goal_marker);
     add_child(m_path_line_cloud);
@@ -77,23 +78,32 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
     add_child(m_explored_paths_line_cloud);
     add_child(m_unimpended_path_line_cloud);
 
+    set_start(m_celeris->start_position());
     set_goal(m_celeris->goal_position());
 }
 
 void CelerisVisualizer::set_start(const NonholonomicPos& nonholonomic_position) {
     set_marker_pose(m_start_marker, nonholonomic_position);
+    reset_marker_interpolation(m_start_marker, m_start_marker_interpolation);
 }
 
 void CelerisVisualizer::set_goal(const NonholonomicPos& nonholonomic_position) {
     set_marker_pose(m_goal_marker, nonholonomic_position);
+    reset_marker_interpolation(m_goal_marker, m_goal_marker_interpolation);
 }
 
 void CelerisVisualizer::set_start(const Transform& transform) {
     m_start_marker.transform = transform;
+    reset_marker_interpolation(m_start_marker, m_start_marker_interpolation);
 }
 
 void CelerisVisualizer::set_goal(const Transform& transform) {
     m_goal_marker.transform = transform;
+    reset_marker_interpolation(m_goal_marker, m_goal_marker_interpolation);
+}
+
+glm::vec3 CelerisVisualizer::get_start_marker_pos() {
+    return m_start_marker.transform.position;
 }
 
 void CelerisVisualizer::update() {
@@ -101,8 +111,24 @@ void CelerisVisualizer::update() {
 
     logger().check(m_celeris, "Celeris was null");
 
-    set_start(m_celeris->start_position());
-    set_goal(m_celeris->goal_position());
+    const auto now = std::chrono::steady_clock::now();
+    const uint32_t received_scan_count = m_celeris->received_scan_count();
+    const bool received_new_scan = received_scan_count != scan_generation;
+    scan_generation = received_scan_count;
+
+    interpolate_marker_pose(
+        m_start_marker,
+        m_start_marker_interpolation,
+        m_celeris->start_position(),
+        now,
+        received_new_scan
+    );
+    interpolate_marker_pose(
+        m_goal_marker,
+        m_goal_marker_interpolation,
+        m_celeris->goal_position(),
+        now
+    );
 
     {
         std::lock_guard<std::mutex> lock(m_celeris->planner_mutex());
@@ -134,6 +160,75 @@ void CelerisVisualizer::set_marker_pose(SphericalPoseMarker& marker, Nonholonomi
         glm::pi<float>() - nonholonomic_position.theta,
         glm::vec3(0.0f, 1.0f, 0.0f)
     );
+}
+
+void CelerisVisualizer::reset_marker_interpolation(
+    SphericalPoseMarker& marker,
+    MarkerInterpolationState& state)
+{
+    state.previous_position = marker.transform.position;
+    state.target_position = marker.transform.position;
+    state.previous_rotation = marker.transform.rotation;
+    state.target_rotation = marker.transform.rotation;
+    state.sample_time = std::chrono::steady_clock::now();
+    state.initialized = true;
+}
+
+void CelerisVisualizer::interpolate_marker_pose(
+    SphericalPoseMarker& marker,
+    MarkerInterpolationState& state,
+    const NonholonomicPos& target,
+    std::chrono::steady_clock::time_point now,
+    bool force_new_sample)
+{
+    const glm::quat target_rotation = glm::normalize(glm::angleAxis(
+        glm::pi<float>() - target.theta,
+        glm::vec3(0.0f, 1.0f, 0.0f)
+    ));
+
+    if (!state.initialized) {
+        set_marker_pose(marker, target);
+        reset_marker_interpolation(marker, state);
+        state.sample_time = now;
+        return;
+    }
+
+    const glm::vec3 position_delta = target.pos - state.target_position;
+    const bool position_changed = glm::dot(position_delta, position_delta) > 1e-8f;
+    const bool rotation_changed =
+        std::abs(glm::dot(target_rotation, state.target_rotation)) < 0.999999f;
+
+    if (force_new_sample || position_changed || rotation_changed) {
+        state.sample_interval = std::clamp(
+            std::chrono::duration<float>(now - state.sample_time).count(),
+            1.0f / 120.0f,
+            0.5f
+        );
+        state.previous_position = marker.transform.position;
+        state.previous_rotation = marker.transform.rotation;
+        state.target_position = target.pos;
+        state.target_rotation = target_rotation;
+        state.sample_time = now;
+    }
+
+    const float interpolation_time =
+        std::chrono::duration<float>(now - state.sample_time).count();
+    const float blend = std::clamp(
+        interpolation_time / state.sample_interval,
+        0.0f,
+        1.0f
+    );
+
+    marker.transform.position = glm::mix(
+        state.previous_position,
+        state.target_position,
+        blend
+    );
+    marker.transform.rotation = glm::normalize(glm::slerp(
+        state.previous_rotation,
+        state.target_rotation,
+        blend
+    ));
 }
 
 std::vector<LineInstance> CelerisVisualizer::make_path_lines(const std::vector<NonholonomicPos>& path, bool override_color) {

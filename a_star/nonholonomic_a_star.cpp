@@ -267,7 +267,7 @@ void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos en
     m_grid->read_and_inflate_chunk_count = 0;
     m_grid->is_solid_count = 0;
 
-    // m_grid->clear_cache();
+    m_grid->clear_cache();
 
     m_state = NonholonomicAStarState();
     

@@ -70,6 +70,7 @@
 #include "autopilot/celeris.h"
 #include "autopilot/celeris_visualizer.h"
 #include "voxel_grid_vulkan/voxel_grid_gpu_debugger.h"
+#include "camera/controllers/third_person_camera_controller.h"
 
 #include <cmath>
 #include <vector>
@@ -98,8 +99,10 @@ int main() {
 
     UI ui(window, engine);
     Camera camera;
-    FPSCameraController camera_controller(camera);
-    camera_controller.speed = 20;
+    // FPSCameraController camera_controller(camera);
+    // camera_controller.speed = 20;
+
+    ThirdPersonCameraController camera_controller(camera);
 
     VulkanResourceLoader resource_loader(engine, 154217728); // 1 Мб
 
@@ -453,14 +456,18 @@ int main() {
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
 
-        camera_controller.update(window, delta_time);
-        frame_resources.update_camera(engine.current_frame(), window, camera);
-        lighting_system.update(engine.current_frame(), window, camera);
 
         celeris.update();
         celeris_visualizer.update();
 
-        voxel_grid.update(window, camera);
+        // camera_controller.update(window, delta_time);
+        camera_controller.set_target(celeris_visualizer.get_start_marker_pos());
+        camera_controller.update(window, delta_time);
+        frame_resources.update_camera(engine.current_frame(), window, camera);
+
+        lighting_system.update(engine.current_frame(), window, camera);
+
+        voxel_grid.update(window, camera);        
 
         if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
             place_start_pressed = true;
