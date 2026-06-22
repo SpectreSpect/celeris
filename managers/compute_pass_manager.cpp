@@ -73,6 +73,10 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         normals_from_webots_lidar_point_cloud_cp(create_normals_from_webots_lidar_point_cloud_compute_pass(device, shader_manager.normals_from_webots_lidar_point_cloud_cs)),
         remove_near_origin_lidar_points_cp(create_remove_near_origin_lidar_points_compute_pass(device, shader_manager.remove_near_origin_lidar_points_cs)),
 
+        // A*
+        prepare_copy_dirty_list_dispatch_args_cp(create_prepare_copy_dirty_list_dispatch_args_compute_pass(device, shader_manager.prepare_copy_dirty_list_dispatch_args_cs)),
+        copy_dirty_list_cp(create_copy_dirty_list_compute_pass(device, shader_manager.copy_dirty_list_cs)),
+
         // PBR
         equirect_to_cubemap_cp(create_equirect_to_cubemap_compute_pass(device, shader_manager.equirect_to_cubemap_cs)),
         brdf_lut_cp(create_brdf_lut_pass(device, shader_manager.brdf_lut_cs)),
@@ -903,6 +907,33 @@ ComputePass ComputePassManager::create_remove_near_origin_lidar_points_compute_p
     builder.add_storage_buffer(0, ShaderStages::compute); // PointBuffer
 
     builder.add_push_constantsf(sizeof(RemoveNearOriginLidarPointsPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_copy_dirty_list_compute_pass(
+    VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // DirtyListBuf
+    builder.add_storage_buffer(1, ShaderStages::compute); // OutputDirtyChunkPositionBuf
+    builder.add_storage_buffer(2, ShaderStages::compute); // ChunkMetaBuf
+
+    builder.add_push_constantsf(sizeof(CopyDirtyListPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_prepare_copy_dirty_list_dispatch_args_compute_pass(
+    VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // DirtyListBuf
+    builder.add_storage_buffer(1, ShaderStages::compute); // DispatchBuf
 
     return create_pass(device, compute_shader_module, builder);
 }

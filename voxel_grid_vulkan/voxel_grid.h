@@ -1,11 +1,13 @@
 #pragma once
 
+#include <vector>
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
-#include <vector>
+#include <functional>
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
+
 
 #include "../vulkan_self/logger/logger_header.h"
 #include "../vulkan_self/vulkan_buffer.h"
@@ -29,6 +31,7 @@ class VulkanQueue;
 class Camera;
 class Window;
 class PointCloud;
+
 
 class VoxelGridChunk {
 public:
@@ -208,6 +211,9 @@ public:
     glm::ivec3 pos_in_chunk_from_global_voxel_pos(glm::ivec3 voxel_pos);
     glm::ivec3 pos_in_chunk_from_global_voxel_pos(glm::ivec3 chunk_pos, glm::ivec3 voxel_pos);
 
+    void add_next_to_stream_chunks_sphere_callback(std::function<void(VulkanCommandBuffer&, VoxelGrid&)> callback);
+    void add_next_to_update_submit_callbacks(std::function<void(VoxelGrid&)> callback);
+
 public:
     struct VoxelGridPassInstances {
         PassWriter fill_buffer_pw;
@@ -263,6 +269,9 @@ private:
     IndirectRenderObject m_render_object;
 
     ShaderHelper m_shader_helper;
+
+    std::vector<std::function<void(VulkanCommandBuffer&, VoxelGrid&)>> m_next_to_stream_chunks_sphere_callbacks;
+    std::vector<std::function<void(VoxelGrid&)>> m_next_to_update_submit_callbacks;
     
 private:
     uint64_t vox_per_chunk() const noexcept;

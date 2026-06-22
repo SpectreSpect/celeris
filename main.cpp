@@ -75,6 +75,11 @@
 #include <vector>
 #include <random>
 
+
+void test_callback_func(VulkanCommandBuffer& command_buffere, VoxelGrid& voxel_grid) {
+    std::cout << "It worked!" << std::endl;
+}
+
 // static std::mt19937 rng(std::random_device{}());
 // static std::uniform_real_distribution<double> dist(0.0, 1.0);
 
@@ -154,6 +159,7 @@ int main() {
         voxel_grid_desc,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
     );
+
     VoxelGridGPUDebugger debugger(
         voxel_grid,
         engine.device(),
@@ -324,8 +330,9 @@ int main() {
                     manager_bundle, 
                     voxel_grid, 
                     Celeris::CelerisDesc());
-    celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69, 1.92, -51.30)});
-    // celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-50.69, 1.92, 0)});
+    celeris.set_start(NonholonomicPos{.pos = glm::vec3(0.0f, 1.5f, 0.0f)});
+    celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.92f, -51.30f)});
+    // celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.5f, -0.0f)});
     celeris.start();
     // celeris.start_lidar_receiver();
 

@@ -88,6 +88,10 @@ public:
     ComputePass prefilter_map_cp;
     ComputePass irradiance_map_cp;
 
+    // A*
+    ComputePass prepare_copy_dirty_list_dispatch_args_cp;
+    ComputePass copy_dirty_list_cp;
+
     ComputePassManager(VulkanDevice& device, ShaderManager& shader_manager);
 
     DescriptorPool& descriptor_pool() noexcept;
@@ -162,6 +166,10 @@ public:
     // Point cloud
     ComputePass create_normals_from_webots_lidar_point_cloud_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_remove_near_origin_lidar_points_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+
+    // A*
+    ComputePass create_prepare_copy_dirty_list_dispatch_args_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_copy_dirty_list_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
 private:
     DescriptorPool m_pool;

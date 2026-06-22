@@ -10,6 +10,7 @@
 #include "../renderer/point_cloud/gicp/gicp_pass.h"
 #include "../vulkan_self/vulkan_engine.h"
 #include "../vulkan_self/logger/logger_header.h"
+#include "../utils/avg_timer.h"
 
 
 class VulkanQueue;
@@ -57,6 +58,8 @@ public:
     std::vector<NonholonomicPos> nonholonomic_astar_path;
     std::vector<LineInstance> explored_paths;
     std::vector<NonholonomicPos> unimpended_path;
+
+    AvgTimer total_path_finding_time;
 
 private:
     VulkanEngine* m_engine = nullptr;

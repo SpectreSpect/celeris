@@ -1604,6 +1604,15 @@ glm::ivec3 VoxelGrid::pos_in_chunk_from_global_voxel_pos(glm::ivec3 chunk_pos, g
     return voxel_pos - chunk_pos * glm::ivec3(m_params.chunk_size);
 }
 
+void VoxelGrid::add_next_to_stream_chunks_sphere_callback(
+    std::function<void(VulkanCommandBuffer&, VoxelGrid&)> callback) {
+    m_next_to_stream_chunks_sphere_callbacks.push_back(callback);
+}
+
+void VoxelGrid::add_next_to_update_submit_callbacks(std::function<void(VoxelGrid&)> callback) {
+    m_next_to_update_submit_callbacks.push_back(callback);
+}
+
 void VoxelGrid::world_init_gpu() {
     LOG_METHOD();
 
@@ -1809,11 +1818,20 @@ void VoxelGrid::update(Window& window, Camera& camera) {
     {
         auto scope = m_command_buffer.begin_scope();
         stream_chunks_sphere(m_command_buffer, camera.position, -1, 42);
+
+        for (auto& callback : m_next_to_stream_chunks_sphere_callbacks) {
+            callback(m_command_buffer, *this);
+        }
+
         build_mesh_from_dirty(m_command_buffer, math_utils::BITS, math_utils::OFFSET);
         build_indirect_draw_commands_frustum(m_command_buffer, vp, camera.position, math_utils::BITS, math_utils::OFFSET);
     }
     
     submit_compute_commands();
+
+    for (auto& callback : m_next_to_update_submit_callbacks) {
+        callback(*this);
+    }
 }
 
 void VoxelGrid::submit_compute_commands() {

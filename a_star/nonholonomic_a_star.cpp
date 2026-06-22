@@ -262,7 +262,12 @@ float NonholonomicAStar::get_nonholonomic_f(NonholonomicPos& new_pos, Nonholonom
 void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos end_pos) {
     LOG_METHOD();
 
-    m_grid->clear_cache();
+    m_grid->read_and_inflate_chunk_time = AvgTimer();
+    m_grid->is_solid_time = AvgTimer();
+    m_grid->read_and_inflate_chunk_count = 0;
+    m_grid->is_solid_count = 0;
+
+    // m_grid->clear_cache();
 
     m_state = NonholonomicAStarState();
     
@@ -271,6 +276,8 @@ void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos en
     m_params.min_radius = m_params.wheel_base / std::tan(m_params.max_steer);
 
     m_state.plain_astar_path = m_plain_astar.find_path(glm::ivec3(glm::floor(start_pos.pos)), glm::ivec3(glm::floor(end_pos.pos)));
+
+    std::cout << "Is solid count: " << m_grid->is_solid_count << std::endl;
 
     logger().log() << std::to_string(m_state.plain_astar_path.path.size()) << "\n";
 
@@ -542,6 +549,11 @@ void NonholonomicAStar::find_nonholomic_path() {
         if (find_nonholomic_path_step())
             break;
     }
+
+    std::cout << "Read and infalte chunk time: " << m_grid->read_and_inflate_chunk_time.total_ms() << " ms" << std::endl;
+    std::cout << "Is solid time: " << m_grid->is_solid_time.total_ms() << " ms" << std::endl;
+    
+    std::cout << "Read and inflate count: " << m_grid->read_and_inflate_chunk_count << std::endl;
 }
 
 OccupancyGrid3D& NonholonomicAStar::occupancy_grid() noexcept {

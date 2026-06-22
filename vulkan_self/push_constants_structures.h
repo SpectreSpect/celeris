@@ -339,3 +339,8 @@ struct RemoveNearOriginLidarPointsPushConstants {
 struct MarkAndCountFailSlotsPushConstants {
     uint32_t u_counter_hash_table_size;
 };
+
+struct CopyDirtyListPushConstants {
+    uint32_t u_pack_bits;
+    int32_t u_pack_offset;
+};

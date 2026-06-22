@@ -88,6 +88,10 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         // Point cloud
         normals_from_webots_lidar_point_cloud_cs(device, path_utils::executable_dir() / "shaders" / "point_cloud" / "normals_from_webots_lidar_point_cloud.comp.spv"),
         remove_near_origin_lidar_points_cs(device, path_utils::executable_dir() / "shaders" / "point_cloud" / "remove_near_origin_lidar_points.comp.spv"),
+
+        // A*
+        prepare_copy_dirty_list_dispatch_args_cs(device, path_utils::executable_dir() / "shaders" / "a_star" / "prepare_copy_dirty_list_dispatch_args.comp.spv"),
+        copy_dirty_list_cs(device, path_utils::executable_dir() / "shaders" / "a_star" / "copy_dirty_list.comp.spv"),
         
         // PBR
         equirect_to_cubemap_cs(device, path_utils::executable_dir() / "shaders" / "equirect_to_cubemap.comp.spv"),

@@ -17,7 +17,7 @@ Celeris::Celeris(VulkanEngine& engine,
         m_gicp_pass(engine, manager_bundle.compute_pass_manager()),
         m_point_cloud_preprocessor(engine.device(), compute_queue, manager_bundle.compute_pass_manager()),
         m_scan_receiver(m_point_cloud_preprocessor),
-        m_occupancy_grid(voxel_grid),
+        m_occupancy_grid(engine.physical_device(), engine.device(), voxel_grid, manager_bundle.compute_pass_manager()),
         m_planner(m_occupancy_grid, desc.nonholonomic_astar_desc),
         m_voxel_point_map(engine, 
                           desc.voxel_point_map_num_hash_table_slots, 
@@ -121,8 +121,15 @@ void Celeris::update() {
 }
 
 void Celeris::find_path() {
+    total_path_finding_time = AvgTimer();
+
+    total_path_finding_time.start();
     m_planner.initialize(m_start_position, m_goal_position);
     m_planner.find_nonholomic_path(); // state_explored_paths
+    total_path_finding_time.end();
+
+    std::cout << "Total path finding time: " << total_path_finding_time.average_ms() << " ms" << std::endl;
+
     {
         std::lock_guard<std::mutex> lock(m_planner_mutex);    
         plain_astar_path = m_planner.state().plain_astar_path;

@@ -96,6 +96,10 @@ public:
     VulkanShaderModule normals_from_webots_lidar_point_cloud_cs;
     VulkanShaderModule remove_near_origin_lidar_points_cs;
 
+    // A*
+    VulkanShaderModule prepare_copy_dirty_list_dispatch_args_cs;
+    VulkanShaderModule copy_dirty_list_cs;
+
     // PBR
     VulkanShaderModule equirect_to_cubemap_cs;
     VulkanShaderModule brdf_lut_cs;
