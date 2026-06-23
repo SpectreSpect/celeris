@@ -20,6 +20,7 @@ layout(std140, set = 0, binding = 0) uniform ParamsBuffer {
     uint num_hash_table_slots;
     uint pack_bits;
     int pack_offset;
+    uint retry_mode;
     mat4 source_model;
     vec4 color;
 } params;
@@ -54,6 +55,20 @@ layout(std430, set = 0, binding = 5) buffer MapNormalBuffer {
 layout(std430, set = 0, binding = 6) coherent buffer PointHashTable {
     HashTableCounters point_hash_table_counters;
     IndexHashTableSlot point_hash_table_slots[];
+};
+
+layout(std430, set = 0, binding = 7) buffer InsertDebugBuffer {
+    uint hash_table_insert_fail_count;
+} insert_debug_buffer;
+
+layout(std430, set = 0, binding = 8) readonly buffer ReadableInsertRetryList {
+    uint readable_retry_list_counter;
+    uint readable_retry_list[];
+};
+
+layout(std430, set = 0, binding = 9) buffer WritableInsertRetryList {
+    uint writable_retry_list_counter;
+    uint writable_retry_list[];
 };
 
 vec3 g_insert_world_position;
@@ -260,6 +275,7 @@ void update_voxel_surfel(
 // ------------------------------------------------------------
 
 bool voxel_insert_point_and_normal(
+    uint source_point_id,
     ivec3 key,
     vec4 world_position4,
     vec4 world_normal4,
@@ -294,8 +310,12 @@ bool voxel_insert_point_and_normal(
 
     uint slot_id;
     bool created;
-    if (!point_hash_table_get_or_create_slot(hash_key, slot_id, created))
+    if (!point_hash_table_get_or_create_slot(hash_key, slot_id, created)) {
+        atomicAdd(insert_debug_buffer.hash_table_insert_fail_count, 1u);
+        uint retry_id = atomicAdd(writable_retry_list_counter, 1u);
+        writable_retry_list[retry_id] = source_point_id;
         return false;
+    }
 
     uint surfel_id = point_hash_table_slots[slot_id].value;
     if (surfel_id == INVALID_ID)
@@ -337,10 +357,20 @@ bool voxel_insert_point_and_normal(
 
 void main()
 {
-    uint source_point_id = gl_GlobalInvocationID.x;
+    uint work_id = gl_GlobalInvocationID.x;
+    uint source_point_id;
 
-    if (source_point_id >= params.source_point_count)
-        return;
+    if (params.retry_mode != 0u) {
+        if (work_id >= readable_retry_list_counter)
+            return;
+
+        source_point_id = readable_retry_list[work_id];
+    } else {
+        source_point_id = work_id;
+
+        if (source_point_id >= params.source_point_count)
+            return;
+    }
 
     PointInstance src_point = source_point_buffer.points[source_point_id];
     vec4 src_normal4 = source_normal_buffer.normals[source_point_id];
@@ -393,7 +423,8 @@ void main()
 
     ivec3 key = voxel_key_from_world_pos(p_world, voxel_size);
 
-    voxel_insert_point_and_normal(
+    bool result = voxel_insert_point_and_normal(
+        source_point_id,
         key,
         vec4(p_world, 1.0),
         vec4(n_world, 0.0),

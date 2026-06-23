@@ -408,6 +408,14 @@ int main() {
 
     vox_box.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
 
+    LidarVideo lidar_video(
+        manager_bundle, 
+        point_cloud_preprocessor, 
+        "/home/spectre/TEMP_lidar_output_mesh/recording_16/index.csv", 
+        40,
+        50
+    );
+
     LidarScan target_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
     LidarScan source_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
 
@@ -419,8 +427,8 @@ int main() {
     celeris.voxel_map_reseter().reset(celeris.voxel_point_map());
     celeris.voxel_map_point_inserter().insert(
         celeris.voxel_point_map(), 
-        target_scan.point_cloud(), 
-        target_scan.normal_buffer()
+        lidar_video.get_scan(0).point_cloud(), 
+        lidar_video.get_scan(0).normal_buffer()
     );
 
     PointCloud voxel_point_map(
@@ -428,7 +436,7 @@ int main() {
         celeris.voxel_point_map().map_point_buffer, 
         celeris.voxel_point_map().m_map_point_count
     );
-    voxel_point_map.set_color(glm::vec4(0, 0, 1, 1));
+    voxel_point_map.set_color(glm::vec4(0, 0, 0, 1));
 
     Scene scene;
 
@@ -436,7 +444,9 @@ int main() {
     // scene.add(celeris_visualizer);
     // scene.add(target_scan);
     scene.add(voxel_point_map);
-    scene.add(source_scan);
+    // scene.add(source_scan);
+
+    // scene.add(lidar_video);
     
     skybox.update(scene);
 
@@ -632,6 +642,8 @@ int main() {
                 ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "y: %.2f", camera.position.y);
                 ImGui::SameLine();
                 ImGui::TextColored(ImVec4(0.0f, 0.35f, 1.0f, 1.0f), "z: %.2f", camera.position.z);
+                
+                ImGui::TextColored(ImVec4(1.0f, 0.35f, 1.0f, 1.0f), "Current frame id: %d", lidar_video.current_frame_id());
 
                 // if (ImGui::Button("FPS controller")) {
                 //     use_fps_camera_controller();
@@ -672,11 +684,32 @@ int main() {
                 // }
 
                 if (ImGui::Button("GICP step")) {
-                    celeris.gicp_pass().step(
-                        celeris.voxel_point_map(), 
-                        source_scan.point_cloud(), 
-                        source_scan.normal_buffer()
+                    // celeris.gicp_pass().step(
+                    //     celeris.voxel_point_map(), 
+                    //     source_scan.point_cloud(), 
+                    //     source_scan.normal_buffer()
+                    // );
+
+                    
+                }
+
+                if (ImGui::Button("Next frame")) {
+                    lidar_video.next_frame();
+
+                    celeris.gicp_pass().fit(
+                        celeris.voxel_point_map(),
+                        lidar_video.get_scan(lidar_video.current_frame_id()).point_cloud(),
+                        lidar_video.get_scan(lidar_video.current_frame_id()).normal_buffer(),
+                        10
                     );
+
+                    celeris.voxel_map_point_inserter().insert(
+                        celeris.voxel_point_map(), 
+                        lidar_video.get_scan(lidar_video.current_frame_id()).point_cloud(), 
+                        lidar_video.get_scan(lidar_video.current_frame_id()).normal_buffer()
+                    );
+
+                    voxel_point_map.set_instance_count(celeris.voxel_point_map().m_map_point_count);
                 }
 
                 ImGui::End();
