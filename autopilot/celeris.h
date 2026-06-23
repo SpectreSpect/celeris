@@ -10,7 +10,11 @@
 #include "../renderer/point_cloud/gicp/gicp_pass.h"
 #include "../vulkan_self/vulkan_engine.h"
 #include "../vulkan_self/logger/logger_header.h"
+#include "vehicle_command_sender.h"
 #include "../utils/avg_timer.h"
+
+#include <chrono>
+#include <cstddef>
 
 
 class VulkanQueue;
@@ -43,10 +47,12 @@ public:
     void find_path();
     void set_start(const NonholonomicPos& position);
     void set_goal(const NonholonomicPos& position);
+    void set_car_speed(float speed) noexcept;
 
     LidarScan* network_scan();
     NonholonomicPos start_position() const noexcept;
     NonholonomicPos goal_position() const noexcept;
+    float car_speed() const noexcept;
     NonholonomicAStar& planner();
     uint32_t received_scan_count() const noexcept;
 
@@ -71,6 +77,7 @@ private:
 
     PointCloudPreprocessor m_point_cloud_preprocessor;
     LidarScanReceiver m_scan_receiver;
+    VehicleCommandSender m_command_sender;
     OccupancyGrid3D m_occupancy_grid;
     NonholonomicAStar m_planner;
     
@@ -82,6 +89,7 @@ private:
 
     NonholonomicPos m_start_position;
     NonholonomicPos m_goal_position;
+    float m_car_speed = 10.0f;
 
     std::unique_ptr<LidarScan> m_network_scan;
     std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;
@@ -92,8 +100,18 @@ private:
     std::atomic<bool> m_replan_requested{false};
     std::mutex m_planner_mutex;
     std::thread m_planner_thread;
+
+    uint32_t current_target_path_point_id = 0;
+
+    bool is_stop_waiting = false;
+    double stop_waiting_time = 2;
+    std::chrono::steady_clock::time_point stop_waiting_start_timestamp{};
     
     void start_planner_thread();
     void request_path_replan(const NonholonomicPos& start_pos, const NonholonomicPos& end_pos);
     void planner_loop();
+
+    bool find_closest_next_path_point(uint32_t current_id, uint32_t& output_id, uint32_t& output_dist);
+    VehicleCommand get_path_following_command();
+    
 };
