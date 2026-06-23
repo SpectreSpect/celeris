@@ -162,6 +162,9 @@ ComputePass ComputePassManager::create_old_point_voxel_map_insert_compute_pass(V
     builder.add_storage_buffer(4, ShaderStages::compute); // MapPointBuffer
     builder.add_storage_buffer(5, ShaderStages::compute); // MapNormalBuffer
     builder.add_storage_buffer(6, ShaderStages::compute); // VoxelHashTableBuffer
+    builder.add_storage_buffer(7, ShaderStages::compute); // InsertDebugBuffer
+    builder.add_storage_buffer(8, ShaderStages::compute); // ReadableInsertRetryList
+    builder.add_storage_buffer(9, ShaderStages::compute); // WritableInsertRetryList
 
     return create_pass(device, compute_shader_module, builder);
 }

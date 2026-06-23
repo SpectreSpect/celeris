@@ -6,8 +6,6 @@
 #include "voxel_point_map.h"
 #include "../../../../math_utils.h"
 
-#include <glm/gtx/euler_angles.hpp>
-
 
 OldGICPPass::OldGICPPass(VulkanEngine& engine, ComputePassManager& compute_pass_manager)
     :   engine(engine),
@@ -47,6 +45,8 @@ double OldGICPPass::step(OldVoxelPointMap& voxel_point_map, OldPointCloud& sourc
     uniform_data.num_source_points = source_point_cloud.instance_count();
     uniform_data.num_target_points = voxel_point_map.m_map_point_count; // 1824 2067 2186 2090
     uniform_data.num_hash_table_slots = voxel_point_map.m_num_hash_table_slots;
+    uniform_data.pack_bits = math_utils::BITS;
+    uniform_data.pack_offset = static_cast<int32_t>(math_utils::OFFSET);
 
     uniform_buffer.upload(&uniform_data, sizeof(GICPPassUniform));
 
@@ -179,10 +179,6 @@ glm::quat OldGICPPass::omega_to_quat(const glm::vec3& omega) {
 
     glm::vec3 axis = omega / theta;
     return glm::normalize(glm::angleAxis(theta, axis));
-}
-
-glm::mat3 OldGICPPass::euler_xyz_to_mat3(const glm::vec3& euler) {
-    return glm::mat3(glm::eulerAngleXYZ(euler.x, euler.y, euler.z));
 }
 
 glm::mat3 OldGICPPass::skew_matrix(const glm::vec3& v) {
@@ -321,10 +317,4 @@ glm::mat3 OldGICPPass::omega_to_mat3(const glm::vec3& omega) {
     glm::vec3 axis = omega / theta;
     glm::mat4 R4 = glm::rotate(glm::mat4(1.0f), theta, axis);
     return glm::mat3(R4);
-}
-
-glm::vec3 OldGICPPass::mat3_to_euler_xyz(const glm::mat3& R) {
-    float x, y, z;
-    glm::extractEulerAngleXYZ(glm::mat4(R), x, y, z);
-    return glm::vec3(x, y, z);
 }

@@ -31,10 +31,12 @@ public:
         uint32_t num_source_points;
         uint32_t num_target_points;
         uint32_t num_hash_table_slots;
-        uint32_t _pad0;
+        uint32_t pack_bits;
+        int32_t pack_offset;
+        uint32_t _pad0[3];
     };
 
-    static_assert(sizeof(GICPPassUniform) == 48);
+    static_assert(sizeof(GICPPassUniform) == 64);
 
     struct OutputBuffer {
         glm::vec4 position;
@@ -69,9 +71,7 @@ private:
     VulkanBuffer rejection_buffer;
 
     static glm::quat omega_to_quat(const glm::vec3& omega);
-    static glm::mat3 euler_xyz_to_mat3(const glm::vec3& euler);
     static glm::mat3 skew_matrix(const glm::vec3& v);
     static bool solve_6x6(const double H_in[6][6], const double g_in[6], double delta_out[6]);
     static glm::mat3 omega_to_mat3(const glm::vec3& omega);
-    static glm::vec3 mat3_to_euler_xyz(const glm::mat3& R);
 };
