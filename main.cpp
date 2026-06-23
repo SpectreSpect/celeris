@@ -367,11 +367,8 @@ int main() {
         camera_controller_mode = CameraControllerMode::ThirdPerson;
     };
 
-    VehicleCommandSender command_sender;
-    command_sender.start();
     float car_speed = celeris.car_speed();
 
-    
 
     auto start_path_planning = [&]() {
         if (has_start_pos && has_end_pos) {
@@ -411,10 +408,35 @@ int main() {
 
     vox_box.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
 
+    LidarScan target_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
+    LidarScan source_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
+
+    target_scan.point_cloud().set_color(glm::vec4(0, 0, 1, 1));
+    source_scan.point_cloud().set_color(glm::vec4(1, 0, 0, 1));
+
+    source_scan.point_cloud().transform.position += glm::vec3(-2, 2, -2);
+
+    celeris.voxel_map_reseter().reset(celeris.voxel_point_map());
+    celeris.voxel_map_point_inserter().insert(
+        celeris.voxel_point_map(), 
+        target_scan.point_cloud(), 
+        target_scan.normal_buffer()
+    );
+
+    PointCloud voxel_point_map(
+        manager_bundle, 
+        celeris.voxel_point_map().map_point_buffer, 
+        celeris.voxel_point_map().m_map_point_count
+    );
+    voxel_point_map.set_color(glm::vec4(0, 0, 1, 1));
+
     Scene scene;
 
     scene.add(skybox);
-    scene.add(celeris_visualizer);
+    // scene.add(celeris_visualizer);
+    // scene.add(target_scan);
+    scene.add(voxel_point_map);
+    scene.add(source_scan);
     
     skybox.update(scene);
 
@@ -437,7 +459,7 @@ int main() {
 
     std::vector<glm::mat4> transform_mem(3);
 
-    uint32_t received_scan_count = 0;
+    use_fps_camera_controller();
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
@@ -487,8 +509,8 @@ int main() {
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
 
 
-        celeris.update();
-        celeris_visualizer.update();
+        // celeris.update();
+        // celeris_visualizer.update();
 
         if (!fps_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_F) == GLFW_PRESS) {
             fps_camera_pressed = true;
@@ -514,7 +536,7 @@ int main() {
 
         lighting_system.update(engine.current_frame(), window, camera);
 
-        voxel_grid.update(window, camera);        
+        // voxel_grid.update(window, camera);        
 
         if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
             place_start_pressed = true;
@@ -582,7 +604,7 @@ int main() {
                 // if (network_scan)
                 //     renderer.render(command_buffer, network_scan->point_cloud(), network_scan->point_cloud().transform.get_model_matrix());
 
-                renderer.render(command_buffer, voxel_grid.render_object());
+                // renderer.render(command_buffer, voxel_grid.render_object());
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
@@ -611,92 +633,51 @@ int main() {
                 ImGui::SameLine();
                 ImGui::TextColored(ImVec4(0.0f, 0.35f, 1.0f, 1.0f), "z: %.2f", camera.position.z);
 
-                if (ImGui::Button("FPS controller")) {
-                    use_fps_camera_controller();
-                }
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Key: F");
+                // if (ImGui::Button("FPS controller")) {
+                //     use_fps_camera_controller();
+                // }
+                // ImGui::SameLine();
+                // ImGui::TextUnformatted("Key: F");
 
-                if (ImGui::Button("Third person controller")) {
-                    use_third_person_camera_controller();
-                }
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Key: R");
+                // if (ImGui::Button("Third person controller")) {
+                //     use_third_person_camera_controller();
+                // }
+                // ImGui::SameLine();
+                // ImGui::TextUnformatted("Key: R");
 
-                // if (footprint_result)
-                //     ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Footprint succeeded");
-                // else
-                //     ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Footprint failed");
-                
-
-                if (ImGui::Button("Next frame")) {
-                    // next_frame();
-                }
-
-                if (ImGui::Button("Place start")) {
-                    place_start();
-                }
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Key: 1");
-
-                if (ImGui::Button("Place end")) {
-                    place_end();
-                }
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Key: 2");
-
-                if (ImGui::Button("Start path planning")) {
-                    start_path_planning();
-                }
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Key: 3");
-
-                if (ImGui::InputFloat("Celeris car speed", &car_speed, 1.0f, 10.0f, "%.1f")) {
-                    celeris.set_car_speed(car_speed);
-                }
-
-                // if (ImGui::Button("Max left")) {
-                //     command_sender.set_command(VehicleCommand{
-                //         .speed = car_speed,
-                //         .steering_angle = -0.4f
-                //     });
+                // if (ImGui::Button("Next frame")) {
+                //     // next_frame();
                 // }
 
-                // if (ImGui::Button("Max left")) {
-                //     command_sender.set_command(VehicleCommand{
-                //     .speed = 100,
-                //     .steering_angle = -0.4f
-                //     });
+                // if (ImGui::Button("Place start")) {
+                //     place_start();
                 // }
-                
-                // if (ImGui::Button("Straight")) {
-                //     command_sender.set_command(VehicleCommand{
-                //         .speed = 100,
-                //         .steering_angle = 0.0f
-                //     });
-                // }
+                // ImGui::SameLine();
+                // ImGui::TextUnformatted("Key: 1");
 
-                // if (ImGui::Button("Max right")) {
-                //     command_sender.set_command(VehicleCommand{
-                //         .speed = 100,
-                //         .steering_angle = 0.4f
-                //     });
+                // if (ImGui::Button("Place end")) {
+                //     place_end();
                 // }
+                // ImGui::SameLine();
+                // ImGui::TextUnformatted("Key: 2");
 
-                // if (ImGui::Button("Stop")) {
-                //     command_sender.set_command(VehicleCommand{
-                //         .speed = 0.0f,
-                //         .steering_angle = 0.0f
-                //     });
+                // if (ImGui::Button("Start path planning")) {
+                //     start_path_planning();
+                // }
+                // ImGui::SameLine();
+                // ImGui::TextUnformatted("Key: 3");
+
+                // if (ImGui::InputFloat("Celeris car speed", &car_speed, 1.0f, 10.0f, "%.1f")) {
+                //     celeris.set_car_speed(car_speed);
                 // }
 
-                
-
-
-                
-
-
-                // ImGui::Text("Path: %s", path_planning_status.c_str());
+                if (ImGui::Button("GICP step")) {
+                    celeris.gicp_pass().step(
+                        celeris.voxel_point_map(), 
+                        source_scan.point_cloud(), 
+                        source_scan.normal_buffer()
+                    );
+                }
 
                 ImGui::End();
                 

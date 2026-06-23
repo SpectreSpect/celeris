@@ -48,8 +48,8 @@ void Celeris::start_lidar_receiver() {
 
 void Celeris::start() {
     start_lidar_receiver();
-    m_command_sender.start();
-    start_planner_thread();
+    // m_command_sender.start();
+    // start_planner_thread();
 }
 
 void Celeris::update() {
@@ -175,6 +175,22 @@ float Celeris::car_speed() const noexcept {
 
 VulkanEngine* Celeris::engine() {
     return m_engine;
+}
+
+GICPPass& Celeris::gicp_pass() {
+    return m_gicp_pass;
+}
+
+VoxelPointMap& Celeris::voxel_point_map() {
+    return m_voxel_point_map;
+}
+
+VoxelMapPointInserter& Celeris::voxel_map_point_inserter() {
+    return m_voxel_map_inserter;
+}
+
+VoxelMapPointReseter& Celeris::voxel_map_reseter() {
+    return m_voxel_map_reseter;
 }
 
 NonholonomicAStar& Celeris::planner() {

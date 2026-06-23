@@ -183,7 +183,7 @@ void LidarScan::build_points_for_frame(FrameData& frame) {
 
         if (!s.valid) {
             frame.points[i].position = glm::vec4(INF, INF, INF, 1.0f);
-            frame.points[i].color = glm::vec4(0, 0, 0, 1);
+            frame.points[i].color = glm::vec4(1, 1, 1, 1);
             continue;
         }
 
@@ -205,7 +205,7 @@ void LidarScan::build_points_for_frame(FrameData& frame) {
         const glm::vec3 p_ref_eng = ros_pos_to_engine(p_ref_ros);
 
         frame.points[i].position = glm::vec4(p_ref_eng, 1.0f);
-        frame.points[i].color = glm::vec4(0, 0, 0, 1);
+        frame.points[i].color = glm::vec4(1, 1, 1, 1);
     }
 }
 

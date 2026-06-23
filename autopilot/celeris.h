@@ -60,6 +60,12 @@ public:
 
     VulkanEngine* engine();
 
+    GICPPass& gicp_pass();
+    VoxelPointMap& voxel_point_map();
+    VoxelMapPointInserter& voxel_map_point_inserter();
+    VoxelMapPointReseter& voxel_map_reseter();
+    
+
     PlainAstarData plain_astar_path;
     std::vector<NonholonomicPos> nonholonomic_astar_path;
     std::vector<LineInstance> explored_paths;
