@@ -70,10 +70,18 @@
 #include "autopilot/celeris.h"
 #include "autopilot/celeris_visualizer.h"
 #include "voxel_grid_vulkan/voxel_grid_gpu_debugger.h"
+#include "camera/controllers/third_person_camera_controller.h"
+#include "autopilot/vehicle_command_sender.h"
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 #include <random>
+
+
+void test_callback_func(VulkanCommandBuffer& command_buffere, VoxelGrid& voxel_grid) {
+    std::cout << "It worked!" << std::endl;
+}
 
 // static std::mt19937 rng(std::random_device{}());
 // static std::uniform_real_distribution<double> dist(0.0, 1.0);
@@ -93,8 +101,15 @@ int main() {
 
     UI ui(window, engine);
     Camera camera;
-    FPSCameraController camera_controller(camera);
-    camera_controller.speed = 20;
+    FPSCameraController fps_camera_controller(camera);
+    fps_camera_controller.speed = 20.0f;
+    ThirdPersonCameraController third_person_camera_controller(camera);
+
+    enum class CameraControllerMode {
+        FPS,
+        ThirdPerson
+    };
+    CameraControllerMode camera_controller_mode = CameraControllerMode::ThirdPerson;
 
     VulkanResourceLoader resource_loader(engine, 154217728); // 1 Мб
 
@@ -154,6 +169,7 @@ int main() {
         voxel_grid_desc,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
     );
+
     VoxelGridGPUDebugger debugger(
         voxel_grid,
         engine.device(),
@@ -324,8 +340,9 @@ int main() {
                     manager_bundle, 
                     voxel_grid, 
                     Celeris::CelerisDesc());
-    celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69, 1.92, -51.30)});
-    // celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-50.69, 1.92, 0)});
+    celeris.set_start(NonholonomicPos{.pos = glm::vec3(0.0f, 1.5f, 0.0f)});
+    celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.92f, -51.30f)});
+    // celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.5f, -0.0f)});
     celeris.start();
     // celeris.start_lidar_receiver();
 
@@ -334,6 +351,27 @@ int main() {
                                          celeris, 
                                          20000, 
                                          skybox_exposure);
+
+    auto use_fps_camera_controller = [&]() {
+        if (camera_controller_mode == CameraControllerMode::FPS)
+            return;
+
+        const glm::vec3 front = glm::normalize(camera.front);
+        fps_camera_controller.yaw = glm::degrees(std::atan2(front.z, front.x));
+        fps_camera_controller.pitch = glm::degrees(std::asin(glm::clamp(front.y, -1.0f, 1.0f)));
+        fps_camera_controller.first_mouse = true;
+        camera_controller_mode = CameraControllerMode::FPS;
+    };
+
+    auto use_third_person_camera_controller = [&]() {
+        camera_controller_mode = CameraControllerMode::ThirdPerson;
+    };
+
+    VehicleCommandSender command_sender;
+    command_sender.start();
+    float car_speed = celeris.car_speed();
+
+    
 
     auto start_path_planning = [&]() {
         if (has_start_pos && has_end_pos) {
@@ -385,6 +423,8 @@ int main() {
     bool place_start_pressed = false;
     bool place_end_pressed = false;
     bool start_path_planning_pressed = false;
+    bool fps_camera_pressed = false;
+    bool third_person_camera_pressed = false;
 
     int step = 0;
     
@@ -446,14 +486,35 @@ int main() {
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
 
-        camera_controller.update(window, delta_time);
-        frame_resources.update_camera(engine.current_frame(), window, camera);
-        lighting_system.update(engine.current_frame(), window, camera);
 
         celeris.update();
         celeris_visualizer.update();
 
-        voxel_grid.update(window, camera);
+        if (!fps_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_F) == GLFW_PRESS) {
+            fps_camera_pressed = true;
+            use_fps_camera_controller();
+        }
+        if (fps_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_F) == GLFW_RELEASE)
+            fps_camera_pressed = false;
+
+        if (!third_person_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_R) == GLFW_PRESS) {
+            third_person_camera_pressed = true;
+            use_third_person_camera_controller();
+        }
+        if (third_person_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_R) == GLFW_RELEASE)
+            third_person_camera_pressed = false;
+
+        third_person_camera_controller.set_target(celeris_visualizer.get_start_marker_pos());
+        if (camera_controller_mode == CameraControllerMode::FPS)
+            fps_camera_controller.update(window, delta_time);
+        else
+            third_person_camera_controller.update(window, delta_time);
+
+        frame_resources.update_camera(engine.current_frame(), window, camera);
+
+        lighting_system.update(engine.current_frame(), window, camera);
+
+        voxel_grid.update(window, camera);        
 
         if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
             place_start_pressed = true;
@@ -550,6 +611,24 @@ int main() {
                 ImGui::SameLine();
                 ImGui::TextColored(ImVec4(0.0f, 0.35f, 1.0f, 1.0f), "z: %.2f", camera.position.z);
 
+                if (ImGui::Button("FPS controller")) {
+                    use_fps_camera_controller();
+                }
+                ImGui::SameLine();
+                ImGui::TextUnformatted("Key: F");
+
+                if (ImGui::Button("Third person controller")) {
+                    use_third_person_camera_controller();
+                }
+                ImGui::SameLine();
+                ImGui::TextUnformatted("Key: R");
+
+                // if (footprint_result)
+                //     ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Footprint succeeded");
+                // else
+                //     ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Footprint failed");
+                
+
                 if (ImGui::Button("Next frame")) {
                     // next_frame();
                 }
@@ -571,6 +650,51 @@ int main() {
                 }
                 ImGui::SameLine();
                 ImGui::TextUnformatted("Key: 3");
+
+                if (ImGui::InputFloat("Celeris car speed", &car_speed, 1.0f, 10.0f, "%.1f")) {
+                    celeris.set_car_speed(car_speed);
+                }
+
+                // if (ImGui::Button("Max left")) {
+                //     command_sender.set_command(VehicleCommand{
+                //         .speed = car_speed,
+                //         .steering_angle = -0.4f
+                //     });
+                // }
+
+                // if (ImGui::Button("Max left")) {
+                //     command_sender.set_command(VehicleCommand{
+                //     .speed = 100,
+                //     .steering_angle = -0.4f
+                //     });
+                // }
+                
+                // if (ImGui::Button("Straight")) {
+                //     command_sender.set_command(VehicleCommand{
+                //         .speed = 100,
+                //         .steering_angle = 0.0f
+                //     });
+                // }
+
+                // if (ImGui::Button("Max right")) {
+                //     command_sender.set_command(VehicleCommand{
+                //         .speed = 100,
+                //         .steering_angle = 0.4f
+                //     });
+                // }
+
+                // if (ImGui::Button("Stop")) {
+                //     command_sender.set_command(VehicleCommand{
+                //         .speed = 0.0f,
+                //         .steering_angle = 0.0f
+                //     });
+                // }
+
+                
+
+
+                
+
 
                 // ImGui::Text("Path: %s", path_planning_status.c_str());
 

@@ -67,6 +67,8 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         clear_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "clear_chunk_hash_table.comp.spv"),
         fill_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "fill_chunk_hash_table.comp.spv"),
         read_voxel_grid_chunk_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "read_voxel_grid_chunk.comp.spv"),
+        check_footprint_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "check_footprint.comp.spv"),
+        read_and_inflate_voxel_grid_chunk_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "read_and_inflate_voxel_grid_chunk.comp.spv"),
 
         voxel_writes_from_point_cloud_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_writes_from_point_cloud.comp.spv"),
 
@@ -86,6 +88,10 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         // Point cloud
         normals_from_webots_lidar_point_cloud_cs(device, path_utils::executable_dir() / "shaders" / "point_cloud" / "normals_from_webots_lidar_point_cloud.comp.spv"),
         remove_near_origin_lidar_points_cs(device, path_utils::executable_dir() / "shaders" / "point_cloud" / "remove_near_origin_lidar_points.comp.spv"),
+
+        // A*
+        prepare_copy_dirty_list_dispatch_args_cs(device, path_utils::executable_dir() / "shaders" / "a_star" / "prepare_copy_dirty_list_dispatch_args.comp.spv"),
+        copy_dirty_list_cs(device, path_utils::executable_dir() / "shaders" / "a_star" / "copy_dirty_list.comp.spv"),
         
         // PBR
         equirect_to_cubemap_cs(device, path_utils::executable_dir() / "shaders" / "equirect_to_cubemap.comp.spv"),

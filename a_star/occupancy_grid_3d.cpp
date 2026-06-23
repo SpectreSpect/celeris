@@ -1,9 +1,123 @@
 #include "occupancy_grid_3d.h"
 
+#include "../voxel_grid_vulkan/shader_helper/buffer_dispatch_arg.h"
+#include "../vulkan_self/push_constants_structures.h"
+#include "../managers/compute_pass_manager.h"
 #include "../voxel_grid_vulkan/voxel_grid.h"
 #include "../math_utils.h"
 
-OccupancyGrid3D::OccupancyGrid3D(VoxelGrid& voxel_grid) : m_voxel_grid(&voxel_grid) {}
+OccupancyGrid3D::OccupancyGrid3D(
+    VulkanPhysicalDevice& physical_device, 
+    VulkanDevice& device, 
+    VoxelGrid& voxel_grid, 
+    ComputePassManager& compute_pass_manager
+) 
+    :   m_voxel_grid(&voxel_grid),
+        m_prepare_copy_dirty_list_dispatch_args_pi(
+            compute_pass_manager.prepare_copy_dirty_list_dispatch_args_cp,
+            compute_pass_manager.descriptor_pool()),
+        m_copy_dirty_list_pi(compute_pass_manager.copy_dirty_list_cp, compute_pass_manager.descriptor_pool()),
+        // voxel_grid.buffers().dirty_list.size()
+        m_dirty_chunk_position_buffer(VulkanBuffer::create_host_visible_storage_buffer(
+            physical_device, 
+            device, 
+            (voxel_grid.params().count_active_chunks + 1) * sizeof(glm::ivec4)
+        )
+        ) {
+    voxel_grid.add_next_to_stream_chunks_sphere_callback([&](VulkanCommandBuffer& command_buffer, VoxelGrid& voxel_grid) {
+
+        m_prepare_copy_dirty_list_dispatch_args_pi.set_storage_buffer(0, voxel_grid.buffers().dirty_list);
+        m_prepare_copy_dirty_list_dispatch_args_pi.set_storage_buffer(1, voxel_grid.buffers().dispatch_args);
+
+        m_prepare_copy_dirty_list_dispatch_args_pi.bind(command_buffer);
+
+        command_buffer.dispatch(1, 1, 1);
+
+        voxel_grid.buffers().dispatch_args.memory_barrier(
+            command_buffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+            VK_ACCESS_INDIRECT_COMMAND_READ_BIT
+        );
+
+
+        // voxel_grid.shader_helper().prepare_dispatch_args(
+        //     command_buffer, 
+        //     voxel_grid.buffers().dispatch_args, 
+        //     BufferDispatchArg(&voxel_grid.buffers().dirty_list, 0u));
+        
+        m_copy_dirty_list_pi.set_storage_buffer(0, voxel_grid.buffers().dirty_list);
+        m_copy_dirty_list_pi.set_storage_buffer(1, m_dirty_chunk_position_buffer);
+        m_copy_dirty_list_pi.set_storage_buffer(2, voxel_grid.buffers().chunk_meta);
+
+        m_copy_dirty_list_pi.push_constants(command_buffer, CopyDirtyListPushConstants{
+            .u_pack_bits = math_utils::BITS,
+            .u_pack_offset = math_utils::OFFSET
+        });
+
+        m_copy_dirty_list_pi.bind(command_buffer);
+
+        command_buffer.dispatch_indirect(voxel_grid.buffers().dispatch_args);
+
+        m_dirty_chunk_position_buffer.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    });
+
+    voxel_grid.add_next_to_update_submit_callbacks([&](VoxelGrid& voxel_grid) {
+        uint32_t dirty_chunk_position_count = 0;
+
+        m_dirty_chunk_position_buffer.read(&dirty_chunk_position_count, sizeof(uint32_t), 0);
+
+        if (m_dirty_chunk_positions.size() < dirty_chunk_position_count)
+            m_dirty_chunk_positions.resize(dirty_chunk_position_count);
+
+        m_dirty_chunk_position_buffer.read(
+            m_dirty_chunk_positions.data(), 
+            dirty_chunk_position_count * sizeof(uint32_t), 
+            sizeof(uint32_t)
+        );
+
+        for (int i = 0; i < dirty_chunk_position_count; i++) {
+            glm::ivec4 center_chunk_pos = m_dirty_chunk_positions[i];
+            uint64_t center_chunk_key = math_utils::pack_key(
+                center_chunk_pos.x, 
+                center_chunk_pos.y, 
+                center_chunk_pos.z
+            );
+
+            auto center_it = m_chunk_cache.find(center_chunk_key);
+
+            if (center_it == m_chunk_cache.end()) {
+                continue;
+            }
+
+            m_chunk_cache.erase(center_chunk_key);
+            m_is_chunk_read.erase(center_chunk_key);
+
+            for (int dx = -1; dx <= 1; dx++)
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dz == 0)
+                        continue;
+
+                    glm::ivec4 chunk_pos = center_chunk_pos + glm::ivec4(dx, 0, dz, 0);
+
+                    uint64_t chunk_key = math_utils::pack_key(
+                        chunk_pos.x, 
+                        chunk_pos.y, 
+                        chunk_pos.z
+                    );
+
+                    m_chunk_cache.erase(chunk_key);
+                    m_is_chunk_read.erase(chunk_key);
+                }
+        }
+    });
+}
+
+void OccupancyGrid3D::clear_cache() {
+    m_chunk_cache.clear();
+    m_is_chunk_read.clear();
+}
 
 glm::ivec3 OccupancyGrid3D::floor_pos(const glm::vec3& p) {
     // LOG_NAMED("OccupancyGrid3D");
@@ -144,10 +258,15 @@ std::vector<glm::ivec3> OccupancyGrid3D::line_intersects(glm::vec3 pos1, glm::ve
 }
 
 bool OccupancyGrid3D::is_solid(glm::ivec3 pos) {
+    is_solid_count++;
     // // LOG_METHOD();
     // return pos.y <= 0;
     
     // logger().check(m_voxel_grid, "Voxel grid was null");
+
+    is_solid_time.start();
+
+    uint32_t inflation_size = 3;
 
     glm::ivec3 chunk_pos = m_voxel_grid->chunk_pos_from_voxel_pos(pos);
 
@@ -155,22 +274,123 @@ bool OccupancyGrid3D::is_solid(glm::ivec3 pos) {
 
     VoxelGridChunk* chunk = nullptr;
 
-    auto it = m_chunk_cache.find(chunk_key);
-    if (it == m_chunk_cache.end()) {
-        auto [inserted_it, inserted] = m_chunk_cache.try_emplace(
-            chunk_key,
-            m_voxel_grid->read_chunk(chunk_pos)
-        );
-        it = inserted_it;
+    auto read_it = m_is_chunk_read.find(chunk_key);
+
+    if (read_it == m_is_chunk_read.end() || !read_it->second) {
+        read_and_inflate_chunk_count++;
+
+        read_and_inflate_chunk_time.start();
+        std::vector<VoxelGridChunk> chunks = m_voxel_grid->read_and_inflate_chunk(chunk_pos, inflation_size);
+        read_and_inflate_chunk_time.end();
+
+        constexpr uint32_t visibility_mask =
+            VOXEL_VISABILITY_FLAG_BIT << VOXEL_TYPE_BITS;
+
+        for (int dz = -1; dz <= 1; ++dz) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                const bool is_center_chunk = dx == 0 && dz == 0;
+                
+                size_t chunk_id =
+                    size_t(dz + 1) * 3 + size_t(dx + 1);
+
+                uint64_t key = math_utils::pack_key(
+                    chunk_pos.x + dx,
+                    chunk_pos.y,
+                    chunk_pos.z + dz
+                );
+
+                
+
+                // Inflation may create a cached neighbor before that
+                // neighbor's own voxels have been read. Never downgrade a
+                // chunk that was already read when it receives more
+                // inflation from another center chunk.
+                auto chunk_read_it =
+                    m_is_chunk_read.try_emplace(key, false).first;
+                if (is_center_chunk) {
+                    chunk_read_it->second = true;
+                }
+
+                auto cached = m_chunk_cache.find(key);
+
+                if (cached == m_chunk_cache.end()) {
+                    m_chunk_cache.emplace(
+                        key,
+                        std::move(chunks[chunk_id])
+                    );
+                    continue;
+                }
+
+                auto& destination = cached->second.voxels();
+                const auto& source = chunks[chunk_id].voxels();
+
+                logger().check(destination.size() == source.size(),
+                            "Voxel chunk sizes did not match");
+
+                const glm::uvec3 chunk_size = cached->second.chunk_size();
+
+                uint32_t x_begin = 0;
+                uint32_t x_end = chunk_size.x;
+                uint32_t z_begin = 0;
+                uint32_t z_end = chunk_size.z;
+
+                // Only the strip facing the center chunk can contain
+                // inflation in an adjacent output chunk. For diagonal
+                // chunks, restricting both axes leaves just the corner.
+                if (dx < 0) {
+                    x_begin = chunk_size.x - inflation_size;
+                } else if (dx > 0) {
+                    x_end = inflation_size;
+                }
+
+                if (dz < 0) {
+                    z_begin = chunk_size.z - inflation_size;
+                } else if (dz > 0) {
+                    z_end = inflation_size;
+                }
+
+                for (uint32_t z = z_begin; z < z_end; ++z) {
+                    for (uint32_t y = 0; y < chunk_size.y; ++y) {
+                        size_t voxel_id =
+                            size_t(chunk_size.x) *
+                            (size_t(y) + size_t(chunk_size.y) * size_t(z)) +
+                            x_begin;
+
+                        for (uint32_t x = x_begin; x < x_end; ++x, ++voxel_id) {
+                            destination[voxel_id].type_flags |=
+                                source[voxel_id].type_flags & visibility_mask;
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    chunk = &it->second;
+    
+
+    // auto it = m_chunk_cache.find(chunk_key);
+
+    chunk = &m_chunk_cache[chunk_key];
+
+    
+
+    // logger().check(it != m_chunk_cache.end(), "Voxel chunk was not cached after reading");
+    // chunk = &it->second;
+
+    
 
     glm::ivec3 local_pos = m_voxel_grid->pos_in_chunk_from_global_voxel_pos(chunk_pos, pos);
 
     VoxelDataGPU voxel = chunk->voxel(glm::uvec3(local_pos));
 
+    is_solid_time.end();
+
     return voxel.is_solid();
+    // return pos.y <= 0;
+}
+
+bool OccupancyGrid3D::check_footprint(glm::ivec3 origin, glm::ivec3 offsets, uint32_t max_step_up) {
+    return m_voxel_grid->check_footprint(origin, offsets, max_step_up);
 }
 
 std::vector<glm::ivec3> OccupancyGrid3D::line_intersects_xz(glm::vec3 pos1, glm::vec3 pos2) {
@@ -323,6 +543,9 @@ bool OccupancyGrid3D::adjust_to_ground(glm::vec3& output, int max_step_up, int m
     if (max_y_diff >= 0) {
         float diff = std::abs(result_pos.y - norm_pos.y);
         if (diff > max_y_diff) {
+            if (allow_flying_over_precepices)
+                return true;
+
             if (status)
                 *status = 3;
             return false;
@@ -363,12 +586,12 @@ bool OccupancyGrid3D::get_closest_visible_bottom_pos(glm::ivec3 pos, glm::ivec3 
     return false;
 }
 
-bool OccupancyGrid3D::get_ground_positions(glm::vec3 pos1, glm::vec3 pos2, std::vector<glm::ivec3>& output, int max_step_up, int max_drop, int max_y_diff) {
+bool OccupancyGrid3D::get_ground_positions(glm::vec3 pos1, glm::vec3 pos2, std::vector<glm::ivec3>& output, int max_step_up, int max_drop, int max_y_diff, bool allow_flying_over_precepices) {
     // LOG_METHOD();
 
     std::vector<glm::ivec3> line_positions = line_intersects_xz(pos1, pos2);
     
-    if (!adjust_to_ground(line_positions, max_step_up, max_drop, max_y_diff))
+    if (!adjust_to_ground(line_positions, max_step_up, max_drop, max_y_diff, allow_flying_over_precepices))
         return false;
     
     for (int i = 0; i < line_positions.size(); i++)
@@ -379,28 +602,28 @@ bool OccupancyGrid3D::get_ground_positions(glm::vec3 pos1, glm::vec3 pos2, std::
     return true;
 }
 
-bool OccupancyGrid3D::get_ground_positions(std::vector<glm::vec3> polyline, std::vector<glm::ivec3>& output, int max_step_up, int max_drop, int max_y_diff) {
+bool OccupancyGrid3D::get_ground_positions(std::vector<glm::vec3> polyline, std::vector<glm::ivec3>& output, int max_step_up, int max_drop, int max_y_diff, bool allow_flying_over_precepices) {
     // LOG_METHOD();
     
     if (polyline.size() < 2)
         return false;
        
     for (int i = 0; i < polyline.size() - 1; i++) {
-        if (!get_ground_positions(polyline[i], polyline[i+1], output, max_step_up, max_drop, max_y_diff))
+        if (!get_ground_positions(polyline[i], polyline[i+1], output, max_step_up, max_drop, max_y_diff, allow_flying_over_precepices))
             return false;
     }
     
     return true;
 }
 
-bool OccupancyGrid3D::get_ground_positions(std::vector<NonholonomicPos> polyline, std::vector<glm::ivec3>& output, int max_step_up, int max_drop, int max_y_diff) {
+bool OccupancyGrid3D::get_ground_positions(std::vector<NonholonomicPos> polyline, std::vector<glm::ivec3>& output, int max_step_up, int max_drop, int max_y_diff, bool allow_flying_over_precepices) {
     // LOG_METHOD();
     
     if (polyline.size() < 2)
         return false;
        
     for (int i = 0; i < polyline.size() - 1; i++) {
-        if (!get_ground_positions(polyline[i].pos, polyline[i+1].pos, output, max_step_up, max_drop, max_y_diff))
+        if (!get_ground_positions(polyline[i].pos, polyline[i+1].pos, output, max_step_up, max_drop, max_y_diff, allow_flying_over_precepices))
             return false;
     }
     

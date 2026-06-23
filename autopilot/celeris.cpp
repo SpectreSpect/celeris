@@ -17,7 +17,8 @@ Celeris::Celeris(VulkanEngine& engine,
         m_gicp_pass(engine, manager_bundle.compute_pass_manager()),
         m_point_cloud_preprocessor(engine.device(), compute_queue, manager_bundle.compute_pass_manager()),
         m_scan_receiver(m_point_cloud_preprocessor),
-        m_occupancy_grid(voxel_grid),
+        m_command_sender(),
+        m_occupancy_grid(engine.physical_device(), engine.device(), voxel_grid, manager_bundle.compute_pass_manager()),
         m_planner(m_occupancy_grid, desc.nonholonomic_astar_desc),
         m_voxel_point_map(engine, 
                           desc.voxel_point_map_num_hash_table_slots, 
@@ -47,6 +48,7 @@ void Celeris::start_lidar_receiver() {
 
 void Celeris::start() {
     start_lidar_receiver();
+    m_command_sender.start();
     start_planner_thread();
 }
 
@@ -56,6 +58,8 @@ void Celeris::update() {
     logger().check(m_engine, "Engine was null");
     logger().check(m_manager_bundle, "Manager bundle was null");
     logger().check(m_voxel_grid, "Voxel grid was null");
+
+    m_command_sender.set_command(get_path_following_command());
 
     if (auto scan = m_scan_receiver.try_pop_scan(*m_manager_bundle)) {
         if (m_network_scan)
@@ -121,8 +125,23 @@ void Celeris::update() {
 }
 
 void Celeris::find_path() {
+    total_path_finding_time = AvgTimer();
+
+    total_path_finding_time.start();
     m_planner.initialize(m_start_position, m_goal_position);
     m_planner.find_nonholomic_path(); // state_explored_paths
+    total_path_finding_time.end();
+
+    std::cout << "Total path finding time: " << total_path_finding_time.average_ms() << " ms" << std::endl;
+
+    {
+        std::lock_guard<std::mutex> lock(m_planner_mutex);    
+        plain_astar_path = m_planner.state().plain_astar_path;
+        nonholonomic_astar_path = m_planner.state().path;
+        explored_paths = m_planner.state().explored_paths;
+        unimpended_path = m_planner.state().unimpended_astar_positions;
+        current_target_path_point_id = 0;
+    }
 }
 
 void Celeris::set_start(const NonholonomicPos& position) {
@@ -131,6 +150,11 @@ void Celeris::set_start(const NonholonomicPos& position) {
 
 void Celeris::set_goal(const NonholonomicPos& position) {
     m_goal_position = position;
+}
+
+void Celeris::set_car_speed(float speed) noexcept {
+    if (std::isfinite(speed))
+        m_car_speed = speed;
 }
 
 LidarScan* Celeris::network_scan() {
@@ -143,6 +167,10 @@ NonholonomicPos Celeris::start_position() const noexcept {
 
 NonholonomicPos Celeris::goal_position() const noexcept {
     return m_goal_position;
+}
+
+float Celeris::car_speed() const noexcept {
+    return m_car_speed;
 }
 
 VulkanEngine* Celeris::engine() {
@@ -176,13 +204,79 @@ void Celeris::planner_loop() {
             continue;
         m_replan_requested.exchange(false);
 
-        m_planner.initialize(m_start_position, m_goal_position);
-        m_planner.find_nonholomic_path();
-
-        {
-            std::lock_guard<std::mutex> lock(m_planner_mutex);    
-            plain_astar_path = m_planner.state().plain_astar_path;
-            nonholonomic_astar_path = m_planner.state().path;
-        }
+        find_path();
     }
+}
+
+bool Celeris::find_closest_next_path_point(uint32_t current_id, uint32_t& output_id, uint32_t& output_dist) {
+    if (current_id + 1 >= nonholonomic_astar_path.size())
+        return false;
+    
+    if (glm::distance(m_start_position.pos, nonholonomic_astar_path[output_id].pos))
+
+
+    output_id = current_id + 1;
+    output_dist = glm::distance(m_start_position.pos, nonholonomic_astar_path[output_id].pos);
+    for (int i = current_id; i < nonholonomic_astar_path.size(); i++) {
+        float dist = glm::distance(m_start_position.pos, nonholonomic_astar_path[output_id].pos);
+    }
+};
+
+VehicleCommand Celeris::get_path_following_command() {
+    std::lock_guard<std::mutex> lock(m_planner_mutex);
+
+    if (nonholonomic_astar_path.empty() || current_target_path_point_id >= nonholonomic_astar_path.size())
+        return VehicleCommand{
+            .speed = 0,
+            .steering_angle = 0
+        };
+
+    float reach_radius = 1;
+
+    float dist_to_target_point = glm::distance(
+        m_start_position.pos, 
+        nonholonomic_astar_path[current_target_path_point_id].pos
+    );
+
+    if (dist_to_target_point <= reach_radius) {
+        
+        
+        if (nonholonomic_astar_path[current_target_path_point_id].dir == -1) {
+            if (!is_stop_waiting) {
+                is_stop_waiting = true;
+                stop_waiting_start_timestamp = std::chrono::steady_clock::now();
+            } else {
+                auto current_timestamp = std::chrono::steady_clock::now();
+                auto elapsed_time = current_timestamp - stop_waiting_start_timestamp;
+                
+                double elapsed_seconds = std::chrono::duration<double>(elapsed_time).count();
+
+                if (elapsed_seconds >= stop_waiting_time) {
+                    is_stop_waiting = false;
+                    current_target_path_point_id++;
+                } else {
+                    return VehicleCommand{
+                        .speed = 0,
+                        .steering_angle = 0
+                    };
+                }
+            }
+        } 
+        else {
+            current_target_path_point_id++;
+        }    
+    }
+
+    float target_theta = nonholonomic_astar_path[current_target_path_point_id].theta;
+    float theta_error = NonholonomicAStar::angle_diff(m_start_position.theta, target_theta);
+
+    float direction = nonholonomic_astar_path[current_target_path_point_id].dir;
+    float steering = direction * theta_error;
+
+    steering = std::clamp(steering, -0.4f, 0.4f);
+
+    return VehicleCommand{
+                .speed = m_car_speed * direction,
+                .steering_angle = steering
+            };
 }

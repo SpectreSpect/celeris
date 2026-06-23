@@ -35,10 +35,10 @@ public:
         bool use_reed_shepps_fallback = false;
         bool force_reeds_shepp_shot = false;
         bool allow_flying_over_precipices = true;
-        int iteration_limit = 10000;
+        int iteration_limit = 20000;
         bool track_explored_paths = true;
-        int max_step_up = 2;
-        int max_drop = 6;
+        int max_step_up = 1;
+        int max_drop = 1;
         int max_y_diff = 1;
         float max_goal_position_error = 0.7f;
         float max_goal_heading_error_radians = 0.3f;
@@ -69,7 +69,7 @@ public:
     static float angle_diff(float a, float b);
     DistToPathData max_unimpended_dist_to_path(glm::vec3 pos, std::vector<glm::ivec3>& path, int start_id = 0, glm::vec3 last_pos = glm::vec3(0, 0, 0), bool replace_last_pos = false);
     static int discretize_angle(float value, int num_bins);
-    float get_nonholonomic_f(NonholonomicPos& new_pos, NonholonomicPos end_pos, NonholonomicPos cur_pos, PlainAstarData plain_a_star_path);
+    float get_nonholonomic_f(NonholonomicPos& new_pos, NonholonomicPos end_pos, NonholonomicPos cur_pos);
     static bool almost_equal(
         NonholonomicPos a, 
         NonholonomicPos b, 

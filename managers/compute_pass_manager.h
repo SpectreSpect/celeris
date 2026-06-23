@@ -66,6 +66,8 @@ public:
     ComputePass clear_chunk_hash_table_cp;
     ComputePass fill_chunk_hash_table_cp;
     ComputePass read_voxel_grid_chunk_cp;
+    ComputePass check_footprint_cp;
+    ComputePass read_and_inflate_voxel_grid_chunk_cp;
     ComputePass voxel_writes_from_point_cloud_cp;
 
     // Voxelizator
@@ -85,6 +87,10 @@ public:
     ComputePass brdf_lut_cp;
     ComputePass prefilter_map_cp;
     ComputePass irradiance_map_cp;
+
+    // A*
+    ComputePass prepare_copy_dirty_list_dispatch_args_cp;
+    ComputePass copy_dirty_list_cp;
 
     ComputePassManager(VulkanDevice& device, ShaderManager& shader_manager);
 
@@ -145,6 +151,8 @@ public:
     ComputePass create_clear_chunk_hash_table_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_fill_chunk_hash_table_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_read_voxel_grid_chunk_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_check_footprint_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_read_and_inflate_voxel_grid_chunk_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_voxel_writes_from_point_cloud_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
     // Voxelizator
@@ -158,6 +166,10 @@ public:
     // Point cloud
     ComputePass create_normals_from_webots_lidar_point_cloud_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_remove_near_origin_lidar_points_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+
+    // A*
+    ComputePass create_prepare_copy_dirty_list_dispatch_args_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_copy_dirty_list_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
 private:
     DescriptorPool m_pool;

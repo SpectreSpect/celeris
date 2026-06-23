@@ -12,4 +12,5 @@ struct AvgTimer {
     void end();
     void add(std::chrono::steady_clock::duration d);
     double average_ms() const;
+    double total_ms() const;
 };
