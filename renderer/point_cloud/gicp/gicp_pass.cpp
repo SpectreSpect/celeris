@@ -45,6 +45,8 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
     uniform_data.num_source_points = source_point_cloud.instance_count();
     uniform_data.num_target_points = voxel_point_map.m_map_point_count; // 1824 2067 2186 2090
     uniform_data.num_hash_table_slots = voxel_point_map.m_num_hash_table_slots;
+    uniform_data.pack_bits = math_utils::BITS;
+    uniform_data.pack_offset = static_cast<int32_t>(math_utils::OFFSET);
 
     uniform_buffer.upload(&uniform_data, sizeof(GICPPassUniform));
 

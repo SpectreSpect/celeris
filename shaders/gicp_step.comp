@@ -1,5 +1,12 @@
 #version 460
+#extension GL_GOOGLE_include_directive : require
+
 layout(local_size_x = 32) in;
+
+#include "common/hash_table/hash_table_decl.inc"
+#include "common/utils.inc"
+#include "voxel_point_map/index_hash_table/decl.inc"
+#include "voxel_point_map/index_hash_table/config_functions/index_key_comp.inc"
 
 struct PointInstance {
     vec4 position;
@@ -19,6 +26,8 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     uint num_source_points;
     uint num_target_points;
     uint num_hash_table_slots;
+    uint pack_bits;
+    int pack_offset;
 } ubo;
 
 layout(std430, set = 0, binding = 1) buffer SourcePointBuffer {
@@ -46,15 +55,35 @@ layout(std430, set = 0, binding = 6) coherent buffer OutputStorageBuffer {
     vec4 rotation;
 } output_buffer;
 
-struct VoxelHashSlot {
-    uint  state;
-    ivec4 key;
-    uint  value;
+layout(std430, set = 0, binding = 7) coherent buffer PointHashTable {
+    HashTableCounters point_hash_table_counters;
+    IndexHashTableSlot point_hash_table_slots[];
 };
 
-layout(std430, set = 0, binding = 7) readonly buffer VoxelHashTableBuffer {
-    VoxelHashSlot slots[];
-} voxel_table;
+#define HT_PREFIX point_hash_table
+#define SLOT_VALUE_TYPE uint
+#define SLOT_KEY_TYPE uvec2
+#define SLOT_TYPE IndexHashTableSlot
+#define TABLE_COUNTERS point_hash_table_counters
+#define SLOTS_BUFFER point_hash_table_slots
+#define HASH_TABLE_SIZE ubo.num_hash_table_slots
+#define KEY_HASH_FUNC hash_uvec2
+#define KEY_COMP_FUNC index_key_comp
+#define MAX_CAS_ATTEMPTS 5u
+
+#include "common/hash_table/hash_table_common_impl.inc"
+#include "common/hash_table/hash_table_lookup_remove_impl.inc"
+
+#undef HT_PREFIX
+#undef SLOT_VALUE_TYPE
+#undef SLOT_KEY_TYPE
+#undef SLOT_TYPE
+#undef TABLE_COUNTERS
+#undef SLOTS_BUFFER
+#undef HASH_TABLE_SIZE
+#undef KEY_HASH_FUNC
+#undef KEY_COMP_FUNC
+#undef MAX_CAS_ATTEMPTS
 
 layout(std430, set = 0, binding = 8) writeonly buffer OutputPartialBuffer {
     GICPPartial partials[];
@@ -295,28 +324,16 @@ bool voxel_key_equal(ivec4 stored_key, ivec3 query_key)
 
 uint voxel_lookup_map_point_id(ivec3 key)
 {
-    uint slot_count = ubo.num_hash_table_slots;
-    if (slot_count == 0u)
+    if (ubo.num_hash_table_slots == 0u)
         return VOXEL_INVALID_ID;
 
-    uint idx = hash_voxel_key(key) % slot_count;
-    uint max_probes = min(slot_count, VOXEL_MAX_PROBES);
+    uvec2 hash_key = pack_key_uvec2(key, uint(ubo.pack_offset), ubo.pack_bits);
+    uint slot_id = point_hash_table_lookup_hash_table_slot_id(hash_key, true);
 
-    for (uint probe = 0u; probe < max_probes; ++probe) {
-        uint state = voxel_table.slots[idx].state;
+    if (slot_id == INVALID_ID)
+        return VOXEL_INVALID_ID;
 
-        if (state == VOXEL_SLOT_EMPTY)
-            return VOXEL_INVALID_ID;
-
-        if (state == VOXEL_SLOT_OCCUPIED) {
-            if (voxel_key_equal(voxel_table.slots[idx].key, key))
-                return voxel_table.slots[idx].value;
-        }
-
-        idx = (idx + 1u) % slot_count;
-    }
-
-    return VOXEL_INVALID_ID;
+    return point_hash_table_slots[slot_id].value;
 }
 
 uint find_closest_id_hash(

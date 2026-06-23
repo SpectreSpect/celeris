@@ -367,11 +367,8 @@ int main() {
         camera_controller_mode = CameraControllerMode::ThirdPerson;
     };
 
-    VehicleCommandSender command_sender;
-    command_sender.start();
     float car_speed = celeris.car_speed();
 
-    
 
     auto start_path_planning = [&]() {
         if (has_start_pos && has_end_pos) {
@@ -411,10 +408,101 @@ int main() {
 
     vox_box.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
 
+    LidarVideo lidar_video(
+        manager_bundle, 
+        point_cloud_preprocessor, 
+        "/home/spectre/TEMP_lidar_output_mesh/recording_16/index.csv", 
+        0,
+        2
+    );
+
+    for (int i = static_cast<int>(lidar_video.get_scan_count()) - 1; i >= 1; --i) {
+        glm::vec3 p_prev = lidar_video.get_scan(i - 1).point_cloud().transform.position;
+        glm::vec3 p_curr = lidar_video.get_scan(i).point_cloud().transform.position;
+
+        glm::quat q_prev = glm::normalize(lidar_video.get_scan(i - 1).point_cloud().transform.rotation);
+        glm::quat q_curr = glm::normalize(lidar_video.get_scan(i).point_cloud().transform.rotation);
+
+        if (glm::dot(q_prev, q_curr) < 0.0f) {
+            q_curr = -q_curr;
+        }
+
+        glm::vec3 delta_position = p_curr - p_prev;
+        glm::quat delta_rotation = glm::normalize(q_curr * glm::inverse(q_prev));
+
+        lidar_video.get_scan(i).point_cloud().transform.position = delta_position;
+        lidar_video.get_scan(i).point_cloud().transform.rotation = delta_rotation;
+    }
+
+    lidar_video.get_scan(0).point_cloud().transform.position = glm::vec3(0.0f);
+    lidar_video.get_scan(0).point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+
+    LidarScan target_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
+    LidarScan source_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
+
+    target_scan.point_cloud().set_color(glm::vec4(0, 0, 1, 1));
+    source_scan.point_cloud().set_color(glm::vec4(1, 0, 0, 1));
+
+    source_scan.point_cloud().transform.position += glm::vec3(-2, 2, -2);
+
+    // celeris.voxel_map_reseter().reset(celeris.voxel_point_map());
+    // celeris.voxel_map_point_inserter().insert(
+    //     celeris.voxel_point_map(), 
+    //     lidar_video.get_scan(0).point_cloud(), 
+    //     lidar_video.get_scan(0).normal_buffer()
+    // );
+
+    PointCloud voxel_point_map(
+        manager_bundle, 
+        celeris.voxel_point_map().map_point_buffer, 
+        celeris.voxel_point_map().m_map_point_count
+    );
+    voxel_point_map.set_color(glm::vec4(0, 0, 0, 1));
+    uint32_t rendered_celeris_scan_count = celeris.received_scan_count();
+
+    auto process_current_lidar_frame = [&]() {
+        uint32_t current_frame_id = lidar_video.current_frame_id();
+
+        if (current_frame_id > 0) {
+            LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
+            LidarScan& previous_scan = lidar_video.get_scan(current_frame_id - 1);
+
+            PointCloud& current_point_cloud = current_scan.point_cloud();
+            PointCloud& previous_point_cloud = previous_scan.point_cloud();
+
+            current_point_cloud.transform.position =
+                previous_point_cloud.transform.position + current_point_cloud.transform.position;
+            current_point_cloud.transform.rotation =
+                glm::normalize(current_point_cloud.transform.rotation * previous_point_cloud.transform.rotation);
+
+            celeris.gicp_pass().fit(
+                celeris.voxel_point_map(),
+                current_scan.point_cloud(),
+                current_scan.normal_buffer(),
+                10
+            );
+
+            celeris.voxel_map_point_inserter().insert(
+                celeris.voxel_point_map(),
+                current_scan.point_cloud(),
+                current_scan.normal_buffer()
+            );
+
+            voxel_point_map.set_instance_view(celeris.voxel_point_map().get_map_instance_view());
+        }
+
+        lidar_video.next_frame();
+    };
+
     Scene scene;
 
     scene.add(skybox);
     scene.add(celeris_visualizer);
+    // scene.add(target_scan);
+    // scene.add(voxel_point_map);
+    // scene.add(source_scan);
+
+    // scene.add(lidar_video);
     
     skybox.update(scene);
 
@@ -437,7 +525,7 @@ int main() {
 
     std::vector<glm::mat4> transform_mem(3);
 
-    uint32_t received_scan_count = 0;
+    use_fps_camera_controller();
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
@@ -487,7 +575,12 @@ int main() {
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
 
 
+        // celeris.update();
         celeris.update();
+        if (rendered_celeris_scan_count != celeris.received_scan_count()) {
+            voxel_point_map.set_instance_view(celeris.voxel_point_map().get_map_instance_view());
+            rendered_celeris_scan_count = celeris.received_scan_count();
+        }
         celeris_visualizer.update();
 
         if (!fps_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_F) == GLFW_PRESS) {
@@ -562,8 +655,7 @@ int main() {
 
         if (!n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_PRESS) {
             n_pressed = true;
-            
-            // next_frame();
+            process_current_lidar_frame();
         }
 
         if (n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_RELEASE) {
@@ -610,93 +702,60 @@ int main() {
                 ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "y: %.2f", camera.position.y);
                 ImGui::SameLine();
                 ImGui::TextColored(ImVec4(0.0f, 0.35f, 1.0f, 1.0f), "z: %.2f", camera.position.z);
-
-                if (ImGui::Button("FPS controller")) {
-                    use_fps_camera_controller();
-                }
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Key: F");
-
-                if (ImGui::Button("Third person controller")) {
-                    use_third_person_camera_controller();
-                }
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Key: R");
-
-                // if (footprint_result)
-                //     ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Footprint succeeded");
-                // else
-                //     ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Footprint failed");
                 
+                ImGui::TextColored(ImVec4(1.0f, 0.35f, 1.0f, 1.0f), "Current frame id: %d", lidar_video.current_frame_id());
+
+                // if (ImGui::Button("FPS controller")) {
+                //     use_fps_camera_controller();
+                // }
+                // ImGui::SameLine();
+                // ImGui::TextUnformatted("Key: F");
+
+                // if (ImGui::Button("Third person controller")) {
+                //     use_third_person_camera_controller();
+                // }
+                // ImGui::SameLine();
+                // ImGui::TextUnformatted("Key: R");
+
+                // if (ImGui::Button("Next frame")) {
+                //     // next_frame();
+                // }
+
+                // if (ImGui::Button("Place start")) {
+                //     place_start();
+                // }
+                // ImGui::SameLine();
+                // ImGui::TextUnformatted("Key: 1");
+
+                // if (ImGui::Button("Place end")) {
+                //     place_end();
+                // }
+                // ImGui::SameLine();
+                // ImGui::TextUnformatted("Key: 2");
+
+                // if (ImGui::Button("Start path planning")) {
+                //     start_path_planning();
+                // }
+                // ImGui::SameLine();
+                // ImGui::TextUnformatted("Key: 3");
+
+                // if (ImGui::InputFloat("Celeris car speed", &car_speed, 1.0f, 10.0f, "%.1f")) {
+                //     celeris.set_car_speed(car_speed);
+                // }
+
+                if (ImGui::Button("GICP step")) {
+                    // celeris.gicp_pass().step(
+                    //     celeris.voxel_point_map(), 
+                    //     source_scan.point_cloud(), 
+                    //     source_scan.normal_buffer()
+                    // );
+
+                    
+                }
 
                 if (ImGui::Button("Next frame")) {
-                    // next_frame();
+                    process_current_lidar_frame();
                 }
-
-                if (ImGui::Button("Place start")) {
-                    place_start();
-                }
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Key: 1");
-
-                if (ImGui::Button("Place end")) {
-                    place_end();
-                }
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Key: 2");
-
-                if (ImGui::Button("Start path planning")) {
-                    start_path_planning();
-                }
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Key: 3");
-
-                if (ImGui::InputFloat("Celeris car speed", &car_speed, 1.0f, 10.0f, "%.1f")) {
-                    celeris.set_car_speed(car_speed);
-                }
-
-                // if (ImGui::Button("Max left")) {
-                //     command_sender.set_command(VehicleCommand{
-                //         .speed = car_speed,
-                //         .steering_angle = -0.4f
-                //     });
-                // }
-
-                // if (ImGui::Button("Max left")) {
-                //     command_sender.set_command(VehicleCommand{
-                //     .speed = 100,
-                //     .steering_angle = -0.4f
-                //     });
-                // }
-                
-                // if (ImGui::Button("Straight")) {
-                //     command_sender.set_command(VehicleCommand{
-                //         .speed = 100,
-                //         .steering_angle = 0.0f
-                //     });
-                // }
-
-                // if (ImGui::Button("Max right")) {
-                //     command_sender.set_command(VehicleCommand{
-                //         .speed = 100,
-                //         .steering_angle = 0.4f
-                //     });
-                // }
-
-                // if (ImGui::Button("Stop")) {
-                //     command_sender.set_command(VehicleCommand{
-                //         .speed = 0.0f,
-                //         .steering_angle = 0.0f
-                //     });
-                // }
-
-                
-
-
-                
-
-
-                // ImGui::Text("Path: %s", path_planning_status.c_str());
 
                 ImGui::End();
                 
