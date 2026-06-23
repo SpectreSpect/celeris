@@ -109,7 +109,7 @@ void VoxelMapPointInserter::insert(VoxelPointMap& voxel_point_map, PointCloud& s
     };
 
     dispatch_insert_pass(0u, source_point_cloud.instance_count(), retry_list_a, retry_list_b);
-    std::cout << "Hash table insert failures: " << hash_table_insert_fail_count << std::endl;
+    // std::cout << "Hash table insert failures: " << hash_table_insert_fail_count << std::endl;
 
     VulkanBuffer* readable_retry_list = &retry_list_b;
     VulkanBuffer* writable_retry_list = &retry_list_a;
@@ -118,8 +118,8 @@ void VoxelMapPointInserter::insert(VoxelPointMap& voxel_point_map, PointCloud& s
         uint32_t current_retry_count = retry_count;
 
         dispatch_insert_pass(1u, current_retry_count, *readable_retry_list, *writable_retry_list);
-        std::cout << "Hash table insert retry " << (retry_attempt + 1u)
-                  << " failures: " << hash_table_insert_fail_count << std::endl;
+        // std::cout << "Hash table insert retry " << (retry_attempt + 1u)
+        //           << " failures: " << hash_table_insert_fail_count << std::endl;
 
         std::swap(readable_retry_list, writable_retry_list);
     }
@@ -127,7 +127,7 @@ void VoxelMapPointInserter::insert(VoxelPointMap& voxel_point_map, PointCloud& s
     // voxel_point_map.map_point_count_buffer.read(&voxel_point_map.m_map_point_count, sizeof(uint32_t), 0);
     voxel_point_map.map_point_count_buffer.read(&voxel_point_map.m_map_point_count, sizeof(voxel_point_map.m_map_point_count), 0);
 
-    if (retry_count > 0u) {
-        std::cout << "Hash table insert failures remaining after retries: " << retry_count << std::endl;
-    }
+    // if (retry_count > 0u) {
+    //     std::cout << "Hash table insert failures remaining after retries: " << retry_count << std::endl;
+    // }
 }

@@ -28,10 +28,6 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         insert_points_into_voxel_map_cs(device, path_utils::executable_dir() / "shaders" / "insert_points_into_voxel_map.comp.spv"),
         reset_point_voxel_map_cs(device, path_utils::executable_dir() / "shaders" / "reset_voxel_point_map.comp.spv"),
         gicp_reduce_cs(device, path_utils::executable_dir() / "shaders" / "gicp_reduce.comp.spv"),
-        old_gicp_step_cs(device, path_utils::executable_dir() / "shaders" / "old_gicp_and_voxel_map_code" / "gicp_step.comp.spv"),
-        old_insert_points_into_voxel_map_cs(device, path_utils::executable_dir() / "shaders" / "old_gicp_and_voxel_map_code" / "insert_points_into_voxel_map.comp.spv"),
-        old_reset_point_voxel_map_cs(device, path_utils::executable_dir() / "shaders" / "old_gicp_and_voxel_map_code" / "reset_voxel_point_map.comp.spv"),
-        old_gicp_reduce_cs(device, path_utils::executable_dir() / "shaders" / "old_gicp_and_voxel_map_code" / "gicp_reduce.comp.spv"),
 
         // Cloud to mesh
         generate_mesh_cs(device, path_utils::executable_dir() / "shaders" / "cloud_to_mesh" / "generate_mesh_cs.comp.spv"),
