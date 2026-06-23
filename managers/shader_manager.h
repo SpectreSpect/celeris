@@ -35,6 +35,10 @@ public:
     VulkanShaderModule insert_points_into_voxel_map_cs;
     VulkanShaderModule reset_point_voxel_map_cs;
     VulkanShaderModule gicp_reduce_cs;
+    VulkanShaderModule old_gicp_step_cs;
+    VulkanShaderModule old_insert_points_into_voxel_map_cs;
+    VulkanShaderModule old_reset_point_voxel_map_cs;
+    VulkanShaderModule old_gicp_reduce_cs;
 
     // Cloud to mesh
     VulkanShaderModule generate_mesh_cs;

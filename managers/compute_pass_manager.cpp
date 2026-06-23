@@ -17,6 +17,10 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         point_voxel_map_insert_cp(create_point_voxel_map_insert_compute_pass(device, shader_manager.insert_points_into_voxel_map_cs)),
         reset_voxel_point_map_cp(create_reset_voxel_point_map_compute_pass(device, shader_manager.reset_point_voxel_map_cs)),
         gicp_reduce_cp(create_gicp_reduce_compute_pass(device, shader_manager.gicp_reduce_cs)),
+        old_gicp_cp(create_gicp_compute_pass(device, shader_manager.old_gicp_step_cs)),
+        old_point_voxel_map_insert_cp(create_old_point_voxel_map_insert_compute_pass(device, shader_manager.old_insert_points_into_voxel_map_cs)),
+        old_reset_voxel_point_map_cp(create_reset_voxel_point_map_compute_pass(device, shader_manager.old_reset_point_voxel_map_cs)),
+        old_gicp_reduce_cp(create_gicp_reduce_compute_pass(device, shader_manager.old_gicp_reduce_cs)),
 
         // Cloud to mesh
         generate_mesh_cp(create_generate_mesh_compute_pass(device, shader_manager.generate_mesh_cs)),
@@ -142,6 +146,22 @@ ComputePass ComputePassManager::create_point_voxel_map_insert_compute_pass(Vulka
     builder.add_storage_buffer(7, ShaderStages::compute); // InsertDebugBuffer
     builder.add_storage_buffer(8, ShaderStages::compute); // ReadableInsertRetryList
     builder.add_storage_buffer(9, ShaderStages::compute); // WritableInsertRetryList
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_old_point_voxel_map_insert_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_uniform_buffer(0, ShaderStages::compute);
+    builder.add_storage_buffer(1, ShaderStages::compute); // SourcePointBuffer
+    builder.add_storage_buffer(2, ShaderStages::compute); // SourceNormalBuffer
+    builder.add_storage_buffer(3, ShaderStages::compute); // MapPointCountBuffer
+    builder.add_storage_buffer(4, ShaderStages::compute); // MapPointBuffer
+    builder.add_storage_buffer(5, ShaderStages::compute); // MapNormalBuffer
+    builder.add_storage_buffer(6, ShaderStages::compute); // VoxelHashTableBuffer
 
     return create_pass(device, compute_shader_module, builder);
 }

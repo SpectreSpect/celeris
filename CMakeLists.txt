@@ -130,6 +130,14 @@ add_executable(app
   renderer/pbr/pbr_maps.cpp
   renderer/pbr/pbr_map_generator.cpp
   renderer/point_cloud/point_cloud_preprocessor.cpp
+  old_adapted_voxel_map_and_gicp/renderer/point_cloud/point_cloud.cpp
+  old_adapted_voxel_map_and_gicp/renderer/point_cloud/lidar/lidar_scan.cpp
+  old_adapted_voxel_map_and_gicp/renderer/point_cloud/lidar/lidar_video.cpp
+  old_adapted_voxel_map_and_gicp/renderer/point_cloud/gicp/gicp_pass.cpp
+  old_adapted_voxel_map_and_gicp/renderer/point_cloud/gicp/voxel_point_map.cpp
+  old_adapted_voxel_map_and_gicp/renderer/point_cloud/gicp/voxel_map_point_inserter.cpp
+  old_adapted_voxel_map_and_gicp/renderer/point_cloud/gicp/voxel_map_point_reseter.cpp
+  old_adapted_voxel_map_and_gicp/renderer/point_cloud/gicp/gicp_reductor.cpp
   a_star/occupancy_grid_3d.cpp
   a_star/a_star.cpp
   a_star/nonholonomic_a_star.cpp

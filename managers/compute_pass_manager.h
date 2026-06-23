@@ -27,6 +27,10 @@ public:
     ComputePass point_voxel_map_insert_cp;
     ComputePass reset_voxel_point_map_cp;
     ComputePass gicp_reduce_cp;
+    ComputePass old_gicp_cp;
+    ComputePass old_point_voxel_map_insert_cp;
+    ComputePass old_reset_voxel_point_map_cp;
+    ComputePass old_gicp_reduce_cp;
 
     // Cloud to mesh
     ComputePass generate_mesh_cp;
@@ -106,6 +110,7 @@ public:
     ComputePass create_point_voxel_map_insert_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_reset_voxel_point_map_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_gicp_reduce_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_old_point_voxel_map_insert_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
     // Cloud to mesh
     ComputePass create_generate_mesh_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);

@@ -1,0 +1,806 @@
+#version 460
+layout(local_size_x = 32) in;
+
+struct PointInstance {
+    vec4 position;
+    vec4 color;
+};
+
+struct GICPPartial {
+    double H[6][6];
+    double g[6];
+    double total_weighted_sq_error;
+    uint valid_count;
+};
+
+layout(set = 0, binding = 0) uniform UniformBufferObject {
+    vec4 position;
+    vec4 rotation;
+    uint num_source_points;
+    uint num_target_points;
+    uint num_hash_table_slots;
+} ubo;
+
+layout(std430, set = 0, binding = 1) buffer SourcePointBuffer {
+    PointInstance points[];
+} source_point_buffer;
+
+layout(std430, set = 0, binding = 2) readonly buffer SourceNormalBuffer {
+    vec4 normals[];
+} source_normal_buffer;
+
+layout(std430, set = 0, binding = 3) readonly buffer MapPointCountBuffer {
+    uint count;
+} map_point_count_buffer;
+
+layout(std430, set = 0, binding = 4) readonly buffer MapPointBuffer {
+    PointInstance points[];
+} map_point_buffer;
+
+layout(std430, set = 0, binding = 5) readonly buffer MapNormalBuffer {
+    vec4 normals[];
+} map_normal_buffer;
+
+layout(std430, set = 0, binding = 6) coherent buffer OutputStorageBuffer {
+    vec4 position;
+    vec4 rotation;
+} output_buffer;
+
+struct VoxelHashSlot {
+    uint  state;
+    ivec4 key;
+    uint  value;
+};
+
+layout(std430, set = 0, binding = 7) readonly buffer VoxelHashTableBuffer {
+    VoxelHashSlot slots[];
+} voxel_table;
+
+layout(std430, set = 0, binding = 8) writeonly buffer OutputPartialBuffer {
+    GICPPartial partials[];
+} output_partial_buffer;
+
+layout(std430, set = 0, binding = 9) writeonly buffer RejectionBuffer {
+    uint rejections[];
+} rejection_buffer;
+
+
+
+
+#ifndef VOXEL_MAX_PROBES
+#define VOXEL_MAX_PROBES 128u
+#endif
+
+#define VOXEL_INVALID_ID    0xFFFFFFFFu
+#define VOXEL_SLOT_EMPTY    0xFFFFFFFFu
+#define VOXEL_SLOT_LOCKED   0xFFFFFFFEu
+#define VOXEL_SLOT_OCCUPIED 0xFFFFFFFCu
+
+shared GICPPartial scratch[32];
+
+
+bool is_finite_vec4(vec4 v)
+{
+    return !any(isnan(v)) && !any(isinf(v));
+}
+
+
+
+bool is_finite_float(float v)
+{
+    return !(isnan(v) || isinf(v));
+}
+
+bool is_finite_vec3(vec3 v)
+{
+    return !any(isnan(v)) && !any(isinf(v));
+}
+
+bool is_finite_mat3(mat3 m)
+{
+    return is_finite_vec3(m[0]) &&
+           is_finite_vec3(m[1]) &&
+           is_finite_vec3(m[2]);
+}
+
+
+// Quaternion layout: q = vec4(x, y, z, w)
+vec4 normalize_quat_xyzw(vec4 q)
+{
+    if (!is_finite_vec4(q))
+        return vec4(0.0, 0.0, 0.0, 1.0);
+
+    float len2 = dot(q, q);
+
+    if (!is_finite_float(len2) || len2 < 1e-12)
+        return vec4(0.0, 0.0, 0.0, 1.0);
+
+    return q * inversesqrt(len2);
+}
+
+// Quaternion layout: q = vec4(x, y, z, w)
+//
+// This matches GLM-style quaternion rotation matrix
+// when CPU sends vec4(q.x, q.y, q.z, q.w).
+mat3 quat_xyzw_to_mat3(vec4 q)
+{
+    q = normalize_quat_xyzw(q);
+
+    float x = q.x;
+    float y = q.y;
+    float z = q.z;
+    float w = q.w;
+
+    float xx = x * x;
+    float yy = y * y;
+    float zz = z * z;
+
+    float xy = x * y;
+    float xz = x * z;
+    float yz = y * z;
+
+    float wx = w * x;
+    float wy = w * y;
+    float wz = w * z;
+
+    // GLSL matrices are column-major.
+    return mat3(
+        vec3(1.0 - 2.0 * (yy + zz), 2.0 * (xy + wz),       2.0 * (xz - wy)),
+        vec3(2.0 * (xy - wz),       1.0 - 2.0 * (xx + zz), 2.0 * (yz + wx)),
+        vec3(2.0 * (xz + wy),       2.0 * (yz - wx),       1.0 - 2.0 * (xx + yy))
+    );
+}
+
+// mat3 euler_xyz_to_mat3(vec3 euler)
+// {
+//     float cx = cos(euler.x);
+//     float sx = sin(euler.x);
+
+//     float cy = cos(euler.y);
+//     float sy = sin(euler.y);
+
+//     float cz = cos(euler.z);
+//     float sz = sin(euler.z);
+
+//     mat3 rx = mat3(
+//         1.0, 0.0, 0.0,
+//         0.0,  cx, -sx,
+//         0.0,  sx,  cx
+//     );
+
+//     mat3 ry = mat3(
+//          cy, 0.0, sy,
+//          0.0, 1.0, 0.0,
+//         -sy, 0.0, cy
+//     );
+
+//     mat3 rz = mat3(
+//         cz, -sz, 0.0,
+//         sz,  cz, 0.0,
+//         0.0, 0.0, 1.0
+//     );
+
+//     return rz * ry * rx;
+// }
+
+mat3 euler_xyz_to_mat3(vec3 euler)
+{
+    float cx = cos(euler.x);
+    float sx = sin(euler.x);
+
+    float cy = cos(euler.y);
+    float sy = sin(euler.y);
+
+    float cz = cos(euler.z);
+    float sz = sin(euler.z);
+
+    mat3 rx = mat3(1.0);
+    rx[0] = vec3(1.0, 0.0, 0.0);
+    rx[1] = vec3(0.0,  cx,  sx);
+    rx[2] = vec3(0.0, -sx,  cx);
+
+    mat3 ry = mat3(1.0);
+    ry[0] = vec3( cy, 0.0, -sy);
+    ry[1] = vec3(0.0, 1.0, 0.0);
+    ry[2] = vec3( sy, 0.0,  cy);
+
+    mat3 rz = mat3(1.0);
+    rz[0] = vec3( cz,  sz, 0.0);
+    rz[1] = vec3(-sz,  cz, 0.0);
+    rz[2] = vec3(0.0, 0.0, 1.0);
+
+    return rx * ry * rz;
+}
+
+vec3 transform_normal_world(mat3 R, vec3 cloud_scale, vec3 local_n)
+{
+    mat3 S = mat3(1.0);
+    S[0][0] = cloud_scale.x;
+    S[1][1] = cloud_scale.y;
+    S[2][2] = cloud_scale.z;
+
+    mat3 linear = R * S;
+    mat3 normal_matrix = transpose(inverse(linear));
+    vec3 n = normal_matrix * local_n;
+
+    if (!is_finite_vec3(n))
+        return vec3(0.0);
+
+    float len2 = dot(n, n);
+    if (len2 < 1e-12)
+        return vec3(0.0);
+
+    return n * inversesqrt(len2);
+}
+
+// vec3 transform_point_world(mat3 R, vec3 cloud_scale, vec3 cloud_position, vec3 local_p)
+// {
+//     vec3 scaled = local_p * cloud_scale;
+//     vec3 p = R * scaled + cloud_position;
+
+//     if (!is_finite_vec3(p))
+//         return vec3(0.0);
+
+//     return p;
+// }
+
+
+
+vec3 transform_point_world(mat3 cloud_R, vec3 cloud_position, vec3 cloud_scale, vec3 local_p) {
+    vec3 scaled = vec3(local_p.x * cloud_scale.x, local_p.y * cloud_scale.y, local_p.z * cloud_scale.z);
+
+    return cloud_R * scaled + cloud_position;
+}
+
+
+mat3 covariance_from_normal(vec3 raw_n, float eps)
+{
+    float len2 = dot(raw_n, raw_n);
+    if (len2 < 1e-12 || !is_finite_float(len2))
+        return mat3(0.0);
+
+    vec3 n = raw_n / sqrt(len2);
+    mat3 I = mat3(1.0);
+    mat3 nnT = outerProduct(n, n);
+
+    mat3 C = I - (1.0 - eps) * nnT;
+    return is_finite_mat3(C) ? C : mat3(0.0);
+}
+
+ivec3 voxel_key_from_world_pos(vec3 world_pos, float voxel_size)
+{
+    return ivec3(floor(world_pos / voxel_size));
+}
+
+uint hash_voxel_key(ivec3 key)
+{
+    uvec3 k = uvec3(key);
+
+    uint h = 2166136261u;
+    h = (h ^ k.x) * 16777619u;
+    h = (h ^ k.y) * 16777619u;
+    h = (h ^ k.z) * 16777619u;
+
+    h ^= h >> 16;
+    h *= 0x7feb352du;
+    h ^= h >> 15;
+    h *= 0x846ca68bu;
+    h ^= h >> 16;
+
+    return h;
+}
+
+bool voxel_key_equal(ivec4 stored_key, ivec3 query_key)
+{
+    return all(equal(stored_key.xyz, query_key));
+}
+
+uint voxel_lookup_map_point_id(ivec3 key)
+{
+    uint slot_count = ubo.num_hash_table_slots;
+    if (slot_count == 0u)
+        return VOXEL_INVALID_ID;
+
+    uint idx = hash_voxel_key(key) % slot_count;
+    uint max_probes = min(slot_count, VOXEL_MAX_PROBES);
+
+    for (uint probe = 0u; probe < max_probes; ++probe) {
+        uint state = voxel_table.slots[idx].state;
+
+        if (state == VOXEL_SLOT_EMPTY)
+            return VOXEL_INVALID_ID;
+
+        if (state == VOXEL_SLOT_OCCUPIED) {
+            if (voxel_key_equal(voxel_table.slots[idx].key, key))
+                return voxel_table.slots[idx].value;
+        }
+
+        idx = (idx + 1u) % slot_count;
+    }
+
+    return VOXEL_INVALID_ID;
+}
+
+uint find_closest_id_hash(
+    vec3 position,
+    vec4 normal4,
+    float max_dist_sq,
+    float max_corr_dist,
+    float min_normal_dot
+) {
+    if (map_point_count_buffer.count == 0u)
+        return VOXEL_INVALID_ID;
+
+    if (!is_finite_vec3(position))
+        return VOXEL_INVALID_ID;
+
+    float voxel_size = 0.5;
+    ivec3 base_voxel = voxel_key_from_world_pos(position, voxel_size);
+
+    int num_layers = int(ceil(max_corr_dist / voxel_size));
+
+    uint min_id = VOXEL_INVALID_ID;
+    float min_dist = max_dist_sq;
+
+    vec3 query_normal = normal4.xyz;
+    bool use_normal_check = is_finite_vec3(query_normal) && dot(query_normal, query_normal) > 1e-12;
+
+    if (use_normal_check)
+        query_normal = normalize(query_normal);
+
+    for (int layer = 0; layer <= num_layers; ++layer) {
+        for (int dx = -layer; dx <= layer; ++dx) {
+            for (int dy = -layer; dy <= layer; ++dy) {
+                for (int dz = -layer; dz <= layer; ++dz) {
+                    if (layer > 0 &&
+                        abs(dx) < layer &&
+                        abs(dy) < layer &&
+                        abs(dz) < layer)
+                    {
+                        continue;
+                    }
+
+                    ivec3 voxel_key = base_voxel + ivec3(dx, dy, dz);
+                    uint candidate_id = voxel_lookup_map_point_id(voxel_key);
+
+                    if (candidate_id == VOXEL_INVALID_ID)
+                        continue;
+
+                    if (candidate_id >= map_point_count_buffer.count)
+                        continue;
+
+                    vec3 candidate_pos = map_point_buffer.points[candidate_id].position.xyz;
+                    vec3 candidate_normal = map_normal_buffer.normals[candidate_id].xyz;
+
+                    if (!is_finite_vec3(candidate_pos) || !is_finite_vec3(candidate_normal))
+                        continue;
+
+                    vec3 to_point = candidate_pos - position;
+                    float dist_sq = dot(to_point, to_point);
+
+                    if (!is_finite_float(dist_sq))
+                        continue;
+
+                    if (dist_sq >= min_dist)
+                        continue;
+
+                    float nlen_sq = dot(candidate_normal, candidate_normal);
+                    if (!is_finite_float(nlen_sq) || nlen_sq < 1e-12)
+                        continue;
+
+                    if (use_normal_check && min_normal_dot > -1.0) {
+                        candidate_normal *= inversesqrt(nlen_sq);
+
+                        float ndot = dot(query_normal, candidate_normal);
+                        if (!is_finite_float(ndot) || ndot < min_normal_dot)
+                            continue;
+                    }
+
+                    min_dist = dist_sq;
+                    min_id = candidate_id;
+                }
+            }
+        }
+    }
+
+    return min_id;
+}
+
+
+uint find_closest_id_brute_force(
+    vec3 position,
+    vec4 normal4,
+    float max_dist_sq,
+    float max_corr_dist,
+    float min_normal_dot
+) {
+    if (map_point_count_buffer.count == 0u)
+        return VOXEL_INVALID_ID;
+
+    if (!is_finite_vec3(position))
+        return VOXEL_INVALID_ID;
+
+    uint min_id = VOXEL_INVALID_ID;
+
+    float min_dist = max_dist_sq;
+
+    if (is_finite_float(max_corr_dist) && max_corr_dist > 0.0) {
+        min_dist = min(min_dist, max_corr_dist * max_corr_dist);
+    }
+
+    vec3 query_normal = normal4.xyz;
+    bool use_normal_check =
+        is_finite_vec3(query_normal) &&
+        dot(query_normal, query_normal) > 1e-12;
+
+    if (use_normal_check)
+        query_normal = normalize(query_normal);
+
+    for (uint candidate_id = 0u;
+         candidate_id < map_point_count_buffer.count;
+         ++candidate_id)
+    {
+        vec3 candidate_pos =
+            map_point_buffer.points[candidate_id].position.xyz;
+
+        vec3 candidate_normal =
+            map_normal_buffer.normals[candidate_id].xyz;
+
+        if (!is_finite_vec3(candidate_pos) || !is_finite_vec3(candidate_normal))
+            continue;
+
+        float nlen_sq = dot(candidate_normal, candidate_normal);
+
+        if (!is_finite_float(nlen_sq) || nlen_sq < 1e-12)
+            continue;
+
+        vec3 to_point = candidate_pos - position;
+        float dist_sq = dot(to_point, to_point);
+
+        if (!is_finite_float(dist_sq))
+            continue;
+
+        if (dist_sq >= min_dist)
+            continue;
+
+        if (use_normal_check && min_normal_dot > -1.0) {
+            candidate_normal *= inversesqrt(nlen_sq);
+
+            float ndot = dot(query_normal, candidate_normal);
+
+            if (!is_finite_float(ndot) || ndot < min_normal_dot)
+                continue;
+        }
+
+        min_dist = dist_sq;
+        min_id = candidate_id;
+    }
+
+    return min_id;
+}
+
+mat3 skew_matrix(vec3 v)
+{
+    return mat3(
+         0.0,  v.z, -v.y,
+        -v.z,  0.0,  v.x,
+         v.y, -v.x,  0.0
+    );
+}
+
+void add_mat3_block(inout double H[6][6], int row0, int col0, mat3 M)
+{
+    for (int r = 0; r < 3; r++) {
+        for (int c = 0; c < 3; c++) {
+            H[row0 + r][col0 + c] += double(M[c][r]);
+        }
+    }
+}
+
+void add_vec3_block(inout double g[6], int row0, vec3 v)
+{
+    for (int r = 0; r < 3; r++) {
+        g[row0 + r] += double(v[r]);
+    }
+}
+
+void add_to_first(inout GICPPartial a, in GICPPartial b)
+{
+    for (int r = 0; r < 6; ++r) {
+        a.g[r] += b.g[r];
+        for (int c = 0; c < 6; ++c) {
+            a.H[r][c] += b.H[r][c];
+        }
+    }
+    a.total_weighted_sq_error += b.total_weighted_sq_error;
+    a.valid_count += b.valid_count;
+}
+
+GICPPartial zero_partial()
+{
+    GICPPartial p;
+    for (int r = 0; r < 6; ++r) {
+        p.g[r] = 0.0;
+        for (int c = 0; c < 6; ++c) {
+            p.H[r][c] = 0.0;
+        }
+    }
+    p.total_weighted_sq_error = 0.0;
+    p.valid_count = 0u;
+    return p;
+}
+
+vec3 heatmap(float t)
+{
+    t = clamp(t, 0.0, 1.0);
+
+    float r = clamp(1.5 - abs(4.0 * t - 3.0), 0.0, 1.0);
+    float g = clamp(1.5 - abs(4.0 * t - 2.0), 0.0, 1.0);
+    float b = clamp(1.5 - abs(4.0 * t - 1.0), 0.0, 1.0);
+
+    return vec3(r, g, b);
+}
+
+GICPPartial get_gicp_partial(uint source_point_id, mat3 R_src, vec3 source_position, vec3 source_scale)
+{
+    rejection_buffer.rejections[source_point_id] = 123123;
+
+    const float max_corr_dist    = 5.0;
+    // const float max_corr_dist    = 20.0;
+    // const float max_corr_dist    = 100.0;
+    const float max_corr_dist_sq = max_corr_dist * max_corr_dist;
+    const float gicp_eps         = 1e-3;
+    // const float min_normal_dot   = -1.0;
+    // const float min_normal_dot   = 0.5f;
+    const float min_normal_dot   = 0.2f;
+
+    GICPPartial partial = zero_partial();
+
+    vec3 p_local     = source_point_buffer.points[source_point_id].position.xyz;
+    vec3 n_src_local = source_normal_buffer.normals[source_point_id].xyz;
+
+
+    if (dot(n_src_local, n_src_local) < 1e-12) {
+        rejection_buffer.rejections[source_point_id] = 1;
+        return partial;
+    }
+
+    if (!is_finite_vec3(p_local) || !is_finite_vec3(n_src_local)) {
+        rejection_buffer.rejections[source_point_id] = 2;
+        return partial;
+    }
+        
+
+    // vec3 scaled_local = p_local * source_scale;
+
+    vec3 x = transform_point_world(R_src, source_position, source_scale, p_local);
+
+    // vec3 x_rel = R_src * scaled_local;
+    if (!is_finite_vec3(x)) {
+        rejection_buffer.rejections[source_point_id] = 3;
+        return partial;
+    }
+
+    vec3 rotation_center = source_position;
+
+    vec3 x_rel = x - rotation_center;
+    if (!is_finite_vec3(x)) {
+        rejection_buffer.rejections[source_point_id] = 4;
+        return partial;
+    }
+    
+    vec3 n_src_world = transform_normal_world(R_src, source_scale, n_src_local);
+
+    if (!is_finite_vec3(n_src_world)) {
+        rejection_buffer.rejections[source_point_id] = 5;
+        return partial;
+    }
+        
+
+    if (dot(n_src_world, n_src_world) < 1e-12) {
+        rejection_buffer.rejections[source_point_id] = 6;
+        return partial;
+    }
+        
+
+    uint target_id = find_closest_id_hash(
+        x,
+        vec4(n_src_world, 0.0),
+        max_corr_dist_sq,
+        max_corr_dist,
+        min_normal_dot
+    );
+
+    // uint target_id = find_closest_id_brute_force(
+    //     x,
+    //     vec4(n_src_world, 0.0),
+    //     max_corr_dist_sq,
+    //     max_corr_dist,
+    //     min_normal_dot
+    // );
+
+
+    if (target_id == VOXEL_INVALID_ID) {
+        rejection_buffer.rejections[source_point_id] = 7;
+        return partial;
+    }
+        
+
+    // vec3 q = map_point_buffer.points[target_id].position.xyz;
+    // vec3 n_tgt_world = map_normal_buffer.normals[target_id].xyz;
+
+    vec3 q = map_point_buffer.points[target_id].position.xyz;
+
+    vec3 n_sum = map_normal_buffer.normals[target_id].xyz;
+    float n_len2 = dot(n_sum, n_sum);
+
+    if (n_len2 < 1e-12) {
+        // reject
+        return partial;
+    }
+
+    vec3 n_tgt_world = n_sum * inversesqrt(n_len2);
+
+    if (!is_finite_vec3(q) || !is_finite_vec3(n_tgt_world)) {
+        rejection_buffer.rejections[source_point_id] = 8;
+        return partial;
+    }
+        
+
+    float n_tgt_len2 = dot(n_tgt_world, n_tgt_world);
+    if (!is_finite_float(n_tgt_len2) || n_tgt_len2 < 1e-12) {
+        rejection_buffer.rejections[source_point_id] = 9;
+        return partial;
+    }
+        
+
+    vec3 d = q - x;
+    if (!is_finite_vec3(d)) {
+        rejection_buffer.rejections[source_point_id] = 10;
+        return partial;
+    }
+        
+
+    float dist_to_target = length(d);
+    if (!is_finite_float(dist_to_target)) {
+        rejection_buffer.rejections[source_point_id] = 11;
+        return partial;
+    }
+        
+
+    mat3 C_A = covariance_from_normal(n_src_world, gicp_eps);
+    mat3 C_B = covariance_from_normal(n_tgt_world, gicp_eps);
+    mat3 Sigma = C_A + C_B;
+
+    if (!is_finite_mat3(Sigma)) {
+        rejection_buffer.rejections[source_point_id] = 12;
+        return partial;
+    }
+        
+
+    float detSigma = determinant(Sigma);
+    if (!is_finite_float(detSigma) || abs(detSigma) < 1e-9) {
+        rejection_buffer.rejections[source_point_id] = 13;
+        return partial;
+    }
+        
+
+    mat3 M = inverse(Sigma);
+    if (!is_finite_mat3(M)) {
+        rejection_buffer.rejections[source_point_id] = 14;
+        return partial;
+    }
+        
+
+    /*
+        Important fix:
+
+        The rotational Jacobian must use the point relative to the source cloud's
+        rotation center, not the absolute world-space position.
+
+        Bad:
+            mat3 B = skew_matrix(x);
+
+        Good:
+            mat3 B = skew_matrix(x_rel);
+
+        Otherwise, translating both clouds by something like vec3(0, 0, 1000)
+        changes the optimization problem, even though the relative pose stayed
+        the same.
+    */
+    mat3 B = skew_matrix(x_rel);
+
+    mat3 H00 = transpose(B) * M * B;
+    mat3 H01 = -transpose(B) * M;
+    mat3 H10 = -M * B;
+    mat3 H11 = M;
+
+    vec3 g0 = -transpose(B) * M * d;
+    vec3 g1 = M * d;
+
+    if (!is_finite_mat3(H00) || !is_finite_mat3(H01) ||
+        !is_finite_mat3(H10) || !is_finite_mat3(H11) ||
+        !is_finite_vec3(g0)  || !is_finite_vec3(g1))
+    {
+        rejection_buffer.rejections[source_point_id] = 15;
+        return partial;
+    }
+
+    add_mat3_block(partial.H, 0, 0, H00);
+    add_mat3_block(partial.H, 0, 3, H01);
+    add_mat3_block(partial.H, 3, 0, H10);
+    add_mat3_block(partial.H, 3, 3, H11);
+
+    add_vec3_block(partial.g, 0, g0);
+    add_vec3_block(partial.g, 3, g1);
+
+    float weighted_error = dot(d, M * d);
+    if (!is_finite_float(weighted_error)) {
+        rejection_buffer.rejections[source_point_id] = 16;
+        return zero_partial();
+    }
+        
+
+    partial.total_weighted_sq_error = double(weighted_error);
+    partial.valid_count = 1u;
+
+    float t = clamp(dist_to_target / max_corr_dist, 0.0, 1.0);
+    // source_point_buffer.points[source_point_id].color = vec4(heatmap(t), 1.0);
+
+    rejection_buffer.rejections[source_point_id] = 0;
+    return partial;
+}
+
+void main()
+{
+    uint lid = gl_LocalInvocationID.x;
+    uint gid = gl_GlobalInvocationID.x;
+    uint wg  = gl_WorkGroupID.x;
+
+    // vec3 source_position = ubo.position.xyz;
+    // vec3 source_rotation = ubo.rotation.xyz;
+    // vec3 source_scale    = vec3(1.0);
+    // mat3 R_src = euler_xyz_to_mat3(source_rotation);
+
+    vec3 source_position = ubo.position.xyz;
+    vec4 source_rotation = normalize_quat_xyzw(ubo.rotation);
+    vec3 source_scale    = vec3(1.0);
+
+    mat3 R_src = quat_xyzw_to_mat3(source_rotation);
+
+    if (gid == 0) {
+        vec3 p_local = vec3(1, 5, 10);
+
+        // vec3 scaled_local = p_local * source_scale;
+        // vec3 x_rel = R_src * scaled_local;
+
+
+        vec3 x = transform_point_world(R_src, source_position, source_scale, p_local);
+        vec3 rotation_center = source_position;
+        vec3 x_rel = x - rotation_center;
+
+
+        output_buffer.position = vec4(x.x, x.y, x.z, 12312);
+        output_buffer.rotation = vec4(x_rel.x, x_rel.y, x_rel.z, 12312);
+    }
+
+
+    if (gid < ubo.num_source_points) {
+        scratch[lid] = get_gicp_partial(gid, R_src, source_position, source_scale);
+    } else {
+        scratch[lid] = zero_partial();
+    }
+
+    barrier();
+
+    for (uint stride = gl_WorkGroupSize.x >> 1; stride > 0; stride >>= 1) {
+        if (lid < stride) {
+            add_to_first(scratch[lid], scratch[lid + stride]);
+        }
+        barrier();
+    }
+
+    if (lid == 0) {
+        output_partial_buffer.partials[wg] = scratch[0];
+    }
+}
