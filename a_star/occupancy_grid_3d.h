@@ -25,8 +25,19 @@ public:
 
     static glm::ivec3 floor_pos(const glm::vec3& p);
     static std::vector<glm::ivec3> line_intersects(glm::vec3 pos1, glm::vec3 pos2);
+    glm::ivec3 world_to_voxel_pos(const glm::vec3& p) const;
+    glm::vec3 voxel_to_world_pos(const glm::ivec3& p) const;
+    glm::vec3 voxel_center_world_pos(const glm::ivec3& p) const;
     bool is_solid(glm::ivec3 pos);
-    bool check_footprint(glm::ivec3 origin, glm::ivec3 offsets, uint32_t max_step_up);
+    bool check_footprint(glm::vec3 origin, glm::vec3 offsets, uint32_t max_step_up);
+    bool adjust_to_ground(
+        glm::ivec3& output,
+        int max_step_up = 500,
+        int max_drop = 500,
+        int max_y_diff = -1,
+        bool allow_flying_over_precepices = true,
+        uint32_t* status = nullptr
+    );
     bool adjust_to_ground(
         std::vector<glm::vec3>& output, 
         int max_step_up = 500, 

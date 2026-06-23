@@ -49,8 +49,8 @@ void Celeris::start_lidar_receiver() {
 
 void Celeris::start() {
     start_lidar_receiver();
-    // m_command_sender.start();
-    // start_planner_thread();
+    m_command_sender.start();
+    start_planner_thread();
 }
 
 void Celeris::update() {

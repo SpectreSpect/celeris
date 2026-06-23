@@ -284,8 +284,8 @@ std::vector<LineInstance> CelerisVisualizer::make_path_lines(const std::vector<g
 
     for (uint32_t i = 1; i < path.size() && path_lines.size() < max_path_line_count; i++) {
         path_lines.push_back(LineInstance{
-            .p0 = glm::vec3(path[i - 1]) + glm::vec3(0, 0.2f, 0),
-            .p1 = glm::vec3(path[i]) + glm::vec3(0, 0.2f, 0),
+            .p0 = m_celeris->planner().occupancy_grid().voxel_center_world_pos(path[i - 1]) + glm::vec3(0, 0.2f, 0),
+            .p1 = m_celeris->planner().occupancy_grid().voxel_center_world_pos(path[i]) + glm::vec3(0, 0.2f, 0),
             .color = glm::vec4(1, 1, 1, 1)
         });
     }

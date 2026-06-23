@@ -134,7 +134,7 @@ DistToPathData NonholonomicAStar::max_unimpended_dist_to_path(glm::vec3 pos, std
 
     glm::vec3 cur_pos = (glm::vec3)pos;
     for (int i = start_id; i < path.size(); i++) {
-        glm::vec3 path_pos = (glm::vec3)path[i] + glm::vec3(0.5f, 0.0f, 0.5f);
+        glm::vec3 path_pos = m_grid->voxel_center_world_pos(path[i]);
 
         if (replace_last_pos && i == path.size() - 1)
             path_pos = last_pos;
@@ -275,7 +275,9 @@ void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos en
     m_state.end_pos = end_pos;
     m_params.min_radius = m_params.wheel_base / std::tan(m_params.max_steer);
 
-    m_state.plain_astar_path = m_plain_astar.find_path(glm::ivec3(glm::floor(start_pos.pos)), glm::ivec3(glm::floor(end_pos.pos)));
+    m_state.plain_astar_path = m_plain_astar.find_path(
+        m_grid->world_to_voxel_pos(start_pos.pos),
+        m_grid->world_to_voxel_pos(end_pos.pos));
 
     std::cout << "Plain A* is solid time: " << m_grid->is_solid_time.total_ms() << " ms" << std::endl;
     std::cout << "Is solid count: " << m_grid->is_solid_count << std::endl;
@@ -286,7 +288,7 @@ void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos en
         return; 
     
     if (m_state.plain_astar_path.reached_precipice) {
-        glm::vec3 pos = m_state.plain_astar_path.path.back();
+        glm::vec3 pos = m_grid->voxel_center_world_pos(m_state.plain_astar_path.path.back());
         glm::vec3 dir_to_end = glm::normalize(end_pos.pos - pos);
         float theta = std::atan2(dir_to_end.z, dir_to_end.x);
         
@@ -295,7 +297,7 @@ void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos en
     }
 
     NonholonomicPos first_unimpended_pos = start_pos;
-    first_unimpended_pos.pos.y = m_state.plain_astar_path.path[0].y;
+    first_unimpended_pos.pos.y = m_grid->voxel_to_world_pos(m_state.plain_astar_path.path[0]).y;
     m_state.unimpended_astar_positions.push_back(first_unimpended_pos);
 
     NonholonomicPos cur_pos = start_pos;
@@ -329,10 +331,11 @@ void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos en
 
             break;
         }
-        glm::vec3 dir = glm::normalize(glm::vec3(m_state.plain_astar_path.path[unimpended_dist_data.id + 1] - m_state.plain_astar_path.path[unimpended_dist_data.id]));
+        glm::vec3 current_path_pos = m_grid->voxel_center_world_pos(m_state.plain_astar_path.path[unimpended_dist_data.id]);
+        glm::vec3 next_path_pos = m_grid->voxel_center_world_pos(m_state.plain_astar_path.path[unimpended_dist_data.id + 1]);
+        glm::vec3 dir = glm::normalize(next_path_pos - current_path_pos);
 
-        unimpended_pos.pos = m_state.plain_astar_path.path[unimpended_dist_data.id];
-        unimpended_pos.pos += glm::vec3(0.5f, 0, 0.5f);
+        unimpended_pos.pos = current_path_pos;
         unimpended_pos.theta = std::atan2(dir.z, dir.x);
 
         m_state.unimpended_astar_positions.push_back(unimpended_pos);

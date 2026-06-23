@@ -190,7 +190,7 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
                 int ny = cur_cell.pos.y;
                 int nz = dz + cur_cell.pos.z;
 
-                glm::vec3 new_pos = glm::vec3(nx, ny, nz);
+                glm::ivec3 new_pos(nx, ny, nz);
 
                 uint32_t status = 0;
 

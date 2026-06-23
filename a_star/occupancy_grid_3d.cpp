@@ -257,6 +257,26 @@ std::vector<glm::ivec3> OccupancyGrid3D::line_intersects(glm::vec3 pos1, glm::ve
     return out;
 }
 
+glm::ivec3 OccupancyGrid3D::world_to_voxel_pos(const glm::vec3& p) const {
+    logger().check(m_voxel_grid, "Voxel grid was null");
+
+    const glm::vec3 voxel_size = m_voxel_grid->voxel_size();
+    logger().check(glm::all(glm::greaterThan(voxel_size, glm::vec3(0.0f))),
+                   "Voxel size must be greater than zero");
+
+    return floor_pos(p / voxel_size);
+}
+
+glm::vec3 OccupancyGrid3D::voxel_to_world_pos(const glm::ivec3& p) const {
+    logger().check(m_voxel_grid, "Voxel grid was null");
+    return glm::vec3(p) * m_voxel_grid->voxel_size();
+}
+
+glm::vec3 OccupancyGrid3D::voxel_center_world_pos(const glm::ivec3& p) const {
+    logger().check(m_voxel_grid, "Voxel grid was null");
+    return (glm::vec3(p) + glm::vec3(0.5f)) * m_voxel_grid->voxel_size();
+}
+
 bool OccupancyGrid3D::is_solid(glm::ivec3 pos) {
     is_solid_count++;
     // // LOG_METHOD();
@@ -266,7 +286,7 @@ bool OccupancyGrid3D::is_solid(glm::ivec3 pos) {
 
     is_solid_time.start();
 
-    uint32_t inflation_size = 3;
+    uint32_t inflation_size = 10;
 
     glm::ivec3 chunk_pos = m_voxel_grid->chunk_pos_from_voxel_pos(pos);
 
@@ -389,7 +409,7 @@ bool OccupancyGrid3D::is_solid(glm::ivec3 pos) {
     // return pos.y <= 0;
 }
 
-bool OccupancyGrid3D::check_footprint(glm::ivec3 origin, glm::ivec3 offsets, uint32_t max_step_up) {
+bool OccupancyGrid3D::check_footprint(glm::vec3 origin, glm::vec3 offsets, uint32_t max_step_up) {
     return m_voxel_grid->check_footprint(origin, offsets, max_step_up);
 }
 
@@ -397,6 +417,13 @@ std::vector<glm::ivec3> OccupancyGrid3D::line_intersects_xz(glm::vec3 pos1, glm:
     // LOG_METHOD();
 
     std::vector<glm::ivec3> out;
+
+    const glm::vec3 voxel_size = m_voxel_grid->voxel_size();
+    logger().check(glm::all(glm::greaterThan(voxel_size, glm::vec3(0.0f))),
+                   "Voxel size must be greater than zero");
+
+    pos1 /= voxel_size;
+    pos2 /= voxel_size;
 
     // Work in 2D (x,z), but output ivec3 with a fixed y layer.
     glm::vec2 p1(pos1.x, pos1.z);
@@ -489,56 +516,31 @@ std::vector<glm::ivec3> OccupancyGrid3D::line_intersects_xz(glm::vec3 pos1, glm:
     return out;
 }
 
-bool OccupancyGrid3D::adjust_to_ground(std::vector<glm::vec3>& output, int max_step_up, int max_drop, int max_y_diff, bool allow_flying_over_precepices) {
-    // LOG_METHOD();
-    bool ok = adjust_to_ground_range(output.data(), 
-                                          output.data() + output.size(), 
-                                          [](const glm::vec3& s){ return s;},
-                                          [](glm::vec3& s, const glm::vec3& p){ s.y = p.y; },
-                                          max_step_up, max_drop, max_y_diff, allow_flying_over_precepices);
-    return ok;
-}
-
-bool OccupancyGrid3D::adjust_to_ground(std::vector<glm::ivec3>& output, int max_step_up, int max_drop, int max_y_diff, bool allow_flying_over_precepices) {
-    bool ok = adjust_to_ground_range(output.data(), 
-                                          output.data() + output.size(), 
-                                          [](const glm::ivec3& s){ return (glm::vec3)s;},
-                                          [](glm::ivec3& s, const glm::vec3& p){ s.y = p.y; },
-                                          max_step_up, max_drop, max_y_diff, allow_flying_over_precepices);
-    return ok;
-}
-
-bool OccupancyGrid3D::adjust_to_ground(std::vector<NonholonomicPos>& output, int max_step_up, int max_drop, int max_y_diff, bool allow_flying_over_precepices) {
-    // LOG_METHOD();
-    bool ok = adjust_to_ground_range(output.data(), 
-                                     output.data() + output.size(), 
-                                     [](const NonholonomicPos& s){ return (glm::vec3)s.pos;},
-                                     [](NonholonomicPos& s, const glm::vec3& p){ s.pos.y = p.y; },
-                                     max_step_up, max_drop, max_y_diff, allow_flying_over_precepices);
-    return ok;
-}
-
-bool OccupancyGrid3D::adjust_to_ground(glm::vec3& output, int max_step_up, int max_drop, int max_y_diff, bool allow_flying_over_precepices, uint32_t* status) {
-    // LOG_METHOD();
-
-    glm::ivec3 norm_pos = glm::ivec3(glm::floor(output));
+bool OccupancyGrid3D::adjust_to_ground(
+    glm::ivec3& output,
+    int max_step_up,
+    int max_drop,
+    int max_y_diff,
+    bool allow_flying_over_precepices,
+    uint32_t* status) {
+    glm::ivec3 norm_pos = output;
     glm::ivec3 result_pos = norm_pos;
 
     if(!get_closest_visible_bottom_pos(norm_pos, result_pos, max_drop)) {
         if (status)
             *status = 1;
-        return allow_flying_over_precepices; // couldn't find
+        return allow_flying_over_precepices;
     }
 
     if ((int)norm_pos.y == (int)result_pos.y) {
         if (!get_closest_invisible_top_pos(norm_pos + glm::ivec3(0, 1, 0), result_pos, max_step_up)) {
             if (status)
                 *status = 2;
-            return false; // couldn't find
+            return false;
         }
     }
     else
-        result_pos += glm::ivec3(0, 1, 0); // first invisible pos
+        result_pos += glm::ivec3(0, 1, 0);
     
     if (max_y_diff >= 0) {
         float diff = std::abs(result_pos.y - norm_pos.y);
@@ -555,6 +557,50 @@ bool OccupancyGrid3D::adjust_to_ground(glm::vec3& output, int max_step_up, int m
     output.y = result_pos.y;
     if (status)
         *status = 4;
+    return true;
+}
+
+bool OccupancyGrid3D::adjust_to_ground(std::vector<glm::vec3>& output, int max_step_up, int max_drop, int max_y_diff, bool allow_flying_over_precepices) {
+    // LOG_METHOD();
+    bool ok = adjust_to_ground_range(output.data(), 
+                                          output.data() + output.size(), 
+                                          [](const glm::vec3& s){ return s;},
+                                          [](glm::vec3& s, const glm::vec3& p){ s.y = p.y; },
+                                          max_step_up, max_drop, max_y_diff, allow_flying_over_precepices);
+    return ok;
+}
+
+bool OccupancyGrid3D::adjust_to_ground(std::vector<glm::ivec3>& output, int max_step_up, int max_drop, int max_y_diff, bool allow_flying_over_precepices) {
+    for (glm::ivec3& p : output) {
+        if (!adjust_to_ground(p, max_step_up, max_drop, max_y_diff, allow_flying_over_precepices))
+            return false;
+    }
+    return true;
+}
+
+bool OccupancyGrid3D::adjust_to_ground(std::vector<NonholonomicPos>& output, int max_step_up, int max_drop, int max_y_diff, bool allow_flying_over_precepices) {
+    // LOG_METHOD();
+    bool ok = adjust_to_ground_range(output.data(), 
+                                     output.data() + output.size(), 
+                                     [](const NonholonomicPos& s){ return (glm::vec3)s.pos;},
+                                     [](NonholonomicPos& s, const glm::vec3& p){ s.pos.y = p.y; },
+                                     max_step_up, max_drop, max_y_diff, allow_flying_over_precepices);
+    return ok;
+}
+
+bool OccupancyGrid3D::adjust_to_ground(glm::vec3& output, int max_step_up, int max_drop, int max_y_diff, bool allow_flying_over_precepices, uint32_t* status) {
+    // LOG_METHOD();
+
+    glm::ivec3 norm_pos = world_to_voxel_pos(output);
+    uint32_t local_status = 0;
+    uint32_t* result_status = status ? status : &local_status;
+
+    if (!adjust_to_ground(norm_pos, max_step_up, max_drop, max_y_diff, allow_flying_over_precepices, result_status))
+        return false;
+
+    if (*result_status == 4)
+        output.y = voxel_to_world_pos(norm_pos).y;
+
     return true;
 }
 
