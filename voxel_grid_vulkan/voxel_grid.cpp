@@ -652,7 +652,7 @@ void VoxelGrid::mesh_emit(VulkanCommandBuffer& command_buffer, VulkanBuffer& dis
 
     m_pass_instances.mesh_emit_pi.push_constants(command_buffer, MeshEmitPushConstants{
         .u_chunk_dim = glm::uvec4(m_params.chunk_size, 0),
-        .u_voxel_size = glm::uvec4(m_params.voxel_size, 0),
+        .u_voxel_size = glm::vec4(m_params.voxel_size, 0.0f),
 
         .u_pack_bits = pack_bits,
         .u_pack_offset = pack_offset,
@@ -1453,10 +1453,10 @@ bool VoxelGrid::check_footprint(glm::vec3 origin, glm::vec3 offsets, uint32_t ma
 
     logger().check(glm::all(glm::greaterThan(offsets, glm::vec3(0.0f))),
                    "Footprint offsets must be greater than zero");
-    logger().check(glm::all(glm::greaterThan(m_params.voxel_size, glm::uvec3(0u))),
+    logger().check(glm::all(glm::greaterThan(m_params.voxel_size, glm::vec3(0.0f))),
                    "Voxel size must be greater than zero");
 
-    const glm::vec3 voxel_size = glm::vec3(m_params.voxel_size);
+    const glm::vec3 voxel_size = m_params.voxel_size;
     const glm::ivec3 voxel_origin = glm::ivec3(glm::floor(origin / voxel_size));
     const glm::ivec3 voxel_end = glm::ivec3(glm::ceil((origin + offsets) / voxel_size));
     const glm::ivec3 voxel_counts_signed = voxel_end - voxel_origin;
@@ -1765,7 +1765,7 @@ ShaderHelper& VoxelGrid::shader_helper() noexcept {
     return m_shader_helper;
 }
 
-glm::uvec3 VoxelGrid::voxel_size() {
+glm::vec3 VoxelGrid::voxel_size() {
     return m_params.voxel_size;
 }
 

@@ -93,7 +93,7 @@ public:
 
     struct VoxelGridParams {
         glm::uvec3 chunk_size = {0u, 0u, 0u};
-        glm::uvec3 voxel_size = {0u, 0u, 0u};
+        glm::vec3 voxel_size = {0.0f, 0.0f, 0.0f};
         uint32_t count_active_chunks = 0u;
         uint32_t count_evict_buckets = 0u;
         uint32_t max_write_count = 0u;
@@ -195,7 +195,7 @@ public:
     ShaderHelper& shader_helper() noexcept;
 
 
-    glm::uvec3 voxel_size();
+    glm::vec3 voxel_size();
     void voxelize_point_cloud(VulkanCommandBuffer& command_buffer, VulkanEngine& engine, 
                               PointCloud& point_cloud, VulkanBuffer& voxel_writes, uint32_t max_write_count);
     void voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud, 
