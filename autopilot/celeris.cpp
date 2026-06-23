@@ -141,10 +141,10 @@ void Celeris::update() {
 
         
         m_voxel_map_inserter.insert(m_voxel_point_map, m_network_scan->point_cloud(), m_network_scan->normal_buffer());
-        // m_voxel_grid->voxelize_point_cloud(*m_engine, 
-        //                                    m_network_scan->point_cloud(), 
-        //                                    voxel_write_list, 
-        //                                    m_desc.max_write_count);
+        m_voxel_grid->voxelize_point_cloud(*m_engine, 
+                                           m_network_scan->point_cloud(), 
+                                           voxel_write_list, 
+                                           m_desc.max_write_count);
 
         request_path_replan(m_start_position, m_goal_position);
 

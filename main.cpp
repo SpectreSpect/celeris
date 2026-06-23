@@ -413,7 +413,7 @@ int main() {
         point_cloud_preprocessor, 
         "/home/spectre/TEMP_lidar_output_mesh/recording_16/index.csv", 
         0,
-        100
+        2
     );
 
     for (int i = static_cast<int>(lidar_video.get_scan_count()) - 1; i >= 1; --i) {
@@ -497,9 +497,9 @@ int main() {
     Scene scene;
 
     scene.add(skybox);
-    // scene.add(celeris_visualizer);
+    scene.add(celeris_visualizer);
     // scene.add(target_scan);
-    scene.add(voxel_point_map);
+    // scene.add(voxel_point_map);
     // scene.add(source_scan);
 
     // scene.add(lidar_video);
@@ -581,7 +581,7 @@ int main() {
             voxel_point_map.set_instance_view(celeris.voxel_point_map().get_map_instance_view());
             rendered_celeris_scan_count = celeris.received_scan_count();
         }
-        // celeris_visualizer.update();
+        celeris_visualizer.update();
 
         if (!fps_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_F) == GLFW_PRESS) {
             fps_camera_pressed = true;
@@ -607,7 +607,7 @@ int main() {
 
         lighting_system.update(engine.current_frame(), window, camera);
 
-        // voxel_grid.update(window, camera);        
+        voxel_grid.update(window, camera);        
 
         if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
             place_start_pressed = true;
@@ -674,7 +674,7 @@ int main() {
                 // if (network_scan)
                 //     renderer.render(command_buffer, network_scan->point_cloud(), network_scan->point_cloud().transform.get_model_matrix());
 
-                // renderer.render(command_buffer, voxel_grid.render_object());
+                renderer.render(command_buffer, voxel_grid.render_object());
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
