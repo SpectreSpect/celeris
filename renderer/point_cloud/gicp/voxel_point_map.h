@@ -17,22 +17,20 @@ public:
         uint32_t max_map_point_count;
     };
 
-    // struct VoxelHashSlot {
-    //     uint32_t state;
-    //     uint32_t pad0[3];
-    //     glm::ivec4 key;
-    //     uint32_t value;
-    //     uint32_t pad1[3];
-    // };
-
-    struct alignas(16) VoxelHashSlotGpu {
-        uint32_t state;
-        uint32_t pad0[3];
-        glm::ivec4 key;
-        uint32_t value;
-        uint32_t pad1[3];
+    struct HashTableCountersGpu {
+        uint32_t count_empty[16];
+        uint32_t count_occupied[16];
+        uint32_t count_tomb[16];
     };
-    static_assert(sizeof(VoxelHashSlotGpu) == 48);
+
+    struct IndexHashTableSlotGpu {
+        glm::uvec2 key;
+        uint32_t value;
+        uint32_t state;
+    };
+
+    static_assert(sizeof(HashTableCountersGpu) == 192);
+    static_assert(sizeof(IndexHashTableSlotGpu) == 16);
 
     VoxelPointMap(VulkanEngine& engine, uint32_t num_hash_table_slots, uint32_t max_map_point_count);
 

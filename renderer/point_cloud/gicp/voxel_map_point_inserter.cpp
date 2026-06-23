@@ -6,6 +6,7 @@
 #include "voxel_point_map.h"
 #include "../point_instance.h"
 #include "../point_cloud.h"
+#include "../../../math_utils.h"
 
 VoxelMapPointInserter::VoxelMapPointInserter(VulkanEngine& engine, ComputePassManager& compute_pass_manager) 
     :   engine(engine),
@@ -51,6 +52,8 @@ void VoxelMapPointInserter::insert(VoxelPointMap& voxel_point_map, PointCloud& s
     uniform_data.source_point_count = source_point_cloud.instance_count();
     // uniform_data.source_point_count = points.size();
     uniform_data.num_hash_table_slots = voxel_point_map.m_num_hash_table_slots;
+    uniform_data.pack_bits = math_utils::BITS;
+    uniform_data.pack_offset = static_cast<int32_t>(math_utils::OFFSET);
     uniform_data.source_model = source_point_cloud.transform.get_model_matrix();
     // uniform_data.color = source_point_cloud.color;
     uniform_data.color = glm::vec4(1, 1, 1, 1);
