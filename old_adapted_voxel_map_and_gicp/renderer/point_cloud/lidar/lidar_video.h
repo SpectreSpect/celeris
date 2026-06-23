@@ -10,6 +10,8 @@
 
 #include "lidar_scan.h"
 
+class PointCloudPreprocessor;
+
 class OldLidarVideo : public SceneObject {
 public:
     _XCHILD_NAME(OldLidarVideo);
@@ -25,9 +27,13 @@ public:
         glm::vec3 linear_acceleration;
     };
 
-    OldLidarVideo(ManagerBundle& manager_bundle, const std::filesystem::path& csv_path, int first_frame = -1, int last_frame = -1);
+    OldLidarVideo(ManagerBundle& manager_bundle, 
+                  PointCloudPreprocessor& point_cloud_preprocessor, 
+                  const std::filesystem::path& csv_path, int first_frame = -1, int last_frame = -1);
 
-    void load_from_file(ManagerBundle& manager_bundle, const std::filesystem::path& csv_path, int first_frame = -1, int last_frame = -1);
+    void load_from_file(ManagerBundle& manager_bundle, 
+                        PointCloudPreprocessor& point_cloud_preprocessor, 
+                        const std::filesystem::path& csv_path, int first_frame = -1, int last_frame = -1);
 
     static bool parse_u64(const std::string& s, uint64_t& out);
     static bool parse_u32(const std::string& s, uint32_t& out);

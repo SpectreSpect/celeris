@@ -31,15 +31,10 @@ public:
     OldPointCloud(ManagerBundle& manager_bundle, uint32_t instance_count);
     OldPointCloud(ManagerBundle& manager_bundle, const std::vector<OldPointInstance>& points);
 
+    uint32_t point_count() const noexcept;
+
     void set_points(const std::vector<OldPointInstance>& points);
-
-    // bool has_owned_instance_batch() const;
-
-    // const InstanceBatch& owned_instance_batch() const;
-    // InstanceBatch& owned_instance_batch();
-
-    // const VulkanBuffer& owned_instance_buffer() const;
-    // VulkanBuffer& owned_instance_buffer();
+    void set_color(glm::vec4 color);
 
 private:
     std::unique_ptr<InstanceBatch> m_instance_batch;

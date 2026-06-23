@@ -18,6 +18,7 @@
 #include "renderer/skybox.h"
 #include "renderer/lighting_system/lighting_system.h"
 #include "imgui_layer.h"
+#include "renderer/point_cloud/point_cloud_preprocessor.h"
 #include "old_adapted_voxel_map_and_gicp/renderer/point_cloud/point_cloud.h"
 #include "old_adapted_voxel_map_and_gicp/renderer/point_cloud/lidar/lidar_video.h"
 #include "old_adapted_voxel_map_and_gicp/renderer/point_cloud/gicp/gicp_pass.h"
@@ -81,6 +82,12 @@ int main() {
     ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager,
                                  material_instance_manager, mesh_manager, compute_pass_manager);
 
+    PointCloudPreprocessor point_cloud_preprocessor(
+        engine.device(),
+        engine.compute_queue(),
+        compute_pass_manager
+    );
+
     OldGICPPass gicp_pass(engine, compute_pass_manager);
     OldVoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);
     OldVoxelMapPointReseter voxel_map_reseter(engine, compute_pass_manager);
@@ -102,7 +109,13 @@ int main() {
         skybox_exposure
     );
 
-    OldLidarVideo lidar_video(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/recording_16/index.csv", 0, 100);
+    OldLidarVideo lidar_video(
+        manager_bundle,
+        point_cloud_preprocessor,
+        "/home/spectre/TEMP_lidar_output_mesh/recording_16/index.csv",
+        0,
+        100
+    );
 
     glm::vec3 first_position = lidar_video.get_scan(0).point_cloud().transform.position;
     glm::quat first_rotation = glm::normalize(lidar_video.get_scan(0).point_cloud().transform.rotation);

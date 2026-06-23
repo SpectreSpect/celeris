@@ -70,47 +70,14 @@ void OldPointCloud::set_points(const std::vector<OldPointInstance>& points) {
 
     logger().check(!points.empty(), "Points vector was empty");
 
-    m_instance_batch->set_instance_count(points.size());
-    m_instance_batch->buffer().upload(points.data(), points.size() * sizeof(OldPointInstance));
-    
-    set_instance_view(m_instance_batch->get_view());
+    set_instance_count(points.size());
+    instance_buffer().upload(points);
 }
 
-// bool OldPointCloud::has_owned_instance_batch() const {
-//     return m_instance_batch != nullptr;
-// }
+void OldPointCloud::set_color(glm::vec4 color) {
+    set_material_data(PointCloudMaterialData{.color = color});
+}
 
-// const InstanceBatch& OldPointCloud::owned_instance_batch() const {
-//     LOG_METHOD();
-
-//     logger.check(m_instance_batch != nullptr, "OldPointCloud does not own an InstanceBatch");
-//     return *m_instance_batch;
-// }
-
-// InstanceBatch& OldPointCloud::owned_instance_batch() {
-//     logger.check(m_instance_batch != nullptr, "OldPointCloud does not own an InstanceBatch");
-//     return *m_instance_batch;
-// }
-
-// const VulkanBuffer& OldPointCloud::owned_instance_buffer() const {
-//     LOG_METHOD();
-
-//     logger.check(m_instance_batch != nullptr, "OldPointCloud does not own an InstanceBatch");
-//     return m_instance_batch->buffer();
-// }
-
-// VulkanBuffer& OldPointCloud::owned_instance_buffer() {
-//     LOG_METHOD();
-
-//     logger.check(m_instance_batch != nullptr, "OldPointCloud does not own an InstanceBatch");
-//     return m_instance_batch->buffer();
-// }
-
-// void OldPointCloud::set_instance_count(uint32_t instance_count) {
-//     LOG_METHOD();
-
-//     logger.check(m_instance_batch != nullptr, "OldPointCloud does not own an InstanceBatch");
-
-//     m_instance_batch->set_instance_count(instance_count);
-//     set_instance_view(m_instance_batch->get_view());
-// }
+uint32_t OldPointCloud::point_count() const noexcept {
+    return m_instance_batch->instance_count();
+}
