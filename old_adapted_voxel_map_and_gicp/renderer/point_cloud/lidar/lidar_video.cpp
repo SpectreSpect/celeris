@@ -6,7 +6,6 @@
 #include "../point_instance.h"
 #include "../../../../renderer/point_cloud/point_cloud_preprocessor.h"
 
-
 OldLidarVideo::OldLidarVideo(ManagerBundle& manager_bundle, 
                              PointCloudPreprocessor& point_cloud_preprocessor, 
                              const std::filesystem::path& csv_path, int first_frame, int last_frame){

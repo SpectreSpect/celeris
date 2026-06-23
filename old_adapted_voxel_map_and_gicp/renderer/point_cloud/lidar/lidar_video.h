@@ -10,8 +10,6 @@
 
 #include "lidar_scan.h"
 
-class PointCloudPreprocessor;
-
 class OldLidarVideo : public SceneObject {
 public:
     _XCHILD_NAME(OldLidarVideo);
