@@ -445,12 +445,12 @@ int main() {
 
     source_scan.point_cloud().transform.position += glm::vec3(-2, 2, -2);
 
-    celeris.voxel_map_reseter().reset(celeris.voxel_point_map());
-    celeris.voxel_map_point_inserter().insert(
-        celeris.voxel_point_map(), 
-        lidar_video.get_scan(0).point_cloud(), 
-        lidar_video.get_scan(0).normal_buffer()
-    );
+    // celeris.voxel_map_reseter().reset(celeris.voxel_point_map());
+    // celeris.voxel_map_point_inserter().insert(
+    //     celeris.voxel_point_map(), 
+    //     lidar_video.get_scan(0).point_cloud(), 
+    //     lidar_video.get_scan(0).normal_buffer()
+    // );
 
     PointCloud voxel_point_map(
         manager_bundle, 
@@ -458,6 +458,7 @@ int main() {
         celeris.voxel_point_map().m_map_point_count
     );
     voxel_point_map.set_color(glm::vec4(0, 0, 0, 1));
+    uint32_t rendered_celeris_scan_count = celeris.received_scan_count();
 
     auto process_current_lidar_frame = [&]() {
         uint32_t current_frame_id = lidar_video.current_frame_id();
@@ -575,6 +576,11 @@ int main() {
 
 
         // celeris.update();
+        celeris.update();
+        if (rendered_celeris_scan_count != celeris.received_scan_count()) {
+            voxel_point_map.set_instance_view(celeris.voxel_point_map().get_map_instance_view());
+            rendered_celeris_scan_count = celeris.received_scan_count();
+        }
         // celeris_visualizer.update();
 
         if (!fps_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_F) == GLFW_PRESS) {

@@ -100,6 +100,9 @@ private:
     std::unique_ptr<LidarScan> m_network_scan;
     std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;
     uint32_t m_received_scan_count = 0;
+    bool m_has_previous_lidar_pose = false;
+    glm::vec3 m_previous_lidar_position{0.0f};
+    glm::quat m_previous_lidar_rotation{1.0f, 0.0f, 0.0f, 0.0f};
     uint32_t path_replanning_interval = 5;
 
     std::atomic<bool> m_planner_running{false};
