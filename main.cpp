@@ -19,12 +19,12 @@
 #include "renderer/lighting_system/lighting_system.h"
 #include "imgui_layer.h"
 #include "renderer/point_cloud/point_cloud_preprocessor.h"
-#include "old_adapted_voxel_map_and_gicp/renderer/point_cloud/point_cloud.h"
-#include "old_adapted_voxel_map_and_gicp/renderer/point_cloud/lidar/lidar_video.h"
-#include "old_adapted_voxel_map_and_gicp/renderer/point_cloud/gicp/gicp_pass.h"
-#include "old_adapted_voxel_map_and_gicp/renderer/point_cloud/gicp/voxel_point_map.h"
-#include "old_adapted_voxel_map_and_gicp/renderer/point_cloud/gicp/voxel_map_point_inserter.h"
-#include "old_adapted_voxel_map_and_gicp/renderer/point_cloud/gicp/voxel_map_point_reseter.h"
+#include "renderer/point_cloud/point_cloud.h"
+#include "renderer/point_cloud/lidar/lidar_video.h"
+#include "renderer/point_cloud/gicp/gicp_pass.h"
+#include "renderer/point_cloud/gicp/voxel_point_map.h"
+#include "renderer/point_cloud/gicp/voxel_map_point_inserter.h"
+#include "renderer/point_cloud/gicp/voxel_map_point_reseter.h"
 
 #include <cmath>
 #include <vector>
@@ -88,9 +88,9 @@ int main() {
         compute_pass_manager
     );
 
-    OldGICPPass gicp_pass(engine, compute_pass_manager);
-    OldVoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);
-    OldVoxelMapPointReseter voxel_map_reseter(engine, compute_pass_manager);
+    GICPPass gicp_pass(engine, compute_pass_manager);
+    VoxelMapPointInserter voxel_map_inserter(engine, compute_pass_manager);
+    VoxelMapPointReseter voxel_map_reseter(engine, compute_pass_manager);
 
     Renderer renderer(engine, frame_resources);
 
@@ -109,7 +109,7 @@ int main() {
         skybox_exposure
     );
 
-    OldLidarVideo lidar_video(
+    LidarVideo lidar_video(
         manager_bundle,
         point_cloud_preprocessor,
         "/home/spectre/TEMP_lidar_output_mesh/recording_16/index.csv",
@@ -141,12 +141,12 @@ int main() {
     lidar_video.get_scan(0).point_cloud().transform.position = glm::vec3(0.0f);
     lidar_video.get_scan(0).point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
-    OldVoxelPointMap voxel_point_map(engine, 1500000, 1500000);
+    VoxelPointMap voxel_point_map(engine, 1500000, 1500000);
     voxel_map_reseter.reset(voxel_point_map);
 
     voxel_map_inserter.insert(voxel_point_map, lidar_video.get_scan(0).point_cloud(), lidar_video.get_scan(0).normal_buffer());
 
-    OldPointCloud voxel_map_point_cloud(manager_bundle, voxel_point_map.map_point_buffer, voxel_point_map.m_map_point_count);
+    PointCloud voxel_map_point_cloud(manager_bundle, voxel_point_map.map_point_buffer, voxel_point_map.m_map_point_count);
 
     unlit_cube.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
     unlit_cube2.set_material_data<BlinPhongMaterialData>({glm::vec4(0.1, 1, 0.5, 32.0), glm::vec4(1, 1, 1, 1)});
@@ -197,7 +197,7 @@ int main() {
             uint32_t current_frame_id = lidar_video.current_frame_id();
 
             if (current_frame_id > 0) {
-                OldLidarScan& current_scan = lidar_video.get_scan(current_frame_id);
+                LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
                 gicp_pass.step(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
             }
 
@@ -214,11 +214,11 @@ int main() {
             uint32_t current_frame_id = lidar_video.current_frame_id();
 
             if (current_frame_id > 0) {
-                OldLidarScan& current_scan = lidar_video.get_scan(current_frame_id);
-                OldLidarScan& previous_scan = lidar_video.get_scan(current_frame_id - 1);
+                LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
+                LidarScan& previous_scan = lidar_video.get_scan(current_frame_id - 1);
 
-                OldPointCloud& current_point_cloud = current_scan.point_cloud();
-                OldPointCloud& previous_point_cloud = previous_scan.point_cloud();
+                PointCloud& current_point_cloud = current_scan.point_cloud();
+                PointCloud& previous_point_cloud = previous_scan.point_cloud();
 
                 current_point_cloud.transform.position = previous_point_cloud.transform.position + current_point_cloud.transform.position;
                 current_point_cloud.transform.rotation = glm::normalize(current_point_cloud.transform.rotation * previous_point_cloud.transform.rotation);

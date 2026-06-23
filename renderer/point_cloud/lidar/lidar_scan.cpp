@@ -113,6 +113,7 @@ LidarScan::FrameData LidarScan::read_frame_from_file(const std::filesystem::path
         frame.samples[i].valid = std::isfinite(x) && std::isfinite(y) && std::isfinite(z);
     }
 
+    frame.ring_count = 16;
     build_points_for_frame(frame);
 
     return frame;
@@ -637,4 +638,3 @@ VulkanBuffer& LidarScan::normal_buffer() {
 //     }
 //     return dr <= allowed;
 // }
-
