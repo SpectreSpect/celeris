@@ -184,7 +184,7 @@ void OldLidarScan::build_points_for_frame(FrameData& frame) {
         const TimedPointSample& s = frame.samples[i];
 
         if (!s.valid) {
-            frame.points[i].pos = glm::vec4(INF, INF, INF, 1.0f);
+            frame.points[i].position = glm::vec4(INF, INF, INF, 1.0f);
             frame.points[i].color = glm::vec4(1, 1, 1, 1);
             continue;
         }
@@ -206,7 +206,7 @@ void OldLidarScan::build_points_for_frame(FrameData& frame) {
         // Convert reference-frame point to engine coords
         const glm::vec3 p_ref_eng = ros_pos_to_engine(p_ref_ros);
 
-        frame.points[i].pos = glm::vec4(p_ref_eng, 1.0f);
+        frame.points[i].position = glm::vec4(p_ref_eng, 1.0f);
         frame.points[i].color = glm::vec4(1, 1, 1, 1);
     }
 }
@@ -284,11 +284,11 @@ void OldLidarScan::remove_points_near_origin(std::vector<OldPointInstance>& poin
         const OldPointInstance& p = points[i];
         const glm::vec4& n = normals[i];
 
-        glm::vec3 pos = glm::vec3(p.pos);
+        glm::vec3 pos = glm::vec3(p.position);
         float dist_sq = glm::dot(pos, pos);
 
         // remove points that are too close to the lidar origin
-        // if (dist_sq < min_dist_sq || p.pos.y < 1.0)
+        // if (dist_sq < min_dist_sq || p.position.y < 1.0)
         if (dist_sq < min_dist_sq)
             continue;
 
@@ -427,7 +427,7 @@ void OldLidarScan::remove_ground_points_and_normals(
 
         bool looks_like_ground =
             (up_dot >= up_dot_threshold) &&
-            (p.pos.y <= max_ground_height);
+            (p.position.y <= max_ground_height);
 
         if (!looks_like_ground) {
             filtered_points.push_back(p);
@@ -493,13 +493,13 @@ void OldLidarScan::remove_invalid_points_and_normals(std::vector<OldPointInstanc
 // }
 
 bool OldLidarScan::is_point_valid(const OldPointInstance &p) {
-    return std::isfinite(p.pos.x) && std::isfinite(p.pos.y) && std::isfinite(p.pos.z);
+    return std::isfinite(p.position.x) && std::isfinite(p.position.y) && std::isfinite(p.position.z);
 }
 
 glm::vec3 OldLidarScan::triangle_normal(const OldPointInstance& a, const OldPointInstance& b, const OldPointInstance& c) {
-    glm::vec3 av = {a.pos.x, a.pos.y, a.pos.z};
-    glm::vec3 bv = {b.pos.x, b.pos.y, b.pos.z};
-    glm::vec3 cv = {c.pos.x, c.pos.y, c.pos.z};
+    glm::vec3 av = {a.position.x, a.position.y, a.position.z};
+    glm::vec3 bv = {b.position.x, b.position.y, b.position.z};
+    glm::vec3 cv = {c.position.x, c.position.y, c.position.z};
 
     glm::vec3 u = bv - av;
     glm::vec3 v = cv - av;
@@ -519,7 +519,7 @@ int OldLidarScan::xy_id(int x, int y, int ring_width, int cloud_size){
 }
 
 float OldLidarScan::radial_distance(const OldPointInstance &p) {
-    return std::hypot(static_cast<double>(p.pos.x), static_cast<double>(p.pos.y), static_cast<double>(p.pos.z));
+    return std::hypot(static_cast<double>(p.position.x), static_cast<double>(p.position.y), static_cast<double>(p.position.z));
 }
 
 
@@ -540,13 +540,13 @@ bool OldLidarScan::is_same_object(const OldPointInstance &p0, const OldPointInst
 
 
     if (more_permissive_with_distance) {
-        // float thresh = std::max(0.2f - p0.pos.y, 0.0f);
+        // float thresh = std::max(0.2f - p0.position.y, 0.0f);
         // allowed = std::max(thresh * std::min(r0, r1), abs_thresh);
         float permission_factor = 1.5;
         allowed = rel_thresh * pow((std::min(r0, r1) / std::pow(permission_factor, 1.5)), permission_factor);
     }
     else {
-        // float thresh = std::max(0.2f - p0.pos.y, 0.0f);
+        // float thresh = std::max(0.2f - p0.position.y, 0.0f);
         // allowed = std::max(thresh, abs_thresh);
         allowed = std::max(rel_thresh, abs_thresh);
     }

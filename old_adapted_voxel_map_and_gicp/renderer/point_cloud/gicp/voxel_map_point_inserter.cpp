@@ -34,7 +34,7 @@ void OldVoxelMapPointInserter::insert(OldVoxelPointMap& voxel_point_map, OldPoin
     //     OldPointInstance point_instance;
     //     glm::vec4 normal = glm::vec4(0, 1, 0, 1);
 
-    //     point_instance.pos = glm::vec4(i * 0.1f, 0, 0, 1);
+    //     point_instance.position = glm::vec4(i * 0.1f, 0, 0, 1);
     //     point_instance.color = glm::vec4(i * 0.1f, 0, 0, 1);
 
     //     points[i] = point_instance;
