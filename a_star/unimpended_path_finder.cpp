@@ -47,6 +47,7 @@ std::vector<glm::ivec3> UnimpendedPathFinder::find_unimpended_path(
     uint32_t max_step_up,
     uint32_t max_drop,
     bool allow_flying_over_precipices,
+    bool allow_diagonal_moves,
     uint32_t start_id)
 {
     LOG_METHOD();
@@ -73,6 +74,7 @@ std::vector<glm::ivec3> UnimpendedPathFinder::find_unimpended_path(
             max_step_up,
             max_drop,
             allow_flying_over_precipices,
+            allow_diagonal_moves,
             start_id
         );
     }
@@ -127,6 +129,7 @@ void UnimpendedPathFinder::fill_max_unimpended_path_indices(
     uint32_t max_step_up,
     uint32_t max_drop,
     bool allow_flying_over_precipices,
+    bool allow_diagonal_moves,
     uint32_t start_id)
 {
     LOG_METHOD();
@@ -160,7 +163,8 @@ void UnimpendedPathFinder::fill_max_unimpended_path_indices(
         .u_voxels_per_chunk = voxel_grid_params.chunk_size.x * voxel_grid_params.chunk_size.y * voxel_grid_params.chunk_size.z,
         .u_pack_offset = static_cast<uint32_t>(math_utils::OFFSET),
         .u_pack_bits = math_utils::BITS,
-        .u_allow_flying_over_precipices = allow_flying_over_precipices ? 1u : 0u
+        .u_allow_flying_over_precipices = allow_flying_over_precipices ? 1u : 0u,
+        .u_allow_diagonal_moves = allow_diagonal_moves ? 1u : 0u
     });
 
     uint32_t from_local_id_groups = math_utils::div_up_u32(count_astar_points - start_id, 256u);

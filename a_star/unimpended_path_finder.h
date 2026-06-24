@@ -48,6 +48,7 @@ public:
         uint32_t max_step_up,
         uint32_t max_drop,
         bool allow_flying_over_precipices = false,
+        bool allow_diagonal_moves = true,
         uint32_t start_id = 0u
     );
 
@@ -85,6 +86,7 @@ private:
         uint32_t max_step_up,
         uint32_t max_drop,
         bool allow_flying_over_precipices = false,
+        bool allow_diagonal_moves = true,
         uint32_t start_id = 0u
     );
 

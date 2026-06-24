@@ -40,6 +40,7 @@ public:
         bool use_reed_shepps_fallback = false;
         bool force_reeds_shepp_shot = false;
         bool allow_flying_over_precipices = true;
+        bool allow_diagonal_moves = true;
         int iteration_limit = 20000;
         bool track_explored_paths = true;
         int max_step_up = 1;

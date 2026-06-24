@@ -11,7 +11,9 @@ NonholonomicAStar::NonholonomicAStar(
     :   m_params(desc),
         m_grid(&occupancy_grid),
         m_unimpened_path_finder(&unimpened_path_finder),
-        m_plain_astar(occupancy_grid, AStar::AStarDesc()) {}
+        m_plain_astar(occupancy_grid, AStar::AStarDesc{
+            .allow_diagonal_moves = desc.allow_diagonal_moves
+        }) {}
 
 std::vector<NonholonomicPos> NonholonomicAStar::simulate_motion(NonholonomicPos start, int steer, int direction)
 {
@@ -282,7 +284,8 @@ std::vector<glm::ivec3> NonholonomicAStar::find_unimpended_points(
         astar_path,
         m_params.max_step_up,
         m_params.max_drop,
-        m_params.allow_flying_over_precipices
+        m_params.allow_flying_over_precipices,
+        m_params.allow_diagonal_moves
     );
 }
 

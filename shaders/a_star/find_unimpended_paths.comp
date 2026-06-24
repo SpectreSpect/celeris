@@ -26,6 +26,7 @@ layout(push_constant) uniform FindUnimpendedPathsPushConstants {
     uint u_pack_offset;
     uint u_pack_bits;
     uint u_allow_flying_over_precipices;
+    uint u_allow_diagonal_moves;
 };
 
 // ----- include -----
@@ -105,6 +106,20 @@ bool make_step(inout ivec3 current_pos, ivec2 step_dir_xz) {
     return true;
 }
 
+bool make_diagonal_step(inout ivec3 current_pos, ivec2 step_dir_xz) {
+    if (u_allow_diagonal_moves == 0u) {
+        return false;
+    }
+
+    ivec3 next;
+    if (!try_make_step(current_pos, step_dir_xz, next)) {
+        return false;
+    }
+
+    current_pos = next;
+    return true;
+}
+
 bool is_path_unimpended(ivec3 from_pos, ivec3 to_pos) {
     if (is_wall_voxel(from_pos))
         return false;
@@ -152,6 +167,11 @@ bool is_path_unimpended(ivec3 from_pos, ivec3 to_pos) {
                 abs_offset.z++;
             } else {
                 ivec3 next;
+
+                if (make_diagonal_step(current_pos, ivec2(sign_dir.x, sign_dir.z))) {
+                    abs_offset += ivec3(1, 0, 1);
+                    continue;
+                }
 
                 if (try_make_step(current_pos, ivec2(sign_dir.x, 0), next) && 
                     make_step(next, ivec2(0, sign_dir.z)))
