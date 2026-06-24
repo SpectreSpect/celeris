@@ -17,7 +17,8 @@ layout(push_constant) uniform FindUnimpendedPathsPushConstants {
 
     uint u_exclusive_window_size; // Количество точек в окне, но кроме текущей точки
     uint u_start_id;
-    uint u_max_step_height;
+    uint u_max_step_up;
+    uint u_max_drop;
     uint u_count_astar_points;
 
     uint u_chunk_hash_table_size;
@@ -42,14 +43,15 @@ bool is_wall_voxel(ivec3 pos) {
     return voxel_vis(pos) == 1u;
 }
 
-// Если будет result > abs(max_offset) -> спуститься/подняться не получилось 
-int voxel_y_offset(ivec3 pos, uint max_offset_u) {
-    int max_offset = int(max_offset_u);
+// Если будет result вне [-max_drop, max_step_up] -> спуститься/подняться не получилось
+int voxel_y_offset(ivec3 pos, uint max_step_up_u, uint max_drop_u) {
+    int max_step_up = int(max_step_up_u);
+    int max_drop = int(max_drop_u);
 
     // Если целевая позиция внутри стены/земли — пытаемся подняться вверх,
     // пока не найдём воздух.
     if (is_wall_voxel(pos)) {
-        for (int dy = 1; dy <= max_offset; dy++) {
+        for (int dy = 1; dy <= max_step_up; dy++) {
             ivec3 stand_pos = pos + ivec3(0, dy, 0);
 
             if (!is_wall_voxel(stand_pos)) {
@@ -57,11 +59,11 @@ int voxel_y_offset(ivec3 pos, uint max_offset_u) {
             }
         }
 
-        return max_offset + 1;
+        return max_step_up + 1;
     }
 
     // Если целевая позиция в воздухе — пытаемся найти землю под ногами.
-    for (int drop = 0; drop <= max_offset; drop++) {
+    for (int drop = 0; drop <= max_drop; drop++) {
         ivec3 stand_pos = pos + ivec3(0, -drop, 0);
         ivec3 ground_pos = stand_pos + ivec3(0, -1, 0);
 
@@ -70,15 +72,15 @@ int voxel_y_offset(ivec3 pos, uint max_offset_u) {
         }
     }
 
-    return -(max_offset + 1);
+    return -(max_drop + 1);
 }
 
 bool try_make_step(ivec3 pos, ivec2 step_dir_xz, out ivec3 next) {
     next = pos + ivec3(step_dir_xz.x, 0, step_dir_xz.y);
 
-    int y_offset = voxel_y_offset(next, u_max_step_height);
+    int y_offset = voxel_y_offset(next, u_max_step_up, u_max_drop);
 
-    if (abs_i(y_offset) <= int(u_max_step_height)) {
+    if (y_offset >= -int(u_max_drop) && y_offset <= int(u_max_step_up)) {
         next.y += y_offset;
         return true;
     }
@@ -112,9 +114,10 @@ bool is_path_unimpended(ivec3 from_pos, ivec3 to_pos) {
     ivec3 abs_offset = ivec3(0, 0, 0);
     
     int max_steps = abs_diff.x + abs_diff.z;
-    int max_possible_height_delta = max_steps * int(u_max_step_height);
+    int max_possible_step_up = max_steps * int(u_max_step_up);
+    int max_possible_drop = max_steps * int(u_max_drop);
 
-    if (abs_i(diff.y) > max_possible_height_delta)
+    if (diff.y > max_possible_step_up || -diff.y > max_possible_drop)
         return false;
 
     while (abs_offset.x < abs_diff.x || abs_offset.z < abs_diff.z) {

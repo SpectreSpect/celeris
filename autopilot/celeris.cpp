@@ -5,6 +5,8 @@
 #include "../managers/compute_pass_manager.h"
 #include "../managers/manager_bundle.h"
 
+#include <utility>
+
 Celeris::Celeris(VulkanEngine& engine,
                  VulkanQueue& compute_queue, 
                  ManagerBundle& manager_bundle,
@@ -17,7 +19,20 @@ Celeris::Celeris(VulkanEngine& engine,
         m_gicp_pass(engine, manager_bundle.compute_pass_manager()),
         m_point_cloud_preprocessor(engine.device(), compute_queue, manager_bundle.compute_pass_manager()),
         m_scan_receiver(m_point_cloud_preprocessor),
-        m_planner(voxel_grid),
+        m_compute_submit_context(engine.device(), compute_queue),
+        m_unimpended_path_finder(
+            engine.physical_device(),
+            engine.device(),
+            m_compute_submit_context,
+            manager_bundle.compute_pass_manager(),
+            voxel_grid,
+            desc.unimpended_path_window_size,
+            desc.unimpended_path_max_astar_points),
+        m_planner(
+            voxel_grid,
+            [this](const PlainAstarData& astar_path_data, uint32_t max_step_up, uint32_t max_drop) {
+                return find_unimpended_path_for_planner(astar_path_data, max_step_up, max_drop);
+            }),
         m_voxel_point_map(engine, 
                           desc.voxel_point_map_num_hash_table_slots, 
                           desc.voxel_point_map_max_map_point_count),
@@ -33,8 +48,36 @@ Celeris::Celeris(VulkanEngine& engine,
     logger.check(desc.voxel_point_map_max_map_point_count > 0, 
                  "The maximum number of voxel point map points must be greater than 0");                 
     logger.check(desc.max_write_count > 0, "Max write count must be greater than 0");
+    logger.check(desc.unimpended_path_window_size > 1, "Unimpended path window size must be greater than 1");
+    logger.check(desc.unimpended_path_max_astar_points > 0, "Unimpended path max astar points must be greater than 0");
 
     m_voxel_map_reseter.reset(m_voxel_point_map);
+}
+
+std::vector<glm::vec3> Celeris::find_unimpended_path_for_planner(
+    const PlainAstarData& astar_path_data,
+    uint32_t max_step_up,
+    uint32_t max_drop)
+{
+    std::vector<glm::vec4> astar_path;
+    astar_path.reserve(astar_path_data.path.size());
+
+    for (const glm::ivec3& point : astar_path_data.path) {
+        astar_path.emplace_back(
+            static_cast<float>(point.x),
+            static_cast<float>(point.y),
+            static_cast<float>(point.z),
+            0.0f
+        );
+    }
+
+    return m_unimpended_path_finder.find_unimpended_path(
+        m_compute_submit_context,
+        std::move(astar_path),
+        max_step_up,
+        max_drop,
+        0u
+    );
 }
 
 void Celeris::start_lidar_receiver() {

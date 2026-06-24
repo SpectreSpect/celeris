@@ -38,18 +38,15 @@ public:
     UnimpendedPathFinder& operator=(UnimpendedPathFinder&&) noexcept = default;
 
     void realloc_buffers(
-        const VulkanPhysicalDevice& physical_device,
-        VulkanDevice& device,
         VulkanSubmitContext& submit_context,
         uint32_t window_size,
         uint32_t max_astar_points
     );
     std::vector<glm::vec3> find_unimpended_path(
-        const VulkanPhysicalDevice& physical_device,
-        VulkanDevice& device,
-        VulkanSubmitContext& submit_context, 
+        VulkanSubmitContext& submit_context,
         std::vector<glm::vec4> astar_path,
-        uint32_t max_step_height,
+        uint32_t max_step_up,
+        uint32_t max_drop,
         uint32_t start_id = 0u
     );
 
@@ -64,6 +61,8 @@ struct FinderPassInstances {
 
 private:
     VoxelGrid* m_voxel_grid;
+    const VulkanPhysicalDevice* m_physical_device = nullptr;
+    VulkanDevice* m_device = nullptr;
 
     uint32_t m_window_size = 0u;
     uint32_t m_max_astar_points = 0u;
@@ -82,7 +81,8 @@ private:
     void fill_max_unimpended_path_indices(
         VulkanCommandBuffer& command_buffer,
         uint32_t count_astar_points,
-        uint32_t max_step_height,
+        uint32_t max_step_up,
+        uint32_t max_drop,
         uint32_t start_id = 0u
     );
 

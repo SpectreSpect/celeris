@@ -18,14 +18,14 @@ UnimpendedPathFinder::UnimpendedPathFinder(
     uint32_t window_size,
     uint32_t max_astar_points)
     :   m_voxel_grid(&voxel_grid),
+        m_physical_device(&physical_device),
+        m_device(&device),
         m_window_size(window_size),
         m_max_astar_points(max_astar_points),
         m_pass_instances(create_pass_instances(device, compute_pass_manager)),
         m_buffers(create_buffers(physical_device, device, submit_context)) {}
 
 void UnimpendedPathFinder::realloc_buffers(
-    const VulkanPhysicalDevice& physical_device,
-    VulkanDevice& device,
     VulkanSubmitContext& submit_context,
     uint32_t window_size,
     uint32_t max_astar_points)
@@ -35,15 +35,17 @@ void UnimpendedPathFinder::realloc_buffers(
     m_window_size = window_size;
     m_max_astar_points = max_astar_points;
 
-    m_buffers = create_buffers(physical_device, device, submit_context);
+    logger.check(m_physical_device != nullptr, "Physical device pointer specify to null");
+    logger.check(m_device != nullptr, "Device pointer specify to null");
+
+    m_buffers = create_buffers(*m_physical_device, *m_device, submit_context);
 }
 
 std::vector<glm::vec3> UnimpendedPathFinder::find_unimpended_path(
-    const VulkanPhysicalDevice& physical_device,
-    VulkanDevice& device,
     VulkanSubmitContext& submit_context,
     std::vector<glm::vec4> astar_path, 
-    uint32_t max_step_height,
+    uint32_t max_step_up,
+    uint32_t max_drop,
     uint32_t start_id)
 {
     LOG_METHOD();
@@ -54,8 +56,6 @@ std::vector<glm::vec3> UnimpendedPathFinder::find_unimpended_path(
 
     if (astar_path.size() > m_max_astar_points) {
         realloc_buffers(
-            physical_device,
-            device,
             submit_context,
             m_window_size,
             astar_path.size() * 2 // *2 чтобы уменьшить вероятность перевыделения
@@ -69,7 +69,8 @@ std::vector<glm::vec3> UnimpendedPathFinder::find_unimpended_path(
         fill_max_unimpended_path_indices(
             scope.command_buffer(),
             static_cast<uint32_t>(astar_path.size()),
-            max_step_height,
+            max_step_up,
+            max_drop,
             start_id
         );
     }
@@ -105,7 +106,7 @@ UnimpendedPathFinder::FinderBuffers UnimpendedPathFinder::create_buffers(
         device,
         astar_path_size,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
     );
 
     {
@@ -120,7 +121,7 @@ UnimpendedPathFinder::FinderBuffers UnimpendedPathFinder::create_buffers(
             device,
             max_unimpended_path_indices_size,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
         ),
         .astar_path = std::move(astar_path),
     };
@@ -129,7 +130,8 @@ UnimpendedPathFinder::FinderBuffers UnimpendedPathFinder::create_buffers(
 void UnimpendedPathFinder::fill_max_unimpended_path_indices(
     VulkanCommandBuffer& command_buffer,
     uint32_t count_astar_points,
-    uint32_t max_step_height,
+    uint32_t max_step_up,
+    uint32_t max_drop,
     uint32_t start_id)
 {
     LOG_METHOD();
@@ -156,7 +158,8 @@ void UnimpendedPathFinder::fill_max_unimpended_path_indices(
         .u_chunk_dim = glm::ivec4(voxel_grid_params.chunk_size, 0),
         .u_exclusive_window_size = m_window_size - 1u,
         .u_start_id = start_id,
-        .u_max_step_height = max_step_height,
+        .u_max_step_up = max_step_up,
+        .u_max_drop = max_drop,
         .u_count_astar_points = count_astar_points,
         .u_chunk_hash_table_size = voxel_grid_params.chunk_hash_table_size,
         .u_voxels_per_chunk = voxel_grid_params.chunk_size.x * voxel_grid_params.chunk_size.y * voxel_grid_params.chunk_size.z,

@@ -16,13 +16,13 @@ class VoxelGrid;
 
 class AStar {
 public:
-    const int max_step_up = 2;
-    const int max_drop = 6;
+    const int max_step_up = 1;
+    const int max_drop = 1;
     const int max_y_diff = 1;
     const int limit = 20000;
     bool allow_diagonal_moves = false;
     bool allow_flying_over_precepices = true;
-    bool use_straight_fallback = true;
+    bool use_straight_fallback = false;
     uint32_t try_straight_interval = 100;
 
     

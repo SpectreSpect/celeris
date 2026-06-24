@@ -5,15 +5,18 @@
 #include "../renderer/point_cloud/gicp/voxel_point_map.h"
 #include "../renderer/point_cloud/gicp/voxel_map_point_reseter.h"
 #include "../renderer/point_cloud/gicp/voxel_map_point_inserter.h"
+#include "../a_star/unimpended_path_finder.h"
 #include "../a_star/nonholonomic_a_star.h"
 #include "../renderer/point_cloud/gicp/gicp_pass.h"
 #include "../vulkan_self/vulkan_engine.h"
+#include "../vulkan_self/vulkan_submit_context.h"
 #include "../vulkan_self/logger/logger_header.h"
 
 
 class VulkanQueue;
 class ComputePassManager;
 class VoxelGrid;
+class ManagerBundle;
 
 class Celeris {
 public:
@@ -25,6 +28,8 @@ public:
         uint32_t voxel_point_map_max_map_point_count = 1500000;
         uint32_t max_write_count = 100000;
         uint32_t max_gicp_iterations = 10;
+        uint32_t unimpended_path_window_size = 64;
+        uint32_t unimpended_path_max_astar_points = 4096;
     };
 
     Celeris(VulkanEngine& engine, 
@@ -49,6 +54,12 @@ public:
     VulkanEngine* engine();
 
 private:
+    std::vector<glm::vec3> find_unimpended_path_for_planner(
+        const PlainAstarData& astar_path_data,
+        uint32_t max_step_up,
+        uint32_t max_drop
+    );
+
     VulkanEngine* m_engine = nullptr;
     ManagerBundle* m_manager_bundle = nullptr;
     VoxelGrid* m_voxel_grid = nullptr;
@@ -58,6 +69,8 @@ private:
 
     PointCloudPreprocessor m_point_cloud_preprocessor;
     LidarScanReceiver m_scan_receiver;
+    VulkanSubmitContext m_compute_submit_context;
+    UnimpendedPathFinder m_unimpended_path_finder;
     NonholonomicAStar m_planner;
     
     VoxelPointMap m_voxel_point_map;
