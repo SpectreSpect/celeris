@@ -887,7 +887,7 @@ ComputePass ComputePassManager::create_find_unimpended_paths_pass(VulkanDevice& 
     ComputePassBuilder builder;
 
     builder.add_storage_buffer(0, ShaderStages::compute); // AstarPath
-    builder.add_storage_buffer(1, ShaderStages::compute); // WindowedAdjacencyMatrix
+    builder.add_storage_buffer(1, ShaderStages::compute); // MaxUnimpendedPathIndices
     builder.add_storage_buffer(2, ShaderStages::compute); // ChunkHashTable
     builder.add_storage_buffer(3, ShaderStages::compute); // ChunkVoxels
 

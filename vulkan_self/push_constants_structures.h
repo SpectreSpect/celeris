@@ -316,8 +316,15 @@ struct MarkAndCountFailSlotsPushConstants {
 };
 
 struct FindUnimpendedPathsPushConstants {
-    uint32_t u_window_size; // Количество точек в окне, но кроме текущей точки
+    glm::ivec4 u_chunk_dim;
+
+    uint32_t u_exclusive_window_size; // Количество точек в окне, но кроме текущей точки
     uint32_t u_start_id;
     uint32_t u_max_step_height;
     uint32_t u_count_astar_points;
+
+    uint32_t u_chunk_hash_table_size;
+    uint32_t u_voxels_per_chunk;
+    uint32_t u_pack_offset;
+    uint32_t u_pack_bits;
 };

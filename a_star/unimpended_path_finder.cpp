@@ -48,6 +48,10 @@ std::vector<glm::vec3> UnimpendedPathFinder::find_unimpended_path(
 {
     LOG_METHOD();
 
+    if (astar_path.empty()) {
+        return {};
+    }
+
     if (astar_path.size() > m_max_astar_points) {
         realloc_buffers(
             physical_device,
@@ -62,7 +66,7 @@ std::vector<glm::vec3> UnimpendedPathFinder::find_unimpended_path(
 
     {
         auto scope = submit_context.submit_and_wait_scope();
-        fill_adjacency_matrix(
+        fill_max_unimpended_path_indices(
             scope.command_buffer(),
             static_cast<uint32_t>(astar_path.size()),
             max_step_height,
@@ -70,7 +74,7 @@ std::vector<glm::vec3> UnimpendedPathFinder::find_unimpended_path(
         );
     }
 
-
+    return build_path_from_max_unimpended_path_indices(astar_path);
 }
 
 UnimpendedPathFinder::FinderPassInstances UnimpendedPathFinder::create_pass_instances(
@@ -93,8 +97,7 @@ UnimpendedPathFinder::FinderBuffers UnimpendedPathFinder::create_buffers(
 {
     LOG_METHOD();
 
-    // -1 потому что связь в себя не считается
-    VkDeviceSize windowed_adjacency_matrix_size = sizeof(uint32_t) * m_max_astar_points * (m_window_size - 1);
+    VkDeviceSize max_unimpended_path_indices_size = sizeof(uint32_t) * m_max_astar_points;
     VkDeviceSize astar_path_size = sizeof(uint32_t) * 4 + sizeof(glm::ivec4) * m_max_astar_points;
 
     VulkanBuffer astar_path = VulkanBuffer(
@@ -112,10 +115,10 @@ UnimpendedPathFinder::FinderBuffers UnimpendedPathFinder::create_buffers(
     }
     
     return FinderBuffers{
-        .windowed_adjacency_matrix = VulkanBuffer(
+        .max_unimpended_path_indices = VulkanBuffer(
             physical_device,
             device,
-            windowed_adjacency_matrix_size,
+            max_unimpended_path_indices_size,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         ),
@@ -123,7 +126,7 @@ UnimpendedPathFinder::FinderBuffers UnimpendedPathFinder::create_buffers(
     };
 }
 
-void UnimpendedPathFinder::fill_adjacency_matrix(
+void UnimpendedPathFinder::fill_max_unimpended_path_indices(
     VulkanCommandBuffer& command_buffer,
     uint32_t count_astar_points,
     uint32_t max_step_height,
@@ -134,39 +137,67 @@ void UnimpendedPathFinder::fill_adjacency_matrix(
     logger.check(m_voxel_grid != nullptr, "Voxel grid pointer specify to null");
 
     m_pass_instances.find_unimpended_paths_pi.set_storage_buffer(0, m_buffers.astar_path);
-    m_pass_instances.find_unimpended_paths_pi.set_storage_buffer(1, m_buffers.windowed_adjacency_matrix);
+    m_pass_instances.find_unimpended_paths_pi.set_storage_buffer(1, m_buffers.max_unimpended_path_indices);
     m_pass_instances.find_unimpended_paths_pi.set_storage_buffer(2, m_voxel_grid->buffers().chunk_hash_table);
     m_pass_instances.find_unimpended_paths_pi.set_storage_buffer(3, m_voxel_grid->buffers().voxels);
 
+    m_buffers.max_unimpended_path_indices.fill(
+        command_buffer,
+        0u,
+        sizeof(uint32_t) * count_astar_points
+    );
+    m_buffers.max_unimpended_path_indices.transfer_write_to_compute_read_write_barrier(command_buffer);
+
     m_pass_instances.find_unimpended_paths_pi.bind(command_buffer);
 
+    const auto& voxel_grid_params = m_voxel_grid->params();
+
     m_pass_instances.find_unimpended_paths_pi.push_constants(command_buffer, FindUnimpendedPathsPushConstants{
-        .u_window_size = m_window_size, // Количество точек в окне, но кроме текущей точки
+        .u_chunk_dim = glm::ivec4(voxel_grid_params.chunk_size, 0),
+        .u_exclusive_window_size = m_window_size - 1u,
         .u_start_id = start_id,
         .u_max_step_height = max_step_height,
-        .u_count_astar_points = count_astar_points
+        .u_count_astar_points = count_astar_points,
+        .u_chunk_hash_table_size = voxel_grid_params.chunk_hash_table_size,
+        .u_voxels_per_chunk = voxel_grid_params.chunk_size.x * voxel_grid_params.chunk_size.y * voxel_grid_params.chunk_size.z,
+        .u_pack_offset = static_cast<uint32_t>(math_utils::OFFSET),
+        .u_pack_bits = math_utils::BITS
     });
 
     uint32_t from_local_id_groups = math_utils::div_up_u32(count_astar_points - start_id, 256u);
     command_buffer.dispatch(from_local_id_groups, m_window_size - 1, 1);
 
-    m_buffers.windowed_adjacency_matrix.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+    m_buffers.max_unimpended_path_indices.memory_barrier_compute_write_to_compute_write_read(command_buffer);
     m_voxel_grid->buffers().chunk_hash_table.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
-std::vector<glm::vec3> UnimpendedPathFinder::build_path_from_adjacency_matrix(
+std::vector<glm::vec3> UnimpendedPathFinder::build_path_from_max_unimpended_path_indices(
     std::vector<glm::vec4> astar_path
 ) {
     LOG_METHOD();
 
-    std::vector<uint32_t > astar_indices = m_buffers.windowed_adjacency_matrix.read_vector<uint32_t>(
-        astar_path.size() * (m_window_size - 1)
-    );
+    std::vector<uint32_t> astar_indices = m_buffers.max_unimpended_path_indices.read_vector<uint32_t>(astar_path.size());
 
     std::vector<glm::vec3> unimpended_path;
-
-    uint32_t current_id = 0u;
-    while (current_id != astar_path.size() - 1) {
-        unimpended_path.push_back();
+    if (astar_path.empty()) {
+        return unimpended_path;
     }
+
+    const uint32_t last_id = static_cast<uint32_t>(astar_path.size() - 1);
+    uint32_t current_id = 0u;
+    while (current_id <= last_id) {
+        unimpended_path.push_back(glm::vec3(astar_path[current_id]));
+        if (current_id == last_id) {
+            break;
+        }
+
+        uint32_t next_id = astar_indices[current_id];
+        if (next_id <= current_id || next_id > last_id) {
+            break;
+        }
+
+        current_id = next_id;
+    }
+
+    return unimpended_path;
 }

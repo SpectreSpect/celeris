@@ -8,15 +8,22 @@ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 // -------------------
 
 layout(std430, set = 0, binding = 0) readonly buffer AstarPath { ivec4 astar_path[]; };
-layout(std430, set = 0, binding = 1) buffer WindowedAdjacencyMatrix { uint windowed_adjacency_matrix[] };
+layout(std430, set = 0, binding = 1) buffer MaxUnimpendedPathIndices { uint max_unimpended_path_indices[]; };
 layout(std430, set = 0, binding = 2) coherent buffer ChunkHashTable { HashTableCounters chunk_hash_table_counters; ChunkHashTableSlot chunk_hash_table_slots[]; };
 layout(std430, set = 0, binding = 3) readonly buffer ChunkVoxels { VoxelData voxels[]; };
 
 layout(push_constant) uniform FindUnimpendedPathsPushConstants {
-    uint u_window_size; // Количество точек в окне, но кроме текущей точки
+    ivec4 u_chunk_dim;
+
+    uint u_exclusive_window_size; // Количество точек в окне, но кроме текущей точки
     uint u_start_id;
     uint u_max_step_height;
     uint u_count_astar_points;
+
+    uint u_chunk_hash_table_size;
+    uint u_voxels_per_chunk;
+    uint u_pack_offset;
+    uint u_pack_bits;
 };
 
 // ----- include -----
@@ -170,26 +177,23 @@ void main() {
     uint window_index = gl_GlobalInvocationID.y;
     uint window_offset = window_index + 1u;
 
-    if (window_index >= u_window_size) return;
+    if (window_index >= u_exclusive_window_size) return;
 
     uint from_id = u_start_id + from_local_id;
     uint to_id = from_id + window_offset;
 
     if (from_id >= u_count_astar_points) return;
 
-    uint matrix_id = window_index + from_id * u_window_size;
+    atomicMax(max_unimpended_path_indices[from_id], from_id);
 
     if (to_id >= u_count_astar_points) {
-        windowed_adjacency_matrix[matrix_id] = 0u;
         return;
     }
     
     ivec3 from_pos = astar_path[from_id].xyz;
     ivec3 to_pos = astar_path[to_id].xyz;
 
-    /*
-        Можно и без атомика
-        1u - можно пройти, 0u - нельзя пройти
-    */
-    windowed_adjacency_matrix[matrix_id] = is_path_unimpended(from_pos, to_pos) ? 1u : 0u; 
+    if (is_path_unimpended(from_pos, to_pos)) {
+        atomicMax(max_unimpended_path_indices[from_id], to_id);
+    }
 }

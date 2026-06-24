@@ -48,11 +48,13 @@ public:
         const VulkanPhysicalDevice& physical_device,
         VulkanDevice& device,
         VulkanSubmitContext& submit_context, 
-        std::vector<glm::vec4> astar_path
+        std::vector<glm::vec4> astar_path,
+        uint32_t max_step_height,
+        uint32_t start_id = 0u
     );
 
 struct FinderBuffers {
-    VulkanBuffer windowed_adjacency_matrix;
+    VulkanBuffer max_unimpended_path_indices;
     VulkanBuffer astar_path;
 };
 
@@ -77,12 +79,14 @@ private:
         VulkanSubmitContext& submit_context
     ) const;
 
-    void fill_adjacency_matrix(
+    void fill_max_unimpended_path_indices(
         VulkanCommandBuffer& command_buffer,
         uint32_t count_astar_points,
         uint32_t max_step_height,
         uint32_t start_id = 0u
     );
 
-    std::vector<glm::vec3> build_path_from_adjacency_matrix();
+    std::vector<glm::vec3> build_path_from_max_unimpended_path_indices(
+        std::vector<glm::vec4> astar_path
+    );
 };
