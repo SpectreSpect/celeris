@@ -47,6 +47,7 @@ public:
         const std::vector<glm::ivec4>& astar_path,
         uint32_t max_step_up,
         uint32_t max_drop,
+        bool allow_flying_over_precipices = false,
         uint32_t start_id = 0u
     );
 
@@ -83,6 +84,7 @@ private:
         uint32_t count_astar_points,
         uint32_t max_step_up,
         uint32_t max_drop,
+        bool allow_flying_over_precipices = false,
         uint32_t start_id = 0u
     );
 

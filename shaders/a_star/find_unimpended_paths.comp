@@ -25,6 +25,7 @@ layout(push_constant) uniform FindUnimpendedPathsPushConstants {
     uint u_voxels_per_chunk;
     uint u_pack_offset;
     uint u_pack_bits;
+    uint u_allow_flying_over_precipices;
 };
 
 // ----- include -----
@@ -70,6 +71,10 @@ int voxel_y_offset(ivec3 pos, uint max_step_up_u, uint max_drop_u) {
         if (!is_wall_voxel(stand_pos) && is_wall_voxel(ground_pos)) {
             return -drop;
         }
+    }
+
+    if (u_allow_flying_over_precipices != 0u) {
+        return 0;
     }
 
     return -(max_drop + 1);

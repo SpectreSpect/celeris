@@ -281,7 +281,8 @@ std::vector<glm::ivec3> NonholonomicAStar::find_unimpended_points(
         submit_context,
         astar_path,
         m_params.max_step_up,
-        m_params.max_drop
+        m_params.max_drop,
+        m_params.allow_flying_over_precipices
     );
 }
 
@@ -293,10 +294,11 @@ std::vector<NonholonomicPos> NonholonomicAStar::prepare_unimpended_points(
     LOG_METHOD();
 
     std::vector<NonholonomicPos> unimpended_path;
+    unimpended_path.reserve(unimpended_points.size());
 
     for (const glm::ivec3& point : unimpended_points) {
         NonholonomicPos unimpended_pos;
-        unimpended_pos.pos = point;
+        unimpended_pos.pos = m_grid->voxel_center_world_pos(point);
         unimpended_pos.theta = start_pos.theta;
         unimpended_path.push_back(unimpended_pos);
     }

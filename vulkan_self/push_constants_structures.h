@@ -353,6 +353,7 @@ struct FindUnimpendedPathsPushConstants {
     uint32_t u_voxels_per_chunk;
     uint32_t u_pack_offset;
     uint32_t u_pack_bits;
+    uint32_t u_allow_flying_over_precipices;
 };
 
 struct CopyDirtyListPushConstants {
