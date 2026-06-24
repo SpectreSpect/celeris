@@ -113,7 +113,7 @@ public:
     inline void push_constants(VulkanCommandBuffer& command_buffer, const Args&... args) const {
         LOG_METHOD();
 
-        logger.check(sizeof...(Args) == push_constant_ranges.size())
+        logger().check(sizeof...(Args) == push_constant_ranges.size())
             << "The number of push constants passed to the arguments does not match the number in the layout.";
 
         std::vector<std::pair<const void*, size_t>> arg_pointers;
@@ -122,7 +122,7 @@ public:
         (arg_pointers.emplace_back(static_cast<const void*>(&args), sizeof(Args)), ...);
 
         for (size_t i = 0; i < push_constant_ranges.size(); i++) {
-            logger.check(arg_pointers[i].second == push_constant_ranges[i].size)
+            logger().check(arg_pointers[i].second == push_constant_ranges[i].size)
                 << "The size of push constant number " << std::to_string(i) << " does not match the layout\n";
             
             vkCmdPushConstants(

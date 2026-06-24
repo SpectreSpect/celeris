@@ -1042,7 +1042,7 @@ void VoxelGridGPUDebugger::display_hash_table_window() {
 void VoxelGridGPUDebugger::submit_commands() {
     LOG_METHOD();
 
-    logger.check(m_queue != nullptr, "Queue pointer specify to null");
+    logger().check(m_queue != nullptr, "Queue pointer specify to null");
 
     m_fence.reset();
     m_queue->submit(m_command_buffer, &m_fence);

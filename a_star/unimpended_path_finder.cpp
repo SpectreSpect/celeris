@@ -35,15 +35,15 @@ void UnimpendedPathFinder::realloc_buffers(
     m_window_size = window_size;
     m_max_astar_points = max_astar_points;
 
-    logger.check(m_physical_device != nullptr, "Physical device pointer specify to null");
-    logger.check(m_device != nullptr, "Device pointer specify to null");
+    logger().check(m_physical_device != nullptr, "Physical device pointer specify to null");
+    logger().check(m_device != nullptr, "Device pointer specify to null");
 
     m_buffers = create_buffers(*m_physical_device, *m_device, submit_context);
 }
 
-std::vector<glm::vec3> UnimpendedPathFinder::find_unimpended_path(
+std::vector<glm::ivec3> UnimpendedPathFinder::find_unimpended_path(
     VulkanSubmitContext& submit_context,
-    std::vector<glm::vec4> astar_path, 
+    const std::vector<glm::ivec4>& astar_path, 
     uint32_t max_step_up,
     uint32_t max_drop,
     uint32_t start_id)
@@ -99,21 +99,7 @@ UnimpendedPathFinder::FinderBuffers UnimpendedPathFinder::create_buffers(
     LOG_METHOD();
 
     VkDeviceSize max_unimpended_path_indices_size = sizeof(uint32_t) * m_max_astar_points;
-    VkDeviceSize astar_path_size = sizeof(uint32_t) * 4 + sizeof(glm::ivec4) * m_max_astar_points;
-
-    VulkanBuffer astar_path = VulkanBuffer(
-        physical_device,
-        device,
-        astar_path_size,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-    );
-
-    {
-        auto scope = submit_context.submit_and_wait_scope();
-
-        astar_path.fill(scope.command_buffer(), 0u, sizeof(uint32_t));
-    }
+    VkDeviceSize astar_path_size = sizeof(glm::ivec4) * m_max_astar_points;
     
     return FinderBuffers{
         .max_unimpended_path_indices = VulkanBuffer(
@@ -123,7 +109,13 @@ UnimpendedPathFinder::FinderBuffers UnimpendedPathFinder::create_buffers(
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
         ),
-        .astar_path = std::move(astar_path),
+        .astar_path = VulkanBuffer(
+            physical_device,
+            device,
+            astar_path_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        )
     };
 }
 
@@ -136,7 +128,7 @@ void UnimpendedPathFinder::fill_max_unimpended_path_indices(
 {
     LOG_METHOD();
 
-    logger.check(m_voxel_grid != nullptr, "Voxel grid pointer specify to null");
+    logger().check(m_voxel_grid != nullptr, "Voxel grid pointer specify to null");
 
     m_pass_instances.find_unimpended_paths_pi.set_storage_buffer(0, m_buffers.astar_path);
     m_pass_instances.find_unimpended_paths_pi.set_storage_buffer(1, m_buffers.max_unimpended_path_indices);
@@ -174,14 +166,14 @@ void UnimpendedPathFinder::fill_max_unimpended_path_indices(
     m_voxel_grid->buffers().chunk_hash_table.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
-std::vector<glm::vec3> UnimpendedPathFinder::build_path_from_max_unimpended_path_indices(
-    std::vector<glm::vec4> astar_path
-) {
+std::vector<glm::ivec3> UnimpendedPathFinder::build_path_from_max_unimpended_path_indices(
+    const std::vector<glm::ivec4>& astar_path)
+{
     LOG_METHOD();
 
     std::vector<uint32_t> astar_indices = m_buffers.max_unimpended_path_indices.read_vector<uint32_t>(astar_path.size());
 
-    std::vector<glm::vec3> unimpended_path;
+    std::vector<glm::ivec3> unimpended_path;
     if (astar_path.empty()) {
         return unimpended_path;
     }
@@ -189,7 +181,7 @@ std::vector<glm::vec3> UnimpendedPathFinder::build_path_from_max_unimpended_path
     const uint32_t last_id = static_cast<uint32_t>(astar_path.size() - 1);
     uint32_t current_id = 0u;
     while (current_id <= last_id) {
-        unimpended_path.push_back(glm::vec3(astar_path[current_id]));
+        unimpended_path.push_back(glm::ivec3(astar_path[current_id]));
         if (current_id == last_id) {
             break;
         }

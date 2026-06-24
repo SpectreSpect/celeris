@@ -136,7 +136,7 @@ public:
         );
 
         if (out_voxel_writes == nullptr) {
-            logger.throw_error("Not implemented yet :D");
+            logger().throw_error("Not implemented yet :D");
             // if (gridable_gpu != nullptr) {
             //     gridable_gpu->set_voxels(voxel_writes_);
             // } else {

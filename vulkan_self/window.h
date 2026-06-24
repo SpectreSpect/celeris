@@ -42,6 +42,7 @@ public:
     uint32_t height() const noexcept;
     const std::string& title() const noexcept;
     MouseState mouse_state() const noexcept;
+    double consume_scroll_y() noexcept;
 
     void wait_until_framebuffer_available();
 
@@ -58,4 +59,5 @@ private:
     static void resize_callback(GLFWwindow* handle, int width, int height);
     static void mouse_callback(GLFWwindow* handle, double xpos, double ypos);
     static void mouse_button_callback(GLFWwindow* handle, int button, int action, int mods);
+    static void scroll_callback(GLFWwindow* handle, double xoffset, double yoffset);
 };

@@ -30,10 +30,10 @@ GICPPass::GICPPass(VulkanEngine& engine, ComputePassManager& compute_pass_manage
 double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_cloud, VulkanBuffer& source_normal_buffer) {
     LOG_METHOD();
 
-    logger.check(source_point_cloud.instance_buffer_view_valid(), "Source point cloud instance view was invalid");
-    logger.check(source_point_cloud.instance_count() > 0, "Source point cloud was empty");
-    logger.check(voxel_point_map.m_map_point_count > 0, "The voxel point map didn't have any points");
-    logger.check(voxel_point_map.m_num_hash_table_slots > 0, "The voxel point map has table has 0 slots");
+    logger().check(source_point_cloud.instance_buffer_view_valid(), "Source point cloud instance view was invalid");
+    logger().check(source_point_cloud.instance_count() > 0, "Source point cloud was empty");
+    logger().check(voxel_point_map.m_map_point_count > 0, "The voxel point map didn't have any points");
+    logger().check(voxel_point_map.m_num_hash_table_slots > 0, "The voxel point map has table has 0 slots");
     
     glm::quat q = glm::normalize(source_point_cloud.transform.rotation);
 
@@ -45,6 +45,8 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
     uniform_data.num_source_points = source_point_cloud.instance_count();
     uniform_data.num_target_points = voxel_point_map.m_map_point_count; // 1824 2067 2186 2090
     uniform_data.num_hash_table_slots = voxel_point_map.m_num_hash_table_slots;
+    uniform_data.pack_bits = math_utils::BITS;
+    uniform_data.pack_offset = static_cast<int32_t>(math_utils::OFFSET);
 
     uniform_buffer.upload(&uniform_data, sizeof(GICPPassUniform));
 

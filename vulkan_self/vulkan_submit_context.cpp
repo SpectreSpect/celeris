@@ -31,7 +31,7 @@ VulkanSubmitContext::VulkanSubmitContext(
 const VulkanQueue& VulkanSubmitContext::queue() const {
     LOG_METHOD();
 
-    logger.check(m_queue != nullptr, "Queue pointer specify to null");
+    logger().check(m_queue != nullptr, "Queue pointer specify to null");
 
     return *m_queue;
 }
@@ -39,7 +39,7 @@ const VulkanQueue& VulkanSubmitContext::queue() const {
 VulkanQueue& VulkanSubmitContext::queue() {
     LOG_METHOD();
 
-    logger.check(m_queue != nullptr, "Queue pointer specify to null");
+    logger().check(m_queue != nullptr, "Queue pointer specify to null");
 
     return *m_queue;
 }
@@ -77,7 +77,7 @@ CommandBufferScope VulkanSubmitContext::record_commands() {
 void VulkanSubmitContext::submit_and_wait() {
     LOG_METHOD();
 
-    logger.check(m_queue != nullptr, "Queue pointer specify to null");
+    logger().check(m_queue != nullptr, "Queue pointer specify to null");
 
     m_fence.reset();
     m_queue->submit(m_command_buffer, &m_fence);

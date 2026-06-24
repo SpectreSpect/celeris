@@ -29,7 +29,7 @@ public:
 
     template<class SlotType>
     void set_material_data(const SlotType& data) {
-        logger.check(m_material != nullptr, "RenderObject has no material");
+        logger().check(m_material != nullptr, "RenderObject has no material");
 
         m_material->slot_buffer().update_slot<SlotType>(
             m_material_data_id,
@@ -39,7 +39,7 @@ public:
 
     template<class SlotType, class Fn>
     void edit_material_data(Fn&& fn) {
-        logger.check(m_material != nullptr, "RenderObject has no material");
+        logger().check(m_material != nullptr, "RenderObject has no material");
 
         m_material->slot_buffer().edit_slot<SlotType>(
             m_material_data_id,

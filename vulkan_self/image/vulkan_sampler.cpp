@@ -85,13 +85,13 @@ void VulkanSampler::create_sampler(
 {
     LOG_METHOD();
 
-    logger.check(
+    logger().check(
         desc.sType == VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
         "Invalid VkSamplerCreateInfo::sType"
     );
 
-    logger.check(m_sampler == VK_NULL_HANDLE, "Sampler is already initialized");
-    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(m_sampler == VK_NULL_HANDLE, "Sampler is already initialized");
+    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
 
     m_device = device.handle();
 
@@ -102,5 +102,5 @@ void VulkanSampler::create_sampler(
         &m_sampler
     );
 
-    logger.check(result == VK_SUCCESS, "Failed to create Vulkan sampler");
+    logger().check(result == VK_SUCCESS, "Failed to create Vulkan sampler");
 }

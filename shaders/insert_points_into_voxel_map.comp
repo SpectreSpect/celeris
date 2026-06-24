@@ -1,4 +1,6 @@
 #version 460
+#extension GL_GOOGLE_include_directive : require
+
 layout(local_size_x = 256) in;
 
 struct PointInstance {
@@ -6,10 +8,19 @@ struct PointInstance {
     vec4 color;
 };
 
+#include "common/hash_table/hash_table_decl.inc"
+#include "common/utils.inc"
+#include "voxel_point_map/index_hash_table/decl.inc"
+#include "voxel_point_map/index_hash_table/config_functions/index_key_comp.inc"
+#include "voxel_point_map/index_hash_table/config_functions/index_value_init.inc"
+
 layout(std140, set = 0, binding = 0) uniform ParamsBuffer {
     uint source_point_count;
     uint max_map_point_count;
     uint num_hash_table_slots;
+    uint pack_bits;
+    int pack_offset;
+    uint retry_mode;
     mat4 source_model;
     vec4 color;
 } params;
@@ -41,14 +52,28 @@ layout(std430, set = 0, binding = 5) buffer MapNormalBuffer {
     vec4 normals[];
 } map_normal_buffer;
 
-#ifndef VOXEL_MAX_PROBES
-#define VOXEL_MAX_PROBES 128u
-#endif
+layout(std430, set = 0, binding = 6) coherent buffer PointHashTable {
+    HashTableCounters point_hash_table_counters;
+    IndexHashTableSlot point_hash_table_slots[];
+};
 
-#define VOXEL_INVALID_ID     0xFFFFFFFFu
-#define VOXEL_SLOT_EMPTY     0xFFFFFFFFu
-#define VOXEL_SLOT_LOCKED    0xFFFFFFFEu
-#define VOXEL_SLOT_OCCUPIED  0xFFFFFFFCu
+layout(std430, set = 0, binding = 7) buffer InsertDebugBuffer {
+    uint hash_table_insert_fail_count;
+} insert_debug_buffer;
+
+layout(std430, set = 0, binding = 8) readonly buffer ReadableInsertRetryList {
+    uint readable_retry_list_counter;
+    uint readable_retry_list[];
+};
+
+layout(std430, set = 0, binding = 9) buffer WritableInsertRetryList {
+    uint writable_retry_list_counter;
+    uint writable_retry_list[];
+};
+
+vec3 g_insert_world_position;
+vec3 g_insert_world_normal;
+vec4 g_insert_color;
 
 const float MIN_NORMAL_LEN = 0.00001;
 
@@ -104,38 +129,64 @@ ivec3 voxel_key_from_world_pos(vec3 world_pos, float voxel_size)
     return ivec3(floor(world_pos / voxel_size));
 }
 
-uint hash_voxel_key(ivec3 key)
+uvec2 voxel_hash_table_key(ivec3 key)
 {
-    uvec3 k = uvec3(key);
-
-    uint h = 2166136261u;
-    h = (h ^ k.x) * 16777619u;
-    h = (h ^ k.y) * 16777619u;
-    h = (h ^ k.z) * 16777619u;
-
-    h ^= h >> 16;
-    h *= 0x7feb352du;
-    h ^= h >> 15;
-    h *= 0x846ca68bu;
-    h ^= h >> 16;
-
-    return h;
+    return pack_key_uvec2(key, uint(params.pack_offset), params.pack_bits);
 }
 
-bool voxel_key_equal(ivec4 stored_key, ivec3 query_key)
+uint allocate_map_entry_id(uvec2 key, out bool success)
 {
-    return all(equal(stored_key.xyz, query_key));
+    uint entry_id = atomicAdd(map_point_count_buffer.count, 1u);
+
+    if (entry_id >= params.max_map_point_count) {
+        atomicAdd(map_point_count_buffer.count, 0xFFFFFFFFu);
+        success = false;
+        return INVALID_ID;
+    }
+
+    success = true;
+    return entry_id;
 }
 
-struct VoxelHashSlot {
-    uint  state;
-    ivec4 key;
-    uint  value;
-};
+void init_map_entry(uint slot_id, uvec2 key, uint entry_id)
+{
+    map_point_buffer.points[entry_id].position =
+        vec4(g_insert_world_position, 1.0);
 
-layout(std430, set = 0, binding = 6) coherent buffer VoxelHashTableBuffer {
-    VoxelHashSlot slots[];
-} voxel_table;
+    map_point_buffer.points[entry_id].color = g_insert_color;
+    map_normal_buffer.normals[entry_id] =
+        vec4(g_insert_world_normal, 0.0);
+}
+
+#define HT_PREFIX point_hash_table
+#define SLOT_VALUE_TYPE uint
+#define SLOT_KEY_TYPE uvec2
+#define SLOT_TYPE IndexHashTableSlot
+#define TABLE_COUNTERS point_hash_table_counters
+#define SLOTS_BUFFER point_hash_table_slots
+#define HASH_TABLE_SIZE params.num_hash_table_slots
+#define KEY_HASH_FUNC hash_uvec2
+#define KEY_COMP_FUNC index_key_comp
+#define VALUE_INIT_FUNC allocate_map_entry_id
+#define INIT_SLOT_CALLBACK init_map_entry
+#define MAX_CAS_ATTEMPTS 5u
+
+#include "common/hash_table/hash_table_common_impl.inc"
+#include "common/hash_table/hash_table_get_or_create_impl.inc"
+#include "common/hash_table/hash_table_lookup_remove_impl.inc"
+
+#undef HT_PREFIX
+#undef SLOT_VALUE_TYPE
+#undef SLOT_KEY_TYPE
+#undef SLOT_TYPE
+#undef TABLE_COUNTERS
+#undef SLOTS_BUFFER
+#undef HASH_TABLE_SIZE
+#undef KEY_HASH_FUNC
+#undef KEY_COMP_FUNC
+#undef VALUE_INIT_FUNC
+#undef INIT_SLOT_CALLBACK
+#undef MAX_CAS_ATTEMPTS
 
 // ------------------------------------------------------------
 // Surfel update
@@ -224,13 +275,13 @@ void update_voxel_surfel(
 // ------------------------------------------------------------
 
 bool voxel_insert_point_and_normal(
+    uint source_point_id,
     ivec3 key,
     vec4 world_position4,
     vec4 world_normal4,
     vec4 color
 ) {
-    uint slot_count = params.num_hash_table_slots;
-    if (slot_count == 0u)
+    if (params.num_hash_table_slots == 0u)
         return false;
 
     vec3 world_position = world_position4.xyz;
@@ -251,129 +302,53 @@ bool voxel_insert_point_and_normal(
     if (!valid_normal(world_normal))
         return false;
 
-    uint max_probes = min(slot_count, VOXEL_MAX_PROBES);
-    uint idx = hash_voxel_key(key) % slot_count;
+    uvec2 hash_key = voxel_hash_table_key(key);
 
-    uint probes = 0u;
+    g_insert_world_position = world_position;
+    g_insert_world_normal = world_normal;
+    g_insert_color = color;
 
-    while (probes < max_probes) {
-        uint state = atomicAdd(voxel_table.slots[idx].state, 0u);
-
-        if (state == VOXEL_SLOT_OCCUPIED) {
-            memoryBarrierBuffer();
-
-            if (voxel_key_equal(voxel_table.slots[idx].key, key)) {
-                // Lock this occupied slot so only one thread updates the mean/count.
-                uint prev = atomicCompSwap(
-                    voxel_table.slots[idx].state,
-                    VOXEL_SLOT_OCCUPIED,
-                    VOXEL_SLOT_LOCKED
-                );
-
-                if (prev == VOXEL_SLOT_OCCUPIED) {
-                    uint surfel_id = voxel_table.slots[idx].value;
-
-                    update_voxel_surfel(
-                        surfel_id,
-                        world_position,
-                        world_normal,
-                        color
-                    );
-
-                    memoryBarrierBuffer();
-
-                    atomicExchange(
-                        voxel_table.slots[idx].state,
-                        VOXEL_SLOT_OCCUPIED
-                    );
-
-                    return true;
-                }
-
-                // Somebody else locked it before us.
-                // Retry the same slot, do not move to the next one.
-                continue;
-            }
-
-            idx = (idx + 1u) % slot_count;
-            probes++;
-            continue;
-        }
-
-        if (state == VOXEL_SLOT_EMPTY) {
-            uint prev = atomicCompSwap(
-                voxel_table.slots[idx].state,
-                VOXEL_SLOT_EMPTY,
-                VOXEL_SLOT_LOCKED
-            );
-
-            if (prev == VOXEL_SLOT_EMPTY) {
-                uint surfel_id = atomicAdd(map_point_count_buffer.count, 1u);
-
-                if (surfel_id >= params.max_map_point_count) {
-                    // Undo count increment.
-                    atomicAdd(map_point_count_buffer.count, 0xFFFFFFFFu);
-
-                    atomicExchange(
-                        voxel_table.slots[idx].state,
-                        VOXEL_SLOT_EMPTY
-                    );
-
-                    return false;
-                }
-
-                voxel_table.slots[idx].key = ivec4(key, 0);
-                voxel_table.slots[idx].value = surfel_id;
-
-                // First point in this voxel.
-                // position.w stores count = 1.
-                map_point_buffer.points[surfel_id].position =
-                    vec4(world_position, 1.0);
-
-                map_point_buffer.points[surfel_id].color = color;
-
-                // Store normal sum, not normalized final normal.
-                map_normal_buffer.normals[surfel_id] =
-                    vec4(world_normal, 0.0);
-
-                memoryBarrierBuffer();
-
-                atomicExchange(
-                    voxel_table.slots[idx].state,
-                    VOXEL_SLOT_OCCUPIED
-                );
-
-                return true;
-            }
-
-            // Someone changed this slot.
-            // Retry the same slot.
-            continue;
-        }
-
-        if (state == VOXEL_SLOT_LOCKED) {
-            uint spin_count = 0u;
-
-            while (spin_count < 1024u) {
-                uint s = atomicAdd(voxel_table.slots[idx].state, 0u);
-
-                if (s != VOXEL_SLOT_LOCKED)
-                    break;
-
-                spin_count++;
-            }
-
-            // Important:
-            // Do NOT move to the next slot here.
-            // The slot may now contain exactly our key.
-            continue;
-        }
-
-        idx = (idx + 1u) % slot_count;
-        probes++;
+    uint slot_id;
+    bool created;
+    if (!point_hash_table_get_or_create_slot(hash_key, slot_id, created)) {
+        atomicAdd(insert_debug_buffer.hash_table_insert_fail_count, 1u);
+        uint retry_id = atomicAdd(writable_retry_list_counter, 1u);
+        writable_retry_list[retry_id] = source_point_id;
+        return false;
     }
 
-    return false;
+    uint surfel_id = point_hash_table_slots[slot_id].value;
+    if (surfel_id == INVALID_ID)
+        return false;
+
+    if (created) {
+        return true;
+    }
+
+    uint prev = atomicCompSwap(
+        point_hash_table_slots[slot_id].state,
+        SLOT_OCCUPIED,
+        SLOT_LOCKED
+    );
+
+    if (prev != SLOT_OCCUPIED)
+        return false;
+
+    update_voxel_surfel(
+        surfel_id,
+        world_position,
+        world_normal,
+        color
+    );
+
+    memoryBarrierBuffer();
+
+    atomicExchange(
+        point_hash_table_slots[slot_id].state,
+        SLOT_OCCUPIED
+    );
+
+    return true;
 }
 
 // ------------------------------------------------------------
@@ -382,10 +357,20 @@ bool voxel_insert_point_and_normal(
 
 void main()
 {
-    uint source_point_id = gl_GlobalInvocationID.x;
+    uint work_id = gl_GlobalInvocationID.x;
+    uint source_point_id;
 
-    if (source_point_id >= params.source_point_count)
-        return;
+    if (params.retry_mode != 0u) {
+        if (work_id >= readable_retry_list_counter)
+            return;
+
+        source_point_id = readable_retry_list[work_id];
+    } else {
+        source_point_id = work_id;
+
+        if (source_point_id >= params.source_point_count)
+            return;
+    }
 
     PointInstance src_point = source_point_buffer.points[source_point_id];
     vec4 src_normal4 = source_normal_buffer.normals[source_point_id];
@@ -438,7 +423,8 @@ void main()
 
     ivec3 key = voxel_key_from_world_pos(p_world, voxel_size);
 
-    voxel_insert_point_and_normal(
+    bool result = voxel_insert_point_and_normal(
+        source_point_id,
         key,
         vec4(p_world, 1.0),
         vec4(n_world, 0.0),

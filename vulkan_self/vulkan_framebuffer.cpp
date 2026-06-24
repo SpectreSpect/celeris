@@ -75,7 +75,7 @@ VkFramebuffer VulkanFramebuffer::handle() const noexcept {
 void VulkanFramebuffer::create(const VkFramebufferCreateInfo& desc) {
     LOG_METHOD();
 
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
     
     VkResult result = vkCreateFramebuffer(
         m_device,
@@ -84,7 +84,7 @@ void VulkanFramebuffer::create(const VkFramebufferCreateInfo& desc) {
         &m_framebuffer
     );
 
-    logger.check(result == VK_SUCCESS, "Failed to create framebuffer");
+    logger().check(result == VK_SUCCESS, "Failed to create framebuffer");
 }
 
 std::vector<VulkanFramebuffer> VulkanFramebuffer::from_image_views(
@@ -121,7 +121,7 @@ std::vector<VulkanFramebuffer> VulkanFramebuffer::from_image_views(
 {
     LOG_NAMED("VulkanFramebuffer");
 
-    logger.check(
+    logger().check(
         color_image_views.size() == depth_image_views.size(),
         "Color image views and depth image views count must match"
     );

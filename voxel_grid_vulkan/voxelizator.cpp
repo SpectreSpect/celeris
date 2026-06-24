@@ -104,7 +104,7 @@ Voxelizator::VoxelizatorPassInstances Voxelizator::create_pass_instances(
 void Voxelizator::submit_compute_commands() {
     LOG_METHOD();
 
-    logger.check(m_queue != nullptr, "VoxelGrid queue was not initialized");
+    logger().check(m_queue != nullptr, "VoxelGrid queue was not initialized");
 
     m_fence.reset();
     m_queue->submit(m_command_buffer, &m_fence);
@@ -290,7 +290,7 @@ void Voxelizator::voxelize_chunks(
 
     m_pass_instances.voxelize_triangles_pi.push_constants(command_buffer, VoxelizeTrianglesPushConstants{
         .u_chunk_dim = glm::uvec4(m_params.chunk_size.x, m_params.chunk_size.y, m_params.chunk_size.z, 0),
-        .u_voxel_size = glm::uvec4(m_params.voxel_size.x, m_params.voxel_size.y, m_params.voxel_size.z, 0),
+        .u_voxel_size = glm::vec4(m_params.voxel_size.x, m_params.voxel_size.y, m_params.voxel_size.z, 0.0f),
         .u_transform = transform,
         .u_counter_hash_table_size = m_params.counter_hash_table_size,
         .u_count_voxels_in_chunk = static_cast<uint32_t>(m_params.chunk_size.x * m_params.chunk_size.y * m_params.chunk_size.z),

@@ -215,7 +215,7 @@ RenderPassScope VulkanRenderPass::begin_scope(
 void VulkanRenderPass::create(const VkRenderPassCreateInfo& desc) {
     LOG_METHOD();
 
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
 
     VkResult result = vkCreateRenderPass(
         m_device,
@@ -224,5 +224,5 @@ void VulkanRenderPass::create(const VkRenderPassCreateInfo& desc) {
         &m_render_pass
     );
 
-    logger.check(result == VK_SUCCESS, "Failed to create render pass");
+    logger().check(result == VK_SUCCESS, "Failed to create render pass");
 }

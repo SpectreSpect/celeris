@@ -1,0 +1,277 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256) in;
+
+struct PointInstance {
+    vec4 position;
+    vec4 color;
+};
+
+#include "common/hash_table/hash_table_decl.inc"
+#include "common/utils.inc"
+#include "voxel_point_map/index_hash_table/decl.inc"
+#include "voxel_point_map/index_hash_table/config_functions/index_key_comp.inc"
+#include "voxel_point_map/index_hash_table/config_functions/index_value_init.inc"
+
+layout(std430, set = 0, binding = 0) coherent buffer PointHashTable {
+    HashTableCounters point_hash_table_counters;
+    IndexHashTableSlot point_hash_table_slots[];
+};
+
+layout(std430, set = 0, binding = 1) buffer MapPointCount {
+    uint count;
+} map_point_count;
+
+layout(std430, set = 0, binding = 2) buffer MapPointBuffer {
+    PointInstance entries[];
+} map_point_buffer;
+
+layout(std430, set = 0, binding = 3) buffer MapNormalBuffer {
+    vec4 entries[];
+} map_normal_buffer;
+
+layout(push_constant) uniform TestShaderPushConstants {
+    uint u_point_hash_table_size;
+    uint u_max_map_entry_count;
+    uint u_pack_bits;
+    int u_pack_offset;
+};
+
+vec3 g_insert_world_position;
+vec3 g_insert_world_normal;
+vec4 g_insert_color;
+
+uint allocate_map_entry_id(uvec2 key, out bool success)
+{
+    uint entry_id = atomicAdd(map_point_count.count, 1u);
+
+    if (entry_id >= u_max_map_entry_count) {
+        atomicAdd(map_point_count.count, 0xFFFFFFFFu);
+        success = false;
+        return INVALID_ID;
+    }
+
+    success = true;
+    return entry_id;
+}
+
+void init_map_entry(uint slot_id, uvec2 key, uint entry_id)
+{
+    map_point_buffer.entries[entry_id].position =
+        vec4(g_insert_world_position, 1.0);
+
+    map_point_buffer.entries[entry_id].color = g_insert_color;
+    map_normal_buffer.entries[entry_id] =
+        vec4(g_insert_world_normal, 0.0);
+}
+
+#define HT_PREFIX point_hash_table
+#define SLOT_VALUE_TYPE uint
+#define SLOT_KEY_TYPE uvec2
+#define SLOT_TYPE IndexHashTableSlot
+#define TABLE_COUNTERS point_hash_table_counters
+#define SLOTS_BUFFER point_hash_table_slots
+#define HASH_TABLE_SIZE u_point_hash_table_size
+#define KEY_HASH_FUNC hash_uvec2
+#define KEY_COMP_FUNC index_key_comp
+#define VALUE_INIT_FUNC allocate_map_entry_id
+#define INIT_SLOT_CALLBACK init_map_entry
+#define MAX_CAS_ATTEMPTS 5u
+
+#include "common/hash_table/hash_table_common_impl.inc"
+#include "common/hash_table/hash_table_get_or_create_impl.inc"
+#include "common/hash_table/hash_table_lookup_remove_impl.inc"
+
+#undef HT_PREFIX
+#undef SLOT_VALUE_TYPE
+#undef SLOT_KEY_TYPE
+#undef SLOT_TYPE
+#undef TABLE_COUNTERS
+#undef SLOTS_BUFFER
+#undef HASH_TABLE_SIZE
+#undef KEY_HASH_FUNC
+#undef KEY_COMP_FUNC
+#undef VALUE_INIT_FUNC
+#undef INIT_SLOT_CALLBACK
+#undef MAX_CAS_ATTEMPTS
+
+const float MIN_NORMAL_LEN = 0.00001;
+
+bool valid_float(float x)
+{
+    return !isnan(x) && !isinf(x);
+}
+
+bool valid_vec3(vec3 v)
+{
+    return valid_float(v.x) &&
+           valid_float(v.y) &&
+           valid_float(v.z);
+}
+
+bool valid_vec4(vec4 v)
+{
+    return valid_float(v.x) &&
+           valid_float(v.y) &&
+           valid_float(v.z) &&
+           valid_float(v.w);
+}
+
+bool valid_normal(vec3 n)
+{
+    if (!valid_vec3(n))
+        return false;
+
+    float len2 = dot(n, n);
+
+    if (!valid_float(len2))
+        return false;
+
+    return len2 > MIN_NORMAL_LEN * MIN_NORMAL_LEN;
+}
+
+uvec2 voxel_hash_table_key(ivec3 key)
+{
+    return pack_key_uvec2(key, uint(u_pack_offset), u_pack_bits);
+}
+
+void update_voxel_surfel(
+    uint entry_id,
+    vec3 world_position,
+    vec3 world_normal,
+    vec4 color
+) {
+    if (!valid_vec3(world_position))
+        return;
+
+    if (!valid_normal(world_normal))
+        return;
+
+    if (!valid_vec4(color))
+        return;
+
+    world_normal = normalize(world_normal);
+
+    vec4 old_mean_count = map_point_buffer.entries[entry_id].position;
+
+    vec3 old_mean = old_mean_count.xyz;
+    float old_count = old_mean_count.w;
+
+    if (!valid_vec3(old_mean))
+        return;
+
+    if (!valid_float(old_count) || old_count < 0.0)
+        return;
+
+    float new_count = old_count + 1.0;
+
+    if (!valid_float(new_count) || new_count <= 0.0)
+        return;
+
+    vec3 new_mean = old_mean + (world_position - old_mean) / new_count;
+
+    if (!valid_vec3(new_mean))
+        return;
+
+    vec4 old_color = map_point_buffer.entries[entry_id].color;
+    vec4 new_color = old_color + (color - old_color) / new_count;
+
+    if (!valid_vec4(new_color))
+        return;
+
+    vec3 normal_sum = map_normal_buffer.entries[entry_id].xyz;
+
+    if (!valid_vec3(normal_sum))
+        return;
+
+    vec3 n = world_normal;
+
+    if (dot(normal_sum, normal_sum) > 1e-12 && dot(normal_sum, n) < 0.0) {
+        n = -n;
+    }
+
+    normal_sum += n;
+
+    if (!valid_vec3(normal_sum))
+        return;
+
+    map_point_buffer.entries[entry_id].position = vec4(new_mean, new_count);
+    map_point_buffer.entries[entry_id].color = new_color;
+    map_normal_buffer.entries[entry_id] = vec4(normal_sum, 0.0);
+}
+
+bool voxel_insert_point_and_normal(
+    ivec3 key,
+    vec4 world_position4,
+    vec4 world_normal4,
+    vec4 color
+) {
+    if (u_point_hash_table_size == 0u)
+        return false;
+
+    vec3 world_position = world_position4.xyz;
+    vec3 raw_world_normal = world_normal4.xyz;
+
+    if (!valid_vec3(world_position))
+        return false;
+
+    if (!valid_normal(raw_world_normal))
+        return false;
+
+    if (!valid_vec4(color))
+        return false;
+
+    vec3 world_normal = normalize(raw_world_normal);
+
+    if (!valid_normal(world_normal))
+        return false;
+
+    uvec2 hash_key = voxel_hash_table_key(key);
+
+    g_insert_world_position = world_position;
+    g_insert_world_normal = world_normal;
+    g_insert_color = color;
+
+    uint slot_id;
+    bool created;
+    if (!point_hash_table_get_or_create_slot(hash_key, slot_id, created))
+        return false;
+
+    uint entry_id = point_hash_table_slots[slot_id].value;
+    if (entry_id == INVALID_ID)
+        return false;
+
+    if (created) {
+        return true;
+    }
+
+    uint prev = atomicCompSwap(
+        point_hash_table_slots[slot_id].state,
+        SLOT_OCCUPIED,
+        SLOT_LOCKED
+    );
+
+    if (prev != SLOT_OCCUPIED)
+        return false;
+
+    update_voxel_surfel(
+        entry_id,
+        world_position,
+        world_normal,
+        color
+    );
+
+    memoryBarrierBuffer();
+
+    atomicExchange(
+        point_hash_table_slots[slot_id].state,
+        SLOT_OCCUPIED
+    );
+
+    return true;
+}
+
+void main()
+{
+}

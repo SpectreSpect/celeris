@@ -42,9 +42,9 @@ public:
         uint32_t window_size,
         uint32_t max_astar_points
     );
-    std::vector<glm::vec3> find_unimpended_path(
+    std::vector<glm::ivec3> find_unimpended_path(
         VulkanSubmitContext& submit_context,
-        std::vector<glm::vec4> astar_path,
+        const std::vector<glm::ivec4>& astar_path,
         uint32_t max_step_up,
         uint32_t max_drop,
         uint32_t start_id = 0u
@@ -86,7 +86,5 @@ private:
         uint32_t start_id = 0u
     );
 
-    std::vector<glm::vec3> build_path_from_max_unimpended_path_indices(
-        std::vector<glm::vec4> astar_path
-    );
+    std::vector<glm::ivec3> build_path_from_max_unimpended_path_indices(const std::vector<glm::ivec4>& astar_path);
 };
