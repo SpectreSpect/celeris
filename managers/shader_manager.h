@@ -44,7 +44,6 @@ public:
 
     // Voxel grid
     VulkanShaderModule world_init_cs;
-    // VulkanShaderModule apply_writes_to_world_cs;
     VulkanShaderModule mesh_pool_clear_cs;
     VulkanShaderModule mesh_pool_seed_cs;
     VulkanShaderModule dispatch_adapter_cs;
@@ -74,7 +73,6 @@ public:
     VulkanShaderModule clear_chunk_hash_table_cs;
     VulkanShaderModule fill_chunk_hash_table_cs;
     VulkanShaderModule read_voxel_grid_chunk_cs;
-
     VulkanShaderModule voxel_writes_from_point_cloud_cs;
 
     // Voxelizator
@@ -99,4 +97,7 @@ public:
     VulkanShaderModule brdf_lut_cs;
     VulkanShaderModule generate_prefilter_map_cs;
     VulkanShaderModule generate_irradiance_map_cs;
+
+    // A*
+    VulkanShaderModule find_unimpended_paths_cs;
 };

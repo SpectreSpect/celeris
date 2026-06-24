@@ -91,4 +91,7 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         equirect_to_cubemap_cs(device, path_utils::executable_dir() / "shaders" / "equirect_to_cubemap.comp.spv"),
         brdf_lut_cs(device, path_utils::executable_dir() / "shaders" / "brdf_lut.comp.spv"),
         generate_prefilter_map_cs(device, path_utils::executable_dir() / "shaders" / "generate_prefilter_map.comp.spv"),
-        generate_irradiance_map_cs(device, path_utils::executable_dir() / "shaders" / "generate_irradiance_map.comp.spv") {}
+        generate_irradiance_map_cs(device, path_utils::executable_dir() / "shaders" / "generate_irradiance_map.comp.spv"),
+        
+        // A*
+        find_unimpended_paths_cs(device, path_utils::executable_dir() / "shaders" / "a_star" / "find_unimpended_paths.comp.spv") {}

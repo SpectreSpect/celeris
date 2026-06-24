@@ -1,0 +1,82 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+/*
+    x - индекс внутри таблицы смежности (правая верхняя половина таблицы)
+    y - индекс вокселя внутри беспрепятственного пути (в этом шейдере проходимость этого пути и ищется)
+*/
+layout(local_size_x = 16, local_size_y = 16) in;
+НЕ ЗАБЫТЬ УСТАНОВИТЬ ТАКОЕ ЖЕ ЗНАЧЕНИЕ В DISPATCH!!!
+
+// ----- include -----
+#include "../common/buffer_structures.inc"
+// -------------------
+
+layout(std430, set = 0, binding = 0) readonly buffer AstarPath { uint count_astar_points; uint pad0_[3]; ivec3 astar_path[]; };
+
+/*
+    Двумерная матрица смежности, записанная в виде плотного одномерного массива.
+    P. S. Возможно имеет смысл хранить только половину таблицы и индексироваться по
+    ней таким же способом, что используется в шейдере (индекс внутри правой верхней половины таблицы)
+*/
+layout(std430, set = 0, binding = 1) buffer AdjacencyMatrix { uint adjacency_matrix[] };
+layout(std430, set = 0, binding = 2) coherent buffer ChunkHashTable { HashTableCounters chunk_hash_table_counters; ChunkHashTableSlot chunk_hash_table_slots[]; };
+layout(std430, set = 0, binding = 3) readonly buffer ChunkVoxels { VoxelData voxels[]; };
+
+// ----- include -----
+#include "../voxel_grid/chunk_pool/read_voxels.inc"
+// -------------------
+
+layout(push_constant) uniform FindUnimpendedPathsPushConstants {
+    uint u_batch_size;
+    uint u_max_path_voxels_count;
+    uint u_start_id;
+    uint u_wall_curvature;
+};
+
+void main() {
+    uint from_to_id = gl_GlobalInvocationID.x;
+    uint path_voxel_id = gl_GlobalInvocationID.y;    
+
+    uint tri_count_elements = u_batch_size * (u_batch_size - 1u) / 2u;
+
+    if (from_to_id >= tri_count_elements || path_voxel_id >= u_max_path_voxels_count) return;
+
+    uint q = (2u * u_batch_size - 1u);
+    uint from_local_id = floor((q - sqrt(q * q - 8u * from_to_id)) / 2u);
+    uint to_local_id = from_local_id + 1u + from_to_id - from_local_id * (2u * u_batch_size - from_local_id - 1u) / 2u;
+
+    uint from_id = u_start_id + from_local_id;
+    uint to_id = u_start_id + to_local_id;
+    
+    ivec3 from_pos = astar_path[from_id];
+    ivec3 to_pos = astar_path[to_id];
+
+    int dx_i = to_pos.x - from_pos.x;
+    int dz_i = to_pos.z - from_pos.z;
+
+    if (dx_i <= 0 || dz_i < 0) return; // пока только для случая dx > 0, dz >= 0
+
+    float dz = float(dz_i) / float(dx_i);
+
+    uint path_voxels_count = uint(dz_i) + 2u * uint(dx_i);
+    if (path_voxel_id >= path_voxels_count) return;
+    
+    int n = int(floor(float(path_voxel_id) / (dz + 2.0)));
+    
+    int voxel_x = from_pos.x + n;
+    int voxel_y = from_pos.y;
+    int voxel_z = from_pos.z + int(path_voxel_id) - 2 * n - 1;
+
+    ivec3 voxel_pos = ivec3(voxel_x, voxel_y, voxel_z);
+
+    bool success;
+    VoxelData voxel_data = voxel_data_world(voxel_pos, success);
+    if (!success) return;
+
+    uint curvature = (voxel_data.color >> 8u) & 0xFFu; // Здесь записана кривизна поверхности
+    if (curvature >= u_wall_curvature) {
+        uint matrix_id = from_local_id + to_local_id * u_batch_size;
+        atomicExchange(adjacency_matrix[matrix_id], 1u);
+    }
+}

@@ -76,6 +76,10 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         brdf_lut_cp(create_brdf_lut_pass(device, shader_manager.brdf_lut_cs)),
         prefilter_map_cp(create_prefilter_map_pass(device, shader_manager.generate_prefilter_map_cs)),
         irradiance_map_cp(create_irradiance_map_pass(device, shader_manager.generate_irradiance_map_cs)),
+
+        // A*
+        find_unimpended_paths_cp(create_find_unimpended_paths_pass(device, shader_manager.find_unimpended_paths_cs)),
+        
         m_pool(device, m_pool_builder) {}
 
 DescriptorPool& ComputePassManager::descriptor_pool() noexcept {
@@ -873,6 +877,21 @@ ComputePass ComputePassManager::create_remove_near_origin_lidar_points_compute_p
     builder.add_storage_buffer(0, ShaderStages::compute); // PointBuffer
 
     builder.add_push_constantsf(sizeof(RemoveNearOriginLidarPointsPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_find_unimpended_paths_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // AstarPath
+    builder.add_storage_buffer(1, ShaderStages::compute); // WindowedAdjacencyMatrix
+    builder.add_storage_buffer(2, ShaderStages::compute); // ChunkHashTable
+    builder.add_storage_buffer(3, ShaderStages::compute); // ChunkVoxels
+
+    builder.add_push_constantsf(sizeof(FindUnimpendedPathsPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }

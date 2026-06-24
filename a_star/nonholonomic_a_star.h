@@ -207,7 +207,11 @@ public:
     // }
 
     DistToPathData dist_to_path(glm::ivec3 pos, std::vector<glm::ivec3>& path);
+<<<<<<< Updated upstream
     DistToPathData max_unimpended_dist_to_path(glm::vec3 pos, std::vector<glm::ivec3>& path, int start_id = 0, glm::vec3 last_pos = glm::vec3(0, 0, 0), bool replace_last_pos = false);
+=======
+    DistToPathData max_unimpended_dist_to_path(glm::vec3 pos, const std::vector<glm::ivec3>& path, int start_id, int end_id, glm::vec3 last_pos);
+>>>>>>> Stashed changes
     DistToPathData dist_to_path_dubins(NonholonomicPos pos, std::vector<glm::ivec3>& path);
     float follow_plain_astar_heuristic(glm::ivec3 pos, std::vector<glm::ivec3>& path, float scale = 1.0f, float dist_to_path_threshold = 2.0f);
     static int discretize_angle(float value, int num_bins);
@@ -220,7 +224,15 @@ public:
     static bool almost_equal(NonholonomicPos a, NonholonomicPos b, bool allow_flying_over_precipices);
     std::vector<NonholonomicPos> reconstruct_path(std::unordered_map<uint64_t, NonholonomicAStarCell> closed_heap, NonholonomicPos pos);
     std::vector<NonholonomicPos> simulate_motion(NonholonomicPos start_pos, int steer, int direction);
+
+
+    std::vector<NonholonomicPos> find_unimpended_points(
+        NonholonomicPos start_pos,
+        NonholonomicPos end_pos,
+        const PlainAstarData& astart_path
+    );
     void initialize(NonholonomicPos start_pos, NonholonomicPos end_pos);
+
     std::vector<glm::ivec3> get_ground_cells(glm::vec3 p0, glm::vec3 p1);
     bool crosses_extreme_curvature(const std::vector<NonholonomicPos>& path, float curvature_limit);
     bool crosses_extreme_curvature(const std::vector<glm::ivec3>& path, float curvature_limit);

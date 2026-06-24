@@ -188,8 +188,7 @@ public:
     const VoxelGridParams& params() const noexcept;
     VoxelGridBuffers& buffers() noexcept;
     ShaderHelper& shader_helper() noexcept;
-
-
+    
     glm::uvec3 voxel_size();
     void voxelize_point_cloud(VulkanCommandBuffer& command_buffer, VulkanEngine& engine, 
                               PointCloud& point_cloud, VulkanBuffer& voxel_writes, uint32_t max_write_count);

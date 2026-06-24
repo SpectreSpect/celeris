@@ -226,6 +226,10 @@ public:
     static bool almost_equal(NonholonomicPos a, NonholonomicPos b);
     std::vector<NonholonomicPos> reconstruct_path(std::unordered_map<uint64_t, NonholonomicAStarCell> closed_heap, NonholonomicPos pos);
     std::vector<NonholonomicPos> simulate_motion(NonholonomicPos start_pos, int steer, int direction);
+
+
+    std::vector<NonholonomicPos> find_unimpended_path();
+
     void initialize(NonholonomicPos start_pos, NonholonomicPos end_pos);
     std::vector<glm::ivec3> get_ground_cells(glm::vec3 p0, glm::vec3 p1);
     bool crosses_extreme_curvature(const std::vector<NonholonomicPos>& path, float curvature_limit);

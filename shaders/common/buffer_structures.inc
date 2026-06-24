@@ -51,7 +51,7 @@ uint pack_voxel_type_flags(uint type, uint flags) {
 
 struct VoxelData {
     uint type_flags; // 32u...flags|type...0u
-    uint color; // 32u...R|G|B|A...0u (получается "развёрнуто" в порядке аргументов, но "логично" в hex представлении 0xRRGGBBAAu)
+    uint color; // 32u...R|G|B|A...0u
 };
 
 #define OVERWRITE_BIT 1u

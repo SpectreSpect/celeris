@@ -314,3 +314,10 @@ struct RemoveNearOriginLidarPointsPushConstants {
 struct MarkAndCountFailSlotsPushConstants {
     uint32_t u_counter_hash_table_size;
 };
+
+struct FindUnimpendedPathsPushConstants {
+    uint32_t u_window_size; // Количество точек в окне, но кроме текущей точки
+    uint32_t u_start_id;
+    uint32_t u_max_step_height;
+    uint32_t u_count_astar_points;
+};

@@ -26,6 +26,13 @@ VoxelData voxel_data_world(ivec3 chunkCoord, ivec3 local, out bool success) {
     return voxel_data_in_chunk(chunk_id, local);
 }
 
+VoxelData voxel_data_world(ivec3 global_voxel_pos, out bool success) {
+    ivec3 chunk_pos = floor_div(global_voxel_pos, u_chunk_dim.xyz);
+    ivec3 local_voxel_pos = global_voxel_pos - chunk_pos * u_chunk_dim.xyz;
+
+    return voxel_data_world(chunk_pos, local_voxel_pos, success);
+}
+
 VoxelData neighbor_voxel_data(uint chunkId, ivec3 chunkCoord, ivec3 p, ivec3 d, out bool success) {
     success = true;
     ivec3 q = p + d;
@@ -50,10 +57,26 @@ VoxelData neighbor_voxel_data(uint chunkId, ivec3 chunkCoord, ivec3 p, ivec3 d, 
     return voxel_data_world(nChunk, nLocal, success);
 }
 
+
+
 // 0/1 видимость
 uint voxel_vis(uint chunkId, ivec3 chunkCoord, ivec3 p, ivec3 d) {
     bool success;
     VoxelData voxel_data = neighbor_voxel_data(chunkId, chunkCoord, p, d, success);
+    if (success)
+        return (read_voxel_flags(voxel_data.type_flags) & VOXEL_VISABILITY_FLAG_BIT) > 0u ? 1u : 0u;
+    else
+        return 0u;
+}
+
+// 0/1 видимость
+uint voxel_vis(ivec3 global_voxel_pos) {
+    ivec3 chunk_pos = floor_div(global_voxel_pos, u_chunk_dim.xyz);
+    ivec3 local_voxel_pos = global_voxel_pos - chunk_pos * u_chunk_dim.xyz;
+
+    bool success;
+    VoxelData voxel_data = voxel_data_world(chunk_pos, local_voxel_pos, success);
+
     if (success)
         return (read_voxel_flags(voxel_data.type_flags) & VOXEL_VISABILITY_FLAG_BIT) > 0u ? 1u : 0u;
     else
