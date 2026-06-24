@@ -196,7 +196,7 @@ std::vector<glm::ivec3> UnimpendedPathFinder::build_path_from_max_unimpended_pat
 
         uint32_t next_id = astar_indices[current_id];
         if (next_id <= current_id || next_id > last_id) {
-            break;
+            next_id = current_id + 1u;
         }
 
         current_id = next_id;
