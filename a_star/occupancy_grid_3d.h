@@ -137,6 +137,5 @@ private:
     VulkanBuffer m_dirty_chunk_position_buffer;
 
     std::unordered_map<uint64_t, VoxelGridChunk> m_chunk_cache;
-    std::unordered_map<uint64_t, bool> m_is_chunk_read;
     std::vector<glm::vec4> m_dirty_chunk_positions;
 };

@@ -85,14 +85,7 @@ OccupancyGrid3D::OccupancyGrid3D(
                 center_chunk_pos.z
             );
 
-            auto center_it = m_chunk_cache.find(center_chunk_key);
-
-            if (center_it == m_chunk_cache.end()) {
-                continue;
-            }
-
             m_chunk_cache.erase(center_chunk_key);
-            m_is_chunk_read.erase(center_chunk_key);
 
             for (int dx = -1; dx <= 1; dx++)
                 for (int dz = -1; dz <= 1; dz++) {
@@ -108,7 +101,6 @@ OccupancyGrid3D::OccupancyGrid3D(
                     );
 
                     m_chunk_cache.erase(chunk_key);
-                    m_is_chunk_read.erase(chunk_key);
                 }
         }
     });
@@ -116,7 +108,6 @@ OccupancyGrid3D::OccupancyGrid3D(
 
 void OccupancyGrid3D::clear_cache() {
     m_chunk_cache.clear();
-    m_is_chunk_read.clear();
 }
 
 glm::ivec3 OccupancyGrid3D::floor_pos(const glm::vec3& p) {
@@ -286,126 +277,29 @@ bool OccupancyGrid3D::is_solid(glm::ivec3 pos) {
 
     is_solid_time.start();
 
-    uint32_t inflation_size = 1;
-
     glm::ivec3 chunk_pos = m_voxel_grid->chunk_pos_from_voxel_pos(pos);
 
     uint64_t chunk_key = math_utils::pack_key(chunk_pos.x, chunk_pos.y, chunk_pos.z);
 
-    VoxelGridChunk* chunk = nullptr;
-
-    auto read_it = m_is_chunk_read.find(chunk_key);
-
-    if (read_it == m_is_chunk_read.end() || !read_it->second) {
+    auto cached_chunk_it = m_chunk_cache.find(chunk_key);
+    if (cached_chunk_it == m_chunk_cache.end()) {
         read_and_inflate_chunk_count++;
 
         read_and_inflate_chunk_time.start();
-        std::vector<VoxelGridChunk> chunks = m_voxel_grid->read_and_inflate_chunk(chunk_pos, inflation_size);
+        cached_chunk_it = m_chunk_cache.emplace(
+            chunk_key,
+            m_voxel_grid->read_chunk(chunk_pos)
+        ).first;
         read_and_inflate_chunk_time.end();
-
-        constexpr uint32_t visibility_mask =
-            VOXEL_VISABILITY_FLAG_BIT << VOXEL_TYPE_BITS;
-
-        for (int dz = -1; dz <= 1; ++dz) {
-            for (int dx = -1; dx <= 1; ++dx) {
-                const bool is_center_chunk = dx == 0 && dz == 0;
-                
-                size_t chunk_id =
-                    size_t(dz + 1) * 3 + size_t(dx + 1);
-
-                uint64_t key = math_utils::pack_key(
-                    chunk_pos.x + dx,
-                    chunk_pos.y,
-                    chunk_pos.z + dz
-                );
-
-                
-
-                // Inflation may create a cached neighbor before that
-                // neighbor's own voxels have been read. Never downgrade a
-                // chunk that was already read when it receives more
-                // inflation from another center chunk.
-                auto chunk_read_it =
-                    m_is_chunk_read.try_emplace(key, false).first;
-                if (is_center_chunk) {
-                    chunk_read_it->second = true;
-                }
-
-                auto cached = m_chunk_cache.find(key);
-
-                if (cached == m_chunk_cache.end()) {
-                    m_chunk_cache.emplace(
-                        key,
-                        std::move(chunks[chunk_id])
-                    );
-                    continue;
-                }
-
-                auto& destination = cached->second.voxels();
-                const auto& source = chunks[chunk_id].voxels();
-
-                logger().check(destination.size() == source.size(),
-                            "Voxel chunk sizes did not match");
-
-                const glm::uvec3 chunk_size = cached->second.chunk_size();
-
-                uint32_t x_begin = 0;
-                uint32_t x_end = chunk_size.x;
-                uint32_t z_begin = 0;
-                uint32_t z_end = chunk_size.z;
-
-                // Only the strip facing the center chunk can contain
-                // inflation in an adjacent output chunk. For diagonal
-                // chunks, restricting both axes leaves just the corner.
-                if (dx < 0) {
-                    x_begin = chunk_size.x - inflation_size;
-                } else if (dx > 0) {
-                    x_end = inflation_size;
-                }
-
-                if (dz < 0) {
-                    z_begin = chunk_size.z - inflation_size;
-                } else if (dz > 0) {
-                    z_end = inflation_size;
-                }
-
-                for (uint32_t z = z_begin; z < z_end; ++z) {
-                    for (uint32_t y = 0; y < chunk_size.y; ++y) {
-                        size_t voxel_id =
-                            size_t(chunk_size.x) *
-                            (size_t(y) + size_t(chunk_size.y) * size_t(z)) +
-                            x_begin;
-
-                        for (uint32_t x = x_begin; x < x_end; ++x, ++voxel_id) {
-                            destination[voxel_id].type_flags |=
-                                source[voxel_id].type_flags & visibility_mask;
-                        }
-                    }
-                }
-            }
-        }
     }
-
-    
-
-    // auto it = m_chunk_cache.find(chunk_key);
-
-    chunk = &m_chunk_cache[chunk_key];
-
-    
-
-    // logger().check(it != m_chunk_cache.end(), "Voxel chunk was not cached after reading");
-    // chunk = &it->second;
-
-    
 
     glm::ivec3 local_pos = m_voxel_grid->pos_in_chunk_from_global_voxel_pos(chunk_pos, pos);
 
-    VoxelDataGPU voxel = chunk->voxel(glm::uvec3(local_pos));
+    VoxelDataGPU voxel = cached_chunk_it->second.voxel(glm::uvec3(local_pos));
 
     is_solid_time.end();
 
-    return voxel.is_solid();
+    return voxel.is_solid() || voxel.is_inflated();
     // return pos.y <= 0;
 }
 

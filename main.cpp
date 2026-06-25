@@ -163,7 +163,7 @@ int main() {
         .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000),
         .inflation_size = 1u,
         .car_height_voxels = 3u,
-        .display_inflated_voxels = 1u,
+        .display_inflated_voxels = 0u,
         .inflated_voxel_color = 0xFF0707FFu, // 0xFF3355FFu
     };
 
