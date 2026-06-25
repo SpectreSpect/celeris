@@ -161,6 +161,10 @@ int main() {
         .render_distance = chunk_size.x * voxel_size.x * 30,
         .generation_distance = 5,
         .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000),
+        .inflation_size = 1u,
+        .car_height_voxels = 3u,
+        .display_inflated_voxels = 1u,
+        .inflated_voxel_color = 0xFF0707FFu, // 0xFF3355FFu
     };
 
     VoxelGrid voxel_grid(
@@ -172,6 +176,25 @@ int main() {
         voxel_grid_desc,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
     );
+
+    bool display_inflated_voxels = voxel_grid.params().display_inflated_voxels != 0u;
+    float inflated_voxel_color[4] = {
+        float((voxel_grid.params().inflated_voxel_color >> 24u) & 0xFFu) / 255.0f,
+        float((voxel_grid.params().inflated_voxel_color >> 16u) & 0xFFu) / 255.0f,
+        float((voxel_grid.params().inflated_voxel_color >> 8u) & 0xFFu) / 255.0f,
+        float(voxel_grid.params().inflated_voxel_color & 0xFFu) / 255.0f
+    };
+    int inflation_size = voxel_grid.params().inflation_size;
+    auto pack_inflated_voxel_color = [](const float color[4]) -> uint32_t {
+        auto pack_channel = [](float value) -> uint32_t {
+            return static_cast<uint32_t>(std::clamp(value, 0.0f, 1.0f) * 255.0f + 0.5f);
+        };
+
+        return (pack_channel(color[0]) << 24u) |
+               (pack_channel(color[1]) << 16u) |
+               (pack_channel(color[2]) << 8u) |
+               pack_channel(color[3]);
+    };
 
     VoxelGridGPUDebugger debugger(
         voxel_grid,
@@ -712,6 +735,29 @@ int main() {
                 ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "y: %.2f", camera.position.y);
                 ImGui::SameLine();
                 ImGui::TextColored(ImVec4(0.0f, 0.35f, 1.0f, 1.0f), "z: %.2f", camera.position.z);
+
+                if (ImGui::CollapsingHeader("Voxel grid debug")) {
+                    bool inflated_settings_changed = false;
+                    inflated_settings_changed |= ImGui::Checkbox(
+                        "Display inflated voxels",
+                        &display_inflated_voxels
+                    );
+                    inflated_settings_changed |= ImGui::ColorEdit4(
+                        "Inflated voxel color",
+                        inflated_voxel_color,
+                        ImGuiColorEditFlags_AlphaBar
+                    );
+
+                    inflated_settings_changed |= ImGui::SliderInt("Inflation size", &inflation_size, 0, 12);
+
+                    if (inflated_settings_changed) {
+                        voxel_grid.set_inflated_voxel_debug_display(
+                            display_inflated_voxels ? 1u : 0u,
+                            pack_inflated_voxel_color(inflated_voxel_color),
+                            inflation_size
+                        );
+                    }
+                }
                 
                 // ImGui::TextColored(ImVec4(1.0f, 0.35f, 1.0f, 1.0f), "Current frame id: %d", lidar_video.current_frame_id());
 

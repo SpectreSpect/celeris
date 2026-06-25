@@ -82,6 +82,10 @@ public:
         float render_distance;
         uint32_t generation_distance;
         uint32_t max_write_count;
+        uint32_t inflation_size = 1u;
+        uint32_t car_height_voxels = 3u;
+        uint32_t display_inflated_voxels = 0u;
+        uint32_t inflated_voxel_color = 0xFF3355FFu;
     };
 
     struct BuddyAllocatorParams {
@@ -103,6 +107,10 @@ public:
         float eviction_bucket_shell_thickness = 0.0f;
         float render_distance = 0.0f;
         float generation_distance = 0.0f;
+        uint32_t inflation_size = 1u;
+        uint32_t car_height_voxels = 3u;
+        uint32_t display_inflated_voxels = 0u;
+        uint32_t inflated_voxel_color = 0xFF3355FFu;
 
         BuddyAllocatorParams vb_allocator_params;
         BuddyAllocatorParams ib_allocator_params;
@@ -204,6 +212,7 @@ public:
     void update(Window& window, Camera& camera);
     void set_voxels(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src);
     void set_render_distance(float value);
+    void set_inflated_voxel_debug_display(uint32_t display_inflated_voxels, uint32_t inflated_voxel_color, uint32_t inflation_size);
     VoxelGridChunk read_chunk(glm::ivec3 chunk_pos);
     bool check_footprint(glm::vec3 origin, glm::vec3 offsets, uint32_t max_step_up);
     std::vector<VoxelGridChunk> read_and_inflate_chunk(glm::ivec3 chunk_pos, uint32_t inflation_size);
@@ -276,6 +285,7 @@ private:
     
 private:
     uint64_t vox_per_chunk() const noexcept;
+    void mark_all_used_chunks_dirty_mesh_cpu();
 
     VoxelGridParams create_params(const VoxelGridDesc& desc) const;
     VoxelGridPassInstances create_pass_instances(VulkanDevice& device, ComputePassManager& compute_pass_manager) const;
