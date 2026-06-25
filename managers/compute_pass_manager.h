@@ -68,6 +68,7 @@ public:
     ComputePass read_voxel_grid_chunk_cp;
     ComputePass check_footprint_cp;
     ComputePass read_and_inflate_voxel_grid_chunk_cp;
+    ComputePass inflate_chunks_cp;
     ComputePass voxel_writes_from_point_cloud_cp;
 
     // Voxelizator
@@ -154,6 +155,7 @@ public:
     ComputePass create_read_voxel_grid_chunk_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_check_footprint_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_read_and_inflate_voxel_grid_chunk_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_inflate_chunks_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_voxel_writes_from_point_cloud_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
     // Voxelizator

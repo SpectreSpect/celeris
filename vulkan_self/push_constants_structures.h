@@ -184,6 +184,16 @@ struct ReadAndInflateVoxelGridChunkPushConstants {
     uint32_t inflation_size;
 };
 
+struct InflateChunksPushConstants {
+    glm::ivec4 u_chunk_dim;
+    uint32_t u_chunk_hash_table_size;
+    uint32_t u_voxels_per_chunk;
+    uint32_t u_pack_offset;
+    uint32_t u_pack_bits;
+    uint32_t u_inflation_size;
+    uint32_t u_car_height_voxels;
+};
+
 struct EvictBucketsBuildPushConstants {
     glm::vec4 u_cam_pos;
     glm::ivec4 u_chunk_dim;

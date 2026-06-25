@@ -6,6 +6,15 @@
 #include "voxel_index.inc"
 #include "../chunk_hash_table/lookup_remove.inc"
 
+ivec3 local_voxel_pos_from_index(uint voxel_id)
+{
+    uint x = voxel_id % uint(u_chunk_dim.x);
+    uint yz = voxel_id / uint(u_chunk_dim.x);
+    uint y = yz % uint(u_chunk_dim.y);
+    uint z = yz / uint(u_chunk_dim.y);
+
+    return ivec3(x, y, z);
+}
 
 VoxelData voxel_data_in_chunk(uint chunkId, ivec3 p) {
     uint idx = chunkId * u_voxels_per_chunk + voxel_index(p);

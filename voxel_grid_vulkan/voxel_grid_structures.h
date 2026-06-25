@@ -25,6 +25,8 @@ static constexpr uint32_t OVERWRITE_BIT = 1u;
 
 static constexpr uint32_t DIRTY_MESH_FLAG_BIT = 1u;
 static constexpr uint32_t NEED_GENERATION_FLAG_BIT = 2u;
+static constexpr uint32_t DIRTY_INFLATE_FLAG_BIT = 4u;
+static constexpr uint32_t ENQUEUED_FAILED_DIRTY_MESH_FLAG_BIT = 8u;
 
 static constexpr uint32_t VOXEL_TYPE_BITS = 16u;
 static constexpr uint32_t VOXEL_TYPE_MASK = (1u << VOXEL_TYPE_BITS) - 1u;

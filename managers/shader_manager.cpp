@@ -69,6 +69,7 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         read_voxel_grid_chunk_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "read_voxel_grid_chunk.comp.spv"),
         check_footprint_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "check_footprint.comp.spv"),
         read_and_inflate_voxel_grid_chunk_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "read_and_inflate_voxel_grid_chunk.comp.spv"),
+        inflate_chunks_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "inflate_chunks.comp.spv"),
 
         voxel_writes_from_point_cloud_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_writes_from_point_cloud.comp.spv"),
 

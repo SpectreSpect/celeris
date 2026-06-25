@@ -75,6 +75,7 @@ public:
     VulkanShaderModule read_voxel_grid_chunk_cs;
     VulkanShaderModule check_footprint_cs;
     VulkanShaderModule read_and_inflate_voxel_grid_chunk_cs;
+    VulkanShaderModule inflate_chunks_cs;
     VulkanShaderModule voxel_writes_from_point_cloud_cs;
 
     // Voxelizator

@@ -42,20 +42,7 @@ layout(push_constant) uniform ReadAndInflateVoxelGridChunkPushConstants {
     uint inflation_size;
 };
 
-#include "../common/utils.inc"
-#include "chunk_hash_table/common.inc"
-#include "chunk_hash_table/lookup_remove.inc"
-#include "chunk_pool/voxel_index.inc"
-
-ivec3 local_voxel_pos_from_index(uint voxel_id)
-{
-    uint x = voxel_id % uint(u_chunk_dim.x);
-    uint yz = voxel_id / uint(u_chunk_dim.x);
-    uint y = yz % uint(u_chunk_dim.y);
-    uint z = yz / uint(u_chunk_dim.y);
-
-    return ivec3(x, y, z);
-}
+#include "chunk_pool/read_voxels.inc"
 
 void mark_inflated_voxel(
     ivec2 source_chunk_offset,

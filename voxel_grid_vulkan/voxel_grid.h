@@ -248,6 +248,7 @@ public:
         PassInstance read_voxel_grid_chunk_pi;
         PassInstance check_footprint_pi;
         PassInstance read_and_inflate_voxel_grid_chunk_pi;
+        PassInstance inflate_chunks_pi;
         
         PassInstance voxel_writes_from_point_cloud_pi;
     };
@@ -372,6 +373,6 @@ private:
         int pack_offset
     );
 
-    void mark_chunks_to_inflate(VulkanCommandBuffer& command_buffer);
-    void inflate_voxels(VulkanCommandBuffer& command_buffer);
+    void inflate_chunks(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_arg);
+    void inflate_marked_chunks(VulkanCommandBuffer& command_buffer);
 };
