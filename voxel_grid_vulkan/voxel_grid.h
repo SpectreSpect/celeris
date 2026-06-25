@@ -369,4 +369,6 @@ private:
         uint32_t pack_bits,
         int pack_offset
     );
+
+    void inflate_voxels(VulkanCommandBuffer& command_buffer);
 };

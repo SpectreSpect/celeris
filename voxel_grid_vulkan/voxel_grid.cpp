@@ -2028,3 +2028,9 @@ void VoxelGrid::stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::v
 
     reset_voxel_write_list_counter(command_buffer, m_buffers.voxel_write_list);
 }
+
+void VoxelGrid::inflate_voxels(VulkanCommandBuffer& command_buffer) {
+    LOG_METHOD();
+
+    
+}

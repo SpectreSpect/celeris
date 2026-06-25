@@ -4,12 +4,19 @@
 #include "../../common/utils.inc"
 #include "../chunk_hash_table/lookup_remove.inc"
 
-void mark_dirty(uint chunkId) {
-    uint was = atomicCompSwap(enqueued[chunkId], 0u, 1u);
-    if (was == 0u) {
-        atomicOr(meta[chunkId].dirty_flags, DIRTY_FLAG_BIT);
-        uint di = atomicAdd(dirty_count, 1u);
-        dirty_list[di] = chunkId;
+bool mark_dirty_flag(uint chunk_id, uint dirty_flag) {
+    uint was = atomicOr(enqueued[chunk_id], dirty_flag);
+    if ((was & dirty_flag) == 0u) {
+        atomicOr(meta[chunk_id].dirty_flags, dirty_flag);
+        return true;
+    }
+    return false;
+}
+
+void mark_dirty(uint chunk_id) {
+    if (mark_dirty_flag(chunk_id, DIRTY_FLAG_BIT)) {
+        uint dirty_idx = atomicAdd(dirty_count, 1u);
+        dirty_list[dirty_idx] = chunk_id;
     }
 }
 

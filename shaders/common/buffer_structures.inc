@@ -36,6 +36,7 @@ const uint VOXEL_TYPE_MASK = (1u << VOXEL_TYPE_BITS) - 1u;
 
 #define VOXEL_VISABILITY_FLAG_BIT 1u // Определяет, видим ли воксель
 #define VOXEL_EASY_OVERWRITE_FLAG_BIT 2u // Определяет, можно ли заменять воксель как будто бы он "воздух" или "вода" в майне
+#define VOXEL_INFLATED_BIT 4u // Определяет, пересикает ли воксель раздутые видимые воксели
 
 uint read_voxel_type(uint type_flags) {
     return type_flags & VOXEL_TYPE_MASK;
