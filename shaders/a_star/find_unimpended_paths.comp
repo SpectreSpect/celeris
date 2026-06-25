@@ -41,22 +41,77 @@ int sign_i(int v) {
     return v < 0 ? -1 : (v > 0 ? 1 : 0);
 }
 
-bool is_wall_voxel(ivec3 pos) {
-    return voxel_vis(pos) == 1u;
+struct VoxelLookupCache {
+    bool valid;
+    bool found;
+    ivec3 chunk_coord;
+    uint chunk_id;
+};
+
+void init_voxel_lookup_cache(out VoxelLookupCache cache) {
+    cache.valid = false;
+    cache.found = false;
+    cache.chunk_coord = ivec3(0);
+    cache.chunk_id = INVALID_ID;
+}
+
+bool cached_chunk_contains(VoxelLookupCache cache, ivec3 pos, out ivec3 local_pos) {
+    if (!cache.valid) return false;
+
+    local_pos = pos - cache.chunk_coord * u_chunk_dim.xyz;
+    return all(greaterThanEqual(local_pos, ivec3(0))) &&
+           all(lessThan(local_pos, u_chunk_dim.xyz));
+}
+
+uint voxel_flags(ivec3 pos, inout VoxelLookupCache cache) {
+    ivec3 local_pos;
+    if (cached_chunk_contains(cache, pos, local_pos)) {
+        if (!cache.found) return 0u;
+
+        VoxelData voxel_data = voxel_data_in_chunk(cache.chunk_id, local_pos);
+        return read_voxel_flags(voxel_data.type_flags);
+    }
+
+    ivec3 chunk_pos = floor_div(pos, u_chunk_dim.xyz);
+    local_pos = pos - chunk_pos * u_chunk_dim.xyz;
+
+    cache.valid = true;
+    cache.found = false;
+    cache.chunk_coord = chunk_pos;
+    cache.chunk_id = INVALID_ID;
+
+    uvec2 key = pack_key_uvec2(chunk_pos, u_pack_offset, u_pack_bits);
+    uint slot_id = chunk_hash_table_lookup_hash_table_slot_id(key, true);
+    if (slot_id == INVALID_ID) return 0u;
+
+    cache.found = true;
+    cache.chunk_id = chunk_hash_table_slots[slot_id].value;
+
+    VoxelData voxel_data = voxel_data_in_chunk(cache.chunk_id, local_pos);
+    return read_voxel_flags(voxel_data.type_flags);
+}
+
+bool is_blocking_voxel(ivec3 pos, inout VoxelLookupCache cache) {
+    uint flags = voxel_flags(pos, cache);
+    return (flags & (VOXEL_VISABILITY_FLAG_BIT | VOXEL_INFLATED_BIT)) != 0u;
+}
+
+bool is_ground_voxel(ivec3 pos, inout VoxelLookupCache cache) {
+    return (voxel_flags(pos, cache) & VOXEL_VISABILITY_FLAG_BIT) != 0u;
 }
 
 // Если будет result вне [-max_drop, max_step_up] -> спуститься/подняться не получилось
-int voxel_y_offset(ivec3 pos, uint max_step_up_u, uint max_drop_u) {
+int voxel_y_offset(ivec3 pos, uint max_step_up_u, uint max_drop_u, inout VoxelLookupCache cache) {
     int max_step_up = int(max_step_up_u);
     int max_drop = int(max_drop_u);
 
     // Если целевая позиция внутри стены/земли — пытаемся подняться вверх,
     // пока не найдём воздух.
-    if (is_wall_voxel(pos)) {
+    if (is_blocking_voxel(pos, cache)) {
         for (int dy = 1; dy <= max_step_up; dy++) {
             ivec3 stand_pos = pos + ivec3(0, dy, 0);
 
-            if (!is_wall_voxel(stand_pos)) {
+            if (!is_blocking_voxel(stand_pos, cache)) {
                 return dy;
             }
         }
@@ -69,7 +124,7 @@ int voxel_y_offset(ivec3 pos, uint max_step_up_u, uint max_drop_u) {
         ivec3 stand_pos = pos + ivec3(0, -drop, 0);
         ivec3 ground_pos = stand_pos + ivec3(0, -1, 0);
 
-        if (!is_wall_voxel(stand_pos) && is_wall_voxel(ground_pos)) {
+        if (!is_blocking_voxel(stand_pos, cache) && is_ground_voxel(ground_pos, cache)) {
             return -drop;
         }
     }
@@ -81,10 +136,10 @@ int voxel_y_offset(ivec3 pos, uint max_step_up_u, uint max_drop_u) {
     return -(max_drop + 1);
 }
 
-bool try_make_step(ivec3 pos, ivec2 step_dir_xz, out ivec3 next) {
+bool try_make_step(ivec3 pos, ivec2 step_dir_xz, out ivec3 next, inout VoxelLookupCache cache) {
     next = pos + ivec3(step_dir_xz.x, 0, step_dir_xz.y);
 
-    int y_offset = voxel_y_offset(next, u_max_step_up, u_max_drop);
+    int y_offset = voxel_y_offset(next, u_max_step_up, u_max_drop, cache);
 
     if (y_offset >= -int(u_max_drop) && y_offset <= int(u_max_step_up)) {
         next.y += y_offset;
@@ -95,10 +150,10 @@ bool try_make_step(ivec3 pos, ivec2 step_dir_xz, out ivec3 next) {
     return false;
 }
 
-bool make_step(inout ivec3 current_pos, ivec2 step_dir_xz) {
+bool make_step(inout ivec3 current_pos, ivec2 step_dir_xz, inout VoxelLookupCache cache) {
     ivec3 next;
 
-    if (!try_make_step(current_pos, step_dir_xz, next)) {
+    if (!try_make_step(current_pos, step_dir_xz, next, cache)) {
         return false;
     }
 
@@ -106,13 +161,13 @@ bool make_step(inout ivec3 current_pos, ivec2 step_dir_xz) {
     return true;
 }
 
-bool make_diagonal_step(inout ivec3 current_pos, ivec2 step_dir_xz) {
+bool make_diagonal_step(inout ivec3 current_pos, ivec2 step_dir_xz, inout VoxelLookupCache cache) {
     if (u_allow_diagonal_moves == 0u) {
         return false;
     }
 
     ivec3 next;
-    if (!try_make_step(current_pos, step_dir_xz, next)) {
+    if (!try_make_step(current_pos, step_dir_xz, next, cache)) {
         return false;
     }
 
@@ -121,7 +176,10 @@ bool make_diagonal_step(inout ivec3 current_pos, ivec2 step_dir_xz) {
 }
 
 bool is_path_unimpended(ivec3 from_pos, ivec3 to_pos) {
-    if (is_wall_voxel(from_pos))
+    VoxelLookupCache cache;
+    init_voxel_lookup_cache(cache);
+
+    if (is_blocking_voxel(from_pos, cache))
         return false;
     
     ivec3 diff = to_pos - from_pos;
@@ -142,12 +200,12 @@ bool is_path_unimpended(ivec3 from_pos, ivec3 to_pos) {
 
     while (abs_offset.x < abs_diff.x || abs_offset.z < abs_diff.z) {
         if (abs_diff.x == 0) {
-            if (!make_step(current_pos, ivec2(0, sign_dir.z)))
+            if (!make_step(current_pos, ivec2(0, sign_dir.z), cache))
                 return false;
 
             abs_offset.z++;
         } else if (abs_diff.z == 0) {
-            if (!make_step(current_pos, ivec2(sign_dir.x, 0)))
+            if (!make_step(current_pos, ivec2(sign_dir.x, 0), cache))
                 return false;
 
             abs_offset.x++;
@@ -156,25 +214,25 @@ bool is_path_unimpended(ivec3 from_pos, ivec3 to_pos) {
             int rhs = (2 * abs_offset.z + 1) * abs_diff.x;
 
             if (lhs < rhs) {
-                if (!make_step(current_pos, ivec2(sign_dir.x, 0)))
+                if (!make_step(current_pos, ivec2(sign_dir.x, 0), cache))
                     return false;
 
                 abs_offset.x++;
             } else if (lhs > rhs) {
-                if (!make_step(current_pos, ivec2(0, sign_dir.z)))
+                if (!make_step(current_pos, ivec2(0, sign_dir.z), cache))
                     return false;
 
                 abs_offset.z++;
             } else {
                 ivec3 next;
 
-                if (make_diagonal_step(current_pos, ivec2(sign_dir.x, sign_dir.z))) {
+                if (make_diagonal_step(current_pos, ivec2(sign_dir.x, sign_dir.z), cache)) {
                     abs_offset += ivec3(1, 0, 1);
                     continue;
                 }
 
-                if (try_make_step(current_pos, ivec2(sign_dir.x, 0), next) && 
-                    make_step(next, ivec2(0, sign_dir.z)))
+                if (try_make_step(current_pos, ivec2(sign_dir.x, 0), next, cache) && 
+                    make_step(next, ivec2(0, sign_dir.z), cache))
                 {
                     // Удалось пробраться в угол
                      current_pos = next;
@@ -182,8 +240,8 @@ bool is_path_unimpended(ivec3 from_pos, ivec3 to_pos) {
                      continue;
                 }
 
-                if (try_make_step(current_pos, ivec2(0, sign_dir.z), next) && 
-                    make_step(next, ivec2(sign_dir.x, 0)))
+                if (try_make_step(current_pos, ivec2(0, sign_dir.z), next, cache) && 
+                    make_step(next, ivec2(sign_dir.x, 0), cache))
                 {
                     // Удалось пробраться в угол
                      current_pos = next;
