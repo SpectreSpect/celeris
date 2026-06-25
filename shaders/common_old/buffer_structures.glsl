@@ -3,7 +3,7 @@
 #include "../voxel_grid/chunk_hash_table/decl.glsl"
 #include "../voxel_rasterization/counter_hash_table/decl.glsl"
 
-#define DIRTY_FLAG_BIT 1u
+#define DIRTY_MESH_FLAG_BIT 1u
 #define NEED_GENERATION_FLAG_BIT 2u
 #define HAS_WRITTEN_VOXELS_BIT 4u
 

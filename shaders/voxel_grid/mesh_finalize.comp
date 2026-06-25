@@ -36,5 +36,5 @@ void main() {
     }
 
     // снять dirty флаг(и)
-    meta[chunkId].dirty_flags &= ~DIRTY_FLAG_BIT;
+    meta[chunkId].dirty_flags &= ~DIRTY_MESH_FLAG_BIT;
 }

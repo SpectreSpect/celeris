@@ -121,6 +121,6 @@ void main() {
 
     // один раз на чанк
     if (voxelId == 0u) {
-        mark_dirty_around(chunkId, chunkCoord);
+        mark_dirty_mesh_around(chunkId, chunkCoord);
     }
 }
