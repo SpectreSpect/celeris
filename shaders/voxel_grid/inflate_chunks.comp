@@ -27,16 +27,27 @@ layout(push_constant) uniform InflateChunksPushConstants {
 #include "chunk_pool/read_voxels.inc"
 // -------------------
 
-bool intersects_inflated_solid(ivec3 target_world_voxel)
+shared uint shared_target_chunk_id;
+shared ivec3 shared_target_chunk_pos;
+
+bool intersects_inflated_solid(uint target_chunk_id, ivec3 target_chunk_pos, ivec3 target_local_pos)
 {
     int radius = int(u_inflation_size);
     int car_height_voxels = int(u_car_height_voxels);
 
+    if (voxel_vis(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(0)) != 0u) {
+        return true;
+    }
+
     for (int height_offset = 0; height_offset < car_height_voxels; ++height_offset) {
         for (int z = -radius; z <= radius; ++z) {
             for (int x = -radius; x <= radius; ++x) {
-                ivec3 source_world_voxel = target_world_voxel + ivec3(x, height_offset, z);
-                if (voxel_vis(source_world_voxel) != 0u) return true;
+                if (x == 0 && z == 0 && height_offset == 0) continue;
+
+                ivec3 sample_offset = ivec3(x, height_offset, z);
+                if (voxel_vis(target_chunk_id, target_chunk_pos, target_local_pos, sample_offset) != 0u) {
+                    return true;
+                }
             }
         }
     }
@@ -46,28 +57,37 @@ bool intersects_inflated_solid(ivec3 target_world_voxel)
 
 void main()
 {
-    uint to_inflate_id = gl_GlobalInvocationID.x;
-    uint voxel_id = gl_GlobalInvocationID.y;
+    uint voxel_id = gl_GlobalInvocationID.x;
+    uint to_inflate_id = gl_GlobalInvocationID.y;
     if (to_inflate_id >= to_inflate_count) return;
+
+    if (gl_LocalInvocationID.x == 0u) {
+        shared_target_chunk_id = to_inflate_list[to_inflate_id];
+        shared_target_chunk_pos = unpack_key_to_coord(
+            uvec2(meta[shared_target_chunk_id].key_lo, meta[shared_target_chunk_id].key_hi),
+            u_pack_offset,
+            u_pack_bits
+        );
+    }
+
+    barrier();
+
     if (voxel_id >= u_voxels_per_chunk) return;
 
-    uint target_chunk_id = to_inflate_list[to_inflate_id];
+    uint target_chunk_id = shared_target_chunk_id;
     uint target_global_voxel_id = target_chunk_id * u_voxels_per_chunk + voxel_id;
     uint inflated_type_flag = VOXEL_INFLATED_BIT << VOXEL_TYPE_BITS;
 
-    atomicAnd(voxels[target_global_voxel_id].type_flags, ~inflated_type_flag);
+    uint target_type_flags = voxels[target_global_voxel_id].type_flags & ~inflated_type_flag;
 
-    ivec3 target_chunk_pos = unpack_key_to_coord(
-        uvec2(meta[target_chunk_id].key_lo, meta[target_chunk_id].key_hi),
-        u_pack_offset,
-        u_pack_bits
-    );
+    ivec3 target_chunk_pos = shared_target_chunk_pos;
     ivec3 target_local_pos = local_voxel_pos_from_index(voxel_id);
-    ivec3 target_world_voxel = target_chunk_pos * u_chunk_dim.xyz + target_local_pos;
 
-    if (intersects_inflated_solid(target_world_voxel)) {
-        atomicOr(voxels[target_global_voxel_id].type_flags, inflated_type_flag);
+    if (intersects_inflated_solid(target_chunk_id, target_chunk_pos, target_local_pos)) {
+        target_type_flags |= inflated_type_flag;
     }
+
+    voxels[target_global_voxel_id].type_flags = target_type_flags;
 
     if (voxel_id == 0u) {
         atomicAnd(meta[target_chunk_id].dirty_flags, ~DIRTY_INFLATE_FLAG_BIT);

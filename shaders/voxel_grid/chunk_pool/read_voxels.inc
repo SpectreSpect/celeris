@@ -23,7 +23,7 @@ VoxelData voxel_data_in_chunk(uint chunkId, ivec3 p) {
 
 VoxelData voxel_data_world(ivec3 chunkCoord, ivec3 local, out bool success) {
     uvec2 key = pack_key_uvec2(chunkCoord, u_pack_offset, u_pack_bits);
-    uint slot_id = chunk_hash_table_lookup_hash_table_slot_id(key);
+    uint slot_id = chunk_hash_table_lookup_hash_table_slot_id(key, true);
     if (slot_id == INVALID_ID) {
         success = false;
         VoxelData r;

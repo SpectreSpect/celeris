@@ -1829,6 +1829,8 @@ void VoxelGrid::update(Window& window, Camera& camera) {
         auto scope = m_command_buffer.begin_scope();
         stream_chunks_sphere(m_command_buffer, camera.position, -1, 42);
 
+        inflate_marked_chunks(m_command_buffer);
+
         for (auto& callback : m_next_to_stream_chunks_sphere_callbacks) {
             callback(m_command_buffer, *this);
         }
@@ -2090,8 +2092,8 @@ void VoxelGrid::inflate_marked_chunks(VulkanCommandBuffer& command_buffer) {
     m_shader_helper.prepare_dispatch_args(
         command_buffer, 
         m_buffers.dispatch_args, 
-        BufferDispatchArg(&m_buffers.to_inflate_list, 0u),
-        ValueDispatchArg(static_cast<uint32_t>(vox_per_chunk()))
+        ValueDispatchArg(static_cast<uint32_t>(vox_per_chunk())),
+        BufferDispatchArg(&m_buffers.to_inflate_list, 0u)
     );
     inflate_chunks(command_buffer, m_buffers.dispatch_args);
 
