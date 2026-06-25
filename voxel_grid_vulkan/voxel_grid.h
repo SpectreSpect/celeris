@@ -129,6 +129,7 @@ public:
         VulkanBuffer mesh_buffers_status;
         VulkanBuffer dirty_list;
         VulkanBuffer load_list;
+        VulkanBuffer to_inflate_list;
         VulkanBuffer local_voxel_write_list;
         VulkanBuffer voxel_write_list;
         VulkanBuffer voxels;
@@ -302,6 +303,7 @@ private:
     void submit_compute_commands();
     
     void reset_load_list_counter(VulkanCommandBuffer& command_buffer);
+    void reset_to_inflate_list_counter(VulkanCommandBuffer& command_buffer);
     void mark_chunk_to_generate(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks);
     void mark_write_chunks_to_generate(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void generate_terrain(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t seed);
@@ -370,5 +372,6 @@ private:
         int pack_offset
     );
 
+    void mark_chunks_to_inflate(VulkanCommandBuffer& command_buffer);
     void inflate_voxels(VulkanCommandBuffer& command_buffer);
 };

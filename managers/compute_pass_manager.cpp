@@ -420,6 +420,7 @@ ComputePass ComputePassManager::create_world_init_compute_pass(VulkanDevice& dev
     builder.add_storage_buffer(6, ShaderStages::compute); // VoxelWriteList
     builder.add_storage_buffer(7, ShaderStages::compute); // IndirectCmdBuf
     builder.add_storage_buffer(8, ShaderStages::compute); // FailedDirtyListBuf
+    builder.add_storage_buffer(9, ShaderStages::compute); // ToInflateListBuf
     builder.add_push_constantsf(sizeof(WorldInitPushConstants), ShaderStages::compute); // WorldInitPushConstants
 
     return create_pass(device, compute_shader_module, builder);

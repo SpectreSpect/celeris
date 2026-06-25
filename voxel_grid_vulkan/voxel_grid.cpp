@@ -949,6 +949,7 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize enqueued_size = sizeof(uint32_t) * (size_t)m_params.count_active_chunks;
     VkDeviceSize dirty_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
     VkDeviceSize load_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
+    VkDeviceSize to_inflate_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
     VkDeviceSize local_voxel_write_list_size = sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * m_params.max_write_count;
     VkDeviceSize voxel_write_list_size = sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * m_params.max_write_count;
     VkDeviceSize voxels_size = sizeof(VoxelDataGPU) * vox_per_chunk() * (size_t)m_params.count_active_chunks;
@@ -1153,6 +1154,13 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
             physical_device,
             device,
             load_list_size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            ssbo_memory_properties
+        ),
+        .to_inflate_list = VulkanBuffer(
+            physical_device,
+            device,
+            to_inflate_list_size,
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             ssbo_memory_properties
         ),
@@ -1631,6 +1639,7 @@ void VoxelGrid::world_init_gpu() {
         m_pass_instances.world_init_pi.set_storage_buffer(6, m_buffers.voxel_write_list);
         m_pass_instances.world_init_pi.set_storage_buffer(7, m_buffers.indirect_cmds);
         m_pass_instances.world_init_pi.set_storage_buffer(8, m_buffers.failed_dirty_list);
+        m_pass_instances.world_init_pi.set_storage_buffer(9, m_buffers.to_inflate_list);
 
         m_pass_instances.world_init_pi.bind(m_command_buffer);
 
@@ -1851,6 +1860,12 @@ void VoxelGrid::reset_load_list_counter(VulkanCommandBuffer& command_buffer) {
     m_buffers.load_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
+void VoxelGrid::reset_to_inflate_list_counter(VulkanCommandBuffer& command_buffer) {
+    LOG_METHOD();
+    m_buffers.to_inflate_list.fill(command_buffer, 0, sizeof(uint32_t));
+    m_buffers.to_inflate_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+}
+
 void VoxelGrid::mark_chunk_to_generate(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks) {
     LOG_METHOD();
 
@@ -2029,8 +2044,11 @@ void VoxelGrid::stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::v
     reset_voxel_write_list_counter(command_buffer, m_buffers.voxel_write_list);
 }
 
+void VoxelGrid::mark_chunks_to_inflate(VulkanCommandBuffer& command_buffer) {
+    LOG_METHOD();
+    reset_to_inflate_list_counter(command_buffer);
+}
+
 void VoxelGrid::inflate_voxels(VulkanCommandBuffer& command_buffer) {
     LOG_METHOD();
-
-    
 }

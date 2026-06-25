@@ -16,6 +16,7 @@ layout(std430, set = 0, binding=5) buffer DirtyListBuf { uint dirty_count; uint 
 layout(std430, set = 0, binding=6) buffer VoxelWriteList { uint write_count; VoxelWrite writes[]; };
 layout(std430, set = 0, binding=7) buffer IndirectCmdBuf { uint cmd_count; DrawElementsIndirectCommand cmds[]; };
 layout(std430, set = 0, binding=8) buffer FailedDirtyListBuf { uint failed_dirty_count; uint failed_dirty_list[]; }; 
+layout(std430, set = 0, binding=9) buffer ToInflateListBuf { uint to_inflate_count; uint to_inflate_list[]; };
 
 
 layout(push_constant) uniform WorldInitPushConstants {
@@ -52,6 +53,7 @@ void main() {
         cmd_count = 0u; 
         free_count = u_max_chunks; 
         failed_dirty_count = 0u;
+        to_inflate_count = 0u;
         
         is_vb_full = 0u;
         is_ib_full = 0u;
