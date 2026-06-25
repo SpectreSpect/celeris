@@ -140,9 +140,7 @@ void main()
     // A solid voxel blocks every possible car-base voxel whose vertical
     // footprint would contain it. Marking downward is equivalent to checking
     // car_height_voxels upward from each possible car position.
-    for (int height_offset = 0;
-         height_offset < car_height_voxels;
-         ++height_offset) {
+    for (int height_offset = 0; height_offset < car_height_voxels; ++height_offset) {
         for (int z = -radius; z <= radius; ++z) {
             for (int x = -radius; x <= radius; ++x) {
                 mark_inflated_voxel(
