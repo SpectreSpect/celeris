@@ -1,5 +1,9 @@
 #include "celeris.h"
 
+#include <algorithm>
+#include <cmath>
+#include <iostream>
+#include <limits>
 #include <utility>
 
 #include "../vulkan_self/vulkan_device.h"
@@ -7,6 +11,18 @@
 #include "../vulkan_self/vulkan_submit_context.h"
 #include "../managers/compute_pass_manager.h"
 #include "../managers/manager_bundle.h"
+
+namespace {
+    constexpr int COLLISION_BINARY_SEARCH_ITERATIONS = 16;
+
+    float min_component(glm::vec3 value) noexcept {
+        return std::min({value.x, value.y, value.z});
+    }
+
+    float length_sq(glm::vec3 value) noexcept {
+        return glm::dot(value, value);
+    }
+}
 
 Celeris::Celeris(VulkanEngine& engine,
                  VulkanQueue& compute_queue,
@@ -60,6 +76,8 @@ void Celeris::start_lidar_receiver() {
     m_scan_receiver.start();
     m_received_scan_count = 0;
     m_has_previous_lidar_pose = false;
+    m_collision_raw_position_history.clear();
+    m_has_collision_surface_point = false;
 }
 
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
@@ -156,10 +174,29 @@ void Celeris::update() {
 
         
         m_voxel_map_inserter.insert(m_voxel_point_map, m_network_scan->point_cloud(), m_network_scan->normal_buffer());
-        m_voxel_grid->voxelize_point_cloud(*m_engine, 
-                                           m_network_scan->point_cloud(), 
-                                           voxel_write_list, 
-                                           m_desc.max_write_count);
+        m_voxel_grid->voxelize_point_cloud(
+            *m_engine, 
+            m_network_scan->point_cloud(), 
+            voxel_write_list, 
+            m_desc.max_write_count
+        );
+
+        // m_occupancy_grid.adjust_to_ground(
+        //     m_start_position.pos, 
+        //     0, 
+        //     6, 
+        //     6, 
+        //     false
+        // );
+
+        const glm::vec3 collision_raw_position = m_start_position.pos;
+
+        // Здесь нужно делать коллизию...
+        collision(
+            m_collision_raw_position_history,
+            m_start_position.pos
+        );
+        remember_collision_raw_position(collision_raw_position);
 
         request_path_replan(m_start_position, m_goal_position);
 
@@ -191,6 +228,8 @@ void Celeris::find_path(VulkanSubmitContext& submit_context) {
 
 void Celeris::set_start(const NonholonomicPos& position) {
     m_start_position = position;
+    m_collision_raw_position_history.clear();
+    m_has_collision_surface_point = false;
 }
 
 void Celeris::set_goal(const NonholonomicPos& position) {
@@ -248,6 +287,256 @@ uint32_t Celeris::received_scan_count() const noexcept {
 
 std::mutex& Celeris::planner_mutex() noexcept {
     return m_planner_mutex;
+}
+
+bool Celeris::collision_point_is_free(glm::vec3 point) {
+    return !m_occupancy_grid.is_solid(
+        m_occupancy_grid.world_to_voxel_pos(point)
+    );
+}
+
+glm::vec3 Celeris::collision_point_in_voxel_closest_to(
+    glm::ivec3 voxel_pos,
+    glm::vec3 reference)
+{
+    const glm::vec3 voxel_size = m_occupancy_grid.voxel_size();
+    const glm::vec3 voxel_min = m_occupancy_grid.voxel_to_world_pos(voxel_pos);
+    const glm::vec3 voxel_max = voxel_min + voxel_size;
+    const glm::vec3 epsilon = voxel_size * 1e-3f;
+
+    return glm::clamp(reference, voxel_min + epsilon, voxel_max - epsilon);
+}
+
+float Celeris::collision_sample_step() {
+    const glm::vec3 voxel_size = m_occupancy_grid.voxel_size();
+    logger().check(
+        glm::all(glm::greaterThan(voxel_size, glm::vec3(0.0f))),
+        "Voxel size must be greater than zero"
+    );
+
+    return std::max(min_component(voxel_size) * 0.25f, 1e-4f);
+}
+
+bool Celeris::find_first_free_collision_point_on_segment(
+    glm::vec3 from,
+    glm::vec3 to,
+    glm::vec3& free_point)
+{
+    const glm::vec3 segment = to - from;
+    const float segment_length = glm::length(segment);
+
+    if (!std::isfinite(segment_length) || segment_length <= 1e-6f) {
+        if (collision_point_is_free(to)) {
+            free_point = to;
+            return true;
+        }
+
+        return false;
+    }
+
+    const float sample_step = collision_sample_step();
+    const int sample_count = std::max(
+        1,
+        static_cast<int>(std::ceil(segment_length / sample_step))
+    );
+
+    glm::vec3 last_blocked = from;
+
+    for (int sample_id = 1; sample_id <= sample_count; ++sample_id) {
+        const float t = static_cast<float>(sample_id) /
+                        static_cast<float>(sample_count);
+        const glm::vec3 candidate = glm::mix(from, to, t);
+
+        if (!collision_point_is_free(candidate)) {
+            last_blocked = candidate;
+            continue;
+        }
+
+        glm::vec3 blocked = last_blocked;
+        glm::vec3 free = candidate;
+
+        for (int i = 0; i < COLLISION_BINARY_SEARCH_ITERATIONS; ++i) {
+            glm::vec3 middle = (blocked + free) * 0.5f;
+
+            if (collision_point_is_free(middle)) {
+                free = middle;
+            } else {
+                blocked = middle;
+            }
+        }
+
+        free_point = free;
+        return true;
+    }
+
+    return false;
+}
+
+bool Celeris::find_collision_surface_point(
+    std::span<const glm::vec3> previous_free_raw_points,
+    glm::vec3 point_pos,
+    glm::vec3& surface_point)
+{
+    for (glm::vec3 previous_point : previous_free_raw_points) {
+        if (find_first_free_collision_point_on_segment(point_pos, previous_point, surface_point)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool Celeris::find_collision_escape_point(
+    glm::vec3 point_pos,
+    glm::vec3 direction,
+    glm::vec3& resolved_pos)
+{
+    if (m_desc.collision_escape_search_radius_voxels == 0u) {
+        return false;
+    }
+
+    const float direction_len_sq = length_sq(direction);
+    if (!std::isfinite(direction_len_sq) || direction_len_sq <= 1e-8f) {
+        return false;
+    }
+
+    const glm::vec3 direction_norm = direction / std::sqrt(direction_len_sq);
+    const glm::ivec3 center_voxel = m_occupancy_grid.world_to_voxel_pos(point_pos);
+    const int radius = static_cast<int>(m_desc.collision_escape_search_radius_voxels);
+
+    bool found = false;
+    float best_distance_sq = std::numeric_limits<float>::infinity();
+    float best_forward_projection = -std::numeric_limits<float>::infinity();
+    glm::vec3 best_pos(0.0f);
+
+    for (int z = -radius; z <= radius; ++z) {
+        for (int y = -radius; y <= radius; ++y) {
+            for (int x = -radius; x <= radius; ++x) {
+                glm::ivec3 candidate_voxel = center_voxel + glm::ivec3(x, y, z);
+                if (m_occupancy_grid.is_solid(candidate_voxel)) {
+                    continue;
+                }
+
+                glm::vec3 candidate_pos =
+                    collision_point_in_voxel_closest_to(candidate_voxel, point_pos);
+                glm::vec3 offset = candidate_pos - point_pos;
+                float candidate_distance_sq = length_sq(offset);
+
+                if (candidate_distance_sq <= 1e-8f) {
+                    continue;
+                }
+
+                float forward_projection = glm::dot(offset, direction_norm);
+                if (forward_projection <= 0.0f) {
+                    continue;
+                }
+
+                if (!found ||
+                    candidate_distance_sq < best_distance_sq ||
+                    (candidate_distance_sq == best_distance_sq &&
+                     forward_projection > best_forward_projection))
+                {
+                    found = true;
+                    best_distance_sq = candidate_distance_sq;
+                    best_forward_projection = forward_projection;
+                    best_pos = candidate_pos;
+                }
+            }
+        }
+    }
+
+    if (!found) {
+        return false;
+    }
+
+    resolved_pos = best_pos;
+    return true;
+}
+
+void Celeris::collision(
+    std::span<const glm::vec3> previous_free_raw_points,
+    glm::vec3& point_pos)
+{
+    LOG_METHOD();
+
+    logger().check(m_voxel_grid, "Voxel grid was null");
+
+    if (collision_point_is_free(point_pos)) {
+        return;
+    }
+
+    if (previous_free_raw_points.empty() && !m_has_collision_surface_point) {
+        return;
+    }
+
+    bool has_fallback_surface_point = false;
+    glm::vec3 fallback_surface_point(0.0f);
+    glm::vec3 escape_direction(0.0f);
+    if (m_has_collision_surface_point) {
+        escape_direction = m_collision_surface_point - point_pos;
+    } else {
+        if (!find_collision_surface_point(previous_free_raw_points, point_pos, m_collision_surface_point)) {
+            return;
+        }
+
+        m_has_collision_surface_point = true;
+        fallback_surface_point = m_collision_surface_point;
+        has_fallback_surface_point = true;
+        escape_direction = point_pos - m_collision_surface_point;
+    }
+
+    glm::vec3 resolved_pos;
+    if (find_collision_escape_point(point_pos, escape_direction, resolved_pos)) {
+        point_pos = resolved_pos;
+        m_collision_surface_point = resolved_pos;
+        m_has_collision_surface_point = true;
+        return;
+    }
+
+    if (find_collision_surface_point(previous_free_raw_points, point_pos, resolved_pos)) {
+        point_pos = resolved_pos;
+        m_collision_surface_point = resolved_pos;
+        m_has_collision_surface_point = true;
+        return;
+    }
+
+    if (m_has_collision_surface_point && collision_point_is_free(m_collision_surface_point)) {
+        point_pos = m_collision_surface_point;
+        return;
+    }
+
+    if (has_fallback_surface_point && collision_point_is_free(fallback_surface_point)) {
+        point_pos = fallback_surface_point;
+        m_collision_surface_point = fallback_surface_point;
+        m_has_collision_surface_point = true;
+        return;
+    }
+
+    logger().log_error() << "Failed to resolve Celeris collision along previous path. "
+                         << "Leaving point unchanged.\n";
+}
+
+void Celeris::remember_collision_raw_position(glm::vec3 point_pos) {
+    if (m_desc.collision_history_size == 0u) {
+        m_collision_raw_position_history.clear();
+        m_has_collision_surface_point = false;
+        return;
+    }
+
+    if (m_occupancy_grid.is_solid(m_occupancy_grid.world_to_voxel_pos(point_pos))) {
+        return;
+    }
+
+    m_has_collision_surface_point = false;
+
+    m_collision_raw_position_history.insert(
+        m_collision_raw_position_history.begin(),
+        point_pos
+    );
+
+    if (m_collision_raw_position_history.size() > m_desc.collision_history_size) {
+        m_collision_raw_position_history.resize(m_desc.collision_history_size);
+    }
 }
 
 void Celeris::start_planner_thread(VulkanSubmitContext&& submit_context) {

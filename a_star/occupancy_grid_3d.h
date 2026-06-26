@@ -25,6 +25,7 @@ public:
 
     static glm::ivec3 floor_pos(const glm::vec3& p);
     static std::vector<glm::ivec3> line_intersects(glm::vec3 pos1, glm::vec3 pos2);
+    glm::vec3 voxel_size() const;
     glm::ivec3 world_to_voxel_pos(const glm::vec3& p) const;
     glm::vec3 voxel_to_world_pos(const glm::ivec3& p) const;
     glm::vec3 voxel_center_world_pos(const glm::ivec3& p) const;
