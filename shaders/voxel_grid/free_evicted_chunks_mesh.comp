@@ -29,10 +29,12 @@ layout(push_constant) uniform FreeEvictedChunksMeshPushConstants {
 #include "../common/utils.inc"
 
 #define PREFIX vb
-#include "../common/allocator.inc"
+#include "../common/allocator/free_pages_impl.inc"
+#undef PREFIX
 
 #define PREFIX ib
-#include "../common/allocator.inc"
+#include "../common/allocator/free_pages_impl.inc"
+#undef PREFIX
 // -------------------
 
 void main() {

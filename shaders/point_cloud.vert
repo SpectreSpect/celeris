@@ -47,6 +47,7 @@ void main() {
 
     vLocal = aCorner;
     vColor = aColor;
+    // vColor = aColor;
     // vColor = pc.color;
 
     vec4 centerW4 = pc.model * vec4(aPos.xyz, 1.0);

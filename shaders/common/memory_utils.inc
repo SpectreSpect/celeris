@@ -19,6 +19,22 @@ uint SF(read_uint, M_SUFFIX)(uint offset_bytes) {
     return (byte_3 << 24u) | (byte_2 << 16u) | (byte_1 << 8u) | byte_0;
 }
 
+float SF(read_float, M_SUFFIX)(uint offset_bytes) {
+    uint byte_0 = SF(read_byte, M_SUFFIX)(offset_bytes + 0u);
+    uint byte_1 = SF(read_byte, M_SUFFIX)(offset_bytes + 1u);
+    uint byte_2 = SF(read_byte, M_SUFFIX)(offset_bytes + 2u);
+    uint byte_3 = SF(read_byte, M_SUFFIX)(offset_bytes + 3u);
+    return uintBitsToFloat((byte_3 << 24u) | (byte_2 << 16u) | (byte_1 << 8u) | byte_0);
+}
+
+vec3 SF(read_vec3, M_SUFFIX)(uint offset_bytes) {
+    return vec3(
+        SF(read_float, M_SUFFIX)(offset_bytes + 0u),
+        SF(read_float, M_SUFFIX)(offset_bytes + 4u),
+        SF(read_float, M_SUFFIX)(offset_bytes + 8u)
+    );
+}
+
 #undef M_SUFFIX
 #undef BUFFER_NAME
 #endif

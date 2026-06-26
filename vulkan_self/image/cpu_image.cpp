@@ -58,11 +58,11 @@ CpuImage CpuImage::load_rgba8_image(const std::filesystem::path& path, VkFormat 
         STBI_rgb_alpha
     );
 
-    logger.check(width > 0, "Loaded image width is invalid");
-    logger.check(height > 0, "Loaded image height is invalid");
+    logger().check(width > 0, "Loaded image width is invalid");
+    logger().check(height > 0, "Loaded image height is invalid");
 
     const char* failure_reason = stbi_failure_reason();
-    logger.check(raw_pixels != nullptr)
+    logger().check(raw_pixels != nullptr)
         << "Failed to load image: "
         << clr(path.string(), LoggerPalette::blue)
         << "\nReason: "
@@ -106,11 +106,11 @@ CpuImage CpuImage::load_rgba32f_image(const std::filesystem::path& path) {
         STBI_rgb_alpha
     );
 
-    logger.check(width > 0, "Loaded HDR image width is invalid");
-    logger.check(height > 0, "Loaded HDR image height is invalid");
+    logger().check(width > 0, "Loaded HDR image width is invalid");
+    logger().check(height > 0, "Loaded HDR image height is invalid");
 
     const char* failure_reason = stbi_failure_reason();
-    logger.check(raw_pixels != nullptr)
+    logger().check(raw_pixels != nullptr)
         << "Failed to load HDR image: "
         << clr(path.string(), LoggerPalette::blue)
         << "\nReason: "

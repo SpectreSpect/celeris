@@ -12,8 +12,8 @@ SlotPassObject::SlotPassObject(
 {
     LOG_NAMED("SlotPassObject");
 
-    logger.check(slot_size > 0, "Slot size must be greater than 0");
-    logger.check(num_slots > 0, "Attempt to create slot buffer with 0 slots");
+    logger().check(slot_size > 0, "Slot size must be greater than 0");
+    logger().check(num_slots > 0, "Attempt to create slot buffer with 0 slots");
 }
 
 SlotBuffer& SlotPassObject::slot_buffer() noexcept {

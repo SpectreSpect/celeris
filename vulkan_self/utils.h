@@ -50,7 +50,7 @@ namespace Utils {
         
         std::ifstream file(path, std::ios::binary | std::ios::ate);
 
-        logger.check(file.is_open())
+        logger().check(file.is_open())
             << "Failed to open image file: "
             << clr(path.string(), LoggerPalette::blue)
             << "\n";
@@ -60,7 +60,7 @@ namespace Utils {
 
         std::vector<std::uint8_t> data(static_cast<size_t>(file_size));
 
-        logger.check(bool(file.read(reinterpret_cast<char*>(data.data()), file_size)))
+        logger().check(bool(file.read(reinterpret_cast<char*>(data.data()), file_size)))
             << "Failed to read image file: "
             << clr(path.string(), LoggerPalette::blue)
             << "\n";
@@ -243,7 +243,7 @@ namespace Utils {
                 return 8;
 
             default:
-                logger.check(false)
+                logger().check(false)
                     << "Unsupported VkFormat in image_size_bytes: "
                     << clr(std::to_string(static_cast<int>(format)), LoggerPalette::orange)
                     << "\n";
@@ -277,14 +277,14 @@ namespace Utils {
     {
         LOG_NAMED("Utils");
 
-        logger.check(extent.width != 0, "Image width is zero");
-        logger.check(extent.height != 0, "Image height is zero");
-        logger.check(extent.depth != 0, "Image depth is zero");
-        logger.check(format != VK_FORMAT_UNDEFINED, "Image format is undefined");
-        logger.check(mip_levels != 0, "Mip levels count is zero");
-        logger.check(array_layers != 0, "Array layers count is zero");
+        logger().check(extent.width != 0, "Image width is zero");
+        logger().check(extent.height != 0, "Image height is zero");
+        logger().check(extent.depth != 0, "Image depth is zero");
+        logger().check(format != VK_FORMAT_UNDEFINED, "Image format is undefined");
+        logger().check(mip_levels != 0, "Mip levels count is zero");
+        logger().check(array_layers != 0, "Array layers count is zero");
 
-        logger.check(mip_levels <= max_mip_levels(extent))
+        logger().check(mip_levels <= max_mip_levels(extent))
             << "Too many mip levels for image extent "
             << "(" << clr("mip_levels", LoggerPalette::blue) << " = "
             << clr(std::to_string(mip_levels), LoggerPalette::orange)

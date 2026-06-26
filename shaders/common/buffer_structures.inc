@@ -5,9 +5,10 @@
 #include "../voxel_grid/chunk_hash_table/decl.inc"
 #include "../voxel_rasterization/counter_hash_table/decl.inc"
 
-#define DIRTY_FLAG_BIT 1u
+#define DIRTY_MESH_FLAG_BIT 1u
 #define NEED_GENERATION_FLAG_BIT 2u
-#define HAS_WRITTEN_VOXELS_BIT 4u
+#define DIRTY_INFLATE_FLAG_BIT 4u
+#define ENQUEUED_FAILED_DIRTY_MESH_FLAG_BIT 8u
 
 struct ChunkMeta { 
     uint used; 
@@ -36,6 +37,7 @@ const uint VOXEL_TYPE_MASK = (1u << VOXEL_TYPE_BITS) - 1u;
 
 #define VOXEL_VISABILITY_FLAG_BIT 1u // Определяет, видим ли воксель
 #define VOXEL_EASY_OVERWRITE_FLAG_BIT 2u // Определяет, можно ли заменять воксель как будто бы он "воздух" или "вода" в майне
+#define VOXEL_INFLATED_BIT 4u // Определяет, пересикает ли воксель раздутые видимые воксели
 
 uint read_voxel_type(uint type_flags) {
     return type_flags & VOXEL_TYPE_MASK;
@@ -51,7 +53,7 @@ uint pack_voxel_type_flags(uint type, uint flags) {
 
 struct VoxelData {
     uint type_flags; // 32u...flags|type...0u
-    uint color; // 32u...R|G|B|A...0u (получается "развёрнуто" в порядке аргументов, но "логично" в hex представлении 0xRRGGBBAAu)
+    uint color; // 32u...R|G|B|A...0u
 };
 
 #define OVERWRITE_BIT 1u
@@ -70,6 +72,8 @@ struct Vertex {
     uint pad0;
     uint pad1;
 };
+
+#define VERTEX_SIZE 32u
 
 struct DrawElementsIndirectCommand {
     uint count;

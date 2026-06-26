@@ -1,4 +1,7 @@
 #include "render_object.h"
+
+#include <utility>
+
 #include "renderer.h"
 
 RenderObject::RenderObject(Mesh& mesh, SlotPassInstance& material)
@@ -11,37 +14,35 @@ RenderObject::RenderObject(MeshView mesh_view, SlotPassInstance& material)
       m_material(&material),
       m_material_data_id(material.slot_buffer().allocate_slot()) {}
 
-RenderObject::~RenderObject() {
+RenderObject::~RenderObject() noexcept {
+    destroy();
+}
+
+void RenderObject::destroy() noexcept {
     if (m_material && m_material_data_id != UINT32_MAX) {
         m_material->slot_buffer().free_slot(m_material_data_id);
     }
+
+    m_material = nullptr;
+    m_material_data_id = UINT32_MAX;
 }
 
 RenderObject::RenderObject(RenderObject&& other) noexcept
     : SceneObject(std::move(other)),
-      m_mesh_view(other.m_mesh_view),
-      m_material(other.m_material),
-      m_material_data_id(other.m_material_data_id)
-{
-    other.m_material = nullptr;
-    other.m_material_data_id = UINT32_MAX;
-}
+      m_mesh_view(std::move(other.m_mesh_view)),
+      m_material(std::exchange(other.m_material, nullptr)),
+      m_material_data_id(std::exchange(other.m_material_data_id, UINT32_MAX)) {}
 
 RenderObject& RenderObject::operator=(RenderObject&& other) noexcept {
-    if (this == &other) {
-        return *this;
+    if (this != &other) {
+        destroy();
+
+        SceneObject::operator=(std::move(other));
+
+        m_mesh_view = std::move(other.m_mesh_view);
+        m_material = std::exchange(other.m_material, nullptr);
+        m_material_data_id = std::exchange(other.m_material_data_id, UINT32_MAX);
     }
-
-    if (m_material && m_material_data_id != UINT32_MAX) {
-        m_material->slot_buffer().free_slot(m_material_data_id);
-    }
-
-    transform = std::move(other.transform);
-    m_material = other.m_material;
-    m_material_data_id = other.m_material_data_id;
-
-    other.m_material = nullptr;
-    other.m_material_data_id = UINT32_MAX;
 
     return *this;
 }

@@ -10,7 +10,7 @@ DescriptorSetLayoutBuilder& DescriptorSetLayoutBuilder::add(uint32_t binding, Vk
                                                             VkShaderStageFlags shader_stage_flags, uint32_t descriptor_count) {
     LOG_METHOD();
 
-    logger.check(descriptor_count > 0, "Descriptor set layout binding must contain at least one descriptor");
+    logger().check(descriptor_count > 0, "Descriptor set layout binding must contain at least one descriptor");
     
     VkDescriptorSetLayoutBinding desc{};
     desc.binding = binding;

@@ -128,12 +128,12 @@ void VulkanMemory::map_memory(
 {
     LOG_METHOD();
 
-    logger.check(m_memory != VK_NULL_HANDLE, "Memory is not initialized");
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(size_bytes != 0, "Attempt to map zero bytes");
-    logger.check(offset_bytes <= m_size, "Map offset is out of bounds");
-    logger.check(size_bytes <= m_size - offset_bytes, "Mapped range out of bounds");
-    logger.check(is_host_visible(), "Attempt to map to non-host-visible buffer memory");
+    logger().check(m_memory != VK_NULL_HANDLE, "Memory is not initialized");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(size_bytes != 0, "Attempt to map zero bytes");
+    logger().check(offset_bytes <= m_size, "Map offset is out of bounds");
+    logger().check(size_bytes <= m_size - offset_bytes, "Mapped range out of bounds");
+    logger().check(is_host_visible(), "Attempt to map to non-host-visible buffer memory");
 
     VkResult result = vkMapMemory(
         m_device,
@@ -144,7 +144,7 @@ void VulkanMemory::map_memory(
         &mapped_memory
     );
 
-    logger.check(result == VK_SUCCESS, "Failed to map buffer memory");
+    logger().check(result == VK_SUCCESS, "Failed to map buffer memory");
 }
 
 void VulkanMemory::map_memory(void*& mapped_memory, VkMemoryMapFlags map_flags) {
@@ -154,8 +154,8 @@ void VulkanMemory::map_memory(void*& mapped_memory, VkMemoryMapFlags map_flags) 
 void VulkanMemory::unmap_memory() {
     LOG_METHOD();
 
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(m_memory != VK_NULL_HANDLE, "Buffer memory is not initialized");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(m_memory != VK_NULL_HANDLE, "Buffer memory is not initialized");
 
     vkUnmapMemory(
         m_device,
@@ -166,11 +166,11 @@ void VulkanMemory::unmap_memory() {
 void VulkanMemory::flush(VkDeviceSize size_bytes, VkDeviceSize offset_bytes) const {
     LOG_METHOD();
 
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(m_memory != VK_NULL_HANDLE, "Memory is not initialized");
-    logger.check(size_bytes != 0, "Attempt to flush zero bytes");
-    logger.check(offset_bytes <= m_size, "Flush offset is out of bounds");
-    logger.check(size_bytes <= m_size - offset_bytes, "Flush range is out of bounds");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(m_memory != VK_NULL_HANDLE, "Memory is not initialized");
+    logger().check(size_bytes != 0, "Attempt to flush zero bytes");
+    logger().check(offset_bytes <= m_size, "Flush offset is out of bounds");
+    logger().check(size_bytes <= m_size - offset_bytes, "Flush range is out of bounds");
 
     if (is_host_coherent()) {
         return;
@@ -199,7 +199,7 @@ void VulkanMemory::flush(VkDeviceSize size_bytes, VkDeviceSize offset_bytes) con
         &range
     );
 
-    logger.check(result == VK_SUCCESS, "Failed to flush mapped memory range");
+    logger().check(result == VK_SUCCESS, "Failed to flush mapped memory range");
 }
 
 void VulkanMemory::flush() const {
@@ -209,13 +209,13 @@ void VulkanMemory::flush() const {
 void VulkanMemory::upload(const void* data, VkDeviceSize size_bytes, VkDeviceSize offset_bytes) {
     LOG_METHOD();
 
-    logger.check(data != nullptr, "Attempt to load data pointing to nullptr");
-    logger.check(size_bytes != 0, "Attempt to upload zero bytes");
-    logger.check(offset_bytes <= m_size, "Upload offset is out of bounds");
-    logger.check(size_bytes <= m_size - offset_bytes, "Upload range is out of bounds");
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(m_memory != VK_NULL_HANDLE, "Buffer memory is not initialized");
-    logger.check(is_host_visible(), "Attempt to upload to non-host-visible buffer memory");
+    logger().check(data != nullptr, "Attempt to load data pointing to nullptr");
+    logger().check(size_bytes != 0, "Attempt to upload zero bytes");
+    logger().check(offset_bytes <= m_size, "Upload offset is out of bounds");
+    logger().check(size_bytes <= m_size - offset_bytes, "Upload range is out of bounds");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(m_memory != VK_NULL_HANDLE, "Buffer memory is not initialized");
+    logger().check(is_host_visible(), "Attempt to upload to non-host-visible buffer memory");
 
     void* mapped_data = nullptr;
     map_memory(mapped_data);
@@ -234,11 +234,11 @@ void VulkanMemory::upload(const void* data, VkDeviceSize size_bytes, VkDeviceSiz
 void VulkanMemory::invalidate(VkDeviceSize size_bytes, VkDeviceSize offset_bytes) const {
     LOG_METHOD();
 
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(m_memory != VK_NULL_HANDLE, "Memory is not initialized");
-    logger.check(size_bytes != 0, "Attempt to invalidate zero bytes");
-    logger.check(offset_bytes <= m_size, "Invalidate offset is out of bounds");
-    logger.check(size_bytes <= m_size - offset_bytes, "Invalidate range is out of bounds");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(m_memory != VK_NULL_HANDLE, "Memory is not initialized");
+    logger().check(size_bytes != 0, "Attempt to invalidate zero bytes");
+    logger().check(offset_bytes <= m_size, "Invalidate offset is out of bounds");
+    logger().check(size_bytes <= m_size - offset_bytes, "Invalidate range is out of bounds");
 
     if (is_host_coherent()) {
         return;
@@ -269,7 +269,7 @@ void VulkanMemory::invalidate(VkDeviceSize size_bytes, VkDeviceSize offset_bytes
         &range
     );
 
-    logger.check(result == VK_SUCCESS, "Failed to invalidate mapped memory range");
+    logger().check(result == VK_SUCCESS, "Failed to invalidate mapped memory range");
 }
 
 void VulkanMemory::invalidate() const {
@@ -279,13 +279,15 @@ void VulkanMemory::invalidate() const {
 void VulkanMemory::read(void* data, VkDeviceSize size_bytes, VkDeviceSize offset_bytes) {
     LOG_METHOD();
 
-    logger.check(data != nullptr, "Attempt to read data into nullptr");
-    logger.check(size_bytes != 0, "Attempt to read zero bytes");
-    logger.check(offset_bytes <= m_size, "Read offset is out of bounds");
-    logger.check(size_bytes <= m_size - offset_bytes, "Read range is out of bounds");
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(m_memory != VK_NULL_HANDLE, "Memory is not initialized");
-    logger.check(is_host_visible(), "Attempt to read from non-host-visible memory");
+    if (size_bytes == 0) return;
+
+    logger().check(data != nullptr, "Attempt to read data into nullptr");
+    // logger().check(size_bytes != 0, "Attempt to read zero bytes");
+    logger().check(offset_bytes <= m_size, "Read offset is out of bounds");
+    logger().check(size_bytes <= m_size - offset_bytes, "Read range is out of bounds");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(m_memory != VK_NULL_HANDLE, "Memory is not initialized");
+    logger().check(is_host_visible(), "Attempt to read from non-host-visible memory");
 
     void* mapped_data = nullptr;
     map_memory(mapped_data);
@@ -304,9 +306,9 @@ void VulkanMemory::read(void* data, VkDeviceSize size_bytes, VkDeviceSize offset
 void VulkanMemory::bind_to_buffer(VulkanBuffer& buffer, VkDeviceSize memory_offset) const {
     LOG_METHOD();
 
-    logger.check(m_memory != VK_NULL_HANDLE, "Memory is not initialized");
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(buffer.handle() != VK_NULL_HANDLE, "Buffer is not initialized");
+    logger().check(m_memory != VK_NULL_HANDLE, "Memory is not initialized");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(buffer.handle() != VK_NULL_HANDLE, "Buffer is not initialized");
 
     VkResult result = vkBindBufferMemory(
         m_device,
@@ -315,15 +317,15 @@ void VulkanMemory::bind_to_buffer(VulkanBuffer& buffer, VkDeviceSize memory_offs
         memory_offset
     );
 
-    logger.check(result == VK_SUCCESS, "Failed to bind buffer memory");
+    logger().check(result == VK_SUCCESS, "Failed to bind buffer memory");
 }
 
 void VulkanMemory::bind_to_image(VkImage image, VkDeviceSize memory_offset) const {
     LOG_METHOD();
 
-    logger.check(m_memory != VK_NULL_HANDLE, "Memory is not initialized");
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(image != VK_NULL_HANDLE, "Image is not initialized");
+    logger().check(m_memory != VK_NULL_HANDLE, "Memory is not initialized");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(image != VK_NULL_HANDLE, "Image is not initialized");
 
     VkResult result = vkBindImageMemory(
         m_device,
@@ -332,7 +334,7 @@ void VulkanMemory::bind_to_image(VkImage image, VkDeviceSize memory_offset) cons
         memory_offset
     );
 
-    logger.check(result == VK_SUCCESS, "Failed to bind image memory");
+    logger().check(result == VK_SUCCESS, "Failed to bind image memory");
 }
 
 void VulkanMemory::allocate(
@@ -343,9 +345,9 @@ void VulkanMemory::allocate(
 {
     LOG_METHOD();
 
-    logger.check(physical_device != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger.check(device != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(size_bytes != 0, "Attempt to allocate zero-sized Vulkan memory");
+    logger().check(physical_device != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger().check(device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(size_bytes != 0, "Attempt to allocate zero-sized Vulkan memory");
 
     m_device = device;
     m_size = size_bytes;
@@ -361,7 +363,7 @@ void VulkanMemory::allocate(
     VkPhysicalDeviceMemoryProperties memory_properties{};
     vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
     
-    // logger.log() << "Allocated " 
+    // logger().log() << "Allocated " 
     //     << clr(std::to_string(size_bytes), LoggerPalette::orange) 
     //     << " in heap "
     //     << clr(std::to_string(memory_properties.memoryTypes[m_memory_type_index].heapIndex), LoggerPalette::blue)
@@ -381,7 +383,7 @@ void VulkanMemory::allocate(
         &m_memory
     );
 
-    logger.check(result == VK_SUCCESS, "Failed to allocate Vulkan memory");
+    logger().check(result == VK_SUCCESS, "Failed to allocate Vulkan memory");
 }
 
 void VulkanMemory::allocate(
@@ -454,7 +456,7 @@ uint32_t VulkanMemory::find_memory_type(
         }
     }
 
-    logger.check(best_type != UINT32_MAX, "Failed to find suitable Vulkan memory type");
+    logger().check(best_type != UINT32_MAX, "Failed to find suitable Vulkan memory type");
 
     return best_type;
 }
@@ -474,7 +476,7 @@ VkMemoryPropertyFlags VulkanMemory::get_memory_type_properties(
 {
     LOG_NAMED("VulkanMemory");
 
-    logger.check(physical_device != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger().check(physical_device != VK_NULL_HANDLE, "Physical device is not initialized");
 
     VkPhysicalDeviceMemoryProperties memory_properties{};
     vkGetPhysicalDeviceMemoryProperties(
@@ -482,7 +484,7 @@ VkMemoryPropertyFlags VulkanMemory::get_memory_type_properties(
         &memory_properties
     );
 
-    logger.check(memory_type_index < memory_properties.memoryTypeCount)
+    logger().check(memory_type_index < memory_properties.memoryTypeCount)
         << "Memory type index is out of range (memory_type_count = "
         << clr(std::to_string(memory_properties.memoryTypeCount), LoggerPalette::blue) << ")\n";
     

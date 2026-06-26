@@ -4,7 +4,7 @@ VulkanSurface::VulkanSurface(const VulkanInstance& instance, const Window& windo
 {
     LOG_METHOD();
     VkResult result = glfwCreateWindowSurface(m_instance, window.handle(), nullptr, &m_surface);
-    logger.check(result == VK_SUCCESS, "Failed to create window surface");
+    logger().check(result == VK_SUCCESS, "Failed to create window surface");
 }
 
 VulkanSurface::~VulkanSurface() {

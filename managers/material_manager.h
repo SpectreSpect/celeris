@@ -35,6 +35,7 @@ public:
     MaterialPass blin_phong_mp;
     MaterialPass unlit_mp;
     MaterialPass point_mp;
+    MaterialPass line_mp;
     MaterialPass skybox_mp;
     MaterialPass pbr_mp;
     MaterialPass voxel_mesh_mp;
@@ -59,6 +60,9 @@ public:
                                    const VulkanShaderModule& vs, const VulkanShaderModule& fs);
     MaterialPass create_point_pass(VulkanEngine& engine, FrameResources& frame_resources, 
                                    const VulkanShaderModule& vs, const VulkanShaderModule& fs);
+    MaterialPass create_line_pass(VulkanEngine& engine, FrameResources& frame_resources, 
+                                  const VulkanShaderModule& vs, const VulkanShaderModule& fs);
+    
     MaterialPass create_skybox_pass(VulkanEngine& engine, FrameResources& frame_resources, 
                                    const VulkanShaderModule& vs, const VulkanShaderModule& fs);
     MaterialPass create_pbr_pass(VulkanEngine& engine, FrameResources& frame_resources, 

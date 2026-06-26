@@ -6,6 +6,15 @@
 #include "voxel_index.inc"
 #include "../chunk_hash_table/lookup_remove.inc"
 
+ivec3 local_voxel_pos_from_index(uint voxel_id)
+{
+    uint x = voxel_id % uint(u_chunk_dim.x);
+    uint yz = voxel_id / uint(u_chunk_dim.x);
+    uint y = yz % uint(u_chunk_dim.y);
+    uint z = yz / uint(u_chunk_dim.y);
+
+    return ivec3(x, y, z);
+}
 
 VoxelData voxel_data_in_chunk(uint chunkId, ivec3 p) {
     uint idx = chunkId * u_voxels_per_chunk + voxel_index(p);
@@ -14,7 +23,7 @@ VoxelData voxel_data_in_chunk(uint chunkId, ivec3 p) {
 
 VoxelData voxel_data_world(ivec3 chunkCoord, ivec3 local, out bool success) {
     uvec2 key = pack_key_uvec2(chunkCoord, u_pack_offset, u_pack_bits);
-    uint slot_id = chunk_hash_table_lookup_hash_table_slot_id(key);
+    uint slot_id = chunk_hash_table_lookup_hash_table_slot_id(key, true);
     if (slot_id == INVALID_ID) {
         success = false;
         VoxelData r;
@@ -24,6 +33,13 @@ VoxelData voxel_data_world(ivec3 chunkCoord, ivec3 local, out bool success) {
     success = true;
     uint chunk_id = chunk_hash_table_slots[slot_id].value;
     return voxel_data_in_chunk(chunk_id, local);
+}
+
+VoxelData voxel_data_world(ivec3 global_voxel_pos, out bool success) {
+    ivec3 chunk_pos = floor_div(global_voxel_pos, u_chunk_dim.xyz);
+    ivec3 local_voxel_pos = global_voxel_pos - chunk_pos * u_chunk_dim.xyz;
+
+    return voxel_data_world(chunk_pos, local_voxel_pos, success);
 }
 
 VoxelData neighbor_voxel_data(uint chunkId, ivec3 chunkCoord, ivec3 p, ivec3 d, out bool success) {
@@ -50,10 +66,26 @@ VoxelData neighbor_voxel_data(uint chunkId, ivec3 chunkCoord, ivec3 p, ivec3 d, 
     return voxel_data_world(nChunk, nLocal, success);
 }
 
+
+
 // 0/1 видимость
 uint voxel_vis(uint chunkId, ivec3 chunkCoord, ivec3 p, ivec3 d) {
     bool success;
     VoxelData voxel_data = neighbor_voxel_data(chunkId, chunkCoord, p, d, success);
+    if (success)
+        return (read_voxel_flags(voxel_data.type_flags) & VOXEL_VISABILITY_FLAG_BIT) > 0u ? 1u : 0u;
+    else
+        return 0u;
+}
+
+// 0/1 видимость
+uint voxel_vis(ivec3 global_voxel_pos) {
+    ivec3 chunk_pos = floor_div(global_voxel_pos, u_chunk_dim.xyz);
+    ivec3 local_voxel_pos = global_voxel_pos - chunk_pos * u_chunk_dim.xyz;
+
+    bool success;
+    VoxelData voxel_data = voxel_data_world(chunk_pos, local_voxel_pos, success);
+
     if (success)
         return (read_voxel_flags(voxel_data.type_flags) & VOXEL_VISABILITY_FLAG_BIT) > 0u ? 1u : 0u;
     else

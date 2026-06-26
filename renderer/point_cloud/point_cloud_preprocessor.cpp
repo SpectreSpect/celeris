@@ -62,7 +62,7 @@ void PointCloudPreprocessor::remove_points_near_origin(VulkanCommandBuffer& comm
                                                        float min_distance) {
     LOG_METHOD();
 
-    logger.check(point_count > 0, "Point cloud had 0 points");
+    logger().check(point_count > 0, "Point cloud had 0 points");
 
     PassInstance& pi = m_pass_instances.remove_near_origin_lidar_points_pi;
 
@@ -92,7 +92,7 @@ void PointCloudPreprocessor::get_normals_from_webots_lidar_point_cloud(VulkanCom
                                                                   uint32_t ring_count) {
     LOG_METHOD();
 
-    logger.check(point_count > 0, "Point cloud had 0 points");
+    logger().check(point_count > 0, "Point cloud had 0 points");
 
     PassInstance& pi = m_pass_instances.normals_from_webots_lidar_point_cloud_pi;
 
@@ -117,7 +117,7 @@ void PointCloudPreprocessor::get_normals_from_webots_lidar_point_cloud(VulkanCom
 void PointCloudPreprocessor::submit_compute_commands() {
     LOG_METHOD();
 
-    logger.check(m_queue != nullptr, "PointCloudPreprocessor queue was not initialized");
+    logger().check(m_queue != nullptr, "PointCloudPreprocessor queue was not initialized");
 
     m_fence.reset();
     m_queue->submit(m_command_buffer, &m_fence);

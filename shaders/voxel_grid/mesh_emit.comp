@@ -23,11 +23,14 @@ layout(push_constant) uniform MeshEmitPushConstants {
 
     uint u_pack_bits;
     int  u_pack_offset;
-    uint u_vb_page_verts;
-    uint u_ib_page_inds;
 
-    uint  u_chunk_hash_table_size;
-    uint  u_voxels_per_chunk;
+    uint u_vb_page_size_bytes;
+    uint u_ib_page_size_bytes;
+
+    uint u_chunk_hash_table_size;
+    uint u_voxels_per_chunk;
+    uint display_inflated_voxels;
+    uint inflated_voxel_color;
 };
 
 // ===== uniforms =====
@@ -44,7 +47,7 @@ layout(push_constant) uniform MeshEmitPushConstants {
 
 // ----- include -----
 #include "../common/utils.inc"
-#include "chunk_pool/read_voxels.inc"
+#include "chunk_pool/mesh_face_rules.inc"
 // -------------------
 
 #define AO_STEP   0.22   // сила затемнения за "ступень" 0..3
@@ -77,12 +80,15 @@ uint ao_corner(uint chunkId, ivec3 chunkCoord, ivec3 p,
 
 // ===== emit quad =====
 void emit_quad(uint chunkId, ivec3 chunkCoord, ivec3 p, uint face, uint colorRGB) {
-    uint maxQuads = chunk_alloc[chunkId].needI / 6u;
+    uint maxQuads = chunk_alloc[chunkId].needI / (6u * 4u);
     uint q = atomicAdd(emit_counter[chunkId], 1u);
     if (q >= maxQuads) return;
 
-    uint baseV = chunk_alloc[chunkId].v_startPage * u_vb_page_verts + q * 4u;
-    uint baseI = chunk_alloc[chunkId].i_startPage * u_ib_page_inds + q * 6u;
+    uint baseV_bytes = chunk_alloc[chunkId].v_startPage * u_vb_page_size_bytes + q * 4u * VERTEX_SIZE;
+    uint baseV = baseV_bytes / VERTEX_SIZE;
+
+    uint baseI_bytes = chunk_alloc[chunkId].i_startPage * u_ib_page_size_bytes + q * 6u * 4u;
+    uint baseI = baseI_bytes / 4u;
 
     vec3 wp = vec3(chunkCoord * u_chunk_dim.xyz + p) * u_voxel_size.xyz;
 
@@ -199,6 +205,25 @@ void emit_quad(uint chunkId, ivec3 chunkCoord, ivec3 p, uint face, uint colorRGB
     }
 }
 
+void emit_face_if_needed(
+    uint chunkId,
+    ivec3 chunkCoord,
+    ivec3 p,
+    ivec3 d,
+    uint face,
+    uint current_flags,
+    uint ordinary_color)
+{
+    uint neighbor_flags = neighbor_voxel_flags(chunkId, chunkCoord, p, d);
+    uint face_kind = mesh_face_kind(current_flags, neighbor_flags);
+    if (face_kind == MESH_FACE_NONE) return;
+
+    uint color = face_kind == MESH_FACE_INFLATED
+        ? inflated_voxel_color
+        : ordinary_color;
+    emit_quad(chunkId, chunkCoord, p, face, color);
+}
+
 void main() {
     if (is_vb_full == 1u || is_ib_full == 1u)
         return;
@@ -222,14 +247,15 @@ void main() {
     ivec3 p = ivec3(lx, ly, lz);
 
     VoxelData voxel_data = voxel_data_in_chunk(chunkId, p);
-    if ((read_voxel_flags(voxel_data.type_flags) & VOXEL_VISABILITY_FLAG_BIT) == 0u) return;
+    uint current_flags = read_voxel_flags(voxel_data.type_flags);
+    if (!voxel_can_emit_faces(current_flags)) return;
 
     uint color = voxel_data.color;
 
-    if (voxel_vis(chunkId, chunkCoord, p, ivec3( 1, 0, 0)) == 0u) emit_quad(chunkId, chunkCoord, p, 0u, color);
-    if (voxel_vis(chunkId, chunkCoord, p, ivec3(-1, 0, 0)) == 0u) emit_quad(chunkId, chunkCoord, p, 1u, color);
-    if (voxel_vis(chunkId, chunkCoord, p, ivec3( 0, 1, 0)) == 0u) emit_quad(chunkId, chunkCoord, p, 2u, color);
-    if (voxel_vis(chunkId, chunkCoord, p, ivec3( 0,-1, 0)) == 0u) emit_quad(chunkId, chunkCoord, p, 3u, color);
-    if (voxel_vis(chunkId, chunkCoord, p, ivec3( 0, 0, 1)) == 0u) emit_quad(chunkId, chunkCoord, p, 4u, color);
-    if (voxel_vis(chunkId, chunkCoord, p, ivec3( 0, 0,-1)) == 0u) emit_quad(chunkId, chunkCoord, p, 5u, color);
+    emit_face_if_needed(chunkId, chunkCoord, p, ivec3( 1, 0, 0), 0u, current_flags, color);
+    emit_face_if_needed(chunkId, chunkCoord, p, ivec3(-1, 0, 0), 1u, current_flags, color);
+    emit_face_if_needed(chunkId, chunkCoord, p, ivec3( 0, 1, 0), 2u, current_flags, color);
+    emit_face_if_needed(chunkId, chunkCoord, p, ivec3( 0,-1, 0), 3u, current_flags, color);
+    emit_face_if_needed(chunkId, chunkCoord, p, ivec3( 0, 0, 1), 4u, current_flags, color);
+    emit_face_if_needed(chunkId, chunkCoord, p, ivec3( 0, 0,-1), 5u, current_flags, color);
 }

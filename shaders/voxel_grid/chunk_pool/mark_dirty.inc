@@ -4,16 +4,36 @@
 #include "../../common/utils.inc"
 #include "../chunk_hash_table/lookup_remove.inc"
 
-void mark_dirty(uint chunkId) {
-    uint was = atomicCompSwap(enqueued[chunkId], 0u, 1u);
-    if (was == 0u) {
-        atomicOr(meta[chunkId].dirty_flags, DIRTY_FLAG_BIT);
-        uint di = atomicAdd(dirty_count, 1u);
-        dirty_list[di] = chunkId;
+bool mark_dirty_flags(uint chunk_id, uint dirty_flags) {
+    if (dirty_flags == 0u) return false;
+
+    uint was = atomicOr(enqueued[chunk_id], dirty_flags);
+    uint new_dirty_flags = dirty_flags & ~was;
+    if (new_dirty_flags == 0u) return false;
+
+    atomicOr(meta[chunk_id].dirty_flags, dirty_flags);
+    return true;
+}
+
+void mark_dirty(uint chunk_id, uint dirty_flags) {
+    if (mark_dirty_flags(chunk_id, dirty_flags)) {
+        uint dirty_idx = atomicAdd(dirty_count, 1u);
+        dirty_list[dirty_idx] = chunk_id;
     }
 }
 
-void try_mark_neighbor(ivec3 ncoord, bool read_only) {
+void mark_inflate(uint chunk_id) {
+    if (mark_dirty_flags(chunk_id, DIRTY_INFLATE_FLAG_BIT)) {
+        uint to_inflate_idx = atomicAdd(to_inflate_count, 1u);
+        to_inflate_list[to_inflate_idx] = chunk_id;
+    }
+}
+
+void mark_dirty_mesh(uint chunk_id) {
+    mark_dirty(chunk_id, DIRTY_MESH_FLAG_BIT);
+}
+
+void try_mark_neighbor(ivec3 ncoord, bool read_only, uint dirty_flags) {
     uint slot_id = chunk_hash_table_lookup_hash_table_slot_id(pack_key_uvec2(ncoord, u_pack_offset, u_pack_bits), read_only);
     if (slot_id == INVALID_ID) return;
 
@@ -21,24 +41,65 @@ void try_mark_neighbor(ivec3 ncoord, bool read_only) {
 
     uint used = atomicAdd(meta[chunk_id].used, 0u);
     if (used == 1u) {
-        mark_dirty(chunk_id);
+        mark_dirty(chunk_id, dirty_flags);
     }
 }
 
-void try_mark_neighbor(ivec3 ncoord) {
-    try_mark_neighbor(ncoord, false);
+void try_mark_dirty_mesh_neighbor(ivec3 ncoord, bool read_only) {
+    try_mark_neighbor(ncoord, read_only, DIRTY_MESH_FLAG_BIT);
 }
 
-void mark_dirty_around(uint chunkId, ivec3 chunk_coord) {
-    mark_dirty(chunkId); // Заставляем перестроить меш у себя
+void try_mark_neighbor(ivec3 ncoord, uint dirty_flags) {
+    try_mark_neighbor(ncoord, false, dirty_flags);
+}
+
+void try_mark_inflate_neighbor(ivec3 ncoord, bool read_only) {
+    uint slot_id = chunk_hash_table_lookup_hash_table_slot_id(pack_key_uvec2(ncoord, u_pack_offset, u_pack_bits), read_only);
+    if (slot_id == INVALID_ID) return;
+
+    uint chunk_id = chunk_hash_table_slots[slot_id].value;
+
+    uint used = atomicAdd(meta[chunk_id].used, 0u);
+    if (used == 1u) {
+        mark_inflate(chunk_id);
+    }
+}
+
+void try_mark_inflate_neighbor(ivec3 ncoord) {
+    try_mark_inflate_neighbor(ncoord, false);
+}
+
+void try_mark_dirty_mesh_neighbor(ivec3 ncoord) {
+    try_mark_dirty_mesh_neighbor(ncoord, false);
+}
+
+void mark_dirty_around(uint chunkId, ivec3 chunk_coord, uint dirty_flags) {
+    mark_dirty(chunkId, dirty_flags); // Заставляем перестроить меш у себя
 
     // А также у всех чанков вокруг
-    try_mark_neighbor(chunk_coord + ivec3( 1, 0, 0));
-    try_mark_neighbor(chunk_coord + ivec3(-1, 0, 0));
-    try_mark_neighbor(chunk_coord + ivec3( 0, 1, 0));
-    try_mark_neighbor(chunk_coord + ivec3( 0,-1, 0));
-    try_mark_neighbor(chunk_coord + ivec3( 0, 0, 1));
-    try_mark_neighbor(chunk_coord + ivec3( 0, 0,-1));
+    try_mark_neighbor(chunk_coord + ivec3( 1, 0, 0), dirty_flags);
+    try_mark_neighbor(chunk_coord + ivec3(-1, 0, 0), dirty_flags);
+    try_mark_neighbor(chunk_coord + ivec3( 0, 1, 0), dirty_flags);
+    try_mark_neighbor(chunk_coord + ivec3( 0,-1, 0), dirty_flags);
+    try_mark_neighbor(chunk_coord + ivec3( 0, 0, 1), dirty_flags);
+    try_mark_neighbor(chunk_coord + ivec3( 0, 0,-1), dirty_flags);
+}
+
+void mark_dirty_mesh_around(uint chunkId, ivec3 chunk_coord) {
+    mark_dirty_around(chunkId, chunk_coord, DIRTY_MESH_FLAG_BIT);
+}
+
+void mark_inflate_around(uint chunkId, ivec3 chunk_coord) {
+    mark_inflate(chunkId);
+
+    for (int z = -1; z <= 1; ++z) {
+        for (int x = -1; x <= 1; ++x) {
+            if (x != 0 || z != 0) {
+                try_mark_inflate_neighbor(chunk_coord + ivec3(x, 0, z));
+            }
+            try_mark_inflate_neighbor(chunk_coord + ivec3(x, -1, z));
+        }
+    }
 }
 
 #endif

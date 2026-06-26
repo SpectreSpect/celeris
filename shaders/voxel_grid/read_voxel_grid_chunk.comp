@@ -1,0 +1,50 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256) in;
+
+// ----- include -----
+#include "../common/buffer_structures.inc"
+// -------------------
+
+layout(std430, set = 0, binding=0) coherent buffer ChunkHashTable { HashTableCounters chunk_hash_table_counters; ChunkHashTableSlot chunk_hash_table_slots[]; };
+layout(std430, set = 0, binding=1) readonly buffer ChunkVoxels { VoxelData voxels[]; };
+layout(std430, set = 0, binding=2) buffer OutputVoxels { VoxelData output_voxels[]; };
+
+layout(push_constant) uniform ReadVoxelGridChunkPushConstants {
+    ivec4 u_chunk_dim;
+    ivec4 chunk_pos;
+    uint u_chunk_hash_table_size;
+
+    uint u_voxels_per_chunk;
+
+    uint u_pack_offset;
+    uint u_pack_bits;
+};
+
+// ----- include -----
+#include "../common/utils.inc"
+
+#include "chunk_hash_table/common.inc"
+#include "chunk_hash_table/lookup_remove.inc"
+// -------------------
+
+void main() {
+    uint voxel_id = gl_GlobalInvocationID.x;
+    
+    if (voxel_id >= u_voxels_per_chunk) return;
+
+    uvec2 key = pack_key_uvec2(chunk_pos.xyz, u_pack_offset, u_pack_bits);
+
+    uint slot_id = chunk_hash_table_lookup_hash_table_slot_id(key, true);
+    if (slot_id == INVALID_ID) {
+        output_voxels[voxel_id].type_flags = 0u;
+        output_voxels[voxel_id].color = 0u;
+        return;
+    }
+
+    uint chunk_id = chunk_hash_table_slots[slot_id].value;
+    uint global_voxel_id = chunk_id * u_voxels_per_chunk + voxel_id;
+
+    output_voxels[voxel_id] = voxels[global_voxel_id];
+}

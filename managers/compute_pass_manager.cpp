@@ -18,6 +18,9 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         reset_voxel_point_map_cp(create_reset_voxel_point_map_compute_pass(device, shader_manager.reset_point_voxel_map_cs)),
         gicp_reduce_cp(create_gicp_reduce_compute_pass(device, shader_manager.gicp_reduce_cs)),
 
+        // Cloud to mesh
+        generate_mesh_cp(create_generate_mesh_compute_pass(device, shader_manager.generate_mesh_cs)),
+
         // Lights
         build_cluster_light_lists_cp(create_build_cluster_light_lists_compute_pass(device, shader_manager.build_cluster_light_lists_cs)),
 
@@ -30,6 +33,7 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         mesh_reset_cp(create_mesh_reset_compute_pass(device, shader_manager.mesh_reset_cs)),
         mesh_count_cp(create_mesh_count_compute_pass(device, shader_manager.mesh_count_cs)),
         mesh_alloc_cp(create_mesh_alloc_compute_pass(device, shader_manager.mesh_alloc_cs)),
+        retry_mesh_alloc_cp(create_retry_mesh_alloc_compute_pass(device, shader_manager.retry_mesh_alloc_cs)),
         verify_mesh_allocation_cp(create_verify_mesh_allocation_compute_pass(device, shader_manager.verify_mesh_allocation_cs)),
         return_free_alloc_nodes_dispatch_adapter_cp(create_return_free_alloc_nodes_dispatch_adapter_compute_pass(device, shader_manager.return_free_alloc_nodes_dispatch_adapter_cs)),
         return_free_alloc_nodes_cp(create_return_free_alloc_nodes_compute_pass(device, shader_manager.return_free_alloc_nodes_cs)),
@@ -51,6 +55,10 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         hash_table_conditional_dispatch_adapter_cp(create_hash_table_conditional_dispatch_adapter_compute_pass(device, shader_manager.hash_table_conditional_dispatch_adapter_cs)),
         clear_chunk_hash_table_cp(create_clear_chunk_hash_table_compute_pass(device, shader_manager.clear_chunk_hash_table_cs)),
         fill_chunk_hash_table_cp(create_fill_chunk_hash_table_compute_pass(device, shader_manager.fill_chunk_hash_table_cs)),
+        read_voxel_grid_chunk_cp(create_read_voxel_grid_chunk_compute_pass(device, shader_manager.read_voxel_grid_chunk_cs)),
+        check_footprint_cp(create_check_footprint_compute_pass(device, shader_manager.check_footprint_cs)),
+        read_and_inflate_voxel_grid_chunk_cp(create_read_and_inflate_voxel_grid_chunk_compute_pass(device, shader_manager.read_and_inflate_voxel_grid_chunk_cs)),
+        inflate_chunks_cp(create_inflate_chunks_compute_pass(device, shader_manager.inflate_chunks_cs)),
 
         voxel_writes_from_point_cloud_cp(create_voxel_writes_from_point_cloud_compute_pass(device, shader_manager.voxel_writes_from_point_cloud_cs)),
 
@@ -58,6 +66,7 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         alloc_active_chunk_triangles_cp(create_alloc_active_chunk_triangles_compute_pass(device, shader_manager.alloc_active_chunk_triangles_cs)),
         fill_triangle_indices_cp(create_fill_triangle_indices_compute_pass(device, shader_manager.fill_triangle_indices_cs)),
         mark_and_count_active_chunks_cp(create_mark_and_count_active_chunks_compute_pass(device, shader_manager.mark_and_count_active_chunks_cs)),
+        mark_and_count_fail_slots_cp(create_mark_and_count_fail_slots_compute_pass(device, shader_manager.mark_and_count_fail_slots_cs)),
         reset_voxelize_pipeline_cp(create_reset_voxelize_pipeline_compute_pass(device, shader_manager.reset_voxelize_pipeline_cs)),
         voxelize_triangles_cp(create_voxelize_triangles_compute_pass(device, shader_manager.voxelize_triangles_cs)),
 
@@ -70,6 +79,12 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         brdf_lut_cp(create_brdf_lut_pass(device, shader_manager.brdf_lut_cs)),
         prefilter_map_cp(create_prefilter_map_pass(device, shader_manager.generate_prefilter_map_cs)),
         irradiance_map_cp(create_irradiance_map_pass(device, shader_manager.generate_irradiance_map_cs)),
+
+        // A*
+        find_unimpended_paths_cp(create_find_unimpended_paths_pass(device, shader_manager.find_unimpended_paths_cs)),
+        prepare_copy_dirty_list_dispatch_args_cp(create_prepare_copy_dirty_list_dispatch_args_compute_pass(device, shader_manager.prepare_copy_dirty_list_dispatch_args_cs)),
+        copy_dirty_list_cp(create_copy_dirty_list_compute_pass(device, shader_manager.copy_dirty_list_cs)),
+        
         m_pool(device, m_pool_builder) {}
 
 DescriptorPool& ComputePassManager::descriptor_pool() noexcept {
@@ -127,6 +142,9 @@ ComputePass ComputePassManager::create_point_voxel_map_insert_compute_pass(Vulka
     builder.add_storage_buffer(4, ShaderStages::compute); // MapPointBuffer
     builder.add_storage_buffer(5, ShaderStages::compute); // MapNormalBuffer
     builder.add_storage_buffer(6, ShaderStages::compute); // VoxelHashTableBuffer
+    builder.add_storage_buffer(7, ShaderStages::compute); // InsertDebugBuffer
+    builder.add_storage_buffer(8, ShaderStages::compute); // ReadableInsertRetryList
+    builder.add_storage_buffer(9, ShaderStages::compute); // WritableInsertRetryList
 
     return create_pass(device, compute_shader_module, builder);
 }
@@ -153,6 +171,23 @@ ComputePass ComputePassManager::create_gicp_reduce_compute_pass(VulkanDevice& de
     builder.add_storage_buffer(1, ShaderStages::compute); // SourcePartialBuffer
     builder.add_storage_buffer(2, ShaderStages::compute); // OutputPartialBuffer
 
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_generate_mesh_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.set_descriptor_set_flags(VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // PointCloud
+    builder.add_storage_buffer(1, ShaderStages::compute); // VertciesOut
+    builder.add_storage_buffer(2, ShaderStages::compute); // IndicesOut
+    builder.add_storage_buffer(3, ShaderStages::compute); // MeshCounters
+    
+    builder.add_push_constantsf(sizeof(GenerateMeshPushConstants), ShaderStages::compute);
+    
     return create_pass(device, compute_shader_module, builder);
 }
 
@@ -208,6 +243,8 @@ ComputePass ComputePassManager::create_mesh_alloc_compute_pass(VulkanDevice& dev
 
     ComputePassBuilder builder;
 
+    builder.set_descriptor_set_flags(VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+
     builder.add_storage_buffer(0, ShaderStages::compute); // MeshBuffersStatusBuf
     builder.add_storage_buffer(1, ShaderStages::compute); // DirtyListBuf
     builder.add_storage_buffer(2, ShaderStages::compute); // DirtyQuadCountBuf
@@ -219,8 +256,35 @@ ComputePass ComputePassManager::create_mesh_alloc_compute_pass(VulkanDevice& dev
     builder.add_storage_buffer(8, ShaderStages::compute); // BBNodes
     builder.add_storage_buffer(9, ShaderStages::compute); // BBFreeNodesList
     builder.add_storage_buffer(10, ShaderStages::compute); // BBReturnedNodesList
+    builder.add_storage_buffer(11, ShaderStages::compute); // ActiveSplitters
+    builder.add_storage_buffer(12, ShaderStages::compute); // DebugCounter
+    builder.add_storage_buffer(13, ShaderStages::compute); // AllocationRetryList
 
     builder.add_push_constantsf(sizeof(MeshAllocPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_retry_mesh_alloc_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.set_descriptor_set_flags(VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // ReadableAllocationRetryList
+    builder.add_storage_buffer(1, ShaderStages::compute); // WritableAllocationRetryList
+    builder.add_storage_buffer(2, ShaderStages::compute); // DirtyListBuf
+    builder.add_storage_buffer(3, ShaderStages::compute); // DirtyQuadCountBuf
+    builder.add_storage_buffer(4, ShaderStages::compute); // ChunkMetaBuf
+    builder.add_storage_buffer(5, ShaderStages::compute); // ChunkMeshAllocLocalBuf
+    builder.add_storage_buffer(6, ShaderStages::compute); // BBHeads
+    builder.add_storage_buffer(7, ShaderStages::compute); // BBState
+    builder.add_storage_buffer(8, ShaderStages::compute); // BBNodes
+    builder.add_storage_buffer(9, ShaderStages::compute); // BBFreeNodesList
+    builder.add_storage_buffer(10, ShaderStages::compute); // BBReturnedNodesList
+
+    builder.add_push_constantsf(sizeof(RetryMeshAllocPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }
@@ -357,6 +421,7 @@ ComputePass ComputePassManager::create_world_init_compute_pass(VulkanDevice& dev
     builder.add_storage_buffer(6, ShaderStages::compute); // VoxelWriteList
     builder.add_storage_buffer(7, ShaderStages::compute); // IndirectCmdBuf
     builder.add_storage_buffer(8, ShaderStages::compute); // FailedDirtyListBuf
+    builder.add_storage_buffer(9, ShaderStages::compute); // ToInflateListBuf
     builder.add_push_constantsf(sizeof(WorldInitPushConstants), ShaderStages::compute); // WorldInitPushConstants
 
     return create_pass(device, compute_shader_module, builder);
@@ -427,12 +492,14 @@ ComputePass ComputePassManager::create_mesh_pool_seed_compute_pass(VulkanDevice&
     builder.add_storage_buffer(1, ShaderStages::compute); // VBNodes
     builder.add_storage_buffer(2, ShaderStages::compute); // VBState
     builder.add_storage_buffer(3, ShaderStages::compute); // VBFreeNodesList
-    builder.add_storage_buffer(4, ShaderStages::compute); // IBHeads
-    builder.add_storage_buffer(5, ShaderStages::compute); // IBNodes
-    builder.add_storage_buffer(6, ShaderStages::compute); // IBState
-    builder.add_storage_buffer(7, ShaderStages::compute); // IBFreeNodesList
+    builder.add_storage_buffer(4, ShaderStages::compute); // VBReturnedNodesList
+    builder.add_storage_buffer(5, ShaderStages::compute); // IBHeads
+    builder.add_storage_buffer(6, ShaderStages::compute); // IBNodes
+    builder.add_storage_buffer(7, ShaderStages::compute); // IBState
+    builder.add_storage_buffer(8, ShaderStages::compute); // IBFreeNodesList
+    builder.add_storage_buffer(9, ShaderStages::compute); // IBReturnedNodesList
 
-    builder.add_uniform_buffer(8, ShaderStages::compute); // UniformBuffer
+    builder.add_uniform_buffer(10, ShaderStages::compute); // UniformBuffer
 
     // builder.add_push_constantsf(sizeof(ApplyVoxelWritesPushConstants), ShaderStages::compute);
 
@@ -508,6 +575,7 @@ ComputePass ComputePassManager::create_stream_generate_terrain_compute_pass(Vulk
     builder.add_storage_buffer(3, ShaderStages::compute); // ChunkMetaBuf
     builder.add_storage_buffer(4, ShaderStages::compute); // EnqueuedBuf
     builder.add_storage_buffer(5, ShaderStages::compute); // DirtyListBuf
+    builder.add_storage_buffer(6, ShaderStages::compute); // ToInflateListBuf
 
     builder.add_push_constantsf(sizeof(StreamGenerateTerrainPushConstants), ShaderStages::compute);
 
@@ -526,6 +594,7 @@ ComputePass ComputePassManager::create_write_voxels_to_grid_compute_pass(VulkanD
     builder.add_storage_buffer(4, ShaderStages::compute); // DirtyListBuf
     builder.add_storage_buffer(5, ShaderStages::compute); // VoxelsWriteData
     builder.add_storage_buffer(6, ShaderStages::compute); // ChunkVoxels
+    builder.add_storage_buffer(7, ShaderStages::compute); // ToInflateListBuf
 
     builder.add_push_constantsf(sizeof(WriteVoxelsToGridPushConstants), ShaderStages::compute);
 
@@ -674,6 +743,64 @@ ComputePass ComputePassManager::create_fill_chunk_hash_table_compute_pass(Vulkan
     return create_pass(device, compute_shader_module, builder);
 }
 
+ComputePass ComputePassManager::create_read_voxel_grid_chunk_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // ChunkHashTable
+    builder.add_storage_buffer(1, ShaderStages::compute); // ChunkVoxels
+    builder.add_storage_buffer(2, ShaderStages::compute); // OutputVoxels
+
+    builder.add_push_constantsf(sizeof(ReadVoxelGridChunkPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_check_footprint_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // ChunkHashTable
+    builder.add_storage_buffer(1, ShaderStages::compute); // ChunkVoxels
+    builder.add_storage_buffer(2, ShaderStages::compute); // Result
+
+    builder.add_push_constantsf(sizeof(CheckFootprintPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_read_and_inflate_voxel_grid_chunk_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // ChunkHashTable
+    builder.add_storage_buffer(1, ShaderStages::compute); // ChunkVoxels
+    builder.add_storage_buffer(2, ShaderStages::compute); // OutputVoxels
+
+    builder.add_push_constantsf(sizeof(ReadAndInflateVoxelGridChunkPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_inflate_chunks_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // ChunkHashTable
+    builder.add_storage_buffer(1, ShaderStages::compute); // ChunkVoxels
+    builder.add_storage_buffer(2, ShaderStages::compute); // ToInflateListBuf
+    builder.add_storage_buffer(3, ShaderStages::compute); // ChunkMetaBuf
+    builder.add_storage_buffer(4, ShaderStages::compute); // EnqueuedBuf
+
+    builder.add_push_constantsf(sizeof(InflateChunksPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
 ComputePass ComputePassManager::create_voxel_writes_from_point_cloud_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
     LOG_METHOD();
 
@@ -723,11 +850,29 @@ ComputePass ComputePassManager::create_mark_and_count_active_chunks_compute_pass
     ComputePassBuilder builder;
 
     builder.add_storage_buffer(0, ShaderStages::compute); // CounterHashTable
-    builder.add_storage_buffer(1, ShaderStages::compute); // ActiveChunkKeysList
-    builder.add_storage_buffer(2, ShaderStages::compute); // VBO
-    builder.add_storage_buffer(3, ShaderStages::compute); // EBO
+    builder.add_storage_buffer(1, ShaderStages::compute); // CounterHashTableFailureSlots
+    builder.add_storage_buffer(2, ShaderStages::compute); // ActiveChunkKeysList
+    builder.add_storage_buffer(3, ShaderStages::compute); // VBO
+    builder.add_storage_buffer(4, ShaderStages::compute); // EBO
 
     builder.add_push_constantsf(sizeof(MarkAndCountActiveChunksPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_mark_and_count_fail_slots_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.set_descriptor_set_flags(VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // CounterHashTable
+    builder.add_storage_buffer(1, ShaderStages::compute); // ReadableCounterHashTableFailureSlots
+    builder.add_storage_buffer(2, ShaderStages::compute); // WritableCounterHashTableFailureSlots
+    builder.add_storage_buffer(3, ShaderStages::compute); // ActiveChunkKeysList
+
+    builder.add_push_constantsf(sizeof(MarkAndCountFailSlotsPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }
@@ -787,6 +932,49 @@ ComputePass ComputePassManager::create_remove_near_origin_lidar_points_compute_p
     builder.add_storage_buffer(0, ShaderStages::compute); // PointBuffer
 
     builder.add_push_constantsf(sizeof(RemoveNearOriginLidarPointsPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_find_unimpended_paths_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // AstarPath
+    builder.add_storage_buffer(1, ShaderStages::compute); // MaxUnimpendedPathIndices
+    builder.add_storage_buffer(2, ShaderStages::compute); // ChunkHashTable
+    builder.add_storage_buffer(3, ShaderStages::compute); // ChunkVoxels
+
+    builder.add_push_constantsf(sizeof(FindUnimpendedPathsPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+
+ComputePass ComputePassManager::create_copy_dirty_list_compute_pass(
+    VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // DirtyListBuf
+    builder.add_storage_buffer(1, ShaderStages::compute); // OutputDirtyChunkPositionBuf
+    builder.add_storage_buffer(2, ShaderStages::compute); // ChunkMetaBuf
+
+    builder.add_push_constantsf(sizeof(CopyDirtyListPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_prepare_copy_dirty_list_dispatch_args_compute_pass(
+    VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // DirtyListBuf
+    builder.add_storage_buffer(1, ShaderStages::compute); // DispatchBuf
 
     return create_pass(device, compute_shader_module, builder);
 }

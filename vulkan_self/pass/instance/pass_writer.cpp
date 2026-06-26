@@ -9,8 +9,8 @@ PassWriter::PassWriter(VulkanDevice& device, PipelinePass& pass)
 {
     LOG_METHOD();
     
-    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(pass.pipeline().handle() != VK_NULL_HANDLE, "Pipeline is not initialized");
+    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(pass.pipeline().handle() != VK_NULL_HANDLE, "Pipeline is not initialized");
 }
 
 void PassWriter::set_uniform_buffer(uint32_t binding, const VulkanBuffer& uniform_buffer) {

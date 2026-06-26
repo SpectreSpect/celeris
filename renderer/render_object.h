@@ -19,7 +19,7 @@ public:
 
     RenderObject(Mesh& mesh, SlotPassInstance& material);
     RenderObject(MeshView mesh_view, SlotPassInstance& material);
-    ~RenderObject();
+    ~RenderObject() noexcept override;
 
     RenderObject(const RenderObject&) = delete;
     RenderObject& operator=(const RenderObject&) = delete;
@@ -29,7 +29,7 @@ public:
 
     template<class SlotType>
     void set_material_data(const SlotType& data) {
-        logger.check(m_material != nullptr, "RenderObject has no material");
+        logger().check(m_material != nullptr, "RenderObject has no material");
 
         m_material->slot_buffer().update_slot<SlotType>(
             m_material_data_id,
@@ -39,7 +39,7 @@ public:
 
     template<class SlotType, class Fn>
     void edit_material_data(Fn&& fn) {
-        logger.check(m_material != nullptr, "RenderObject has no material");
+        logger().check(m_material != nullptr, "RenderObject has no material");
 
         m_material->slot_buffer().edit_slot<SlotType>(
             m_material_data_id,
@@ -66,6 +66,8 @@ public:
     virtual void render(Renderer& renderer, VulkanCommandBuffer& command_buffer, const glm::mat4& world_transform);
 
 private:
+    void destroy() noexcept;
+
     // Mesh& m_mesh;
     MeshView m_mesh_view;
     SlotPassInstance* m_material = nullptr;

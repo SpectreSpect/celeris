@@ -23,14 +23,17 @@ static constexpr uint32_t SLOT_OCCUPIED = 0xFFFFFFFCu;
 
 static constexpr uint32_t OVERWRITE_BIT = 1u;
 
-static constexpr uint32_t DIRTY_FLAG_BIT = 1u;
+static constexpr uint32_t DIRTY_MESH_FLAG_BIT = 1u;
 static constexpr uint32_t NEED_GENERATION_FLAG_BIT = 2u;
+static constexpr uint32_t DIRTY_INFLATE_FLAG_BIT = 4u;
+static constexpr uint32_t ENQUEUED_FAILED_DIRTY_MESH_FLAG_BIT = 8u;
 
 static constexpr uint32_t VOXEL_TYPE_BITS = 16u;
 static constexpr uint32_t VOXEL_TYPE_MASK = (1u << VOXEL_TYPE_BITS) - 1u;
 
 static constexpr uint32_t VOXEL_VISABILITY_FLAG_BIT = 1u; // Определяет, видим ли воксель
 static constexpr uint32_t VOXEL_EASY_OVERWRITE_FLAG_BIT = 2u; // Определяет, можно ли заменять воксель как будто бы он "воздух" или "вода" в майне
+static constexpr uint32_t VOXEL_INFLATED_BIT = 4u; // Определяет, пересекает ли воксель раздутые видимые воксели
 
 struct alignas(8) VoxelDataGPU {
     uint32_t type_flags;
@@ -56,7 +59,25 @@ struct alignas(8) VoxelDataGPU {
         this->type_flags = (flags << VOXEL_TYPE_BITS) | (type & VOXEL_TYPE_MASK);
         this->color = color;
     }
+
+    inline glm::vec4 color_vec4() const {
+        return glm::vec4(
+            static_cast<float>((color >> 24u) & 0xFFu),
+            static_cast<float>((color >> 16u) & 0xFFu),
+            static_cast<float>((color >> 8u) & 0xFFu),
+            static_cast<float>(color & 0xFFu)
+        ) / 255.0f;
+    }
+
+    inline bool is_solid() const {
+        return ((type_flags >> VOXEL_TYPE_BITS) & VOXEL_VISABILITY_FLAG_BIT) > 0;
+    }
+
+    inline bool is_inflated() const {
+        return ((type_flags >> VOXEL_TYPE_BITS) & VOXEL_INFLATED_BIT) > 0;
+    }
 };
+
 static_assert(sizeof(VoxelDataGPU) == 8);
 static_assert(alignof(VoxelDataGPU) == 8);
 
@@ -181,42 +202,18 @@ struct MeshPoolSeedUniform {
 };
 
 struct alignas(16) BuildIndirectCmdsUniform {
-    uint32_t u_max_chunks;
-    uint32_t _pad0;
-    uint32_t _pad1;
-    uint32_t _pad2;
-
     glm::ivec4 u_chunk_dim;
     glm::vec4  u_voxel_size;
 
+    uint32_t u_max_chunks;
+    uint32_t u_ib_page_size_bytes;
     uint32_t u_pack_bits;
     int32_t  u_pack_offset;
-    uint32_t u_vb_page_verts;
-    uint32_t u_ib_page_inds;
 
     float render_distance;
-    uint32_t _pad3;
-    uint32_t _pad4;
-    uint32_t _pad5;
+    uint32_t _pad0;
+    uint32_t _pad1;
+    uint32_t _pad2;
 };
 
-static_assert(offsetof(BuildIndirectCmdsUniform, u_max_chunks) == 0);
-static_assert(offsetof(BuildIndirectCmdsUniform, u_chunk_dim) == 16);
-static_assert(offsetof(BuildIndirectCmdsUniform, u_voxel_size) == 32);
-static_assert(offsetof(BuildIndirectCmdsUniform, u_pack_bits) == 48);
-static_assert(offsetof(BuildIndirectCmdsUniform, u_pack_offset) == 52);
-static_assert(offsetof(BuildIndirectCmdsUniform, u_vb_page_verts) == 56);
-static_assert(offsetof(BuildIndirectCmdsUniform, u_ib_page_inds) == 60);
-static_assert(offsetof(BuildIndirectCmdsUniform, render_distance) == 64);
-static_assert(sizeof(BuildIndirectCmdsUniform) == 80);
-
-// layout(std430, set = 0, binding=7) buffer UniformBuffer  { 
-//     uint u_vb_pages;
-//     uint u_ib_pages;
-//     uint u_vb_nodes;
-//     uint u_ib_nodes;
-//     uint u_vb_heads_count;
-//     uint u_ib_heads_count;
-//     uint u_max_chunks;
-//     uint pad0;
-// } ubo;
+static_assert(sizeof(BuildIndirectCmdsUniform) == 64);

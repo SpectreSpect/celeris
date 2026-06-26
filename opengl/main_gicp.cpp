@@ -262,7 +262,7 @@ public:
                 continue;
 
             PointInstance p;
-            p.pos = glm::vec4(cell.centroid(), 1.0f);
+            p.position = glm::vec4(cell.centroid(), 1.0f);
             p.color = color;
             out.push_back(p);
         }
@@ -298,7 +298,7 @@ void insert_scan_into_voxel_map(const PointCloud& scan_point_cloud,
     }
 
     for (size_t i = 0; i < pts.size(); i++) {
-        glm::vec3 p_local = glm::vec3(pts[i].pos);
+        glm::vec3 p_local = glm::vec3(pts[i].position);
         glm::vec3 p_world = GICP::transform_point_world(scan_point_cloud, p_local);
 
         glm::vec3 n_world = GICP::transform_normal_world(scan_point_cloud, scan_normals[i]);
@@ -322,7 +322,7 @@ void rebuild_map_point_cloud_from_voxel_map(VoxelMap& voxel_map,
 
     for (size_t i = 0; i < map_points_world.size(); i++) {
         PointInstance p{};
-        p.pos = glm::vec4(map_points_world[i], 1.0f);
+        p.position = glm::vec4(map_points_world[i], 1.0f);
         p.color = glm::vec4(1.0f, 0.0f, 1.0f, 1.0f); // blue map
         instances.push_back(p);
     }
@@ -445,9 +445,9 @@ int main() {
         for (int z = 0; z < size_z; z++) {
             PointInstance new_point{};
 
-            new_point.pos.x = static_cast<float>(x);
-            new_point.pos.z = static_cast<float>(z);
-            new_point.pos.w = 1.0f;
+            new_point.position.x = static_cast<float>(x);
+            new_point.position.z = static_cast<float>(z);
+            new_point.position.w = 1.0f;
 
             // Normalize grid coords to [-1, 1]
             float u = 2.0f * static_cast<float>(x) / static_cast<float>(size_x - 1) - 1.0f;
@@ -472,7 +472,7 @@ int main() {
                 + 0.65f * e1
                 - 0.40f * e2;
 
-            new_point.pos.y = h * amplitude;
+            new_point.position.y = h * amplitude;
             new_point.color = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
 
             target_points.push_back(new_point);
@@ -513,7 +513,7 @@ int main() {
             }
 
             PointInstance src_point = new_point;
-            glm::vec3 p3 = glm::vec3(new_point.pos);
+            glm::vec3 p3 = glm::vec3(new_point.position);
 
             // First apply the rigid transform
             glm::vec3 transformed = initial_R * p3 + source_translation;
@@ -539,7 +539,7 @@ int main() {
 
             transformed += local_offset;
 
-            src_point.pos = glm::vec4(transformed, 1.0f);
+            src_point.position = glm::vec4(transformed, 1.0f);
             src_point.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
 
             source_points.push_back(src_point);

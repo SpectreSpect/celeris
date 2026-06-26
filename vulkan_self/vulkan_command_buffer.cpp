@@ -10,7 +10,7 @@ CommandBufferScope::CommandBufferScope(VulkanCommandBuffer& command_buffer)
     :   m_command_buffer(command_buffer) 
 {
     LOG_METHOD();
-    logger.check(m_command_buffer.handle() != VK_NULL_HANDLE, "Command buffer has not been initialized");
+    logger().check(m_command_buffer.handle() != VK_NULL_HANDLE, "Command buffer has not been initialized");
 
     m_command_buffer.begin();
 }
@@ -82,7 +82,7 @@ void VulkanCommandBuffer::begin() {
 
     VkResult begin_result = vkBeginCommandBuffer(m_command_buffer, &begin_info);
 
-    logger.check(begin_result == VK_SUCCESS, "Failed to begin recording command buffer");
+    logger().check(begin_result == VK_SUCCESS, "Failed to begin recording command buffer");
 }
 
 VkResult VulkanCommandBuffer::end_noexcept() noexcept {
@@ -92,7 +92,7 @@ VkResult VulkanCommandBuffer::end_noexcept() noexcept {
 void VulkanCommandBuffer::end() {
     LOG_METHOD();
     VkResult end_result = end_noexcept();
-    logger.check(end_result == VK_SUCCESS, "Failed to record command buffer");
+    logger().check(end_result == VK_SUCCESS, "Failed to record command buffer");
 }
 
 CommandBufferScope VulkanCommandBuffer::begin_scope() {
@@ -106,7 +106,7 @@ std::vector<VulkanCommandBuffer> VulkanCommandBuffer::create_command_buffers(
 {
     LOG_NAMED("VulkanCommandBuffer");
 
-    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
 
     std::vector<VulkanCommandBuffer> command_buffers;
     command_buffers.reserve(count_buffers);
@@ -124,7 +124,7 @@ std::vector<VulkanCommandBuffer> VulkanCommandBuffer::create_command_buffers(
         command_buffer_handles.data()
     );
 
-    logger.check(result == VK_SUCCESS, "Failed to allocate command buffers");
+    logger().check(result == VK_SUCCESS, "Failed to allocate command buffers");
 
     for (VkCommandBuffer handle : command_buffer_handles) {
         command_buffers.emplace_back(device, command_pool, handle);
@@ -136,13 +136,13 @@ std::vector<VulkanCommandBuffer> VulkanCommandBuffer::create_command_buffers(
 void VulkanCommandBuffer::reset() {
     LOG_METHOD();
     VkResult result = vkResetCommandBuffer(m_command_buffer, 0);
-    logger.check(result == VK_SUCCESS, "Failed to reset command buffer");
+    logger().check(result == VK_SUCCESS, "Failed to reset command buffer");
 }
 
 void VulkanCommandBuffer::dispatch(uint32_t x_groups, uint32_t y_groups, uint32_t z_groups) {
     LOG_METHOD();
 
-    logger.check(m_command_buffer != VK_NULL_HANDLE, "Command buffer was not initialized");
+    logger().check(m_command_buffer != VK_NULL_HANDLE, "Command buffer was not initialized");
 
     vkCmdDispatch(m_command_buffer, x_groups, y_groups, z_groups);
 }
@@ -150,7 +150,7 @@ void VulkanCommandBuffer::dispatch(uint32_t x_groups, uint32_t y_groups, uint32_
 void VulkanCommandBuffer::dispatch_indirect(const VulkanBuffer& args) {
     LOG_METHOD();
 
-    logger.check(m_command_buffer != VK_NULL_HANDLE, "Command buffer was not initialized");
+    logger().check(m_command_buffer != VK_NULL_HANDLE, "Command buffer was not initialized");
 
     vkCmdDispatchIndirect(m_command_buffer, args.handle(), 0);
 }
@@ -159,7 +159,7 @@ void VulkanCommandBuffer::draw_indexed(uint32_t index_count, uint32_t instance_c
                                        uint32_t vertex_offset, uint32_t first_instance) {
     LOG_METHOD();
 
-    logger.check(m_command_buffer != VK_NULL_HANDLE, "Command buffer was not initialized");
+    logger().check(m_command_buffer != VK_NULL_HANDLE, "Command buffer was not initialized");
 
     vkCmdDrawIndexed(m_command_buffer, index_count, instance_count, first_index, vertex_offset, first_instance);
 }

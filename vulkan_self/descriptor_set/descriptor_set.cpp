@@ -11,7 +11,7 @@
 void DescriptorSet::write_buffer(uint32_t binding, const VulkanBuffer& buffer, VkDescriptorType descriptor_type) {
     LOG_METHOD();
 
-    logger.check(buffer.size() > 0, "Video buffer size must be greater than 0");
+    logger().check(buffer.size() > 0, "Video buffer size must be greater than 0");
 
     VkDescriptorBufferInfo buffer_info{};
     buffer_info.buffer = buffer.handle();
@@ -46,12 +46,12 @@ void DescriptorSet::write_texture(
 {
     LOG_METHOD();
 
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(m_descriptor_set != VK_NULL_HANDLE, "Descriptor set is not initialized");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(m_descriptor_set != VK_NULL_HANDLE, "Descriptor set is not initialized");
 
-    logger.check(texture.view().handle() != VK_NULL_HANDLE, "Texture image view is not initialized");
-    logger.check(texture.sampler().handle() != VK_NULL_HANDLE, "Texture sampler is not initialized");
-    logger.check(
+    logger().check(texture.view().handle() != VK_NULL_HANDLE, "Texture image view is not initialized");
+    logger().check(texture.sampler().handle() != VK_NULL_HANDLE, "Texture sampler is not initialized");
+    logger().check(
         texture.texture_layout() == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         "Texture image layout must be VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL"
     );
@@ -85,14 +85,14 @@ void DescriptorSet::write_cubemap(
 {
     LOG_METHOD();
 
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(m_descriptor_set != VK_NULL_HANDLE, "Descriptor set is not initialized");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(m_descriptor_set != VK_NULL_HANDLE, "Descriptor set is not initialized");
 
-    logger.check(cubemap.view().handle() != VK_NULL_HANDLE, "Cubemap image view is not initialized");
-    logger.check(cubemap.sampler().handle() != VK_NULL_HANDLE, "Cubemap sampler is not initialized");
+    logger().check(cubemap.view().handle() != VK_NULL_HANDLE, "Cubemap image view is not initialized");
+    logger().check(cubemap.sampler().handle() != VK_NULL_HANDLE, "Cubemap sampler is not initialized");
 
     // Use this check if your Cubemap class tracks its current layout.
-    logger.check(
+    logger().check(
         cubemap.layout() == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         "Cubemap image layout must be VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL"
     );
@@ -126,12 +126,12 @@ void DescriptorSet::write_cubemap_array(
 {
     LOG_METHOD();
 
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(m_descriptor_set != VK_NULL_HANDLE, "Descriptor set is not initialized");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(m_descriptor_set != VK_NULL_HANDLE, "Descriptor set is not initialized");
 
-    logger.check(cubemap_array.view().handle() != VK_NULL_HANDLE, "Cubemap array image view is not initialized");
-    logger.check(cubemap_array.sampler().handle() != VK_NULL_HANDLE, "Cubemap array sampler is not initialized");
-    logger.check(
+    logger().check(cubemap_array.view().handle() != VK_NULL_HANDLE, "Cubemap array image view is not initialized");
+    logger().check(cubemap_array.sampler().handle() != VK_NULL_HANDLE, "Cubemap array sampler is not initialized");
+    logger().check(
         cubemap_array.layout() == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         "Cubemap array image layout must be VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL"
     );
@@ -165,12 +165,12 @@ void DescriptorSet::write_storage_cubemap(
 {
     LOG_METHOD();
 
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(m_descriptor_set != VK_NULL_HANDLE, "Descriptor set is not initialized");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(m_descriptor_set != VK_NULL_HANDLE, "Descriptor set is not initialized");
 
-    logger.check(cubemap.view().handle() != VK_NULL_HANDLE, "Cubemap image view is not initialized");
+    logger().check(cubemap.view().handle() != VK_NULL_HANDLE, "Cubemap image view is not initialized");
 
-    // logger.check(
+    // logger().check(
     //     cubemap.layout() == VK_IMAGE_LAYOUT_GENERAL,
     //     "Cubemap image layout must be VK_IMAGE_LAYOUT_GENERAL for storage image"
     // );
@@ -201,14 +201,14 @@ void DescriptorSet::write_storage_cubemap(
 void DescriptorSet::write_storage_texture(uint32_t binding, const VulkanTexture2D& texture) {
     LOG_METHOD();
 
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(m_descriptor_set != VK_NULL_HANDLE, "Descriptor set is not initialized");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(m_descriptor_set != VK_NULL_HANDLE, "Descriptor set is not initialized");
 
-    logger.check(texture.view().handle() != VK_NULL_HANDLE, "Texture image view is not initialized");
+    logger().check(texture.view().handle() != VK_NULL_HANDLE, "Texture image view is not initialized");
 
     // Use this if your VulkanTexture2D tracks its current layout.
     // For storage images, the image must be in VK_IMAGE_LAYOUT_GENERAL.
-    logger.check(
+    logger().check(
         texture.texture_layout() == VK_IMAGE_LAYOUT_GENERAL,
         "Texture image layout must be VK_IMAGE_LAYOUT_GENERAL for storage image"
     );
@@ -242,10 +242,10 @@ void DescriptorSet::write_storage_image_view(
 {
     LOG_METHOD();
 
-    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
-    logger.check(m_descriptor_set != VK_NULL_HANDLE, "Descriptor set is not initialized");
+    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(m_descriptor_set != VK_NULL_HANDLE, "Descriptor set is not initialized");
 
-    logger.check(
+    logger().check(
         image_view.handle() != VK_NULL_HANDLE,
         "Storage image view is not initialized"
     );

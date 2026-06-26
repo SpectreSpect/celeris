@@ -133,9 +133,9 @@ void Cubemap::set_layout(VkImageLayout layout) noexcept {
 uint32_t Cubemap::calculate_mip_levels(VkExtent2D extent2d) {
     LOG_NAMED("Cubemap");
 
-    logger.check(extent2d.width != 0, "Cubemap width is zero");
-    logger.check(extent2d.height != 0, "Cubemap height is zero");
-    logger.check(extent2d.width == extent2d.height, "Cubemap faces must be square");
+    logger().check(extent2d.width != 0, "Cubemap width is zero");
+    logger().check(extent2d.height != 0, "Cubemap height is zero");
+    logger().check(extent2d.width == extent2d.height, "Cubemap faces must be square");
 
     uint32_t max_dimension = std::max(extent2d.width, extent2d.height);
 
@@ -162,20 +162,20 @@ void Cubemap::transition_layout(
 {
     LOG_METHOD();
 
-    logger.check(m_image.handle() != VK_NULL_HANDLE, "Cubemap image is not initialized");
-    logger.check(new_layout != VK_IMAGE_LAYOUT_UNDEFINED, "New cubemap layout must not be UNDEFINED");
-    logger.check(src_stage != 0, "Source stage must not be zero");
-    logger.check(dst_stage != 0, "Destination stage must not be zero");
+    logger().check(m_image.handle() != VK_NULL_HANDLE, "Cubemap image is not initialized");
+    logger().check(new_layout != VK_IMAGE_LAYOUT_UNDEFINED, "New cubemap layout must not be UNDEFINED");
+    logger().check(src_stage != 0, "Source stage must not be zero");
+    logger().check(dst_stage != 0, "Destination stage must not be zero");
 
     if (level_count == 0) {
         level_count = m_image.mip_levels() - base_mip_level;
     }
 
-    logger.check(base_mip_level < m_image.mip_levels(), "Base mip level is out of range");
-    logger.check(level_count <= m_image.mip_levels() - base_mip_level, "Mip level range is out of bounds");
+    logger().check(base_mip_level < m_image.mip_levels(), "Base mip level is out of range");
+    logger().check(level_count <= m_image.mip_levels() - base_mip_level, "Mip level range is out of bounds");
 
-    logger.check(base_array_layer < m_image.array_layers(), "Base array layer is out of range");
-    logger.check(layer_count <= m_image.array_layers() - base_array_layer, "Array layer range is out of bounds");
+    logger().check(base_array_layer < m_image.array_layers(), "Base array layer is out of range");
+    logger().check(layer_count <= m_image.array_layers() - base_array_layer, "Array layer range is out of bounds");
 
     m_image.memory_barrier(
         command_buffer,
@@ -199,16 +199,16 @@ void Cubemap::generate_mipmaps(VulkanCommandBuffer& command_buffer)
 {
     LOG_METHOD();
 
-    logger.check(image().handle() != VK_NULL_HANDLE, "Cubemap image is not initialized");
-    logger.check(mip_levels() != 0, "Cubemap mip levels count is zero");
-    logger.check(array_layers() == Cubemap::face_count, "Cubemap must have 6 faces");
+    logger().check(image().handle() != VK_NULL_HANDLE, "Cubemap image is not initialized");
+    logger().check(mip_levels() != 0, "Cubemap mip levels count is zero");
+    logger().check(array_layers() == Cubemap::face_count, "Cubemap must have 6 faces");
 
-    logger.check(
+    logger().check(
         image().has_usage(VK_IMAGE_USAGE_TRANSFER_SRC_BIT),
         "Cubemap image must have VK_IMAGE_USAGE_TRANSFER_SRC_BIT for mip generation"
     );
 
-    logger.check(
+    logger().check(
         image().has_usage(VK_IMAGE_USAGE_TRANSFER_DST_BIT),
         "Cubemap image must have VK_IMAGE_USAGE_TRANSFER_DST_BIT for mip generation"
     );
@@ -397,20 +397,20 @@ VulkanImage Cubemap::create_image(
 {
     LOG_NAMED("Cubemap");
 
-    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger().check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
 
-    logger.check(extent2d.width != 0, "Cubemap width is zero");
-    logger.check(extent2d.height != 0, "Cubemap height is zero");
-    logger.check(extent2d.width == extent2d.height, "Cubemap faces must be square");
+    logger().check(extent2d.width != 0, "Cubemap width is zero");
+    logger().check(extent2d.height != 0, "Cubemap height is zero");
+    logger().check(extent2d.width == extent2d.height, "Cubemap faces must be square");
 
-    logger.check(format != VK_FORMAT_UNDEFINED, "Cubemap format is undefined");
+    logger().check(format != VK_FORMAT_UNDEFINED, "Cubemap format is undefined");
 
     if (mip_levels == 0) {
         mip_levels = calculate_mip_levels(extent2d);
     }
 
-    logger.check(mip_levels != 0, "Cubemap mip levels count is zero");
+    logger().check(mip_levels != 0, "Cubemap mip levels count is zero");
 
     VkImageUsageFlags usage =
         VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
@@ -447,7 +447,7 @@ VkSamplerCreateInfo Cubemap::create_sampler_desc(
 {
     LOG_NAMED("Cubemap");
 
-    logger.check(mip_levels != 0, "Sampler mip levels count is zero");
+    logger().check(mip_levels != 0, "Sampler mip levels count is zero");
 
     VkSamplerCreateInfo sampler_info{};
     sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;

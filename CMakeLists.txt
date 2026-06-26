@@ -68,6 +68,7 @@ add_executable(app
   renderer/resources/frame_resources.cpp
   camera/camera.cpp
   camera/controllers/fps_camera_controller.cpp
+  camera/controllers/third_person_camera_controller.cpp
   vulkan_self/vulkan_image_temp.cpp
   renderer/transform.cpp
   renderer/mesh.cpp
@@ -109,6 +110,10 @@ add_executable(app
   renderer/point_cloud/gicp/voxel_map_point_inserter.cpp
   renderer/point_cloud/gicp/voxel_map_point_reseter.cpp
   renderer/point_cloud/gicp/gicp_reductor.cpp
+  renderer/point_cloud/point_cloud_mesher.cpp
+
+  renderer/lines/line_cloud.cpp
+
   imgui_layer.cpp
   renderer/lighting_system/lighting_system.cpp
   voxel_grid_vulkan/voxel_grid.cpp
@@ -125,9 +130,29 @@ add_executable(app
   renderer/pbr/pbr_maps.cpp
   renderer/pbr/pbr_map_generator.cpp
   renderer/point_cloud/point_cloud_preprocessor.cpp
+  a_star/occupancy_grid_3d.cpp
+  a_star/a_star.cpp
+  a_star/nonholonomic_a_star.cpp
+  a_star/reeds_shepp.cpp
+  autopilot/spherical_pose_marker.cpp
+  autopilot/vehicle_command_sender.cpp
+  autopilot/celeris.cpp
+  autopilot/celeris_visualizer.cpp
+  voxel_grid_vulkan/voxel_grid_gpu_debugger.cpp
+  a_star/unimpended_path_finder.cpp
+  vulkan_self/vulkan_submit_context.cpp
+  utils/avg_timer.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  target_compile_options(app PRIVATE
+    -fdiagnostics-color=always
+    -fdiagnostics-show-option
+    -fdiagnostics-show-caret
+  )
+endif()
 
 # ---------------- ImGui (FetchContent, no submodule) ----------------
 
