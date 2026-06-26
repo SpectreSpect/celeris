@@ -29,7 +29,7 @@ uint32_t MeshView::index_count() const noexcept {
 void MeshView::bind_vertex_buffer(VulkanCommandBuffer& command_buffer, uint32_t buffer_binding, VkDeviceSize offset) {
     LOG_METHOD();
 
-    logger().check(m_vertex_buffer_view.valid(), "Vertex buffer view was invalid");
+    logger.check(m_vertex_buffer_view.valid(), "Vertex buffer view was invalid");
 
     m_vertex_buffer_view.handle().bind_as_vertex_buffer(command_buffer, buffer_binding, offset);
 }
@@ -37,7 +37,7 @@ void MeshView::bind_vertex_buffer(VulkanCommandBuffer& command_buffer, uint32_t 
 void MeshView::bind_index_buffer(VulkanCommandBuffer& command_buffer, uint32_t buffer_binding, VkDeviceSize offset) {
     LOG_METHOD();
 
-    logger().check(m_index_buffer_view.valid(), "Index buffer view was invalid");
+    logger.check(m_index_buffer_view.valid(), "Index buffer view was invalid");
 
     m_index_buffer_view.handle().bind_as_index_buffer(command_buffer, offset);
 }

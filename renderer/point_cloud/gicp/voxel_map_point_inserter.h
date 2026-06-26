@@ -24,10 +24,7 @@ public:
         uint32_t source_point_count;
         uint32_t max_map_point_count;
         uint32_t num_hash_table_slots;
-        uint32_t pack_bits;
-        int32_t pack_offset;
-        uint32_t retry_mode;
-        uint32_t _pad0[2];
+        uint32_t _pad0;
         alignas(16) glm::mat4 source_model;
         glm::vec4 color;
     };
@@ -44,7 +41,6 @@ private:
     VulkanEngine& engine;
     PassInstance insert_pass;
     VulkanBuffer uniform_buffer;
-    VulkanBuffer hash_table_insert_fail_debug_buffer;
 
     VulkanCommandBuffer compute_command_buffer;
     VulkanFence compute_fence;

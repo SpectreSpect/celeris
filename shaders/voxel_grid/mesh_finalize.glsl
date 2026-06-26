@@ -23,17 +23,16 @@ void main() {
     uint chunkId = dirty_list[dirtyIdx];
     
     if (!chunk_alloc[chunkId].is_valid) {
-        if ((enqueued[chunkId] & ENQUEUED_FAILED_DIRTY_MESH_FLAG_BIT) == 0u) {
+        if (enqueued[chunkId] != 2u) {
             uint idx = atomicAdd(failed_dirty_count, 1u);
             failed_dirty_list[idx] = chunkId;
-            atomicOr(enqueued[chunkId], ENQUEUED_FAILED_DIRTY_MESH_FLAG_BIT);
+            enqueued[chunkId] = 2u;
         }
-        atomicAnd(enqueued[chunkId], ~DIRTY_MESH_FLAG_BIT);
     } else {
-        // разрешить повторно enqueue mesh, не трогая другие очереди
-        atomicAnd(enqueued[chunkId], ~(DIRTY_MESH_FLAG_BIT | ENQUEUED_FAILED_DIRTY_MESH_FLAG_BIT));
+        // разрешить повторно enqueue
+        enqueued[chunkId] = 0u;
     }
 
     // снять dirty флаг(и)
-    meta[chunkId].dirty_flags &= ~DIRTY_MESH_FLAG_BIT;
+    meta[chunkId].dirty_flags &= ~DIRTY_FLAG_BIT;
 }

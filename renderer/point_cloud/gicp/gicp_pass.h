@@ -31,12 +31,10 @@ public:
         uint32_t num_source_points;
         uint32_t num_target_points;
         uint32_t num_hash_table_slots;
-        uint32_t pack_bits;
-        int32_t pack_offset;
-        uint32_t _pad0[3];
+        uint32_t _pad0;
     };
 
-    static_assert(sizeof(GICPPassUniform) == 64);
+    static_assert(sizeof(GICPPassUniform) == 48);
 
     struct OutputBuffer {
         glm::vec4 position;

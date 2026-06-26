@@ -21,12 +21,12 @@ PrefilterPass::PrefilterPass(
 Cubemap PrefilterPass::generate(Cubemap& environment_map, uint32_t face_size) {
     LOG_METHOD();
 
-    logger().check(face_size != 0, "Face size must be greater than 0");
-    logger().check(environment_map.image().handle() != VK_NULL_HANDLE, "Environment map image is not initialized");
-    logger().check(environment_map.view().handle() != VK_NULL_HANDLE, "Environment map image view is not initialized");
-    logger().check(environment_map.sampler().handle() != VK_NULL_HANDLE, "Environment map sampler is not initialized");
-    logger().check(environment_map.array_layers() == Cubemap::face_count, "Environment map must have 6 faces");
-    logger().check(
+    logger.check(face_size != 0, "Face size must be greater than 0");
+    logger.check(environment_map.image().handle() != VK_NULL_HANDLE, "Environment map image is not initialized");
+    logger.check(environment_map.view().handle() != VK_NULL_HANDLE, "Environment map image view is not initialized");
+    logger.check(environment_map.sampler().handle() != VK_NULL_HANDLE, "Environment map sampler is not initialized");
+    logger.check(environment_map.array_layers() == Cubemap::face_count, "Environment map must have 6 faces");
+    logger.check(
         environment_map.layout() == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         "Environment map must be in VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL"
     );
@@ -136,17 +136,17 @@ Cubemap PrefilterPass::generate(Cubemap& environment_map, uint32_t face_size) {
 void PrefilterPass::generate_into(Cubemap& environment_map, CubemapArray& prefilter_maps, uint32_t cubemap_id) {
     LOG_METHOD();
 
-    logger().check(prefilter_maps.extent().width != 0, "Prefilter cubemap array width is zero");
-    logger().check(prefilter_maps.extent().height != 0, "Prefilter cubemap array height is zero");
-    logger().check(prefilter_maps.extent().width == prefilter_maps.extent().height, "Prefilter cubemap array faces must be square");
-    logger().check(prefilter_maps.format() == VK_FORMAT_R32G32B32A32_SFLOAT, "Prefilter cubemap array must use VK_FORMAT_R32G32B32A32_SFLOAT");
-    logger().check(cubemap_id < prefilter_maps.cubemap_count(), "Prefilter cubemap id is out of range");
+    logger.check(prefilter_maps.extent().width != 0, "Prefilter cubemap array width is zero");
+    logger.check(prefilter_maps.extent().height != 0, "Prefilter cubemap array height is zero");
+    logger.check(prefilter_maps.extent().width == prefilter_maps.extent().height, "Prefilter cubemap array faces must be square");
+    logger.check(prefilter_maps.format() == VK_FORMAT_R32G32B32A32_SFLOAT, "Prefilter cubemap array must use VK_FORMAT_R32G32B32A32_SFLOAT");
+    logger.check(cubemap_id < prefilter_maps.cubemap_count(), "Prefilter cubemap id is out of range");
 
-    logger().check(environment_map.image().handle() != VK_NULL_HANDLE, "Environment map image is not initialized");
-    logger().check(environment_map.view().handle() != VK_NULL_HANDLE, "Environment map image view is not initialized");
-    logger().check(environment_map.sampler().handle() != VK_NULL_HANDLE, "Environment map sampler is not initialized");
-    logger().check(environment_map.array_layers() == Cubemap::face_count, "Environment map must have 6 faces");
-    logger().check(
+    logger.check(environment_map.image().handle() != VK_NULL_HANDLE, "Environment map image is not initialized");
+    logger.check(environment_map.view().handle() != VK_NULL_HANDLE, "Environment map image view is not initialized");
+    logger.check(environment_map.sampler().handle() != VK_NULL_HANDLE, "Environment map sampler is not initialized");
+    logger.check(environment_map.array_layers() == Cubemap::face_count, "Environment map must have 6 faces");
+    logger.check(
         environment_map.layout() == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         "Environment map must be in VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL"
     );

@@ -9,8 +9,8 @@ DescriptorSetLayout::DescriptorSetLayout(const VulkanDevice& device, std::span<c
 ) : m_device(device.handle())  {
     LOG_METHOD();
 
-    logger().check(!bindings.empty(), "DescriptorSetLayout has no bindings. Did you forget to add bindings to DescriptorSetLayoutBuilder?");
-    logger().check(bindings.data() != nullptr, "bindings must not be nullptr");
+    logger.check(!bindings.empty(), "DescriptorSetLayout has no bindings. Did you forget to add bindings to DescriptorSetLayoutBuilder?");
+    logger.check(bindings.data() != nullptr, "bindings must not be nullptr");
     
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -20,7 +20,7 @@ DescriptorSetLayout::DescriptorSetLayout(const VulkanDevice& device, std::span<c
 
     VkResult result = vkCreateDescriptorSetLayout(device.handle(), &layoutInfo, nullptr, &m_layout);
 
-    logger().check(result == VK_SUCCESS) << "Failed to create descriptor set layout: " << clr(string_VkResult(result), LoggerPalette::blue) << "\n";
+    logger.check(result == VK_SUCCESS) << "Failed to create descriptor set layout: " << clr(string_VkResult(result), LoggerPalette::blue) << "\n";
 }
 
 DescriptorSetLayout::DescriptorSetLayout(const VulkanDevice& device, const DescriptorSetLayoutBuilder& builder

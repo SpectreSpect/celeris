@@ -91,7 +91,7 @@ UI::VulkanInitInfo UI::get_default_vulkan_init_info(VulkanEngine& engine, Descri
 void UI::check_vk_result(VkResult err) {
     LOG_NAMED("UI");
 
-    logger().check(err == VK_SUCCESS) << clr(string_VkResult(err), LoggerPalette::blue) << "\n";
+    logger.check(err == VK_SUCCESS) << clr(string_VkResult(err), LoggerPalette::blue) << "\n";
 
     if (err < 0)
         std::abort();
@@ -106,7 +106,7 @@ void UI::init_imgui(Window& window, VulkanEngine& engine, const VulkanInitInfo& 
 
     ImGui::StyleColorsDark();
 
-    logger().check(ImGui_ImplGlfw_InitForVulkan(window.handle(), true), "Failed to initialize ImGui GLFW backend");
+    logger.check(ImGui_ImplGlfw_InitForVulkan(window.handle(), true), "Failed to initialize ImGui GLFW backend");
 
     ImGui_ImplVulkan_InitInfo init_info{};
     init_info.Instance = info.instance;
@@ -124,7 +124,7 @@ void UI::init_imgui(Window& window, VulkanEngine& engine, const VulkanInitInfo& 
     init_info.Allocator = info.allocator;
     init_info.CheckVkResultFn = info.check_vk_result_fn;
 
-    logger().check(ImGui_ImplVulkan_Init(&init_info), "Failed to initialize ImGui Vulkan backend");
+    logger.check(ImGui_ImplVulkan_Init(&init_info), "Failed to initialize ImGui Vulkan backend");
 }
 
 

@@ -16,9 +16,6 @@ public:
 
     VulkanShaderModule point_vs;
     VulkanShaderModule point_fs;
-
-    VulkanShaderModule line_vs;
-    VulkanShaderModule line_fs;    
     
     VulkanShaderModule skybox_vs;
     VulkanShaderModule skybox_fs;
@@ -35,22 +32,19 @@ public:
     VulkanShaderModule insert_points_into_voxel_map_cs;
     VulkanShaderModule reset_point_voxel_map_cs;
     VulkanShaderModule gicp_reduce_cs;
-
-    // Cloud to mesh
-    VulkanShaderModule generate_mesh_cs;
     
     // Lights
     VulkanShaderModule build_cluster_light_lists_cs;
 
     // Voxel grid
     VulkanShaderModule world_init_cs;
+    // VulkanShaderModule apply_writes_to_world_cs;
     VulkanShaderModule mesh_pool_clear_cs;
     VulkanShaderModule mesh_pool_seed_cs;
     VulkanShaderModule dispatch_adapter_cs;
     VulkanShaderModule mesh_reset_cs;
     VulkanShaderModule mesh_count_cs;
     VulkanShaderModule mesh_alloc_cs;
-    VulkanShaderModule retry_mesh_alloc_cs;
     VulkanShaderModule verify_mesh_allocation_cs;
     VulkanShaderModule return_free_alloc_nodes_dispatch_adapter_cs;
     VulkanShaderModule return_free_alloc_nodes_cs;
@@ -72,17 +66,13 @@ public:
     VulkanShaderModule hash_table_conditional_dispatch_adapter_cs;
     VulkanShaderModule clear_chunk_hash_table_cs;
     VulkanShaderModule fill_chunk_hash_table_cs;
-    VulkanShaderModule read_voxel_grid_chunk_cs;
-    VulkanShaderModule check_footprint_cs;
-    VulkanShaderModule read_and_inflate_voxel_grid_chunk_cs;
-    VulkanShaderModule inflate_chunks_cs;
+
     VulkanShaderModule voxel_writes_from_point_cloud_cs;
 
     // Voxelizator
     VulkanShaderModule alloc_active_chunk_triangles_cs;
     VulkanShaderModule fill_triangle_indices_cs;
     VulkanShaderModule mark_and_count_active_chunks_cs;
-    VulkanShaderModule mark_and_count_fail_slots_cs;
     VulkanShaderModule reset_voxelize_pipeline_cs;
     VulkanShaderModule voxelize_triangles_cs;
     
@@ -95,16 +85,9 @@ public:
     VulkanShaderModule normals_from_webots_lidar_point_cloud_cs;
     VulkanShaderModule remove_near_origin_lidar_points_cs;
 
-    // A*
-    VulkanShaderModule prepare_copy_dirty_list_dispatch_args_cs;
-    VulkanShaderModule copy_dirty_list_cs;
-
     // PBR
     VulkanShaderModule equirect_to_cubemap_cs;
     VulkanShaderModule brdf_lut_cs;
     VulkanShaderModule generate_prefilter_map_cs;
     VulkanShaderModule generate_irradiance_map_cs;
-
-    // A*
-    VulkanShaderModule find_unimpended_paths_cs;
 };

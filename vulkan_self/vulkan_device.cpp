@@ -47,7 +47,7 @@ VulkanDevice::VulkanDevice(const VulkanPhysicalDevice& physical_device) {
     VkPhysicalDeviceFeatures supported_features{};
     vkGetPhysicalDeviceFeatures(physical_device.handle(), &supported_features);
 
-    logger().check(
+    logger.check(
         supported_features.imageCubeArray == VK_TRUE,
         "Physical device does not support imageCubeArray"
     );
@@ -81,7 +81,7 @@ VulkanDevice::VulkanDevice(const VulkanPhysicalDevice& physical_device) {
         &m_device
     );
 
-    logger().check(result == VK_SUCCESS, "Failed to create logical device");
+    logger.check(result == VK_SUCCESS, "Failed to create logical device");
 
     load_device_functions();
 
@@ -139,7 +139,7 @@ void VulkanDevice::wait_idle() {
 
     if (m_device != VK_NULL_HANDLE) {
         VkResult result = vkDeviceWaitIdle(m_device);
-        logger().check(result == VK_SUCCESS, "Failed to wait for logical device idle");
+        logger.check(result == VK_SUCCESS, "Failed to wait for logical device idle");
     }
 }
 
@@ -189,7 +189,7 @@ void VulkanDevice::load_device_functions() {
             vkGetDeviceProcAddr(m_device, "vkCmdPushDescriptorSetKHR")
         );
 
-    logger().check(
+    logger.check(
         m_vkCmdPushDescriptorSetKHR != nullptr,
         "Failed to load vkCmdPushDescriptorSetKHR"
     );
@@ -223,8 +223,8 @@ const VulkanQueue& VulkanDevice::get_queue(
     std::string_view error_message) const
 {
     LOG_METHOD();
-    logger().check(!queues.empty(), error_message.data());
-    logger().check(index < queues.size(), "Queue index is out of range");
+    logger.check(!queues.empty(), error_message.data());
+    logger.check(index < queues.size(), "Queue index is out of range");
 
     return *queues[index];
 }

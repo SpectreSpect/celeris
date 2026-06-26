@@ -14,9 +14,9 @@ DescriptorPool::DescriptorPool(
     VkDescriptorPoolCreateFlags flags) : m_device(device.handle()) {
     LOG_METHOD();
 
-    logger().check(!pool_sizes.empty(), "pool_sizes was empty");
-    logger().check(pool_sizes.data() != nullptr, "pool_sizes must not be nullptr");
-    logger().check(max_sets > 0, "max_sets must be greater than 0");
+    logger.check(!pool_sizes.empty(), "pool_sizes was empty");
+    logger.check(pool_sizes.data() != nullptr, "pool_sizes must not be nullptr");
+    logger.check(max_sets > 0, "max_sets must be greater than 0");
 
     VkDescriptorPoolCreateInfo pool_info{};
     pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -27,7 +27,7 @@ DescriptorPool::DescriptorPool(
 
     VkResult result = vkCreateDescriptorPool(device.handle(), &pool_info, nullptr, &m_pool);
 
-    logger().check(result == VK_SUCCESS) << "Failed to create descriptor pool: " << clr(string_VkResult(result), LoggerPalette::blue) << "\n";
+    logger.check(result == VK_SUCCESS) << "Failed to create descriptor pool: " << clr(string_VkResult(result), LoggerPalette::blue) << "\n";
 }
 
 DescriptorPool::DescriptorPool(const VulkanDevice& device, const DescriptorPoolBuilder& builder) 
@@ -68,7 +68,7 @@ VkDescriptorPool DescriptorPool::handle() const noexcept {
 std::vector<DescriptorSet> DescriptorPool::allocate_sets(const DescriptorSetLayout& layout, uint32_t set_count) {
     LOG_METHOD();
 
-    logger().check(set_count > 0, "set_count must be greater than 0");
+    logger.check(set_count > 0, "set_count must be greater than 0");
 
     std::vector<VkDescriptorSetLayout> layouts(set_count, layout.handle());
 
@@ -82,7 +82,7 @@ std::vector<DescriptorSet> DescriptorPool::allocate_sets(const DescriptorSetLayo
 
     VkResult result = vkAllocateDescriptorSets(m_device, &allocInfo, descriptor_set_handles.data());
     
-    logger().check(result == VK_SUCCESS) << "Failed to create descriptor sets: " << clr(string_VkResult(result), LoggerPalette::blue) << "\n";
+    logger.check(result == VK_SUCCESS) << "Failed to create descriptor sets: " << clr(string_VkResult(result), LoggerPalette::blue) << "\n";
 
     std::vector<DescriptorSet> descriptor_sets;
     descriptor_sets.reserve(set_count);

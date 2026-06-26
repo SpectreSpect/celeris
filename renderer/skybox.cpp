@@ -46,13 +46,13 @@ float Skybox::exposure() const noexcept {
 void Skybox::update(Scene& scene) {
     LOG_METHOD();
 
-    logger().check(m_texture_manager != nullptr, "Texture manager pointer is null");
-    logger().check(m_pbr_material_pass != nullptr, "PBR material pass pointer is null");
+    logger.check(m_texture_manager != nullptr, "Texture manager pointer is null");
+    logger.check(m_pbr_material_pass != nullptr, "PBR material pass pointer is null");
 
     update_skybox_material();
 
     for (SceneObject* scene_object : scene.scene_objects) {
-        logger().check(scene_object != nullptr, "Scene contains a null object");
+        logger.check(scene_object != nullptr, "Scene contains a null object");
         update_object(*scene_object);
     }
 }
@@ -60,8 +60,8 @@ void Skybox::update(Scene& scene) {
 void Skybox::update_skybox_material() {
     LOG_METHOD();
 
-    logger().check(m_texture_manager != nullptr, "Texture manager pointer is null");
-    logger().check(m_environment_map_id < m_texture_manager->hdr_env_maps.size(), "Skybox environment map id is out of range");
+    logger.check(m_texture_manager != nullptr, "Texture manager pointer is null");
+    logger.check(m_environment_map_id < m_texture_manager->hdr_env_maps.size(), "Skybox environment map id is out of range");
 
     material().descripter_set().write_cubemap(
         1,
@@ -85,7 +85,7 @@ void Skybox::update_object(SceneObject& scene_object) {
     }
 
     for (SceneObject* child : scene_object.children) {
-        logger().check(child != nullptr, "Scene object contains a null child");
+        logger.check(child != nullptr, "Scene object contains a null child");
         update_object(*child);
     }
 }

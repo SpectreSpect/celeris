@@ -84,7 +84,7 @@ DescriptorSetLayout& FrameResources::descriptor_layout() noexcept {
 void FrameResources::update_camera(uint32_t frame_id, const Window& window, const Camera& camera) {
     LOG_METHOD();
 
-    logger().check(frame_id < m_frame_data.size(), "Frame index was out of bounds");
+    logger.check(frame_id < m_frame_data.size(), "Frame index was out of bounds");
 
     static CameraUniform ubo;
 
@@ -105,7 +105,7 @@ void FrameResources::bind(uint32_t frame_id, VulkanCommandBuffer& command_buffer
 FrameData& FrameResources::frame_data(uint32_t frame_id) {
     LOG_METHOD();
 
-    logger().check(frame_id < m_frame_data.size(), "Frame index was out of bounds");
+    logger.check(frame_id < m_frame_data.size(), "Frame index was out of bounds");
 
     return m_frame_data[frame_id];
 }

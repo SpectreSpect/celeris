@@ -22,7 +22,7 @@ public:
 
     SceneObject();
 
-    virtual ~SceneObject() noexcept = default;
+    virtual ~SceneObject() = default;
 
     SceneObject(const SceneObject&) = delete;
     SceneObject& operator=(const SceneObject&) = delete;

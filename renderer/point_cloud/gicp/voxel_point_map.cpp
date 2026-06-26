@@ -11,10 +11,7 @@ VoxelPointMap::VoxelPointMap(VulkanEngine& engine, uint32_t num_hash_table_slots
     :   m_num_hash_table_slots(num_hash_table_slots),
         m_max_map_point_count(max_map_point_count),
         map_uniform_buffer(VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(VoxelPointMapUniform))),
-        map_hash_table_buffer(VulkanBuffer::create_storage_buffer(
-            engine,
-            sizeof(HashTableCountersGpu) + sizeof(IndexHashTableSlotGpu) * num_hash_table_slots
-        )),
+        map_hash_table_buffer(VulkanBuffer::create_storage_buffer(engine, sizeof(VoxelHashSlotGpu) * num_hash_table_slots)),
         // map_point_buffer(VulkanBuffer::create_storage_buffer(engine, sizeof(PointInstance) * max_map_point_count)),
         map_point_buffer(VulkanBuffer(engine.physical_device(), engine.device(), sizeof(PointInstance) * max_map_point_count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)),        
         map_normal_buffer(VulkanBuffer::create_storage_buffer(engine, sizeof(glm::vec4) * max_map_point_count)), 
@@ -36,7 +33,7 @@ void VoxelPointMap::upload_voxels(VulkanEngine& engine, VoxelGrid& voxel_grid) {
     for (int i = 0; i < points.size(); i++) {
         glm::ivec3 color{0, 98, 255};
 
-        glm::vec3 local = glm::vec3(points[i].position) / glm::vec3(voxel_grid.voxel_size());
+        glm::vec3 local = glm::vec3(points[i].pos) / glm::vec3(voxel_grid.voxel_size());
 
         glm::ivec4 voxel_pos = glm::ivec4(glm::floor(local.x),
                                           glm::floor(local.y),

@@ -3,10 +3,9 @@
 #include "../voxel_grid/chunk_hash_table/decl.glsl"
 #include "../voxel_rasterization/counter_hash_table/decl.glsl"
 
-#define DIRTY_MESH_FLAG_BIT 1u
+#define DIRTY_FLAG_BIT 1u
 #define NEED_GENERATION_FLAG_BIT 2u
-#define DIRTY_INFLATE_FLAG_BIT 4u
-#define ENQUEUED_FAILED_DIRTY_MESH_FLAG_BIT 8u
+#define HAS_WRITTEN_VOXELS_BIT 4u
 
 struct ChunkMeta { 
     uint used; 

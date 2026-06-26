@@ -1,49 +1,50 @@
 #pragma once
-
-#include <glm/glm.hpp>
+#include "occupancy_grid_3d.h"
 #include <queue>
 #include <vector>
 #include <set>
 #include <iostream>
 #include <algorithm>
+#include "../voxel_engine/voxel_grid.h"
+#include "voxel_occupancy_grid_3d.h"
 
-#include "occupancy_grid_3d.h"
-#include "../math_utils.h"
+struct AStarCell {
+    float g;
+    float f;
+    glm::ivec3 pos;
+    glm::ivec3 came_from;
+    bool no_parent = true;
 
-#include "../vulkan_self/logger/logger_header.h"
+    bool has_intermediate_pos = false;
+    glm::ivec3 intermediate_pos;
+};
 
-class VoxelGrid;
+struct ByPriority {
+    bool operator()(const AStarCell& a, const AStarCell& b) const {
+        return a.f > b.f; // higher priority first
+    }
+};
+
+struct PlainAstarData {
+    std::vector<glm::ivec3> path;
+    std::vector<float> dist_to_end;
+};
 
 class AStar {
 public:
-    _XCLASS_NAME(AStar);
+    const int max_step_up = 500;
+    const int max_drop = 500;
+    const int max_y_diff = 1;
+    bool allow_diagonal_moves = false;
 
-    struct AStarParams {
-        int max_step_up = 1;
-        int max_drop = 1;
-        int max_y_diff = 1;
-        int iteration_limit = 50000;
-        bool allow_diagonal_moves = true;
-        bool allow_flying_over_precepices = true;
-        bool use_straight_fallback = true;
-        uint32_t try_straight_interval = 100;
-        float heuristic_weight = 1.01f;
-    };
-
-    typedef AStarParams AStarDesc;
-
-    AStar(OccupancyGrid3D& occupancy_grid, const AStarDesc& desc);
+    OccupancyGrid3D* grid;
+    AStar();
+    AStar(VoxelGrid* voxel_grid);
 
     virtual float get_heuristic(glm::ivec3 a, glm::ivec3 b);
-    std::vector<glm::ivec3> get_straight_path(glm::ivec3& start, glm::ivec3& end, std::vector<glm::ivec3>& out_path);
-    bool try_straight_shot(glm::ivec3& start, glm::ivec3& end, std::vector<glm::ivec3>& out_path);
 
     virtual PlainAstarData reconstruct_path(std::unordered_map<uint64_t, AStarCell> closed_heap, glm::ivec3 pos);
+    // bool adjust_to_ground(glm::ivec3& voxel_pos, int max_step_up = 1, int max_drop = 1);
+    // virtual std::vector<glm::ivec3> find_path(glm::ivec3 start_pos, glm::ivec3 end_pos);
     virtual PlainAstarData find_path(glm::ivec3 start_pos, glm::ivec3 end_pos);
-
-    OccupancyGrid3D& occupancy_grid() noexcept;
-
-private:
-    OccupancyGrid3D* m_grid = nullptr;
-    AStarParams m_params;
 };

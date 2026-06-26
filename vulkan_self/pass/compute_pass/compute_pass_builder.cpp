@@ -23,7 +23,7 @@ ComputePipeline ComputePassBuilder::create_compute_pipeline(
 {
     LOG_METHOD();
 
-    logger().check(m_compute_shader_module != nullptr, "Pointer to compute shader module specify to null");
+    logger.check(m_compute_shader_module != nullptr, "Pointer to compute shader module specify to null");
 
     return ComputePipeline(device, pipeline_layout, *m_compute_shader_module, m_compute_shader_entry_point);
 }

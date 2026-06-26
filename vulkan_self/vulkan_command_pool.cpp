@@ -11,7 +11,7 @@ VulkanCommandPool::VulkanCommandPool(const VulkanDevice& device, QueueFamilyInfo
 {
     LOG_METHOD();
 
-    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
 
     VkCommandPoolCreateInfo pool_info{};
     pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -25,7 +25,7 @@ VulkanCommandPool::VulkanCommandPool(const VulkanDevice& device, QueueFamilyInfo
         &m_command_pool
     );
 
-    logger().check(result == VK_SUCCESS, "Failed to create command pool");
+    logger.check(result == VK_SUCCESS, "Failed to create command pool");
 }
 
 VulkanCommandPool::VulkanCommandPool(const VulkanDevice& device, const VulkanQueue& queue)

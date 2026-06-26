@@ -30,8 +30,8 @@ BufferFiller::BufferFiller(
     {
         LOG_METHOD();
 
-        logger().check(m_physical_device != VK_NULL_HANDLE, "Physical device is not initialized");
-        logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+        logger.check(m_physical_device != VK_NULL_HANDLE, "Physical device is not initialized");
+        logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
     }
 
 VulkanBuffer& BufferFiller::fill_buffer(

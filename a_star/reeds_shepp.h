@@ -1,14 +1,52 @@
 #pragma once
-// #include "../nonholonomic_pos.h"
-#include "a_star_structures.h"
+#include "../nonholonomic_pos.h"
 #include <vector>
 #include <array>
 #include <functional>
 
+enum class Steering : int {
+    LEFT = -1,
+    RIGHT = 1,
+    STRAIGHT = 0
+};
+
+enum class Gear : int {
+    FORWARD = 1,
+    BACKWARD = -1
+};
+
+
+class NonholonomicPathElement {
+public:
+    float dist = 0;
+    Steering steering = Steering::STRAIGHT;
+    Gear gear = Gear::FORWARD;
+
+    NonholonomicPathElement(float dist = 0, Steering steering = Steering::STRAIGHT, Gear gear = Gear::FORWARD) {
+        this->dist = dist;
+        this->steering = steering;
+        this->gear = gear;
+
+        if (this->dist < 0) {
+            this->dist = -this->dist;
+            reverse_gear();
+        }
+    }
+
+    void reverse_steering() {
+        if (steering == Steering::LEFT) steering = Steering::RIGHT;
+        else if (steering == Steering::RIGHT) steering = Steering::LEFT;
+    }
+
+    void reverse_gear() {
+        gear = (gear == Gear::FORWARD) ? Gear::BACKWARD : Gear::FORWARD;
+    }
+};
+
 class ReedsShepp {
 public:
     ReedsShepp() = default;
-    
+    // std::vector<NonholonomicPos> find_path(NonholonomicPos& start, NonholonomicPos& end);
     static glm::vec3 change_of_basis_r(glm::vec3& p1, glm::vec3& p2, float min_radius);
     static NonholonomicPos change_of_basis_r(NonholonomicPos& p1, NonholonomicPos& p2, float min_radius);
     static glm::vec2 cart_to_polar(glm::vec2 pos);

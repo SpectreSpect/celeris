@@ -17,7 +17,7 @@ EquirectToCubemapPass::EquirectToCubemapPass(VulkanEngine& engine, ComputePassMa
 Cubemap EquirectToCubemapPass::generate(VulkanTexture2D& equirectangular_map, uint32_t face_size) {
     LOG_METHOD();
 
-    logger().check(face_size != 0, "Face size must be greater than 0");
+    logger.check(face_size != 0, "Face size must be greater than 0");
 
     uint32_t mip_levels = Cubemap::calculate_mip_levels({face_size, face_size});
 
@@ -69,16 +69,16 @@ void EquirectToCubemapPass::generate_cubemap_mipmaps(
 {
     LOG_METHOD();
 
-    logger().check(cubemap.image().handle() != VK_NULL_HANDLE, "Cubemap image is not initialized");
-    logger().check(cubemap.mip_levels() != 0, "Cubemap mip levels count is zero");
-    logger().check(cubemap.array_layers() == Cubemap::face_count, "Cubemap must have 6 faces");
+    logger.check(cubemap.image().handle() != VK_NULL_HANDLE, "Cubemap image is not initialized");
+    logger.check(cubemap.mip_levels() != 0, "Cubemap mip levels count is zero");
+    logger.check(cubemap.array_layers() == Cubemap::face_count, "Cubemap must have 6 faces");
 
-    logger().check(
+    logger.check(
         cubemap.image().has_usage(VK_IMAGE_USAGE_TRANSFER_SRC_BIT),
         "Cubemap image must have VK_IMAGE_USAGE_TRANSFER_SRC_BIT for mip generation"
     );
 
-    logger().check(
+    logger.check(
         cubemap.image().has_usage(VK_IMAGE_USAGE_TRANSFER_DST_BIT),
         "Cubemap image must have VK_IMAGE_USAGE_TRANSFER_DST_BIT for mip generation"
     );

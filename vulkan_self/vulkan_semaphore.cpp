@@ -19,7 +19,7 @@ VulkanSemaphore::VulkanSemaphore(const VulkanDevice& device) : m_device(device.h
         &m_semaphore
     );
 
-    logger().check(
+    logger.check(
         result == VK_SUCCESS,
         "Failed to create semaphore"
     );

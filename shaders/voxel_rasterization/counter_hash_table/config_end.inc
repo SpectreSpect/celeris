@@ -9,5 +9,4 @@
 #undef KEY_HASH_FUNC
 #undef KEY_COMP_FUNC
 #undef VALUE_INIT_FUNC
-#undef MAX_CAS_ATTEMPTS
 // #undef INIT_SLOT_CALLBACK

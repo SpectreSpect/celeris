@@ -91,33 +91,33 @@ std::vector<VulkanImageView> VulkanImageView::create_image_views(
 {
     LOG_NAMED("VulkanImageView");
 
-    logger().check(!images.empty(), "Attempt to create views from zero amount of images");
-    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
-    logger().check(aspect_mask != 0, "Image view aspect mask is empty");
+    logger.check(!images.empty(), "Attempt to create views from zero amount of images");
+    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(aspect_mask != 0, "Image view aspect mask is empty");
 
-    logger().check(mip_levels_count != 0, "Mip levels count is zero");
-    logger().check(array_levels_count != 0, "Array levels count is zero");
+    logger.check(mip_levels_count != 0, "Mip levels count is zero");
+    logger.check(array_levels_count != 0, "Array levels count is zero");
 
     for (size_t i = 0; i < images.size(); i++) {
         const VulkanImage& image = images[i];
 
-        logger().check(image.handle() != VK_NULL_HANDLE)
+        logger.check(image.handle() != VK_NULL_HANDLE)
             << "Image " << clr(std::to_string(i), LoggerPalette::black)
             << " is not initialized\n";
 
-        logger().check(image.format() != VK_FORMAT_UNDEFINED)
+        logger.check(image.format() != VK_FORMAT_UNDEFINED)
             << "Image " << clr(std::to_string(i), LoggerPalette::black)
             << " has undefined format\n";
 
-        logger().check(image.mip_levels() != 0)
+        logger.check(image.mip_levels() != 0)
             << "Image " << clr(std::to_string(i), LoggerPalette::black)
             << " has zero mip levels\n";
 
-        logger().check(image.array_layers() != 0)
+        logger.check(image.array_layers() != 0)
             << "Image " << clr(std::to_string(i), LoggerPalette::black)
             << " has zero array layers\n";
 
-        logger().check(base_mip_level < image.mip_levels())
+        logger.check(base_mip_level < image.mip_levels())
             << "Base mip level ("
             << clr(std::to_string(base_mip_level), LoggerPalette::blue)
             << ") is out of bounds for image "
@@ -126,7 +126,7 @@ std::vector<VulkanImageView> VulkanImageView::create_image_views(
             << clr(std::to_string(image.mip_levels()), LoggerPalette::blue)
             << ")\n";
 
-        logger().check(mip_levels_count <= image.mip_levels() - base_mip_level)
+        logger.check(mip_levels_count <= image.mip_levels() - base_mip_level)
             << "Mip levels range ["
             << clr(std::to_string(base_mip_level), LoggerPalette::blue)
             << ", "
@@ -137,7 +137,7 @@ std::vector<VulkanImageView> VulkanImageView::create_image_views(
             << clr(std::to_string(image.mip_levels()), LoggerPalette::blue)
             << ")\n";
 
-        logger().check(base_array_level < image.array_layers())
+        logger.check(base_array_level < image.array_layers())
             << "Base array level ("
             << clr(std::to_string(base_array_level), LoggerPalette::blue)
             << ") is out of bounds for image "
@@ -146,7 +146,7 @@ std::vector<VulkanImageView> VulkanImageView::create_image_views(
             << clr(std::to_string(image.array_layers()), LoggerPalette::blue)
             << ")\n";
 
-        logger().check(array_levels_count <= image.array_layers() - base_array_level)
+        logger.check(array_levels_count <= image.array_layers() - base_array_level)
             << "Array layers range ["
             << clr(std::to_string(base_array_level), LoggerPalette::blue)
             << ", "
@@ -221,12 +221,12 @@ std::vector<VulkanImageView> VulkanImageView::from_swapchain(const VulkanDevice&
 void VulkanImageView::create_view(const VkImageViewCreateInfo& desc, const VulkanDevice& device) {
     LOG_METHOD();
 
-    logger().check(m_image_view == VK_NULL_HANDLE, "Image view was already initialized");
-    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
-    logger().check(desc.sType == VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, "Invalid VkImageViewCreateInfo::sType");
-    logger().check(desc.image != VK_NULL_HANDLE, "Image is not initialized");
-    logger().check(desc.format != VK_FORMAT_UNDEFINED, "Image view format is undefined");
-    logger().check(desc.subresourceRange.aspectMask != 0, "Image view aspect mask is empty");
+    logger.check(m_image_view == VK_NULL_HANDLE, "Image view was already initialized");
+    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(desc.sType == VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, "Invalid VkImageViewCreateInfo::sType");
+    logger.check(desc.image != VK_NULL_HANDLE, "Image is not initialized");
+    logger.check(desc.format != VK_FORMAT_UNDEFINED, "Image view format is undefined");
+    logger.check(desc.subresourceRange.aspectMask != 0, "Image view aspect mask is empty");
 
     m_device = device.handle();
 
@@ -237,5 +237,5 @@ void VulkanImageView::create_view(const VkImageViewCreateInfo& desc, const Vulka
         &m_image_view
     );
 
-    logger().check(result == VK_SUCCESS, "Failed to create swapchain image view");
+    logger.check(result == VK_SUCCESS, "Failed to create swapchain image view");
 }

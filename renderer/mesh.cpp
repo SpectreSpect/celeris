@@ -21,20 +21,20 @@ Mesh::Mesh(VulkanPhysicalDevice& physical_device, VulkanDevice& device, VulkanRe
         ) {
     LOG_METHOD();
 
-    logger().check(vertex_data != nullptr, "Failed to create mesh: vertex data is null");
-    logger().check(index_data != nullptr, "Failed to create mesh: index data is null");
+    logger.check(vertex_data != nullptr, "Failed to create mesh: vertex data is null");
+    logger.check(index_data != nullptr, "Failed to create mesh: index data is null");
 
-    logger().check(vertex_data_size_bytes > 0, "Failed to create mesh: vertex data size is 0");
-    logger().check(index_data_size_bytes > 0, "Failed to create mesh: index data size is 0");
+    logger.check(vertex_data_size_bytes > 0, "Failed to create mesh: vertex data size is 0");
+    logger.check(index_data_size_bytes > 0, "Failed to create mesh: index data size is 0");
 
     m_index_count = index_data_size_bytes / sizeof(unsigned int);
 
-    logger().check(
+    logger.check(
         m_index_count >= 3,
         "Failed to create mesh: index count must be at least 3"
     );
 
-    logger().check(
+    logger.check(
         m_index_count % 3 == 0,
         "Failed to create mesh: index count must be divisible by 3 for triangle list topology"
     );
@@ -52,20 +52,20 @@ Mesh::Mesh(VulkanPhysicalDevice& physical_device, VulkanDevice& device, VulkanRe
 // {
 //     LOG_METHOD();
 
-//     logger().check(vertex_data != nullptr, "Failed to create mesh: vertex data is null");
-//     logger().check(index_data != nullptr, "Failed to create mesh: index data is null");
+//     logger.check(vertex_data != nullptr, "Failed to create mesh: vertex data is null");
+//     logger.check(index_data != nullptr, "Failed to create mesh: index data is null");
 
-//     logger().check(vertex_data_size_bytes > 0, "Failed to create mesh: vertex data size is 0");
-//     logger().check(index_data_size_bytes > 0, "Failed to create mesh: index data size is 0");
+//     logger.check(vertex_data_size_bytes > 0, "Failed to create mesh: vertex data size is 0");
+//     logger.check(index_data_size_bytes > 0, "Failed to create mesh: index data size is 0");
 
 //     m_index_count = index_data_size_bytes / sizeof(unsigned int);
 
-//     logger().check(
+//     logger.check(
 //         m_index_count >= 3,
 //         "Failed to create mesh: index count must be at least 3"
 //     );
 
-//     logger().check(
+//     logger.check(
 //         m_index_count % 3 == 0,
 //         "Failed to create mesh: index count must be divisible by 3 for triangle list topology"
 //     );

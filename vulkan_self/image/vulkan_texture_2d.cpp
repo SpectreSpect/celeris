@@ -148,8 +148,8 @@ VulkanTexture2DDesc VulkanTexture2D::default_desc(VkExtent2D extent2d) {
 uint32_t VulkanTexture2D::calculate_mip_levels(VkExtent2D extent2d) {
     LOG_NAMED("VulkanTexture2D");
 
-    logger().check(extent2d.width != 0, "Texture width is zero");
-    logger().check(extent2d.height != 0, "Texture height is zero");
+    logger.check(extent2d.width != 0, "Texture width is zero");
+    logger.check(extent2d.height != 0, "Texture height is zero");
 
     uint32_t max_dimension = std::max(extent2d.width, extent2d.height);
 
@@ -174,17 +174,17 @@ void VulkanTexture2D::transition_layout(
 {
     LOG_METHOD();
 
-    logger().check(m_image.handle() != VK_NULL_HANDLE, "Texture image is not initialized");
-    logger().check(new_layout != VK_IMAGE_LAYOUT_UNDEFINED, "New texture layout must not be UNDEFINED");
-    logger().check(src_stage != 0, "Source stage must not be zero");
-    logger().check(dst_stage != 0, "Destination stage must not be zero");
+    logger.check(m_image.handle() != VK_NULL_HANDLE, "Texture image is not initialized");
+    logger.check(new_layout != VK_IMAGE_LAYOUT_UNDEFINED, "New texture layout must not be UNDEFINED");
+    logger.check(src_stage != 0, "Source stage must not be zero");
+    logger.check(dst_stage != 0, "Destination stage must not be zero");
 
     if (level_count == 0) {
         level_count = m_image.mip_levels() - base_mip_level;
     }
 
-    logger().check(base_mip_level < m_image.mip_levels(), "Base mip level is out of range");
-    logger().check(level_count <= m_image.mip_levels() - base_mip_level, "Mip level range is out of bounds");
+    logger.check(base_mip_level < m_image.mip_levels(), "Base mip level is out of range");
+    logger.check(level_count <= m_image.mip_levels() - base_mip_level, "Mip level range is out of bounds");
 
     m_image.memory_barrier(
         command_buffer,
@@ -211,20 +211,20 @@ VulkanImage VulkanTexture2D::create_image(
 {
     LOG_NAMED("VulkanTexture2D");
 
-    logger().check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
 
-    logger().check(desc.extent2d.width != 0, "Texture width is zero");
-    logger().check(desc.extent2d.height != 0, "Texture height is zero");
+    logger.check(desc.extent2d.width != 0, "Texture width is zero");
+    logger.check(desc.extent2d.height != 0, "Texture height is zero");
 
-    logger().check(desc.format != VK_FORMAT_UNDEFINED, "Texture format is undefined");
-    logger().check(desc.usage != 0, "Texture usage flags must not be zero");
+    logger.check(desc.format != VK_FORMAT_UNDEFINED, "Texture format is undefined");
+    logger.check(desc.usage != 0, "Texture usage flags must not be zero");
     uint32_t mip_levels = desc.mip_levels;
     if (mip_levels == 0) {
         mip_levels = calculate_mip_levels(desc.extent2d);
     }
 
-    logger().check(mip_levels != 0, "Texture mip levels count is zero");
+    logger.check(mip_levels != 0, "Texture mip levels count is zero");
 
     VkImageUsageFlags usage = desc.usage;
 
@@ -257,20 +257,20 @@ VulkanImageView VulkanTexture2D::create_view(
 {
     LOG_NAMED("VulkanTexture2D");
 
-    logger().check(image.handle() != VK_NULL_HANDLE, "Texture image is not initialized");
-    logger().check(desc.view_aspect_mask != 0, "Texture view aspect mask is empty");
+    logger.check(image.handle() != VK_NULL_HANDLE, "Texture image is not initialized");
+    logger.check(desc.view_aspect_mask != 0, "Texture view aspect mask is empty");
 
     uint32_t mip_levels_count = desc.view_mip_levels_count;
     if (mip_levels_count == 0) {
         mip_levels_count = image.mip_levels() - desc.view_base_mip_level;
     }
 
-    logger().check(desc.view_base_mip_level < image.mip_levels(), "Texture view base mip level is out of range");
-    logger().check(mip_levels_count <= image.mip_levels() - desc.view_base_mip_level, "Texture view mip level range is out of bounds");
+    logger.check(desc.view_base_mip_level < image.mip_levels(), "Texture view base mip level is out of range");
+    logger.check(mip_levels_count <= image.mip_levels() - desc.view_base_mip_level, "Texture view mip level range is out of bounds");
 
-    logger().check(desc.view_base_array_layer == 0, "Texture2D view base array layer must be 0");
-    logger().check(desc.view_array_layers_count == 1, "Texture2D view array layer count must be 1");
-    logger().check(desc.view_type == VK_IMAGE_VIEW_TYPE_2D, "Texture2D view type must be VK_IMAGE_VIEW_TYPE_2D");
+    logger.check(desc.view_base_array_layer == 0, "Texture2D view base array layer must be 0");
+    logger.check(desc.view_array_layers_count == 1, "Texture2D view array layer count must be 1");
+    logger.check(desc.view_type == VK_IMAGE_VIEW_TYPE_2D, "Texture2D view type must be VK_IMAGE_VIEW_TYPE_2D");
 
     return VulkanImageView(
         device,
@@ -290,7 +290,7 @@ VkSamplerCreateInfo VulkanTexture2D::create_sampler_desc(
 {
     LOG_NAMED("VulkanTexture2D");
 
-    logger().check(mip_levels != 0, "Sampler mip levels count is zero");
+    logger.check(mip_levels != 0, "Sampler mip levels count is zero");
 
     VkSamplerCreateInfo sampler_info{};
     sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;

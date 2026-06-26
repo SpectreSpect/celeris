@@ -39,30 +39,14 @@ uint32_t InstancedRenderObject::instance_count() const {
     return m_instance_buffer_view.instance_count();
 }
 
-void InstancedRenderObject::set_instance_count(uint32_t count) {
-    LOG_METHOD();
-
-    logger().check(instance_buffer_view_valid(), "Instance buffer must be valid");
-    
-    m_instance_buffer_view.set_instance_count(count);
-}
-
 uint32_t InstancedRenderObject::instance_size() const {
     return m_instance_buffer_view.instance_size();
 }
 
-InstanceBufferView InstancedRenderObject::instance_view() const {
+InstanceBufferView InstancedRenderObject::get_instance_view() const {
     return m_instance_buffer_view;
 }
 
-const VulkanBuffer& InstancedRenderObject::instance_buffer() const {
-    LOG_METHOD();
-
-    return m_instance_buffer_view.buffer();
-}
-
-VulkanBuffer& InstancedRenderObject::instance_buffer() {
-    LOG_METHOD();
-
+VulkanBuffer* InstancedRenderObject::instance_buffer() {
     return m_instance_buffer_view.buffer();
 }

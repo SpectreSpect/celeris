@@ -2,7 +2,7 @@
 
 GlfwContext::GlfwContext() {
     glfwSetErrorCallback(glfw_error_callback);
-    logger().check(glfwInit(), "Failed to initialize GLFW");
+    logger.check(glfwInit(), "Failed to initialize GLFW");
 }
 
 GlfwContext::~GlfwContext() {
@@ -12,7 +12,7 @@ GlfwContext::~GlfwContext() {
 void GlfwContext::glfw_error_callback(int code, const char* description) {
     LOG_NAMED("GlfwContext");
 
-    logger().log_traceback();
+    logger.log_traceback();
 
     std::cerr << "GLFW error [" << code << "]: " << description << std::endl;
 

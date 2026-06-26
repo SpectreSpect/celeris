@@ -18,16 +18,16 @@ PipelineLayoutBuilder& PipelineLayoutBuilder::add_push_constants(
 {
     LOG_METHOD();
 
-    logger().check(size_bytes > 0)
+    logger.check(size_bytes > 0)
         << "Push constant range size must be greater than zero\n";
 
-    logger().check(size_bytes % 4 == 0)
+    logger.check(size_bytes % 4 == 0)
         << "Push constant range size must be a multiple of 4\n";
 
-    logger().check(offset % 4 == 0)
+    logger.check(offset % 4 == 0)
         << "Push constant range offset must be a multiple of 4\n";
 
-    logger().check(stage_flags != 0)
+    logger.check(stage_flags != 0)
         << "Push constant range stage flags must not be zero\n";
 
     VkPushConstantRange push_constant_range{};
@@ -80,14 +80,14 @@ VulkanPipelineLayout::VulkanPipelineLayout(const VulkanDevice& device) : m_devic
         &m_pipeline_layout
     );
 
-    logger().check(result == VK_SUCCESS, "Failed to create pipeline layout");
+    logger.check(result == VK_SUCCESS, "Failed to create pipeline layout");
 }
 
 VulkanPipelineLayout::VulkanPipelineLayout(const PipelineLayoutBuilder& builder) : m_device(builder.desc().device)
 {
     LOG_METHOD();
 
-    logger().check(m_device != VK_NULL_HANDLE)
+    logger.check(m_device != VK_NULL_HANDLE)
         << "Device is not initialized. Init it or specify in the method "
         << VSCODE_CLR_STREAM("PipelineLayoutBuilder", "set_device") << "\n";
 
@@ -114,7 +114,7 @@ VulkanPipelineLayout::VulkanPipelineLayout(const PipelineLayoutBuilder& builder)
         &m_pipeline_layout
     );
 
-    logger().check(result == VK_SUCCESS, "Failed to create pipeline layout");
+    logger.check(result == VK_SUCCESS, "Failed to create pipeline layout");
 }
 
 VulkanPipelineLayout::~VulkanPipelineLayout() noexcept {

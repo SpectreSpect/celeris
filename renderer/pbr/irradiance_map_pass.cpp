@@ -19,14 +19,14 @@ IrradiancePass::IrradiancePass(
 Cubemap IrradiancePass::generate(Cubemap& environment_map, uint32_t face_size) {
     LOG_METHOD();
 
-    logger().check(face_size != 0, "Face size must be greater than 0");
+    logger.check(face_size != 0, "Face size must be greater than 0");
 
-    logger().check(environment_map.image().handle() != VK_NULL_HANDLE, "Environment map image is not initialized");
-    logger().check(environment_map.view().handle() != VK_NULL_HANDLE, "Environment map image view is not initialized");
-    logger().check(environment_map.sampler().handle() != VK_NULL_HANDLE, "Environment map sampler is not initialized");
-    logger().check(environment_map.array_layers() == Cubemap::face_count, "Environment map must have 6 faces");
+    logger.check(environment_map.image().handle() != VK_NULL_HANDLE, "Environment map image is not initialized");
+    logger.check(environment_map.view().handle() != VK_NULL_HANDLE, "Environment map image view is not initialized");
+    logger.check(environment_map.sampler().handle() != VK_NULL_HANDLE, "Environment map sampler is not initialized");
+    logger.check(environment_map.array_layers() == Cubemap::face_count, "Environment map must have 6 faces");
 
-    logger().check(
+    logger.check(
         environment_map.layout() == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         "Environment map must be in VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL"
     );
@@ -108,17 +108,17 @@ Cubemap IrradiancePass::generate(Cubemap& environment_map, uint32_t face_size) {
 void IrradiancePass::generate_into(Cubemap& environment_map, CubemapArray& irradiance_maps, uint32_t cubemap_id) {
     LOG_METHOD();
 
-    logger().check(irradiance_maps.extent().width != 0, "Irradiance cubemap array width is zero");
-    logger().check(irradiance_maps.extent().height != 0, "Irradiance cubemap array height is zero");
-    logger().check(irradiance_maps.mip_levels() == 1, "Irradiance cubemap array must have exactly one mip level");
-    logger().check(irradiance_maps.format() == VK_FORMAT_R32G32B32A32_SFLOAT, "Irradiance cubemap array must use VK_FORMAT_R32G32B32A32_SFLOAT");
-    logger().check(cubemap_id < irradiance_maps.cubemap_count(), "Irradiance cubemap id is out of range");
+    logger.check(irradiance_maps.extent().width != 0, "Irradiance cubemap array width is zero");
+    logger.check(irradiance_maps.extent().height != 0, "Irradiance cubemap array height is zero");
+    logger.check(irradiance_maps.mip_levels() == 1, "Irradiance cubemap array must have exactly one mip level");
+    logger.check(irradiance_maps.format() == VK_FORMAT_R32G32B32A32_SFLOAT, "Irradiance cubemap array must use VK_FORMAT_R32G32B32A32_SFLOAT");
+    logger.check(cubemap_id < irradiance_maps.cubemap_count(), "Irradiance cubemap id is out of range");
 
-    logger().check(environment_map.image().handle() != VK_NULL_HANDLE, "Environment map image is not initialized");
-    logger().check(environment_map.view().handle() != VK_NULL_HANDLE, "Environment map image view is not initialized");
-    logger().check(environment_map.sampler().handle() != VK_NULL_HANDLE, "Environment map sampler is not initialized");
-    logger().check(environment_map.array_layers() == Cubemap::face_count, "Environment map must have 6 faces");
-    logger().check(
+    logger.check(environment_map.image().handle() != VK_NULL_HANDLE, "Environment map image is not initialized");
+    logger.check(environment_map.view().handle() != VK_NULL_HANDLE, "Environment map image view is not initialized");
+    logger.check(environment_map.sampler().handle() != VK_NULL_HANDLE, "Environment map sampler is not initialized");
+    logger.check(environment_map.array_layers() == Cubemap::face_count, "Environment map must have 6 faces");
+    logger.check(
         environment_map.layout() == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         "Environment map must be in VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL"
     );

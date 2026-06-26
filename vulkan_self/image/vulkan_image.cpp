@@ -34,17 +34,17 @@ VulkanImage::VulkanImage(
 {
     LOG_METHOD();
 
-    logger().check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
 
-    logger().check(extent.width != 0, "Image width is zero");
-    logger().check(extent.height != 0, "Image height is zero");
-    logger().check(extent.depth != 0, "Image depth is zero");
+    logger.check(extent.width != 0, "Image width is zero");
+    logger.check(extent.height != 0, "Image height is zero");
+    logger.check(extent.depth != 0, "Image depth is zero");
 
-    logger().check(format != VK_FORMAT_UNDEFINED, "Image format is undefined");
-    logger().check(usage != 0, "Image usage flags are empty");
-    logger().check(mip_levels != 0, "Image mip levels count is zero");
-    logger().check(array_layers != 0, "Image array layers count is zero");
+    logger.check(format != VK_FORMAT_UNDEFINED, "Image format is undefined");
+    logger.check(usage != 0, "Image usage flags are empty");
+    logger.check(mip_levels != 0, "Image mip levels count is zero");
+    logger.check(array_layers != 0, "Image array layers count is zero");
 
     VkImageCreateInfo image_info{};
     image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -70,7 +70,7 @@ VulkanImage::VulkanImage(
         &m_image
     );
 
-    logger().check(result == VK_SUCCESS, "Failed to create Vulkan image");
+    logger.check(result == VK_SUCCESS, "Failed to create Vulkan image");
 
     VkMemoryRequirements memory_requirements{};
     vkGetImageMemoryRequirements(
@@ -225,11 +225,11 @@ void VulkanImage::memory_barrier(
 {
     LOG_METHOD();
 
-    logger().check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
-    logger().check(m_image != VK_NULL_HANDLE, "Image is not initialized");
-    logger().check(src_stage != 0, "Source pipeline stage mask is empty");
-    logger().check(dst_stage != 0, "Destination pipeline stage mask is empty");
-    logger().check(aspect_mask != 0, "Image aspect mask is empty");
+    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+    logger.check(m_image != VK_NULL_HANDLE, "Image is not initialized");
+    logger.check(src_stage != 0, "Source pipeline stage mask is empty");
+    logger.check(dst_stage != 0, "Destination pipeline stage mask is empty");
+    logger.check(aspect_mask != 0, "Image aspect mask is empty");
 
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -271,7 +271,7 @@ void VulkanImage::barrier_undefined_to_transfer_dst(
 {
     LOG_METHOD();
 
-    logger().check(
+    logger.check(
         has_usage(VK_IMAGE_USAGE_TRANSFER_DST_BIT),
         "Image was not created with VK_IMAGE_USAGE_TRANSFER_DST_BIT"
     );
@@ -303,12 +303,12 @@ void VulkanImage::barrier_transfer_write_to_shader_read(
 {
     LOG_METHOD();
 
-    logger().check(
+    logger.check(
         has_usage(VK_IMAGE_USAGE_SAMPLED_BIT) || has_usage(VK_IMAGE_USAGE_STORAGE_BIT),
         "Image was not created with shader-readable usage"
     );
 
-    logger().check(shader_stage != 0, "Shader stage mask is empty");
+    logger.check(shader_stage != 0, "Shader stage mask is empty");
 
     memory_barrier(
         command_buffer,
@@ -339,16 +339,16 @@ void VulkanImage::copy_from_buffer(
 {
     LOG_METHOD();
 
-    logger().check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
-    logger().check(m_image != VK_NULL_HANDLE, "Image is not initialized");
-    logger().check(src_buffer.handle() != VK_NULL_HANDLE, "Source buffer is not initialized");
+    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+    logger.check(m_image != VK_NULL_HANDLE, "Image is not initialized");
+    logger.check(src_buffer.handle() != VK_NULL_HANDLE, "Source buffer is not initialized");
 
-    logger().check(
+    logger.check(
         has_usage(VK_IMAGE_USAGE_TRANSFER_DST_BIT),
         "Image was not created with VK_IMAGE_USAGE_TRANSFER_DST_BIT"
     );
 
-    logger().check(
+    logger.check(
         src_buffer.has_usage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT),
         "Source buffer was not created with VK_BUFFER_USAGE_TRANSFER_SRC_BIT"
     );
@@ -392,15 +392,15 @@ std::vector<VulkanImage> VulkanImage::create_images(
 {
     LOG_NAMED("VulkanImage");
 
-    logger().check(count_images != 0, "Attempt to create zero images");
-    logger().check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
-    logger().check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(count_images != 0, "Attempt to create zero images");
+    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger.check(device.handle() != VK_NULL_HANDLE, "Device is not initialized");
 
-    logger().check(extent.width != 0, "Image width is zero");
-    logger().check(extent.height != 0, "Image height is zero");
+    logger.check(extent.width != 0, "Image width is zero");
+    logger.check(extent.height != 0, "Image height is zero");
 
-    logger().check(format != VK_FORMAT_UNDEFINED, "Image format is undefined");
-    logger().check(usage != 0, "Image usage flags are empty");
+    logger.check(format != VK_FORMAT_UNDEFINED, "Image format is undefined");
+    logger.check(usage != 0, "Image usage flags are empty");
     
     std::vector<VulkanImage> images;
     images.reserve(count_images);

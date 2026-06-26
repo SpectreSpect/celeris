@@ -1,81 +1,26 @@
 #include "a_star.h"
 
-#include <cmath>
 
-AStar::AStar(OccupancyGrid3D& occupancy_grid, const AStarDesc& desc) 
-    :   m_grid(&occupancy_grid),
-        m_params(desc) {}
-
-
-
-
-// float AStar::get_heuristic(glm::ivec3 a, glm::ivec3 b) {
-//     return glm::distance(glm::vec3(a), glm::vec3(b));
-// }
-
-float AStar::get_heuristic(glm::ivec3 a, glm::ivec3 b)
-{
-    float dx = std::abs(a.x - b.x);
-    float dz = std::abs(a.z - b.z);
-
-    if (!m_params.allow_diagonal_moves)
-        return dx + dz; // Manhattan distance
-
-    float diagonal = std::min(dx, dz);
-    float straight = std::max(dx, dz) - diagonal;
-
-    return diagonal * std::sqrt(2.0f) + straight; // Octile distance
+AStar::AStar() {
+    this->grid = new OccupancyGrid3D();
 }
 
-std::vector<glm::ivec3> AStar::get_straight_path(glm::ivec3& start, glm::ivec3& end, std::vector<glm::ivec3>& out_path) {
-    LOG_METHOD();
-
-    glm::ivec3 delta = end - start;
-    int steps = std::max({std::abs(delta.x), std::abs(delta.y), std::abs(delta.z)});
-
-    out_path.clear();
-    out_path.reserve(steps + 1);
-
-    if (steps == 0) {
-        out_path.push_back(start);
-        return out_path;
-    }
-
-    glm::vec3 start_f = glm::vec3(start);
-    glm::vec3 step = glm::vec3(delta) / static_cast<float>(steps);
-
-    for (int i = 0; i <= steps; i++) {
-        glm::vec3 p = start_f + step * static_cast<float>(i);
-        out_path.push_back(glm::ivec3(glm::round(p)));
-    }
-
-    return out_path;
+AStar::AStar(VoxelGrid* voxel_grid) {
+    this->grid = new VoxelOccupancyGrid3D(voxel_grid);
 }
 
-bool AStar::try_straight_shot(glm::ivec3& start, glm::ivec3& end, std::vector<glm::ivec3>& out_path) {
-    LOG_METHOD();
-
-    get_straight_path(start, end, out_path);
-
-    if (out_path.empty())
-        return false;
-
-    if (!m_grid->adjust_to_ground(out_path, m_params.max_step_up, m_params.max_drop, m_params.max_y_diff))
-        return false;
-    
-    return true;
+float AStar::get_heuristic(glm::ivec3 a, glm::ivec3 b) {
+    return glm::distance(glm::vec3(a), glm::vec3(b));
 }
 
 PlainAstarData AStar::reconstruct_path(std::unordered_map<uint64_t, AStarCell> closed_heap, glm::ivec3 pos) {
-    LOG_METHOD();
-    
     PlainAstarData plain_astar_data;
+    // plain_astar_data.path.push_back(pos);
     glm::ivec3 cur_pos = pos;
     float dist_to_end = 0;
 
     while (true) {
-        uint64_t cur_key = math_utils::pack_key(cur_pos.x, cur_pos.y, cur_pos.z);
-
+        uint64_t cur_key = grid->pack_key(cur_pos.x, cur_pos.y, cur_pos.z);
         auto it = closed_heap.find(cur_key);
 
         if (it == closed_heap.end())
@@ -99,9 +44,72 @@ PlainAstarData AStar::reconstruct_path(std::unordered_map<uint64_t, AStarCell> c
     return plain_astar_data;
 }
 
-PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
-    LOG_METHOD();
+// bool AStar::adjust_to_ground(glm::ivec3& voxel_pos, int max_step_up, int max_drop) {
+//     auto solid = [&](const glm::ivec3& q) {
+//         return grid->get_cell(q).solid;
+//     };
 
+//     // 1) If we're inside solid, try stepping up
+//     if (solid(voxel_pos)) {
+//         bool freed = false;
+//         for (int k = 1; k <= max_step_up; ++k) {
+//             glm::ivec3 up = voxel_pos + glm::ivec3(0, k, 0);
+//             if (!solid(up)) {
+//                 voxel_pos = up;
+//                 freed = true;
+//                 break;
+//             }
+//         }
+//         if (!freed) return false;
+//     }
+
+//     // 2) Now find a y such that: current is empty AND below is solid
+//     // (and don't drop more than max_drop)
+//     for (int drop = 0; drop <= max_drop; ++drop) {
+//         if (!solid(voxel_pos) && solid(voxel_pos + glm::ivec3(0, -1, 0)))
+//             return true;
+
+//         // If we somehow are in solid, we're already too low → reject
+//         // (or you could step up 1, but reject is safer)
+//         if (solid(voxel_pos))
+//             return false;
+
+//         voxel_pos.y -= 1;
+//     }
+
+//     return false;
+// }
+
+// float my_smoothstep(float e0, float e1, float x) {
+//     float t = glm::clamp((x - e0) / (e1 - e0), 0.0f, 1.0f);
+//     return t * t * (3.0f - 2.0f * t);
+// }
+
+// float directional_peak(glm::vec3 a_in, glm::vec3 b_in, glm::vec3 p_in,
+//                        float sigma, float halfAngleRad, float sharpnessK,
+//                        bool suppressAlongPlusD = true)
+// {
+//     glm::vec2 a = glm::vec2(a_in.x, a_in.z);
+//     glm::vec2 b = glm::vec2(b_in.x, b_in.z);
+//     glm::vec2 p = glm::vec2(p_in.x, p_in.z);
+
+//     glm::vec2 d = glm::normalize(a - b);      // "bad" direction
+//     glm::vec2 r = p - a;
+//     float dist = glm::length(r);
+
+//     float R = std::exp(- (dist*dist) / (sigma*sigma));
+
+//     if (dist < 1e-8f) return R;               // at a: purely radial peak
+
+//     glm::vec2 u = r / dist;
+//     float c = glm::dot(u, suppressAlongPlusD ? d : -d);
+
+//     float ca = std::cos(halfAngleRad);
+//     float N = 1.0f - my_smoothstep(ca, 1.0f, c); // 1 outside cone, 0 inside
+//     return R * std::pow(N, sharpnessK);
+// }
+
+PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
     std::priority_queue<AStarCell, std::vector<AStarCell>, ByPriority> pq;
     std::unordered_map<uint64_t, AStarCell> closed_heap;
     std::unordered_map<uint64_t, float> g_score;
@@ -110,8 +118,9 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
     start.pos = start_pos;
     start.no_parent = true;
     start.g = 0;
-    start.f = get_heuristic(start_pos, end_pos);
+    start.f = 0;
 
+    int limit = 10000;
     int counter = 0;
 
     pq.push(start);
@@ -120,10 +129,12 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
         AStarCell cur_cell = pq.top();
         pq.pop();
 
-        if (counter >= m_params.iteration_limit)
+        if (counter >= limit)
             return {};
+
         
-        uint64_t cur_key = math_utils::pack_key(cur_cell.pos.x, cur_cell.pos.y, cur_cell.pos.z);
+
+        uint64_t cur_key = grid->pack_key(cur_cell.pos.x, cur_cell.pos.y, cur_cell.pos.z);
         auto cur_it = g_score.find(cur_key);
 
         if (cur_it != g_score.end())
@@ -132,46 +143,9 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
         
         closed_heap[cur_key] = cur_cell;
 
-        // if (m_params.use_straight_fallback && counter % m_params.try_straight_interval == 0) {
-        //     std::vector<glm::ivec3> out_path;
-        //     if (try_straight_shot(cur_cell.pos, end_pos, out_path)) {
-        //         PlainAstarData data = reconstruct_path(closed_heap, cur_cell.pos);
-
-        //         if (out_path.size() == 1)
-        //             return data;
-
-        //         float dist_to_end = data.dist_to_end.back();
-        //         glm::ivec3 prev_pos = data.path.back();
-
-        //         for (int i = 1; i < out_path.size(); i++) {
-        //             glm::ivec3& cur_pos = out_path[i];
-
-        //             dist_to_end += glm::distance((glm::vec3)cur_pos, (glm::vec3)prev_pos);
-                    
-        //             data.path.push_back(cur_pos);
-        //             data.dist_to_end.push_back(dist_to_end);
-                    
-        //             prev_pos = out_path[i];
-        //         }
-
-        //         return data;
-        //     }
-        // }
-
         counter++;
 
-        // if (cur_cell.pos == end_pos) {
-        //     return reconstruct_path(closed_heap, cur_cell.pos);
-        // }
-
-        bool reached_goal = false;
-
-        if (m_params.allow_flying_over_precepices)
-            reached_goal = (cur_cell.pos.x == end_pos.x) && (cur_cell.pos.z == end_pos.z);
-        else
-            reached_goal = cur_cell.pos == end_pos;
-
-        if (reached_goal) {
+        if (cur_cell.pos == end_pos) {
             return reconstruct_path(closed_heap, cur_cell.pos);
         }
             
@@ -181,7 +155,7 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
                 if (dx == 0 && dz == 0)
                     continue;
                 
-                if (!m_params.allow_diagonal_moves) {
+                if (!allow_diagonal_moves) {
                     if (dx != 0 && dz != 0)
                         continue;
                 }
@@ -190,66 +164,20 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
                 int ny = cur_cell.pos.y;
                 int nz = dz + cur_cell.pos.z;
 
-                glm::ivec3 new_pos(nx, ny, nz);
+                glm::vec3 new_pos = glm::vec3(nx, ny, nz);
 
-                uint32_t status = 0;
-
-                // int cube_radius = 2;
-
-                // bool should_continue = false;
-                // for (int xc = -cube_radius; xc < cube_radius; xc++) {
-                //     for (int zc = -cube_radius; zc < cube_radius; zc++) {
-                //         glm::vec3 test_pos = new_pos + glm::vec3(xc, 0, zc);
-
-                //         if (!m_grid->adjust_to_ground(
-                //             test_pos, 
-                //             m_params.max_step_up, 
-                //             m_params.max_drop, 
-                //             m_params.max_y_diff, 
-                //             m_params.allow_flying_over_precepices, 
-                //             &status)
-                //         ) {
-                //             should_continue = true;
-                //             break;
-                //         }
-                //     }
-                //     if (should_continue)
-                //         break;
-                // }
-
-                // if (should_continue)
-                //     continue;
-                
-
-                if (!m_grid->adjust_to_ground(
-                        new_pos, 
-                        m_params.max_step_up, 
-                        m_params.max_drop, 
-                        m_params.max_y_diff, 
-                        m_params.allow_flying_over_precepices, 
-                        &status)
-                    ) {
+                if (!grid->adjust_to_ground(new_pos, max_step_up, max_drop, max_y_diff))
                     continue;
-                }
 
-                // int cube_radius = 5;
-
-                // bool footprint_result = m_grid->check_footprint(
-                //     new_pos - glm::vec3(cube_radius, 0, cube_radius),
-                //     glm::vec3(cube_radius * 2, cube_radius * 2, cube_radius * 2),
-                //     1);
-                
-                // if (!footprint_result)
-                //     continue;
-
-                uint64_t new_key = math_utils::pack_key(new_pos.x, new_pos.y, new_pos.z);
+                uint64_t new_key = grid->pack_key(new_pos.x, new_pos.y, new_pos.z);
                 auto heap_it = closed_heap.find(new_key);
                 if (heap_it != closed_heap.end())
                     continue;
+                
 
                 float new_g = cur_cell.g + glm::distance((glm::vec3)cur_cell.pos, (glm::vec3)new_pos);
 
-                uint64_t key = math_utils::pack_key(new_pos.x, new_pos.y, new_pos.z);
+                uint64_t key = grid->pack_key(new_pos.x, new_pos.y, new_pos.z);
                 auto it = g_score.find(key);
                 
                 if (it != g_score.end()) {
@@ -266,14 +194,10 @@ PlainAstarData AStar::find_path(glm::ivec3 start_pos, glm::ivec3 end_pos) {
                 new_cell.no_parent = false;
                 new_cell.g = new_g;
                 
-                new_cell.f = new_g + m_params.heuristic_weight * get_heuristic(new_pos, end_pos);
+                new_cell.f = new_g + get_heuristic(new_pos, end_pos);
 
                 pq.push(new_cell);
             }
     }
     return {};
-}
-
-OccupancyGrid3D& AStar::occupancy_grid() noexcept {
-    return *m_grid;
 }

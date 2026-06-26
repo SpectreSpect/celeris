@@ -11,9 +11,6 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         point_vs(device, path_utils::executable_dir() / "shaders" / "point_cloud.vert.spv"),
         point_fs(device, path_utils::executable_dir() / "shaders" / "point_cloud.frag.spv"),
 
-        line_vs(device, path_utils::executable_dir() / "shaders" / "line_cloud.vert.spv"),
-        line_fs(device, path_utils::executable_dir() / "shaders" / "line_cloud.frag.spv"),   
-
         skybox_vs(device, path_utils::executable_dir() / "shaders" / "skybox.vert.spv"),
         skybox_fs(device, path_utils::executable_dir() / "shaders" / "skybox.frag.spv"),
         pbr_vs(device, path_utils::executable_dir() / "shaders" / "pbr.vert.spv"),
@@ -29,9 +26,6 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         reset_point_voxel_map_cs(device, path_utils::executable_dir() / "shaders" / "reset_voxel_point_map.comp.spv"),
         gicp_reduce_cs(device, path_utils::executable_dir() / "shaders" / "gicp_reduce.comp.spv"),
 
-        // Cloud to mesh
-        generate_mesh_cs(device, path_utils::executable_dir() / "shaders" / "cloud_to_mesh" / "generate_mesh_cs.comp.spv"),
-
         // Lights
         build_cluster_light_lists_cs(device, path_utils::executable_dir() / "shaders" / "build_cluster_light_lists.comp.spv"),
         
@@ -44,7 +38,6 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         mesh_reset_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_reset.comp.spv"),
         mesh_count_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_count.comp.spv"),
         mesh_alloc_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mesh_alloc.comp.spv"),
-        retry_mesh_alloc_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "retry_mesh_alloc.comp.spv"),
         verify_mesh_allocation_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "verify_mesh_allocation.comp.spv"),
         return_free_alloc_nodes_dispatch_adapter_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "return_free_alloc_nodes_dispatch_adapter.comp.spv"),
         return_free_alloc_nodes_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "return_free_alloc_nodes.comp.spv"),
@@ -66,10 +59,6 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         hash_table_conditional_dispatch_adapter_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "hash_table_conditional_dispatch_adapter.comp.spv"),
         clear_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "clear_chunk_hash_table.comp.spv"),
         fill_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "fill_chunk_hash_table.comp.spv"),
-        read_voxel_grid_chunk_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "read_voxel_grid_chunk.comp.spv"),
-        check_footprint_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "check_footprint.comp.spv"),
-        read_and_inflate_voxel_grid_chunk_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "read_and_inflate_voxel_grid_chunk.comp.spv"),
-        inflate_chunks_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "inflate_chunks.comp.spv"),
 
         voxel_writes_from_point_cloud_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_writes_from_point_cloud.comp.spv"),
 
@@ -77,7 +66,6 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         alloc_active_chunk_triangles_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "alloc_active_chunk_triangles.comp.spv"),
         fill_triangle_indices_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "fill_triangle_indices.comp.spv"),
         mark_and_count_active_chunks_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "mark_and_count_active_chunks.comp.spv"),
-        mark_and_count_fail_slots_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "mark_and_count_fail_slots.comp.spv"),
         reset_voxelize_pipeline_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "reset_voxelize_pipeline.comp.spv"),
         voxelize_triangles_cs(device, path_utils::executable_dir() / "shaders" / "voxel_rasterization" / "voxelize_triangles.comp.spv"),
 
@@ -94,9 +82,4 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         equirect_to_cubemap_cs(device, path_utils::executable_dir() / "shaders" / "equirect_to_cubemap.comp.spv"),
         brdf_lut_cs(device, path_utils::executable_dir() / "shaders" / "brdf_lut.comp.spv"),
         generate_prefilter_map_cs(device, path_utils::executable_dir() / "shaders" / "generate_prefilter_map.comp.spv"),
-        generate_irradiance_map_cs(device, path_utils::executable_dir() / "shaders" / "generate_irradiance_map.comp.spv"),
-        
-        // A*
-        find_unimpended_paths_cs(device, path_utils::executable_dir() / "shaders" / "a_star" / "find_unimpended_paths.comp.spv"),
-        prepare_copy_dirty_list_dispatch_args_cs(device, path_utils::executable_dir() / "shaders" / "a_star" / "prepare_copy_dirty_list_dispatch_args.comp.spv"),
-        copy_dirty_list_cs(device, path_utils::executable_dir() / "shaders" / "a_star" / "copy_dirty_list.comp.spv") {}
+        generate_irradiance_map_cs(device, path_utils::executable_dir() / "shaders" / "generate_irradiance_map.comp.spv") {}

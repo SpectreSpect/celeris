@@ -16,8 +16,8 @@ VulkanImageTemp::VulkanImageTemp(
 {
     LOG_METHOD();
 
-    logger().check(m_device != VK_NULL_HANDLE, "Device is not initialized");
-    logger().check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
+    logger.check(m_device != VK_NULL_HANDLE, "Device is not initialized");
+    logger.check(physical_device.handle() != VK_NULL_HANDLE, "Physical device is not initialized");
 
     VkResult result = vkCreateImage(
         m_device,
@@ -26,7 +26,7 @@ VulkanImageTemp::VulkanImageTemp(
         &m_image
     );
 
-    logger().check(result == VK_SUCCESS, "Failed to create Vulkan image");
+    logger.check(result == VK_SUCCESS, "Failed to create Vulkan image");
 
     VkMemoryRequirements memory_requirements{};
     vkGetImageMemoryRequirements(
@@ -51,7 +51,7 @@ VulkanImageTemp::VulkanImageTemp(
         &m_memory
     );
 
-    logger().check(result == VK_SUCCESS, "Failed to allocate Vulkan image memory");
+    logger.check(result == VK_SUCCESS, "Failed to allocate Vulkan image memory");
 
     result = vkBindImageMemory(
         m_device,
@@ -60,7 +60,7 @@ VulkanImageTemp::VulkanImageTemp(
         0
     );
 
-    logger().check(result == VK_SUCCESS, "Failed to bind Vulkan image memory");
+    logger.check(result == VK_SUCCESS, "Failed to bind Vulkan image memory");
 }
 
 VulkanImageTemp::~VulkanImageTemp() {
@@ -146,7 +146,7 @@ uint32_t VulkanImageTemp::find_memory_type(
         }
     }
 
-    logger().check(false, "Failed to find suitable image memory type");
+    logger.check(false, "Failed to find suitable image memory type");
     return 0;
 }
 

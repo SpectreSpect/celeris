@@ -16,7 +16,7 @@ VulkanQueue::VulkanQueue(const VulkanDevice& device, QueueLocation location, Vul
 {
     LOG_METHOD();
 
-    logger().check(device.handle() != VK_NULL_HANDLE, "Device has not been initialized");
+    logger.check(device.handle() != VK_NULL_HANDLE, "Device has not been initialized");
 
     vkGetDeviceQueue(device.handle(), location.family_index, location.queue_index, &m_queue);
 }
@@ -64,25 +64,25 @@ void VulkanQueue::submit(
 {
     LOG_METHOD();
 
-    logger().check(m_queue != VK_NULL_HANDLE, "Queue has not been initialized");
+    logger.check(m_queue != VK_NULL_HANDLE, "Queue has not been initialized");
 
-    logger().check(wait_semaphores.size() == wait_stages.size())
+    logger.check(wait_semaphores.size() == wait_stages.size())
         << "The number of simaphores (" << clr(std::to_string(wait_semaphores.size()), LoggerPalette::orange)
         << ") does not match the number of waiting stages "
         << "(" << clr(std::to_string(wait_stages.size()), LoggerPalette::orange) << ")";
     
     for (size_t i = 0; i < wait_semaphores.size(); i++) {
-        logger().check(wait_semaphores[i].handle() != VK_NULL_HANDLE)
+        logger.check(wait_semaphores[i].handle() != VK_NULL_HANDLE)
             << "Wait semaphore " << clr(std::to_string(i), LoggerPalette::blue) << " is not initialized";
     }
 
     for (size_t i = 0; i < command_buffers.size(); i++) {
-        logger().check(command_buffers[i].handle() != VK_NULL_HANDLE)
+        logger.check(command_buffers[i].handle() != VK_NULL_HANDLE)
             << "Command buffer " << clr(std::to_string(i), LoggerPalette::blue) << " is not initialized";
     }
 
     for (size_t i = 0; i < signal_semaphores.size(); i++) {
-        logger().check(signal_semaphores[i].handle() != VK_NULL_HANDLE)
+        logger.check(signal_semaphores[i].handle() != VK_NULL_HANDLE)
             << "Signal semaphore " << clr(std::to_string(i), LoggerPalette::blue) << " is not initialized";
     }
 
@@ -110,7 +110,7 @@ void VulkanQueue::submit(
         fence != nullptr ? fence->handle() : VK_NULL_HANDLE
     );
 
-    logger().check(submit_result == VK_SUCCESS, "Failed to submit draw command buffer");
+    logger.check(submit_result == VK_SUCCESS, "Failed to submit draw command buffer");
 }
 
 void VulkanQueue::submit(
@@ -154,13 +154,13 @@ VkResult VulkanQueue::present(
 {
     LOG_METHOD();
 
-    logger().check(m_queue != VK_NULL_HANDLE, "Queue has not been initialized");
+    logger.check(m_queue != VK_NULL_HANDLE, "Queue has not been initialized");
 
-    logger().check(m_type == VulkanQueueType::Present)
+    logger.check(m_type == VulkanQueueType::Present)
         << "The queue type must be '" << clr("Present", LoggerPalette::blue)
         << "', but it is '" << clr(queue_type_str(m_type), LoggerPalette::blue) << "'\n";
     
-    logger().check(swapchains.size() == image_indices.size(), "The number of swapchains is not equal to the number of image_indices");
+    logger.check(swapchains.size() == image_indices.size(), "The number of swapchains is not equal to the number of image_indices");
 
     VkPresentInfoKHR present_info{};
     present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -177,7 +177,7 @@ VkResult VulkanQueue::present(
 
     VkResult present_result = vkQueuePresentKHR(m_queue, &present_info);
 
-    logger().check(
+    logger.check(
         present_result == VK_SUCCESS ||
         present_result == VK_SUBOPTIMAL_KHR ||
         present_result == VK_ERROR_OUT_OF_DATE_KHR, 

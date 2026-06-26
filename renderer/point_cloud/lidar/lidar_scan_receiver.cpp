@@ -103,7 +103,6 @@ std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_scan(ManagerBundle& manage
     glm::mat3 rotation_engine = basis * rotation_ros * glm::transpose(basis);
 
     scan->point_cloud().transform.rotation = glm::quat_cast(rotation_engine);
-    // scan->point_cloud().transform.scale = glm::vec3(2);
 
     return scan;
 }

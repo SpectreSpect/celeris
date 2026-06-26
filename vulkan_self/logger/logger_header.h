@@ -1,12 +1,10 @@
 #pragma once
-#include <type_traits>
-
 #include "logger.h"
 #include "palette.h"
 #include "level_marker.h"
 #include "class_name_concept.h"
 
-Logger& logger();
+extern Logger logger;
 
 template <class... Args>
 requires ((std::convertible_to<Args, std::string_view>) && ...)
@@ -47,19 +45,19 @@ static MultiColorString header_str(std::string_view class_name, std::string_view
         "LOG_METHOD() requires k_class_name method in the enclosing class"       \
     );                                                                           \
     LevelMarker XROBOCROSS_CAT(_logger_level_marker_, __LINE__)(                 \
-        logger(),                                                                  \
+        logger,                                                                  \
         header_str(this->k_class_name(), __func__) \
     )
 
 #define LOG_NAMED(NAME)                                          \
     LevelMarker XROBOCROSS_CAT(_logger_level_marker_, __LINE__)( \
-        logger(),                                                  \
+        logger,                                                  \
         header_str(NAME, __func__)                               \
     )
 
 #define LOG_FUNC()                                               \
     LevelMarker XROBOCROSS_CAT(_logger_level_marker_, __LINE__)( \
-        logger(),                                                  \
+        logger,                                                  \
         ColoredString(__func__, LoggerPalette::purple)           \
     )
 

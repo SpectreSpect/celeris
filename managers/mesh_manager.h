@@ -11,7 +11,6 @@ public:
     Mesh cube;
     Mesh sphere;
     Mesh point_cloud_quad;
-    Mesh line_quad;
     Mesh skybox_cube;
 
     Mesh two_sphere_indirect_test;

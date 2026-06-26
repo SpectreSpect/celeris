@@ -30,8 +30,7 @@ vec4 linear_to_srgb(vec4 color)
 }
 
 void main() {
-    vec4 col = vColor * vec4(material_buffer.materials[pc.material_data_id].color.xyz, 1);
-    // vec4 col = vColor;
+    vec4 col = vColor;
 
     float r = length(vLocal);
     float aa = fwidth(r);

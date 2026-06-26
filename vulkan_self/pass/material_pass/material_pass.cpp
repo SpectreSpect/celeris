@@ -67,7 +67,7 @@ VkPipelineBindPoint MaterialPass::bind_point() const noexcept {
 const Pipeline& MaterialPass::pipeline() const {
     LOG_METHOD();
 
-    logger().check(m_pipeline.handle() != VK_NULL_HANDLE, "Pipline is not initialized");
+    logger.check(m_pipeline.handle() != VK_NULL_HANDLE, "Pipline is not initialized");
 
     return m_pipeline;
 }
@@ -75,7 +75,7 @@ const Pipeline& MaterialPass::pipeline() const {
 void MaterialPass::bind(VulkanCommandBuffer& command_buffer) const {
     LOG_METHOD();
 
-    logger().check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
+    logger.check(command_buffer.handle() != VK_NULL_HANDLE, "Command buffer is not initialized");
 
     m_pipeline.bind(command_buffer);
 }
