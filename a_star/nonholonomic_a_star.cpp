@@ -4,6 +4,35 @@
 #include "unimpended_path_finder.h"
 #include "reeds_shepp.h"
 
+namespace {
+    void insert_y_transition_points(std::vector<NonholonomicPos>& path) {
+        constexpr float eps = 1e-6f;
+
+        if (path.size() < 2) {
+            return;
+        }
+
+        std::vector<NonholonomicPos> corrected_path;
+        corrected_path.reserve(path.size() * 2);
+        corrected_path.push_back(path.front());
+
+        for (size_t i = 1; i < path.size(); i++) {
+            const NonholonomicPos& previous = path[i - 1];
+            const NonholonomicPos& current = path[i];
+
+            if (std::abs(previous.pos.y - current.pos.y) > eps) {
+                NonholonomicPos intermediate_point = previous;
+                intermediate_point.pos.y = current.pos.y;
+                corrected_path.push_back(intermediate_point);
+            }
+
+            corrected_path.push_back(current);
+        }
+
+        path = std::move(corrected_path);
+    }
+}
+
 NonholonomicAStar::NonholonomicAStar(
     OccupancyGrid3D& occupancy_grid, 
     const NonholonomicAStarDesc& desc,
@@ -98,14 +127,21 @@ std::vector<NonholonomicPos> NonholonomicAStar::reconstruct_path(std::unordered_
         if (it == closed_heap.end())
             return {};
             
-        NonholonomicAStarCell prev_cell = it->second;
+        NonholonomicAStarCell cur_cell = it->second;
 
         path.push_back(cur_pos);
-        
-        if (prev_cell.no_parent)
+
+        if (cur_cell.no_parent)
             break;
         
-        cur_pos = prev_cell.came_from;
+        float eps = 1e-6;
+        if (std::abs(cur_pos.pos.y - cur_cell.came_from.pos.y) > eps) {
+            NonholonomicPos intermediate_point = cur_cell.came_from;
+            intermediate_point.pos.y = cur_pos.pos.y;
+            path.push_back(intermediate_point);
+        }
+        
+        cur_pos = cur_cell.came_from;
     }
 
     std::reverse(path.begin(), path.end());
@@ -402,7 +438,30 @@ void NonholonomicAStar::initialize(
 bool NonholonomicAStar::try_reeds_shepp_shot(NonholonomicPos& start, NonholonomicPos& end, std::vector<NonholonomicPos>& out_path) {
     LOG_METHOD();
 
-    out_path = ReedsShepp::get_optimal_path_discretized(start, end, 8, m_params.min_radius);
+    const glm::vec3 voxel_size = m_grid->voxel_size();
+    float line_step_world = std::min(voxel_size.x, voxel_size.z);
+    if (line_step_world <= 0.0f) {
+        line_step_world = m_params.reeds_shepp_step_world;
+    }
+
+    std::vector<NonholonomicPathElement> reeds_shepp_path = ReedsShepp::get_optimal_path(
+        start,
+        end,
+        m_params.min_radius
+    );
+
+    if (reeds_shepp_path.empty()) {
+        return false;
+    }
+
+    out_path = ReedsShepp::discretize_path(
+        start,
+        reeds_shepp_path,
+        8,
+        m_params.min_radius,
+        std::nullopt,
+        line_step_world
+    );
 
     if (out_path.empty())
         return false;
@@ -414,6 +473,8 @@ bool NonholonomicAStar::try_reeds_shepp_shot(NonholonomicPos& start, Nonholonomi
             m_params.max_y_diff, 
             m_params.allow_flying_over_precipices))
         return false;
+
+    insert_y_transition_points(out_path);
     
     return true;
 }
@@ -424,7 +485,12 @@ bool NonholonomicAStar::try_finish_with_reeds_shepp(NonholonomicPos& from, Nonho
     std::vector<NonholonomicPos> reeds_shepp_path;
     if (try_reeds_shepp_shot(from, to, reeds_shepp_path)) {
         m_state.path = reconstruct_path(m_state.closed_heap, from);
-        m_state.path.insert(m_state.path.end(), reeds_shepp_path.begin(), reeds_shepp_path.end());
+        auto insert_begin = reeds_shepp_path.begin();
+        if (!m_state.path.empty() && insert_begin != reeds_shepp_path.end()) {
+            ++insert_begin;
+        }
+
+        m_state.path.insert(m_state.path.end(), insert_begin, reeds_shepp_path.end());
         return true;
     }
     return false;

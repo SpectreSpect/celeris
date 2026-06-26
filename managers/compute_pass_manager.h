@@ -91,6 +91,7 @@ public:
 
     // A*
     ComputePass find_unimpended_paths_cp;
+    ComputePass check_path_passability_cp;
     ComputePass prepare_copy_dirty_list_dispatch_args_cp;
     ComputePass copy_dirty_list_cp;
 
@@ -172,6 +173,7 @@ public:
 
     // A*
     ComputePass create_find_unimpended_paths_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_check_path_passability_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_prepare_copy_dirty_list_dispatch_args_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
     ComputePass create_copy_dirty_list_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 

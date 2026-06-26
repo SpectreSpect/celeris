@@ -107,4 +107,5 @@ public:
 
     // A*
     VulkanShaderModule find_unimpended_paths_cs;
+    VulkanShaderModule check_path_passability_cs;
 };

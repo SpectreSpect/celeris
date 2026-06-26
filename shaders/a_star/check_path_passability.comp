@@ -1,0 +1,48 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+// ----- include -----
+#include "../common/buffer_structures.inc"
+// -------------------
+
+layout(std430, set = 0, binding = 0) readonly buffer PathPoints { vec4 path_points[]; };
+layout(std430, set = 0, binding = 1) coherent buffer PathPassability { uint path_passability; };
+layout(std430, set = 0, binding = 2) coherent buffer ChunkHashTable { HashTableCounters chunk_hash_table_counters; ChunkHashTableSlot chunk_hash_table_slots[]; };
+layout(std430, set = 0, binding = 3) readonly buffer ChunkVoxels { VoxelData voxels[]; };
+
+layout(push_constant) uniform CheckPathPassabilityPushConstants {
+    ivec4 u_chunk_dim;
+    vec4 u_voxel_size;
+
+    uint u_count_path_points;
+    uint u_max_step_up;
+    uint u_max_drop;
+    uint u_chunk_hash_table_size;
+
+    uint u_voxels_per_chunk;
+    uint u_pack_offset;
+    uint u_pack_bits;
+    uint u_allow_flying_over_precipices;
+
+    uint u_allow_diagonal_moves;
+};
+
+// ----- include -----
+#include "../voxel_grid/chunk_pool/read_voxels.inc"
+#include "path_utils/path_passability.inc"
+// -------------------
+
+void main() {
+    uint segment_id = gl_GlobalInvocationID.x;
+
+    if (segment_id + 1u >= u_count_path_points) return;
+
+    vec3 from_voxel_point = path_points[segment_id].xyz / u_voxel_size.xyz;
+    vec3 to_voxel_point = path_points[segment_id + 1u].xyz / u_voxel_size.xyz;
+
+    if (!is_voxel_segment_unblocked(from_voxel_point, to_voxel_point)) {
+        atomicExchange(path_passability, 0u);
+    }
+}

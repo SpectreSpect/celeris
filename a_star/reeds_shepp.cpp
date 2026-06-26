@@ -66,21 +66,44 @@ float ReedsShepp::wrap_pi(float theta) {
     return theta;
 }
 
-std::vector<NonholonomicPos> ReedsShepp::discretize_path(NonholonomicPos start_pos, std::vector<NonholonomicPathElement> path, int points_per_circlar_element, float min_radius) {
+std::vector<NonholonomicPos> ReedsShepp::discretize_path(
+    NonholonomicPos start_pos,
+    std::vector<NonholonomicPathElement> path,
+    int points_per_circlar_element,
+    float min_radius,
+    std::optional<NonholonomicPos> end_pos,
+    float linear_step_world)
+{
     std::vector<NonholonomicPos> output_path;
 
     output_path.push_back(start_pos);
 
     NonholonomicPos last_point = output_path[0];
+    if (end_pos.has_value() && std::abs(start_pos.pos.y - end_pos->pos.y) > EPS) {
+        NonholonomicPos intermediate_point = start_pos;
+        intermediate_point.pos.y = end_pos->pos.y;
+        output_path.push_back(intermediate_point);
+        last_point = intermediate_point;
+    }
+
     for (int i = 0; i < path.size(); i++) {
         float gear = path[i].gear == Gear::FORWARD ? 1 : -1;
 
         if (path[i].steering == Steering::STRAIGHT) {
             glm::vec3 dir = glm::vec3(cos(last_point.theta), 0, sin(last_point.theta));
-            last_point.pos += dir * (path[i].dist * min_radius) * gear;
+            float segment_length = path[i].dist * min_radius;
 
-            last_point.dir = gear;
-            output_path.push_back(last_point);
+            int step_count = 1;
+            if (linear_step_world > EPS) {
+                step_count = std::max(1, static_cast<int>(std::ceil(segment_length / linear_step_world)));
+            }
+
+            float step_dist = (segment_length / static_cast<float>(step_count)) * gear;
+            for (int step = 0; step < step_count; step++) {
+                last_point.pos += dir * step_dist;
+                last_point.dir = gear;
+                output_path.push_back(last_point);
+            }
         }
         else {
             float steering = path[i].steering == Steering::LEFT ? -1 : 1;
@@ -218,10 +241,21 @@ std::vector<NonholonomicPathElement> ReedsShepp::get_optimal_path(NonholonomicPo
 }
 
 std::vector<NonholonomicPos> ReedsShepp::get_optimal_path_discretized(
-                                                                      NonholonomicPos start, NonholonomicPos end, 
-                                                                      int points_per_circlar_element, float min_radius) {
+    NonholonomicPos start,
+    NonholonomicPos end,
+    int points_per_circlar_element,
+    float min_radius,
+    float linear_step_world)
+{
     std::vector<NonholonomicPathElement> reeds_shepp_test_path = get_optimal_path(start, end, min_radius);
-    std::vector<NonholonomicPos> discretized_path = discretize_path(start, reeds_shepp_test_path, points_per_circlar_element, min_radius);
+    std::vector<NonholonomicPos> discretized_path = discretize_path(
+        start,
+        reeds_shepp_test_path,
+        points_per_circlar_element,
+        min_radius,
+        end,
+        linear_step_world
+    );
     return discretized_path;
     // std::vector<LineInstance> reeds_shepp_test_line_instances;
     // if (discretized_path.size() >= 2)
@@ -702,8 +736,17 @@ ReedsShepp::get_optimal_dubins_path(NonholonomicPos start, NonholonomicPos end, 
 std::vector<NonholonomicPos>
 ReedsShepp::get_optimal_dubins_path_discretized(
     NonholonomicPos start, NonholonomicPos end,
-    int points_per_circlar_element, float min_radius
+    int points_per_circlar_element,
+    float min_radius,
+    float linear_step_world
 ) {
     auto path = get_optimal_dubins_path(start, end, min_radius);
-    return discretize_path(start, path, points_per_circlar_element, min_radius);
+    return discretize_path(
+        start,
+        path,
+        points_per_circlar_element,
+        min_radius,
+        end,
+        linear_step_world
+    );
 }

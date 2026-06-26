@@ -98,5 +98,6 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         
         // A*
         find_unimpended_paths_cs(device, path_utils::executable_dir() / "shaders" / "a_star" / "find_unimpended_paths.comp.spv"),
+        check_path_passability_cs(device, path_utils::executable_dir() / "shaders" / "a_star" / "check_path_passability.comp.spv"),
         prepare_copy_dirty_list_dispatch_args_cs(device, path_utils::executable_dir() / "shaders" / "a_star" / "prepare_copy_dirty_list_dispatch_args.comp.spv"),
         copy_dirty_list_cs(device, path_utils::executable_dir() / "shaders" / "a_star" / "copy_dirty_list.comp.spv") {}
