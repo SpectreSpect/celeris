@@ -26,11 +26,15 @@ glm::mat3 ros_basis_to_engine_basis() {
 }
 }
 
-LidarScanReceiver::LidarScanReceiver(PointCloudPreprocessor& point_cloud_preprocessor, 
-                                     uint16_t port, size_t max_queued_frames)
+LidarScanReceiver::LidarScanReceiver(
+    PointCloudPreprocessor& point_cloud_preprocessor, 
+    uint16_t port,
+    size_t max_queued_frames,
+    uint32_t points_freq)
     :   m_point_cloud_preprocessor(&point_cloud_preprocessor), 
         m_port(port), 
-        m_max_queued_frames(max_queued_frames) {}
+        m_max_queued_frames(max_queued_frames),
+        m_points_freq(points_freq) {}
 
 LidarScanReceiver::~LidarScanReceiver() {
     stop();
@@ -198,27 +202,31 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
 
         frame.ring_count = 16;
 
-        frame.samples.resize(point_count);
+        uint32_t freq = 5;
+
+        frame.samples.resize(point_count / freq);
         const uint8_t* p = payload.data();
 
         uint32_t valid_count = 0;
 
-        for (uint32_t i = 0; i < point_count; ++i) {
+        for (uint32_t i = 0; i < point_count / freq; ++i) {
             float x, y, z;
             float time;
             float px, py, pz;
             float roll, pitch, yaw;
 
-            std::memcpy(&x,     p, 4); p += 4;
-            std::memcpy(&y,     p, 4); p += 4;
-            std::memcpy(&z,     p, 4); p += 4;
-            std::memcpy(&time,  p, 4); p += 4;
-            std::memcpy(&px,    p, 4); p += 4;
-            std::memcpy(&py,    p, 4); p += 4;
-            std::memcpy(&pz,    p, 4); p += 4;
-            std::memcpy(&roll,  p, 4); p += 4;
-            std::memcpy(&pitch, p, 4); p += 4;
-            std::memcpy(&yaw,   p, 4); p += 4;
+            const uint8_t* local_p = p;
+            std::memcpy(&x,     local_p, 4); local_p += 4;
+            std::memcpy(&y,     local_p, 4); local_p += 4;
+            std::memcpy(&z,     local_p, 4); local_p += 4;
+            std::memcpy(&time,  local_p, 4); local_p += 4;
+            std::memcpy(&px,    local_p, 4); local_p += 4;
+            std::memcpy(&py,    local_p, 4); local_p += 4;
+            std::memcpy(&pz,    local_p, 4); local_p += 4;
+            std::memcpy(&roll,  local_p, 4); local_p += 4;
+            std::memcpy(&pitch, local_p, 4); local_p += 4;
+            std::memcpy(&yaw,   local_p, 4); local_p += 4;
+            p += 4 * 10 * freq;
 
             frame.samples[i].p_local_ros = glm::vec3(x, y, z);
             frame.samples[i].time = time;

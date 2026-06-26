@@ -248,6 +248,11 @@ std::vector<glm::ivec3> OccupancyGrid3D::line_intersects(glm::vec3 pos1, glm::ve
     return out;
 }
 
+glm::vec3 OccupancyGrid3D::voxel_size() const {
+    logger().check(m_voxel_grid, "Voxel grid was null");
+    return m_voxel_grid->voxel_size();
+}
+
 glm::ivec3 OccupancyGrid3D::world_to_voxel_pos(const glm::vec3& p) const {
     logger().check(m_voxel_grid, "Voxel grid was null");
 

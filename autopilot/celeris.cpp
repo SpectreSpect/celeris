@@ -1,5 +1,8 @@
 #include "celeris.h"
 
+#include <algorithm>
+#include <cmath>
+#include <iostream>
 #include <utility>
 
 #include "../vulkan_self/vulkan_device.h"
@@ -7,6 +10,14 @@
 #include "../vulkan_self/vulkan_submit_context.h"
 #include "../managers/compute_pass_manager.h"
 #include "../managers/manager_bundle.h"
+
+namespace {
+    constexpr int COLLISION_BINARY_SEARCH_ITERATIONS = 16;
+
+    float min_component(glm::vec3 value) noexcept {
+        return std::min({value.x, value.y, value.z});
+    }
+}
 
 Celeris::Celeris(VulkanEngine& engine,
                  VulkanQueue& compute_queue,
@@ -60,6 +71,7 @@ void Celeris::start_lidar_receiver() {
     m_scan_receiver.start();
     m_received_scan_count = 0;
     m_has_previous_lidar_pose = false;
+    m_collision_position_history.clear();
 }
 
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
@@ -156,10 +168,24 @@ void Celeris::update() {
 
         
         m_voxel_map_inserter.insert(m_voxel_point_map, m_network_scan->point_cloud(), m_network_scan->normal_buffer());
-        m_voxel_grid->voxelize_point_cloud(*m_engine, 
-                                           m_network_scan->point_cloud(), 
-                                           voxel_write_list, 
-                                           m_desc.max_write_count);
+        m_voxel_grid->voxelize_point_cloud(
+            *m_engine, 
+            m_network_scan->point_cloud(), 
+            voxel_write_list, 
+            m_desc.max_write_count
+        );
+
+        m_occupancy_grid.adjust_to_ground(
+            m_start_position.pos, 
+            0, 
+            6, 
+            6, 
+            false
+        );
+
+        // Здесь нужно делать коллизию...
+        collision(m_collision_position_history, m_start_position.pos);
+        remember_collision_position(m_start_position.pos);
 
         request_path_replan(m_start_position, m_goal_position);
 
@@ -191,6 +217,7 @@ void Celeris::find_path(VulkanSubmitContext& submit_context) {
 
 void Celeris::set_start(const NonholonomicPos& position) {
     m_start_position = position;
+    m_collision_position_history.clear();
 }
 
 void Celeris::set_goal(const NonholonomicPos& position) {
@@ -248,6 +275,124 @@ uint32_t Celeris::received_scan_count() const noexcept {
 
 std::mutex& Celeris::planner_mutex() noexcept {
     return m_planner_mutex;
+}
+
+void Celeris::collision(
+    std::span<const glm::vec3> previous_points,
+    glm::vec3& point_pos)
+{
+    LOG_METHOD();
+
+    logger().check(m_voxel_grid, "Voxel grid was null");
+
+    auto point_is_free = [&](glm::vec3 point) {
+        return !m_occupancy_grid.is_solid(
+            m_occupancy_grid.world_to_voxel_pos(point)
+        );
+    };
+
+    if (point_is_free(point_pos)) {
+        return;
+    }
+
+    if (previous_points.empty()) {
+        return;
+    }
+
+    logger().check(
+        glm::all(glm::greaterThan(m_occupancy_grid.voxel_size(), glm::vec3(0.0f))),
+        "Voxel size must be greater than zero"
+    );
+
+    const float min_voxel_size = min_component(m_occupancy_grid.voxel_size());
+    const float sample_step = std::max(min_voxel_size * 0.25f, 1e-4f);
+
+    auto find_first_free_on_segment =
+        [&](glm::vec3 from, glm::vec3 to, glm::vec3& free_point)
+    {
+        const glm::vec3 segment = to - from;
+        const float segment_length = glm::length(segment);
+
+        if (!std::isfinite(segment_length) || segment_length <= 1e-6f) {
+            if (point_is_free(to)) {
+                free_point = to;
+                return true;
+            }
+
+            return false;
+        }
+
+        const int sample_count = std::max(
+            1,
+            static_cast<int>(std::ceil(segment_length / sample_step))
+        );
+
+        glm::vec3 last_blocked = from;
+
+        for (int sample_id = 1; sample_id <= sample_count; ++sample_id) {
+            const float t = static_cast<float>(sample_id) /
+                            static_cast<float>(sample_count);
+            const glm::vec3 candidate = glm::mix(from, to, t);
+
+            if (!point_is_free(candidate)) {
+                last_blocked = candidate;
+                continue;
+            }
+
+            glm::vec3 blocked = last_blocked;
+            glm::vec3 free = candidate;
+
+            for (int i = 0; i < COLLISION_BINARY_SEARCH_ITERATIONS; ++i) {
+                glm::vec3 middle = (blocked + free) * 0.5f;
+
+                if (point_is_free(middle)) {
+                    free = middle;
+                } else {
+                    blocked = middle;
+                }
+            }
+
+            free_point = free;
+            return true;
+        }
+
+        return false;
+    };
+
+    glm::vec3 segment_start = point_pos;
+    glm::vec3 resolved_pos;
+
+    for (glm::vec3 previous_point : previous_points) {
+        if (find_first_free_on_segment(segment_start, previous_point, resolved_pos)) {
+            point_pos = resolved_pos;
+            return;
+        }
+
+        segment_start = previous_point;
+    }
+
+    std::cerr << "Failed to resolve Celeris collision along previous path. "
+              << "Leaving point unchanged.\n";
+}
+
+void Celeris::remember_collision_position(glm::vec3 point_pos) {
+    if (m_desc.collision_history_size == 0u) {
+        m_collision_position_history.clear();
+        return;
+    }
+
+    if (m_occupancy_grid.is_solid(m_occupancy_grid.world_to_voxel_pos(point_pos))) {
+        return;
+    }
+
+    m_collision_position_history.insert(
+        m_collision_position_history.begin(),
+        point_pos
+    );
+
+    if (m_collision_position_history.size() > m_desc.collision_history_size) {
+        m_collision_position_history.resize(m_desc.collision_history_size);
+    }
 }
 
 void Celeris::start_planner_thread(VulkanSubmitContext&& submit_context) {

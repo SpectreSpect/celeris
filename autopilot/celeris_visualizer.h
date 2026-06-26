@@ -62,6 +62,10 @@ private:
     MarkerInterpolationState m_start_marker_interpolation;
     MarkerInterpolationState m_goal_marker_interpolation;
 
+private:
+    glm::vec3 voxel_size() noexcept;
+    glm::vec3 marker_vertical_offset() noexcept;
+
     void set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position);
     void reset_marker_interpolation(
         SphericalPoseMarker& marker,

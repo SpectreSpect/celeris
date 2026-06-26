@@ -94,11 +94,13 @@ void CelerisVisualizer::set_goal(const NonholonomicPos& nonholonomic_position) {
 
 void CelerisVisualizer::set_start(const Transform& transform) {
     m_start_marker.transform = transform;
+    m_start_marker.transform.position += marker_vertical_offset();
     reset_marker_interpolation(m_start_marker, m_start_marker_interpolation);
 }
 
 void CelerisVisualizer::set_goal(const Transform& transform) {
     m_goal_marker.transform = transform;
+    m_goal_marker.transform.position += marker_vertical_offset();
     reset_marker_interpolation(m_goal_marker, m_goal_marker_interpolation);
 }
 
@@ -154,8 +156,16 @@ void CelerisVisualizer::update() {
     // }
 }
 
+glm::vec3 CelerisVisualizer::voxel_size() noexcept {
+    return m_celeris->planner().occupancy_grid().voxel_size();
+}
+
+glm::vec3 CelerisVisualizer::marker_vertical_offset() noexcept {
+    return glm::vec3(0.0f, 0.5f * voxel_size().y, 0.0f);
+}
+
 void CelerisVisualizer::set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position) {
-    marker.transform.position = nonholonomic_position.pos;
+    marker.transform.position = nonholonomic_position.pos + marker_vertical_offset();
     marker.transform.rotation = glm::angleAxis(
         glm::pi<float>() - nonholonomic_position.theta,
         glm::vec3(0.0f, 1.0f, 0.0f)
@@ -181,6 +191,7 @@ void CelerisVisualizer::interpolate_marker_pose(
     std::chrono::steady_clock::time_point now,
     bool force_new_sample)
 {
+    const glm::vec3 target_position = target.pos + marker_vertical_offset();
     const glm::quat target_rotation = glm::normalize(glm::angleAxis(
         glm::pi<float>() - target.theta,
         glm::vec3(0.0f, 1.0f, 0.0f)
@@ -193,7 +204,7 @@ void CelerisVisualizer::interpolate_marker_pose(
         return;
     }
 
-    const glm::vec3 position_delta = target.pos - state.target_position;
+    const glm::vec3 position_delta = target_position - state.target_position;
     const bool position_changed = glm::dot(position_delta, position_delta) > 1e-8f;
     const bool rotation_changed =
         std::abs(glm::dot(target_rotation, state.target_rotation)) < 0.999999f;
@@ -206,7 +217,7 @@ void CelerisVisualizer::interpolate_marker_pose(
         );
         state.previous_position = marker.transform.position;
         state.previous_rotation = marker.transform.rotation;
-        state.target_position = target.pos;
+        state.target_position = target_position;
         state.target_rotation = target_rotation;
         state.sample_time = now;
     }

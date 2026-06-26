@@ -15,8 +15,12 @@ class PointCloudPreprocessor;
 
 class LidarScanReceiver {
 public:
-    explicit LidarScanReceiver(PointCloudPreprocessor& point_cloud_preprocessor, 
-                               uint16_t port = 5000, size_t max_queued_frames = 3);
+    explicit LidarScanReceiver(
+        PointCloudPreprocessor& point_cloud_preprocessor,
+        uint16_t port = 5000,
+        size_t max_queued_frames = 3,
+        uint32_t points_freq = 5
+    );
     ~LidarScanReceiver();
 
     LidarScanReceiver(const LidarScanReceiver&) = delete;
@@ -33,6 +37,7 @@ public:
 private:
     uint16_t m_port = 0;
     size_t m_max_queued_frames = 0;
+    uint32_t m_points_freq = 5;
     PointCloudPreprocessor* m_point_cloud_preprocessor = nullptr;
     std::atomic<bool> m_running{false};
     int m_listen_socket = -1;
@@ -42,6 +47,7 @@ private:
     std::mutex m_queue_mutex;
     std::deque<LidarScan::FrameData> m_frames;
 
+private:
     void receive_loop();
     bool receive_frames_from_client(int client_socket);
     bool read_exact(int socket, void* data, size_t byte_count);
