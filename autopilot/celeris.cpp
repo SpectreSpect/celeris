@@ -64,7 +64,7 @@ void Celeris::start_lidar_receiver() {
 
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     start_lidar_receiver();
-    m_command_sender.start();
+    // m_command_sender.start();
     start_planner_thread(std::move(planner_submit_context));
 }
 
