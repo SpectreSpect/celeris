@@ -39,6 +39,7 @@ public:
         uint32_t unimpended_path_window_size = 64;
         uint32_t unimpended_path_max_astar_points = 4096;
         uint32_t collision_history_size = 8;
+        uint32_t collision_escape_search_radius_voxels = 8;
         NonholonomicAStar::NonholonomicAStarDesc nonholonomic_astar_desc;
     };
 
@@ -114,7 +115,9 @@ private:
     bool m_has_previous_lidar_pose = false;
     glm::vec3 m_previous_lidar_position{0.0f};
     glm::quat m_previous_lidar_rotation{1.0f, 0.0f, 0.0f, 0.0f};
-    std::vector<glm::vec3> m_collision_position_history;
+    std::vector<glm::vec3> m_collision_raw_position_history;
+    glm::vec3 m_collision_surface_point{0.0f};
+    bool m_has_collision_surface_point = false;
     uint32_t path_replanning_interval = 5;
 
     std::atomic<bool> m_planner_running{false};
@@ -128,8 +131,21 @@ private:
     double stop_waiting_time = 2;
     std::chrono::steady_clock::time_point stop_waiting_start_timestamp{};
 
-    void collision(std::span<const glm::vec3> previous_points, glm::vec3& point_pos);
-    void remember_collision_position(glm::vec3 point_pos);
+    void collision(
+        std::span<const glm::vec3> previous_free_raw_points,
+        glm::vec3& point_pos
+    );
+    bool collision_point_is_free(glm::vec3 point);
+    glm::vec3 collision_point_in_voxel_closest_to(glm::ivec3 voxel_pos, glm::vec3 reference);
+    float collision_sample_step();
+    bool find_first_free_collision_point_on_segment(glm::vec3 from, glm::vec3 to, glm::vec3& free_point);
+    bool find_collision_surface_point(
+        std::span<const glm::vec3> previous_free_raw_points,
+        glm::vec3 point_pos,
+        glm::vec3& surface_point
+    );
+    bool find_collision_escape_point(glm::vec3 point_pos, glm::vec3 direction, glm::vec3& resolved_pos);
+    void remember_collision_raw_position(glm::vec3 point_pos);
     
     void start_planner_thread(VulkanSubmitContext&& submit_context);
     void request_path_replan(const NonholonomicPos& start_pos, const NonholonomicPos& end_pos);
