@@ -140,6 +140,7 @@ add_executable(app
   autopilot/celeris_visualizer.cpp
   voxel_grid_vulkan/voxel_grid_gpu_debugger.cpp
   a_star/unimpended_path_finder.cpp
+  a_star/path_intersection_detector.cpp
   vulkan_self/vulkan_submit_context.cpp
   utils/avg_timer.cpp
 )

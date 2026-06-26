@@ -370,6 +370,23 @@ struct FindUnimpendedPathsPushConstants {
     uint32_t u_allow_diagonal_moves;
 };
 
+struct CheckPathPassabilityPushConstants {
+    glm::ivec4 u_chunk_dim;
+    glm::vec4 u_voxel_size;
+
+    uint32_t u_count_path_points;
+    uint32_t u_max_step_up;
+    uint32_t u_max_drop;
+    uint32_t u_chunk_hash_table_size;
+
+    uint32_t u_voxels_per_chunk;
+    uint32_t u_pack_offset;
+    uint32_t u_pack_bits;
+    uint32_t u_allow_flying_over_precipices;
+
+    uint32_t u_allow_diagonal_moves;
+};
+
 struct CopyDirtyListPushConstants {
     uint32_t u_pack_bits;
     int32_t u_pack_offset;

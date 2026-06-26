@@ -6,6 +6,7 @@
 #include "../renderer/point_cloud/gicp/voxel_map_point_reseter.h"
 #include "../renderer/point_cloud/gicp/voxel_map_point_inserter.h"
 #include "../a_star/unimpended_path_finder.h"
+#include "../a_star/path_intersection_detector.h"
 #include "../a_star/nonholonomic_a_star.h"
 #include "../a_star/occupancy_grid_3d.h"
 #include "../renderer/point_cloud/gicp/gicp_pass.h"
@@ -95,6 +96,7 @@ private:
     PointCloudPreprocessor m_point_cloud_preprocessor;
     LidarScanReceiver m_scan_receiver;
     UnimpendedPathFinder m_unimpended_path_finder;
+    PathIntersectionDetector m_path_intersection_detector;
     VehicleCommandSender m_command_sender;
     OccupancyGrid3D m_occupancy_grid;
     NonholonomicAStar m_planner;

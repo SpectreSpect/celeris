@@ -46,6 +46,14 @@ Celeris::Celeris(VulkanEngine& engine,
             desc.unimpended_path_window_size,
             desc.unimpended_path_max_astar_points
         ),
+        m_path_intersection_detector(
+            engine.physical_device(),
+            engine.device(),
+            submit_context,
+            manager_bundle.compute_pass_manager(),
+            voxel_grid,
+            desc.unimpended_path_max_astar_points
+        ),
         m_command_sender(),
         m_occupancy_grid(engine.physical_device(), engine.device(), voxel_grid, manager_bundle.compute_pass_manager()),
         m_planner(m_occupancy_grid, desc.nonholonomic_astar_desc, m_unimpended_path_finder),
@@ -82,7 +90,7 @@ void Celeris::start_lidar_receiver() {
 
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     start_lidar_receiver();
-    // m_command_sender.start();
+    m_command_sender.start();
     start_planner_thread(std::move(planner_submit_context));
 }
 
@@ -181,13 +189,13 @@ void Celeris::update() {
             m_desc.max_write_count
         );
 
-        // m_occupancy_grid.adjust_to_ground(
-        //     m_start_position.pos, 
-        //     0, 
-        //     6, 
-        //     6, 
-        //     false
-        // );
+        m_occupancy_grid.adjust_to_ground(
+            m_start_position.pos, 
+            0, 
+            6, 
+            6, 
+            false
+        );
 
         const glm::vec3 collision_raw_position = m_start_position.pos;
 
@@ -554,7 +562,17 @@ void Celeris::planner_loop(VulkanSubmitContext submit_context) {
             continue;
         m_replan_requested.exchange(false);
 
-        find_path(submit_context);
+        std::vector<glm::vec3> noncholonomic_path_points;
+        noncholonomic_path_points.reserve(m_planner.state().path.size());
+
+        for (const NonholonomicPos& point : m_planner.state().path) {
+            noncholonomic_path_points.push_back(point.pos);
+        }
+        
+        if (noncholonomic_path_points.size() == 0 || 
+            m_path_intersection_detector.has_intersection(submit_context, noncholonomic_path_points)) {
+            find_path(submit_context);
+        }
     }
 }
 

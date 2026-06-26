@@ -82,6 +82,7 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
 
         // A*
         find_unimpended_paths_cp(create_find_unimpended_paths_pass(device, shader_manager.find_unimpended_paths_cs)),
+        check_path_passability_cp(create_check_path_passability_pass(device, shader_manager.check_path_passability_cs)),
         prepare_copy_dirty_list_dispatch_args_cp(create_prepare_copy_dirty_list_dispatch_args_compute_pass(device, shader_manager.prepare_copy_dirty_list_dispatch_args_cs)),
         copy_dirty_list_cp(create_copy_dirty_list_compute_pass(device, shader_manager.copy_dirty_list_cs)),
         
@@ -947,6 +948,21 @@ ComputePass ComputePassManager::create_find_unimpended_paths_pass(VulkanDevice& 
     builder.add_storage_buffer(3, ShaderStages::compute); // ChunkVoxels
 
     builder.add_push_constantsf(sizeof(FindUnimpendedPathsPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_check_path_passability_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+
+    builder.add_storage_buffer(0, ShaderStages::compute); // PathPoints
+    builder.add_storage_buffer(1, ShaderStages::compute); // PathPassability
+    builder.add_storage_buffer(2, ShaderStages::compute); // ChunkHashTable
+    builder.add_storage_buffer(3, ShaderStages::compute); // ChunkVoxels
+
+    builder.add_push_constantsf(sizeof(CheckPathPassabilityPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }
