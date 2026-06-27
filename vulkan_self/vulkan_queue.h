@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <mutex>
 #include <utility>
 #include <span>
 
@@ -70,4 +71,5 @@ private:
     VkQueue m_queue = VK_NULL_HANDLE;
     QueueLocation m_location{};
     VulkanQueueType m_type = VulkanQueueType::Graphics;
+    std::mutex m_mutex;
 };

@@ -103,12 +103,16 @@ void VulkanQueue::submit(
     submit_info.signalSemaphoreCount = static_cast<uint32_t>(signal_semaphore_handles.size());
     submit_info.pSignalSemaphores = signal_semaphore_handles.data();
 
-    VkResult submit_result = vkQueueSubmit(
-        m_queue,
-        1,
-        &submit_info,
-        fence != nullptr ? fence->handle() : VK_NULL_HANDLE
-    );
+    VkResult submit_result = VK_SUCCESS;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        submit_result = vkQueueSubmit(
+            m_queue,
+            1,
+            &submit_info,
+            fence != nullptr ? fence->handle() : VK_NULL_HANDLE
+        );
+    }
 
     logger().check(submit_result == VK_SUCCESS, "Failed to submit draw command buffer");
 }
@@ -175,7 +179,11 @@ VkResult VulkanQueue::present(
     present_info.pSwapchains = swapchain_handles.data();
     present_info.pImageIndices = image_indices.data();
 
-    VkResult present_result = vkQueuePresentKHR(m_queue, &present_info);
+    VkResult present_result = VK_SUCCESS;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        present_result = vkQueuePresentKHR(m_queue, &present_info);
+    }
 
     logger().check(
         present_result == VK_SUCCESS ||

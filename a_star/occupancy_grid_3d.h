@@ -1,5 +1,6 @@
 #pragma once
 
+#include <mutex>
 #include <unordered_set>
 #include <vector>
 
@@ -138,5 +139,6 @@ private:
     VulkanBuffer m_dirty_chunk_position_buffer;
 
     std::unordered_map<uint64_t, VoxelGridChunk> m_chunk_cache;
+    std::mutex m_chunk_cache_mutex;
     std::vector<glm::vec4> m_dirty_chunk_positions;
 };

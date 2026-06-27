@@ -118,46 +118,34 @@ void CelerisVisualizer::update() {
     const bool received_new_scan = received_scan_count != scan_generation;
     scan_generation = received_scan_count;
 
-    interpolate_marker_pose(
-        m_start_marker,
-        m_start_marker_interpolation,
-        m_celeris->start_position(),
-        now,
-        received_new_scan
-    );
-    interpolate_marker_pose(
-        m_goal_marker,
-        m_goal_marker_interpolation,
-        m_celeris->goal_position(),
-        now
-    );
+    set_start(m_celeris->start_position());
+    set_goal(m_celeris->goal_position());
 
-    {
-        std::lock_guard<std::mutex> lock(m_celeris->planner_mutex());
-        m_guide_path_line_cloud.set_lines(make_path_lines(m_celeris->plain_astar_path.path));
-        m_path_line_cloud.set_lines(make_path_lines(m_celeris->nonholonomic_astar_path, true));
-        if (m_celeris->explored_paths.size() > 0)
-            m_explored_paths_line_cloud.set_lines(m_celeris->explored_paths);
-        m_unimpended_path_line_cloud.set_lines(make_path_lines(m_celeris->unimpended_path));
-    }
+    // interpolate_marker_pose(
+    //     m_start_marker,
+    //     m_start_marker_interpolation,
+    //     m_celeris->start_position(),
+    //     now,
+    //     received_new_scan
+    // );
+    // interpolate_marker_pose(
+    //     m_goal_marker,
+    //     m_goal_marker_interpolation,
+    //     m_celeris->goal_position(),
+    //     now
+    // );
 
-    
-    // if (m_celeris->planner().state_explored_paths.size() > 0)
-    
+    PathPlanner::PathPlannerResult path_result = m_celeris->path_result_snapshot();
+    m_guide_path_line_cloud.set_lines(make_path_lines(path_result.plain_astar_path.path));
+    m_path_line_cloud.set_lines(make_path_lines(path_result.nonholonomic_astar_path, true));
+    if (path_result.explored_paths.size() > 0)
+        m_explored_paths_line_cloud.set_lines(path_result.explored_paths);
+    m_unimpended_path_line_cloud.set_lines(make_path_lines(path_result.unimpended_path));
 
-    // if (scan_generation != m_celeris->received_scan_count()) {
-    //     scan_generation = m_celeris->received_scan_count();
-
-    //     if (m_celeris->network_scan()) {
-    //         set_start(m_celeris->network_scan()->point_cloud().transform);
-    //         set_goal(m_celeris->goal_position());
-    //         m_path_line_cloud.set_lines(make_path_lines(m_celeris->planner().state_path));
-    //     }
-    // }
 }
 
 glm::vec3 CelerisVisualizer::voxel_size() noexcept {
-    return m_celeris->planner().occupancy_grid().voxel_size();
+    return m_celeris->voxel_size();
 }
 
 glm::vec3 CelerisVisualizer::marker_vertical_offset() noexcept {
@@ -295,8 +283,8 @@ std::vector<LineInstance> CelerisVisualizer::make_path_lines(const std::vector<g
 
     for (uint32_t i = 1; i < path.size() && path_lines.size() < max_path_line_count; i++) {
         path_lines.push_back(LineInstance{
-            .p0 = m_celeris->planner().occupancy_grid().voxel_center_world_pos(path[i - 1]) + glm::vec3(0, 0.2f, 0),
-            .p1 = m_celeris->planner().occupancy_grid().voxel_center_world_pos(path[i]) + glm::vec3(0, 0.2f, 0),
+            .p0 = m_celeris->voxel_center_world_pos(path[i - 1]) + glm::vec3(0, 0.2f, 0),
+            .p1 = m_celeris->voxel_center_world_pos(path[i]) + glm::vec3(0, 0.2f, 0),
             .color = glm::vec4(1, 1, 1, 1)
         });
     }
