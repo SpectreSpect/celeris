@@ -80,8 +80,17 @@ std::vector<NonholonomicPos> ReedsShepp::discretize_path(
 
     NonholonomicPos last_point = output_path[0];
     if (end_pos.has_value() && std::abs(start_pos.pos.y - end_pos->pos.y) > EPS) {
-        NonholonomicPos intermediate_point = start_pos;
-        intermediate_point.pos.y = end_pos->pos.y;
+        float y_delta = end_pos->pos.y - start_pos.pos.y;
+        NonholonomicPos intermediate_point;
+
+        if (y_delta > 0.0f) {
+            intermediate_point = start_pos;
+            intermediate_point.pos.y = end_pos->pos.y;
+        } else {
+            intermediate_point = *end_pos;
+            intermediate_point.pos.y = start_pos.pos.y;
+        }
+
         output_path.push_back(intermediate_point);
         last_point = intermediate_point;
     }

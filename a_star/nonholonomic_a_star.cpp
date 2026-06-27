@@ -22,9 +22,18 @@ namespace {
             const NonholonomicPos& previous = path[i - 1];
             const NonholonomicPos& current = path[i];
 
-            if (std::abs(previous.pos.y - current.pos.y) > eps) {
-                NonholonomicPos intermediate_point = previous;
-                intermediate_point.pos.y = current.pos.y;
+            float y_delta = current.pos.y - previous.pos.y;
+            if (std::abs(y_delta) > eps) {
+                NonholonomicPos intermediate_point;
+
+                if (y_delta > 0.0f) {
+                    intermediate_point = previous;
+                    intermediate_point.pos.y = current.pos.y;
+                } else {
+                    intermediate_point = current;
+                    intermediate_point.pos.y = previous.pos.y;
+                }
+
                 corrected_path.push_back(intermediate_point);
             }
 
@@ -136,10 +145,19 @@ std::vector<NonholonomicPos> NonholonomicAStar::reconstruct_path(std::unordered_
         if (cur_cell.no_parent)
             break;
         
-        float eps = 1e-6;
-        if (std::abs(cur_pos.pos.y - cur_cell.came_from.pos.y) > eps) {
-            NonholonomicPos intermediate_point = cur_cell.came_from;
-            intermediate_point.pos.y = cur_pos.pos.y;
+        float eps = 1e-6f;
+        float y_delta = cur_pos.pos.y - cur_cell.came_from.pos.y;
+        if (std::abs(y_delta) > eps) {
+            NonholonomicPos intermediate_point;
+
+            if (y_delta > 0.0f) {
+                intermediate_point = cur_cell.came_from;
+                intermediate_point.pos.y = cur_pos.pos.y;
+            } else {
+                intermediate_point = cur_pos;
+                intermediate_point.pos.y = cur_cell.came_from.pos.y;
+            }
+
             path.push_back(intermediate_point);
         }
         
@@ -450,7 +468,10 @@ void NonholonomicAStar::initialize(
 
     for (int i = 1; i < m_state.unimpended_astar_positions.size() - 1; i++) {
         
-        glm::vec3 dir = glm::normalize(m_state.unimpended_astar_positions[i].pos - m_state.unimpended_astar_positions[i-1].pos);
+        glm::vec3 dir = glm::normalize(
+            m_state.unimpended_astar_positions[i].pos - 
+            m_state.unimpended_astar_positions[i-1].pos
+        );
         m_state.unimpended_astar_positions[i].theta = std::atan2(dir.z, dir.x);
     }
 
