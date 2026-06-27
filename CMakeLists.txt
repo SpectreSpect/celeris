@@ -136,6 +136,7 @@ add_executable(app
   a_star/reeds_shepp.cpp
   autopilot/spherical_pose_marker.cpp
   autopilot/vehicle_command_sender.cpp
+  autopilot/path_planner.cpp
   autopilot/celeris.cpp
   autopilot/celeris_visualizer.cpp
   voxel_grid_vulkan/voxel_grid_gpu_debugger.cpp

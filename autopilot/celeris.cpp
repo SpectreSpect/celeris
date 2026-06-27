@@ -47,26 +47,18 @@ Celeris::Celeris(VulkanEngine& engine,
         m_gicp_pass(engine, manager_bundle.compute_pass_manager()),
         m_point_cloud_preprocessor(engine.device(), compute_queue, manager_bundle.compute_pass_manager()),
         m_scan_receiver(m_point_cloud_preprocessor),
-        m_unimpended_path_finder(
-            engine.physical_device(),
-            engine.device(),
-            submit_context,
-            manager_bundle.compute_pass_manager(),
-            voxel_grid,
-            desc.unimpended_path_window_size,
-            desc.unimpended_path_max_astar_points
-        ),
-        m_path_intersection_detector(
-            engine.physical_device(),
-            engine.device(),
-            submit_context,
-            manager_bundle.compute_pass_manager(),
-            voxel_grid,
-            desc.unimpended_path_max_astar_points
-        ),
         m_command_sender(),
-        m_occupancy_grid(engine.physical_device(), engine.device(), voxel_grid, manager_bundle.compute_pass_manager()),
-        m_planner(m_occupancy_grid, desc.nonholonomic_astar_desc, m_unimpended_path_finder),
+        m_path_planner(
+            engine,
+            submit_context,
+            manager_bundle,
+            voxel_grid,
+            PathPlanner::PathPlannerDesc{
+                .unimpended_path_window_size = desc.unimpended_path_window_size,
+                .unimpended_path_max_astar_points = desc.unimpended_path_max_astar_points,
+                .nonholonomic_astar_desc = desc.nonholonomic_astar_desc
+            }
+        ),
         m_voxel_point_map(engine,
                           desc.voxel_point_map_num_hash_table_slots,
                           desc.voxel_point_map_max_map_point_count),
@@ -101,16 +93,17 @@ void Celeris::start_lidar_receiver() {
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     start_lidar_receiver();
     m_command_sender.start();
-    start_planner_thread(std::move(planner_submit_context));
+    m_path_planner.start(std::move(planner_submit_context));
 }
 
-void Celeris::update() {
+void Celeris::update(VulkanSubmitContext& submit_context) {
     LOG_METHOD();
 
     logger().check(m_engine, "Engine was null");
     logger().check(m_manager_bundle, "Manager bundle was null");
     logger().check(m_voxel_grid, "Voxel grid was null");
 
+    sync_path_planner_result();
     m_command_sender.set_command(get_path_following_command());
 
     if (auto scan = m_scan_receiver.try_pop_scan(*m_manager_bundle)) {
@@ -178,31 +171,6 @@ void Celeris::update() {
         // start_sphere.transform.position = m_network_scan->point_cloud().transform.position;
         // start_direction_sphere.transform.position = start_pos.pos + direction_offset(start_pos.theta) * 0.85f + glm::vec3(0, 0.4f, 0);
 
-        // if (m_received_scan_count % path_replanning_interval == 0) {
-        //     m_planner.initialize(m_start_position, m_goal_position);
-        //     m_planner.find_nonholomic_path(); // state_explored_paths    
-        // }
-
-        // lines = make_path_lines(planner.state_path);
-        // line_cloud.set_lines(lines);
-        // explored_path_line_cloud.set_lines(planner.state_explored_paths);
-
-        // has_planned_path = !planner.state_path.empty();
-        // path_planning_status = has_planned_path
-        //     ? "Path planning finished."
-        //     : "Path planning finished with no path.";
-        
-
-        // if (make_pose_from_camera(camera, start_pos.theta, start_pos)) {
-        //     has_start_pos = true;
-        //     has_planned_path = false;
-        //     path_planning_status = has_end_pos ? "Start position placed on ground." : "Start position placed on ground. Place end position.";
-        //     sync_path_marker_transforms();
-        // } else {
-        //     path_planning_status = "Could not place start: no ground found near camera.";
-        // }
-
-        
         m_voxel_map_inserter.insert(m_voxel_point_map, m_network_scan->point_cloud(), m_network_scan->normal_buffer());
         // m_voxel_grid->voxelize_point_cloud(
         //     *m_engine, 
@@ -228,11 +196,11 @@ void Celeris::update() {
             &m_voxel_grid->local_voxel_write_list()
         );
 
-        m_occupancy_grid.adjust_to_ground(
+        m_path_planner.request_adjust_to_ground(
             m_start_position.pos, 
             0, 
-            6, 
-            6, 
+            10, 
+            10, 
             false
         );
 
@@ -245,31 +213,12 @@ void Celeris::update() {
         );
         remember_collision_raw_position(collision_raw_position);
 
-        request_path_replan(m_start_position, m_goal_position);
+        if (is_path_impended(submit_context))
+            request_path_replan();
 
         m_previous_lidar_position = raw_position;
         m_previous_lidar_rotation = raw_rotation;
         m_received_scan_count++;
-    }
-}
-
-void Celeris::find_path(VulkanSubmitContext& submit_context) {
-    total_path_finding_time = AvgTimer();
-
-    total_path_finding_time.start();
-    m_planner.initialize(submit_context, m_start_position, m_goal_position);
-    m_planner.find_nonholomic_path(); // state_explored_paths
-    total_path_finding_time.end();
-
-    std::cout << "Total path finding time: " << total_path_finding_time.average_ms() << " ms" << std::endl;
-
-    {
-        std::lock_guard<std::mutex> lock(m_planner_mutex);    
-        plain_astar_path = m_planner.state().plain_astar_path;
-        nonholonomic_astar_path = m_planner.state().path;
-        explored_paths = m_planner.state().explored_paths;
-        unimpended_path = m_planner.state().unimpended_astar_positions;
-        current_target_path_point_id = 0;
     }
 }
 
@@ -324,38 +273,28 @@ VoxelMapPointReseter& Celeris::voxel_map_reseter() {
     return m_voxel_map_reseter;
 }
 
-NonholonomicAStar& Celeris::planner() {
-    return m_planner;
-}
-
 uint32_t Celeris::received_scan_count() const noexcept {
     return m_received_scan_count;
 }
 
-std::mutex& Celeris::planner_mutex() noexcept {
-    return m_planner_mutex;
-}
-
 bool Celeris::collision_point_is_free(glm::vec3 point) {
-    return !m_occupancy_grid.is_solid(
-        m_occupancy_grid.world_to_voxel_pos(point)
-    );
+    return !m_path_planner.request_is_solid_world(point);
 }
 
 glm::vec3 Celeris::collision_point_in_voxel_closest_to(
     glm::ivec3 voxel_pos,
     glm::vec3 reference)
 {
-    const glm::vec3 voxel_size = m_occupancy_grid.voxel_size();
-    const glm::vec3 voxel_min = m_occupancy_grid.voxel_to_world_pos(voxel_pos);
-    const glm::vec3 voxel_max = voxel_min + voxel_size;
-    const glm::vec3 epsilon = voxel_size * 1e-3f;
+    const glm::vec3 size = m_path_planner.request_voxel_size();
+    const glm::vec3 voxel_min = m_path_planner.request_voxel_to_world_pos(voxel_pos);
+    const glm::vec3 voxel_max = voxel_min + size;
+    const glm::vec3 epsilon = size * 1e-3f;
 
     return glm::clamp(reference, voxel_min + epsilon, voxel_max - epsilon);
 }
 
 float Celeris::collision_sample_step() {
-    const glm::vec3 voxel_size = m_occupancy_grid.voxel_size();
+    const glm::vec3 voxel_size = m_path_planner.request_voxel_size();
     logger().check(
         glm::all(glm::greaterThan(voxel_size, glm::vec3(0.0f))),
         "Voxel size must be greater than zero"
@@ -448,7 +387,7 @@ bool Celeris::find_collision_escape_point(
     }
 
     const glm::vec3 direction_norm = direction / std::sqrt(direction_len_sq);
-    const glm::ivec3 center_voxel = m_occupancy_grid.world_to_voxel_pos(point_pos);
+    const glm::ivec3 center_voxel = m_path_planner.request_world_to_voxel_pos(point_pos);
     const int radius = static_cast<int>(m_desc.collision_escape_search_radius_voxels);
 
     bool found = false;
@@ -460,7 +399,7 @@ bool Celeris::find_collision_escape_point(
         for (int y = -radius; y <= radius; ++y) {
             for (int x = -radius; x <= radius; ++x) {
                 glm::ivec3 candidate_voxel = center_voxel + glm::ivec3(x, y, z);
-                if (m_occupancy_grid.is_solid(candidate_voxel)) {
+                if (m_path_planner.request_is_solid(candidate_voxel)) {
                     continue;
                 }
 
@@ -570,7 +509,7 @@ void Celeris::remember_collision_raw_position(glm::vec3 point_pos) {
         return;
     }
 
-    if (m_occupancy_grid.is_solid(m_occupancy_grid.world_to_voxel_pos(point_pos))) {
+    if (m_path_planner.request_is_solid_world(point_pos)) {
         return;
     }
 
@@ -586,33 +525,47 @@ void Celeris::remember_collision_raw_position(glm::vec3 point_pos) {
     }
 }
 
-void Celeris::start_planner_thread(VulkanSubmitContext&& submit_context) {
-    m_planner_running.exchange(true);
-    m_planner_thread = std::thread(&Celeris::planner_loop, this, std::move(submit_context));
+void Celeris::request_path_replan() {
+    m_path_planner.request_path_replan(m_start_position, m_goal_position);
 }
 
-void Celeris::request_path_replan(const NonholonomicPos& start_pos, const NonholonomicPos& end_pos) {
-    m_replan_requested.exchange(true);
+bool Celeris::adjust_to_ground(glm::vec3& output) {
+    return m_path_planner.request_adjust_to_ground(output);
 }
 
-void Celeris::planner_loop(VulkanSubmitContext submit_context) {
-    while (m_planner_running.load()) {
-        if (!m_replan_requested.load())
-            continue;
-        m_replan_requested.exchange(false);
+bool Celeris::has_planned_path() const {
+    return m_path_planner.request_has_path();
+}
 
-        std::vector<glm::vec3> noncholonomic_path_points;
-        noncholonomic_path_points.reserve(m_planner.state().path.size());
+PathPlanner::PathPlannerResult Celeris::path_result_snapshot() const {
+    return m_path_planner.request_result_snapshot();
+}
 
-        for (const NonholonomicPos& point : m_planner.state().path) {
-            noncholonomic_path_points.push_back(point.pos);
-        }
-        
-        if (noncholonomic_path_points.size() == 0 || 
-            m_path_intersection_detector.has_intersection(submit_context, noncholonomic_path_points)) {
-            find_path(submit_context);
-        }
-    }
+glm::vec3 Celeris::voxel_size() {
+    return m_path_planner.request_voxel_size();
+}
+
+glm::vec3 Celeris::voxel_center_world_pos(const glm::ivec3& voxel_pos) {
+    return m_path_planner.request_voxel_center_world_pos(voxel_pos);
+}
+
+bool Celeris::is_path_impended(VulkanSubmitContext& submit_context) {
+    return m_path_planner.request_is_path_impended(submit_context);
+}
+
+void Celeris::sync_path_planner_result() {
+    PathPlanner::PathPlannerResult result = m_path_planner.request_result_snapshot();
+    if (result.generation == m_synced_path_generation)
+        return;
+
+    std::lock_guard<std::mutex> lock(m_path_mutex);
+    plain_astar_path = std::move(result.plain_astar_path);
+    nonholonomic_astar_path = std::move(result.nonholonomic_astar_path);
+    explored_paths = std::move(result.explored_paths);
+    unimpended_path = std::move(result.unimpended_path);
+    total_path_finding_time = result.total_path_finding_time;
+    m_synced_path_generation = result.generation;
+    current_target_path_point_id = 0;
 }
 
 bool Celeris::find_closest_next_path_point(uint32_t current_id, uint32_t& output_id, uint32_t& output_dist) {
@@ -627,10 +580,12 @@ bool Celeris::find_closest_next_path_point(uint32_t current_id, uint32_t& output
     for (int i = current_id; i < nonholonomic_astar_path.size(); i++) {
         float dist = glm::distance(m_start_position.pos, nonholonomic_astar_path[output_id].pos);
     }
+
+    return true;
 };
 
 VehicleCommand Celeris::get_path_following_command() {
-    std::lock_guard<std::mutex> lock(m_planner_mutex);
+    std::lock_guard<std::mutex> lock(m_path_mutex);
 
     if (nonholonomic_astar_path.empty() || current_target_path_point_id >= nonholonomic_astar_path.size())
         return VehicleCommand{
@@ -661,6 +616,11 @@ VehicleCommand Celeris::get_path_following_command() {
                 if (elapsed_seconds >= stop_waiting_time) {
                     is_stop_waiting = false;
                     current_target_path_point_id++;
+                    if (current_target_path_point_id >= nonholonomic_astar_path.size())
+                        return VehicleCommand{
+                            .speed = 0,
+                            .steering_angle = 0
+                        };
                 } else {
                     return VehicleCommand{
                         .speed = 0,
@@ -671,6 +631,11 @@ VehicleCommand Celeris::get_path_following_command() {
         } 
         else {
             current_target_path_point_id++;
+            if (current_target_path_point_id >= nonholonomic_astar_path.size())
+                return VehicleCommand{
+                    .speed = 0,
+                    .steering_angle = 0
+                };
         }    
     }
 

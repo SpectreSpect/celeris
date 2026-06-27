@@ -77,6 +77,7 @@ OccupancyGrid3D::OccupancyGrid3D(
             sizeof(uint32_t)
         );
 
+        std::lock_guard lock(m_chunk_cache_mutex);
         for (int i = 0; i < dirty_chunk_position_count; i++) {
             glm::ivec4 center_chunk_pos = m_dirty_chunk_positions[i];
             uint64_t center_chunk_key = math_utils::pack_key(
@@ -107,6 +108,7 @@ OccupancyGrid3D::OccupancyGrid3D(
 }
 
 void OccupancyGrid3D::clear_cache() {
+    std::lock_guard lock(m_chunk_cache_mutex);
     m_chunk_cache.clear();
 }
 
@@ -286,21 +288,33 @@ bool OccupancyGrid3D::is_solid(glm::ivec3 pos) {
 
     uint64_t chunk_key = math_utils::pack_key(chunk_pos.x, chunk_pos.y, chunk_pos.z);
 
-    auto cached_chunk_it = m_chunk_cache.find(chunk_key);
-    if (cached_chunk_it == m_chunk_cache.end()) {
+    glm::ivec3 local_pos = m_voxel_grid->pos_in_chunk_from_global_voxel_pos(chunk_pos, pos);
+
+    {
+        std::lock_guard lock(m_chunk_cache_mutex);
+        auto cached_chunk_it = m_chunk_cache.find(chunk_key);
+        if (cached_chunk_it != m_chunk_cache.end()) {
+            VoxelDataGPU voxel = cached_chunk_it->second.voxel(glm::uvec3(local_pos));
+            is_solid_time.end();
+            return voxel.is_solid() || voxel.is_inflated();
+        }
+    }
+
+    VoxelGridChunk loaded_chunk;
+    {
         read_and_inflate_chunk_count++;
 
         read_and_inflate_chunk_time.start();
-        cached_chunk_it = m_chunk_cache.emplace(
-            chunk_key,
-            m_voxel_grid->read_chunk(chunk_pos)
-        ).first;
+        loaded_chunk = m_voxel_grid->read_chunk(chunk_pos);
         read_and_inflate_chunk_time.end();
     }
 
-    glm::ivec3 local_pos = m_voxel_grid->pos_in_chunk_from_global_voxel_pos(chunk_pos, pos);
-
-    VoxelDataGPU voxel = cached_chunk_it->second.voxel(glm::uvec3(local_pos));
+    VoxelDataGPU voxel;
+    {
+        std::lock_guard lock(m_chunk_cache_mutex);
+        auto [cached_chunk_it, inserted] = m_chunk_cache.emplace(chunk_key, std::move(loaded_chunk));
+        voxel = cached_chunk_it->second.voxel(glm::uvec3(local_pos));
+    }
 
     is_solid_time.end();
 
