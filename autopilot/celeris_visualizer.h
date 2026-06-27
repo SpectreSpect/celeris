@@ -35,6 +35,8 @@ public:
     glm::vec3 get_start_marker_pos();
 
     void update();
+    void display_debug_controls();
+
 private:
     struct MarkerInterpolationState {
         glm::vec3 previous_position{0.0f};
@@ -61,6 +63,11 @@ private:
 
     MarkerInterpolationState m_start_marker_interpolation;
     MarkerInterpolationState m_goal_marker_interpolation;
+
+    bool show_path = true;
+    bool show_guide_path = true;
+    bool show_explored_paths = false;
+    bool show_unimpeded_path = true;
 
 private:
     glm::vec3 voxel_size() noexcept;

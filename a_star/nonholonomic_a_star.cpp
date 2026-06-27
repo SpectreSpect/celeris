@@ -4,6 +4,8 @@
 #include "unimpended_path_finder.h"
 #include "reeds_shepp.h"
 
+#include <iostream>
+
 namespace {
     void insert_y_transition_points(std::vector<NonholonomicPos>& path) {
         constexpr float eps = 1e-6f;
@@ -171,39 +173,39 @@ float NonholonomicAStar::angle_diff(float a, float b) {
     return d;
 }
 
-// DistToPathData NonholonomicAStar::max_unimpended_dist_to_path(glm::vec3 pos, std::vector<glm::ivec3>& path, int start_id, glm::vec3 last_pos, bool replace_last_pos) {
-//     LOG_METHOD();
+DistToPathData NonholonomicAStar::max_unimpended_dist_to_path(glm::vec3 pos, std::vector<glm::ivec3>& path, int start_id, glm::vec3 last_pos, bool replace_last_pos) {
+    LOG_METHOD();
 
-//     int id = -1;
-//     float max_dist = 0;
+    int id = -1;
+    float max_dist = 0;
 
-//     glm::vec3 cur_pos = (glm::vec3)pos;
-//     for (int i = start_id; i < path.size(); i++) {
-//         glm::vec3 path_pos = m_grid->voxel_center_world_pos(path[i]);
+    glm::vec3 cur_pos = (glm::vec3)pos;
+    for (int i = start_id; i < path.size(); i++) {
+        glm::vec3 path_pos = m_grid->voxel_center_world_pos(path[i]);
 
-// //         if (replace_last_pos && i == path.size() - 1)
-// //             path_pos = last_pos;
+//         if (replace_last_pos && i == path.size() - 1)
+//             path_pos = last_pos;
             
 
-// //         path_pos.y = cur_pos.y;
+//         path_pos.y = cur_pos.y;
 
-// //         std::vector<glm::vec3> line = {cur_pos, path_pos};
+        std::vector<glm::vec3> line = {cur_pos, path_pos};
 
-//         std::vector<glm::ivec3> ground_positions;
-//         if (!m_grid->get_ground_positions(
-//                 line, 
-//                 ground_positions, 
-//                 m_params.max_step_up, 
-//                 m_params.max_drop, 
-//                 m_params.max_y_diff,
-//                 m_params.allow_flying_over_precipices)) {
-//             continue;
-//         }
+        std::vector<glm::ivec3> ground_positions;
+        if (!m_grid->get_ground_positions(
+                line, 
+                ground_positions, 
+                m_params.max_step_up, 
+                m_params.max_drop, 
+                m_params.max_y_diff,
+                m_params.allow_flying_over_precipices)) {
+            continue;
+        }
         
-//         id = i;
-//         max_dist = glm::distance(cur_pos, path_pos); 
-//     }
-// }
+        id = i;
+        max_dist = glm::distance(cur_pos, path_pos); 
+    }
+}
 
 int NonholonomicAStar::discretize_angle(float value, int num_bins) {
     LOG_NAMED("NonholonomicAStar");
@@ -393,7 +395,42 @@ void NonholonomicAStar::initialize(
     }
 
     std::vector<glm::ivec3> unimpended_points = find_unimpended_points(submit_context, m_state.plain_astar_path);
+
     m_state.unimpended_astar_positions = prepare_unimpended_points(unimpended_points, start_pos, end_pos);
+
+    const float desired_distance_from_last = 5.0f;
+    const float min_segment_length = 2.0f;
+
+    if (m_state.unimpended_astar_positions.size() >= 2) {
+        NonholonomicPos& previous_pos =
+            m_state.unimpended_astar_positions[m_state.unimpended_astar_positions.size() - 2];
+        NonholonomicPos& last_pos =
+            m_state.unimpended_astar_positions[m_state.unimpended_astar_positions.size() - 1];
+
+        const glm::vec3 segment = last_pos.pos - previous_pos.pos;
+        const float segment_length = glm::length(segment);
+
+        if (segment_length > desired_distance_from_last) {
+            NonholonomicPos intermediate_pos = last_pos;
+
+            const float previous_to_intermediate_length =
+                segment_length - desired_distance_from_last;
+
+            if (previous_to_intermediate_length < min_segment_length ||
+                desired_distance_from_last < min_segment_length)
+            {
+                intermediate_pos.pos = (previous_pos.pos + last_pos.pos) * 0.5f;
+            } else {
+                intermediate_pos.pos =
+                    last_pos.pos - glm::normalize(segment) * desired_distance_from_last;
+            }
+
+            m_state.unimpended_astar_positions.insert(
+                m_state.unimpended_astar_positions.end() - 1,
+                intermediate_pos
+            );
+        }
+    }
 
     m_state.dubins_segment_lengths.reserve(m_state.unimpended_astar_positions.size() - 1);
 

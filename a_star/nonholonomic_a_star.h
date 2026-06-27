@@ -106,6 +106,8 @@ public:
     OccupancyGrid3D& occupancy_grid() noexcept;
     NonholonomicAStarState& state() noexcept;
 
+    DistToPathData max_unimpended_dist_to_path(glm::vec3 pos, std::vector<glm::ivec3>& path, int start_id, glm::vec3 last_pos, bool replace_last_pos);
+
 private:
     NonholonomicAStarParams m_params;
     NonholonomicAStarState m_state;

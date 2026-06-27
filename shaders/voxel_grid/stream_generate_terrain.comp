@@ -99,8 +99,15 @@ void main() {
 
     // uint type = (float(worldVoxel.y) <= height) ? 1u : 0u;
     // uint type = (precipice) && (float(worldVoxel.y) <= height) ? 1u : 0u;
+
+    float steepeness = 10;
+
+    float cur_height = worldVoxel.y + (worldVoxel.x / steepeness) + (worldVoxel.z / steepeness);
+
+
     // uint type = (float(worldVoxel.y) <= height) ? 1u : 0u;
-    uint type = 0u;
+    uint type = ((cur_height <= height) && precipice) ? 1u : 0u;
+    // uint type = 0u;
     uint voxel_flags = (type != 0u) ? VOXEL_VISABILITY_FLAG_BIT : VOXEL_EASY_OVERWRITE_FLAG_BIT;
 
     VoxelData vd;

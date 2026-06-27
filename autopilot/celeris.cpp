@@ -81,8 +81,8 @@ void Celeris::start_lidar_receiver() {
 }
 
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
-    start_lidar_receiver();
-    m_command_sender.start();
+    // start_lidar_receiver();
+    // m_command_sender.start();
     m_path_planner.start(std::move(planner_submit_context));
 }
 
@@ -157,11 +157,14 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
             m_desc.max_write_count
         );
 
+        m_start_position.pos.y -= 1.1f;
+
+
         m_path_planner.request_adjust_to_ground(
             m_start_position.pos, 
             0, 
-            10, 
-            10, 
+            6, 
+            6, 
             false
         );
 

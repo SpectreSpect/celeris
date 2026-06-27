@@ -161,7 +161,7 @@ int main() {
         .render_distance = chunk_size.x * voxel_size.x * 30,
         .generation_distance = 5,
         .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000),
-        .inflation_size = 1u,
+        .inflation_size = 0u,
         .car_height_voxels = 3u,
         .display_inflated_voxels = 0u,
         .inflated_voxel_color = 0xFF0707FFu, // 0xFF3355FFu
@@ -759,6 +759,8 @@ int main() {
                         );
                     }
                 }
+
+                celeris_visualizer.display_debug_controls();
                 
                 // ImGui::TextColored(ImVec4(1.0f, 0.35f, 1.0f, 1.0f), "Current frame id: %d", lidar_video.current_frame_id());
 

@@ -439,7 +439,9 @@ bool OccupancyGrid3D::adjust_to_ground(
     glm::ivec3 norm_pos = output;
     glm::ivec3 result_pos = norm_pos;
 
-    if(!get_closest_visible_bottom_pos(norm_pos, result_pos, max_drop)) {
+    const int ground_search_drop = max_drop + 1;
+
+    if(!get_closest_visible_bottom_pos(norm_pos, result_pos, ground_search_drop)) {
         if (status)
             *status = 1;
         return allow_flying_over_precepices;
