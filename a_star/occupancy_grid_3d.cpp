@@ -458,9 +458,10 @@ bool OccupancyGrid3D::adjust_to_ground(
         result_pos += glm::ivec3(0, 1, 0);
     
     if (max_y_diff >= 0) {
-        float diff = std::abs(result_pos.y - norm_pos.y);
-        if (diff > max_y_diff) {
-            if (allow_flying_over_precepices)
+        int y_diff = result_pos.y - norm_pos.y;
+        int abs_y_diff = std::abs(y_diff);
+        if (abs_y_diff > max_y_diff) {
+            if (allow_flying_over_precepices && y_diff < 0)
                 return true;
 
             if (status)

@@ -1894,7 +1894,7 @@ void VoxelGrid::update(Window& window, Camera& camera) {
         auto scope = m_command_buffer.begin_scope();
         stream_chunks_sphere(m_command_buffer, camera.position, -1, 42);
 
-        inflate_marked_chunks(m_command_buffer);
+        // inflate_marked_chunks(m_command_buffer);
 
         for (auto& callback : m_next_to_stream_chunks_sphere_callbacks) {
             callback(m_command_buffer, *this);

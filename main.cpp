@@ -143,13 +143,13 @@ int main() {
     std::unique_ptr<LidarScan> network_scan;
     std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
 
-    glm::vec3 voxel_size(0.5f);
+    glm::vec3 voxel_size(0.2f);
     glm::ivec3 chunk_size(16);
     VoxelGrid::VoxelGridDesc voxel_grid_desc {
         .chunk_size = chunk_size,
         .voxel_size = voxel_size,
-        .count_active_chunks = 8'000,
-        .max_quads = 1'000'000,
+        .count_active_chunks = 15'000,
+        .max_quads = 2'500'000,
         .chunk_hash_table_size_factor = 1.0f,
         .count_evict_buckets = 32,
         .min_free_chunks = 4'500,
@@ -286,25 +286,35 @@ int main() {
     //     &voxel_grid.local_voxel_write_list()
     // );
 
-    glm::ivec3 block_size = glm::ivec3(1, 5, 5);
-    glm::ivec3 block_origin = glm::ivec3(5, 0, 0);
+    glm::ivec2 wall_junction_xz = glm::ivec2(5, 5);
     std::vector<VoxelWriteGPU> test_voxel_writes;
-    test_voxel_writes.reserve(static_cast<size_t>(block_size.x * block_size.y * block_size.z));
+    test_voxel_writes.reserve(50);
 
-    for (int x = 0; x < block_size.x; x++)
-        for (int y = 0; y < block_size.y; y++)
-            for (int z = 0; z < block_size.z; z++) {
-                glm::ivec3 base_color{0, 98, 255};
-                glm::ivec3 color = glm::vec3(base_color) * glm::vec3(0.5 + math_utils::dist(math_utils::rng) * 0.5);
+    auto add_test_wall = [&](glm::ivec3 wall_origin, glm::ivec3 wall_size) {
+        for (int x = 0; x < wall_size.x; x++)
+            for (int y = 0; y < wall_size.y; y++)
+                for (int z = 0; z < wall_size.z; z++) {
+                    glm::ivec3 world_voxel = wall_origin + glm::ivec3(x, y, z);
 
-                test_voxel_writes.push_back(
-                    VoxelWriteGPU{
-                        .world_voxel = glm::ivec4(block_origin, 0) + glm::ivec4(x, y, z, 0),
-                        .voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, color),
-                        .set_flags = OVERWRITE_BIT
+                    if (glm::ivec2(world_voxel.x, world_voxel.z) == wall_junction_xz) {
+                        continue;
                     }
-                );
-            }
+
+                    glm::ivec3 base_color{0, 98, 255};
+                    glm::ivec3 color = glm::vec3(base_color) * glm::vec3(0.5 + math_utils::dist(math_utils::rng) * 0.5);
+
+                    test_voxel_writes.push_back(
+                        VoxelWriteGPU{
+                            .world_voxel = glm::ivec4(world_voxel, 0),
+                            .voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, color),
+                            .set_flags = OVERWRITE_BIT
+                        }
+                    );
+                }
+    };
+
+    add_test_wall(glm::ivec3(5, 0, 0), glm::ivec3(1, 5, 6));
+    add_test_wall(glm::ivec3(5, 0, 5), glm::ivec3(6, 5, 1));
 
     VulkanBuffer box_voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + Utils::size_bytes(test_voxel_writes));
     box_voxel_write_list.upload_scalar<uint32_t>(test_voxel_writes.size(), 0);
@@ -728,6 +738,8 @@ int main() {
                 
 
                 ImGui::Begin("Debug");
+
+                ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
 
                 ImGui::TextUnformatted("Camera position:");
                 ImGui::SameLine();

@@ -52,7 +52,12 @@ NonholonomicAStar::NonholonomicAStar(
         m_grid(&occupancy_grid),
         m_unimpened_path_finder(&unimpened_path_finder),
         m_plain_astar(occupancy_grid, AStar::AStarDesc{
-            .allow_diagonal_moves = desc.allow_diagonal_moves
+            .max_step_up = desc.max_step_up,
+            .max_drop = desc.max_drop,
+            .max_y_diff = desc.max_y_diff,
+            .iteration_limit = desc.iteration_limit,
+            .allow_diagonal_moves = desc.allow_diagonal_moves,
+            .allow_flying_over_precepices = desc.allow_flying_over_precipices
         }) {}
 
 std::vector<NonholonomicPos> NonholonomicAStar::simulate_motion(NonholonomicPos start, int steer, int direction)
