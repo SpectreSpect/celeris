@@ -35,6 +35,7 @@ public:
     uint32_t point_count() const noexcept;
 
     void set_points(const std::vector<PointInstance>& points);
+    void set_color(glm::vec4 color);
     
 private:
     std::unique_ptr<InstanceBatch> m_instance_batch;

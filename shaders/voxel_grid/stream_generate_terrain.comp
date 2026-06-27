@@ -13,6 +13,7 @@ layout(std430, set = 0, binding=2) buffer ChunkVoxels { VoxelData voxels[]; };
 layout(std430, set = 0, binding=3) buffer ChunkMetaBuf { ChunkMeta meta[]; };
 layout(std430, set = 0, binding=4) buffer EnqueuedBuf { uint enqueued[]; };
 layout(std430, set = 0, binding=5) buffer DirtyListBuf { uint dirty_count; uint dirty_list[]; };
+layout(std430, set = 0, binding=6) buffer ToInflateListBuf { uint to_inflate_count; uint to_inflate_list[]; };
 
 // layout(push_constant) uniform StreamGenerateTerrainPushConstants {
 //     ivec3 u_chunk_dim;
@@ -91,13 +92,14 @@ void main() {
     vec2 xz = vec2(worldVoxel.x, worldVoxel.z) * 0.03; // частота
     float n = fbm(xz); // 0..~1
     // float n = 0.5f;
-    // float height = -30.0 + n * 30.0; // базовый уровень + амплитуда
+    // float height = -30.0 + n * 70.0 - worldVoxel.z + worldVoxel.x; // базовый уровень + амплитуда
     float height = 0; // базовый уровень + амплитуда
 
     bool precipice = ((worldVoxel.z / 20) % 2) == 0;
 
     // uint type = (float(worldVoxel.y) <= height) ? 1u : 0u;
     // uint type = (precipice) && (float(worldVoxel.y) <= height) ? 1u : 0u;
+    // uint type = (float(worldVoxel.y) <= height) ? 1u : 0u;
     uint type = 0u;
     uint voxel_flags = (type != 0u) ? VOXEL_VISABILITY_FLAG_BIT : VOXEL_EASY_OVERWRITE_FLAG_BIT;
 
@@ -120,6 +122,7 @@ void main() {
 
     // один раз на чанк
     if (voxelId == 0u) {
-        mark_dirty_around(chunkId, chunkCoord);
+        mark_dirty_mesh_around(chunkId, chunkCoord);
+        mark_inflate_around(chunkId, chunkCoord);
     }
 }

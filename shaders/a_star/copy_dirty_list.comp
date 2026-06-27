@@ -1,0 +1,53 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256) in;
+
+// ----- include -----
+#include "../common/buffer_structures.inc"
+// -------------------
+
+// struct ChunkMeta { 
+//     uint used; 
+//     uint key_lo; 
+//     uint key_hi; 
+//     uint dirty_flags; 
+// };
+
+layout(std430, set = 0, binding=0) buffer DirtyListBuf { uint dirty_count; uint dirty_list[]; };
+layout(std430, set = 0, binding=1) buffer OutputDirtyChunkPositionBuf { 
+    uint dirty_chunk_position_count; 
+    uint pad[3]; 
+    vec4 output_dirty_chunk_positions[]; 
+};
+layout(std430, set = 0, binding=2) buffer ChunkMetaBuf { ChunkMeta meta[]; };
+
+// ----- include -----
+#include "../common/utils.inc"
+// -------------------
+
+layout(push_constant) uniform CopyDirtyListPushConstants {
+    uint u_pack_bits;
+    int u_pack_offset;
+};
+
+void main() {
+    uint x_id = gl_GlobalInvocationID.x;
+
+    if (x_id == 0) {
+        dirty_chunk_position_count = dirty_count;
+        return;
+    }    
+    
+    if (x_id >= dirty_count) return;
+        
+    uint dirty_chunk_id = x_id + 1;
+    
+    // ivec3 unpack_key_to_coord(uvec2 key2, uint pack_offset, uint pack_bits) 
+    uint chunk_id = dirty_list[dirty_chunk_id];
+    ChunkMeta chunk_meta = meta[chunk_id];
+
+    ivec3 chunk_pos = unpack_key_to_coord(uvec2(chunk_meta.key_lo, chunk_meta.key_hi), u_pack_offset, u_pack_bits);
+
+    output_dirty_chunk_positions[dirty_chunk_id] =  ivec4(chunk_pos, 1);
+}

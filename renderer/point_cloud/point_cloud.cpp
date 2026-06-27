@@ -80,6 +80,10 @@ void PointCloud::set_points(const std::vector<PointInstance>& points) {
     instance_buffer().upload(points);
 }
 
+void PointCloud::set_color(glm::vec4 color) {
+    set_material_data(PointCloudMaterialData{.color = color});
+}
+
 uint32_t PointCloud::point_count() const noexcept {
     return m_instance_batch->instance_count();
 }

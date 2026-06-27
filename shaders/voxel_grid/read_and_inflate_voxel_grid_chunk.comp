@@ -1,0 +1,142 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256) in;
+
+#include "../common/buffer_structures.inc"
+
+layout(std430, set = 0, binding = 0) coherent buffer ChunkHashTable {
+    HashTableCounters chunk_hash_table_counters;
+    ChunkHashTableSlot chunk_hash_table_slots[];
+};
+
+layout(std430, set = 0, binding = 1) readonly buffer ChunkVoxels {
+    VoxelData voxels[];
+};
+
+layout(std430, set = 0, binding = 2) buffer OutputVoxels {
+    VoxelData output_voxels[];
+};
+
+// Nine output chunks in the XZ plane:
+//
+// 0 1 2
+// 3 4 5
+// 6 7 8
+//
+// Chunk 4 corresponds to the requested center chunk. Solid voxels in the
+// center chunk inflate into all nine output chunks. Solid voxels in the eight
+// surrounding chunks inflate only into the center output chunk.
+//
+// output_voxels must contain 9 * u_voxels_per_chunk elements and must be
+// cleared before this shader is dispatched. The output is binary occupancy:
+// inflated solid voxels have VOXEL_VISABILITY_FLAG_BIT set and color remains 0.
+
+layout(push_constant) uniform ReadAndInflateVoxelGridChunkPushConstants {
+    ivec4 u_chunk_dim;
+    ivec4 chunk_pos;
+    uint u_chunk_hash_table_size;
+    uint u_voxels_per_chunk;
+    uint u_pack_offset;
+    uint u_pack_bits;
+    uint inflation_size;
+};
+
+#include "chunk_pool/read_voxels.inc"
+
+void mark_inflated_voxel(
+    ivec2 source_chunk_offset,
+    ivec3 source_local_pos,
+    ivec2 inflation_offset,
+    int height_offset)
+{
+    // Express the source voxel in the coordinate system of the 3x3 output.
+    ivec2 output_xz = ivec2(
+        (source_chunk_offset.x + 1) * u_chunk_dim.x +
+            source_local_pos.x + inflation_offset.x,
+        (source_chunk_offset.y + 1) * u_chunk_dim.z +
+            source_local_pos.z + inflation_offset.y
+    );
+
+    ivec2 output_dims = ivec2(3 * u_chunk_dim.x, 3 * u_chunk_dim.z);
+    if (any(lessThan(output_xz, ivec2(0))) ||
+        any(greaterThanEqual(output_xz, output_dims))) {
+        return;
+    }
+
+    ivec2 output_chunk_pos = output_xz / ivec2(u_chunk_dim.x, u_chunk_dim.z);
+
+    // Neighboring chunks contribute inflation to the center chunk only. The
+    // center chunk is allowed to contribute to every output chunk so its
+    // inflation can cross chunk boundaries in the other direction as well.
+    bool source_is_center = all(equal(source_chunk_offset, ivec2(0)));
+    bool output_is_center = all(equal(output_chunk_pos, ivec2(1)));
+    if (!source_is_center && !output_is_center) return;
+
+    int output_y = source_local_pos.y - height_offset;
+
+    // Only the nine chunks in the requested chunk's XZ plane are emitted.
+    // Obstacles in the chunks above/below, and inflation that would cross a
+    // vertical chunk boundary, are intentionally ignored for now.
+    if (output_y < 0 || output_y >= u_chunk_dim.y) return;
+
+    ivec3 output_local_pos = ivec3(
+        output_xz.x % u_chunk_dim.x,
+        output_y,
+        output_xz.y % u_chunk_dim.z
+    );
+
+    uint output_chunk_id = uint(output_chunk_pos.y * 3 + output_chunk_pos.x);
+    uint output_voxel_id = output_chunk_id * u_voxels_per_chunk +
+                           voxel_index(output_local_pos);
+
+    uint visibility_flag = VOXEL_VISABILITY_FLAG_BIT << VOXEL_TYPE_BITS;
+    atomicOr(output_voxels[output_voxel_id].type_flags, visibility_flag);
+}
+
+void main()
+{
+    uint invocation_id = gl_GlobalInvocationID.x;
+    uint source_chunk_id = invocation_id / u_voxels_per_chunk;
+    if (source_chunk_id >= 9u) return;
+
+    uint voxel_id = invocation_id % u_voxels_per_chunk;
+    ivec2 source_chunk_offset = ivec2(
+        int(source_chunk_id % 3u) - 1,
+        int(source_chunk_id / 3u) - 1
+    );
+    ivec3 source_chunk_pos = chunk_pos.xyz +
+        ivec3(source_chunk_offset.x, 0, source_chunk_offset.y);
+
+    uvec2 key = pack_key_uvec2(source_chunk_pos, u_pack_offset, u_pack_bits);
+    uint slot_id = chunk_hash_table_lookup_hash_table_slot_id(key, true);
+    if (slot_id == INVALID_ID) return;
+
+    uint chunk_id = chunk_hash_table_slots[slot_id].value;
+    uint global_voxel_id = chunk_id * u_voxels_per_chunk + voxel_id;
+
+    VoxelData source_voxel = voxels[global_voxel_id];
+    bool solid = (read_voxel_flags(source_voxel.type_flags) &
+                  VOXEL_VISABILITY_FLAG_BIT) != 0u;
+    if (!solid) return;
+
+    ivec3 source_local_pos = local_voxel_pos_from_index(voxel_id);
+    int radius = int(inflation_size);
+    const int car_height_voxels = 3;
+
+    // A solid voxel blocks every possible car-base voxel whose vertical
+    // footprint would contain it. Marking downward is equivalent to checking
+    // car_height_voxels upward from each possible car position.
+    for (int height_offset = 0; height_offset < car_height_voxels; ++height_offset) {
+        for (int z = -radius; z <= radius; ++z) {
+            for (int x = -radius; x <= radius; ++x) {
+                mark_inflated_voxel(
+                    source_chunk_offset,
+                    source_local_pos,
+                    ivec2(x, z),
+                    height_offset
+                );
+            }
+        }
+    }
+}

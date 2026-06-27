@@ -20,3 +20,7 @@ double AvgTimer::average_ms() const {
         ? std::chrono::duration<double, std::milli>(total).count() / n
         : 0.0;
 }
+
+double AvgTimer::total_ms() const {
+    return std::chrono::duration<double, std::milli>(total).count();
+}

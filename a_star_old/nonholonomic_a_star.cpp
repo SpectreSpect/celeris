@@ -616,41 +616,19 @@ float NonholonomicAStar::get_nonholonomic_f(NonholonomicPos& new_pos, Nonholonom
     return f;
 }
 
-void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos end_pos) {
-    state_pq = std::priority_queue<NonholonomicAStarCell, std::vector<NonholonomicAStarCell>, NonholonomicByPriority>();
-    state_closed_heap = std::unordered_map<uint64_t, NonholonomicAStarCell>();
-    state_g_score = std::unordered_map<uint64_t, float>();
-    state_path = std::vector<NonholonomicPos>();
-    state_explored_paths = std::vector<LineInstance>();
-    state_start_pos = start_pos;
-    state_end_pos = end_pos;
-    state_counter = 0;
-    
-    min_radius = wheel_base / std::tan(max_steer);
+std::vector<NonholonomicPos> NonholonomicAStar::find_unimpended_path(
+    NonholonomicPos start_pos,
+    const PlainAstarData& state_plain_astar_path,
 
-    state_plain_astar_path = find_path(glm::ivec3(glm::floor(start_pos.pos)), glm::ivec3(glm::floor(end_pos.pos)));
-
-    if (state_plain_astar_path.path.empty())
-        return;
-
-    unimpended_astar_positions = std::vector<NonholonomicPos>();
-
+) {
     NonholonomicPos first_unimpended_pos = start_pos;
     first_unimpended_pos.pos.y = state_plain_astar_path.path[0].y;
     unimpended_astar_positions.push_back(first_unimpended_pos);
 
-    // dubins_segment_lengths = std::vector<float>();
-
     NonholonomicPos cur_pos = start_pos;
     int last_id = -1;
-    // int last_id = 0;
-    // int stride = 5;
     while(true) {
         DistToPathData unimpended_dist_data = max_unimpended_dist_to_path(cur_pos.pos, state_plain_astar_path.path, last_id + 1, end_pos.pos, true);
-        // last_id = std::min((float)last_id + stride, (float)state_plain_astar_path.path.size() - 1);
-        // DistToPathData unimpended_dist_data;
-        // unimpended_dist_data.id = last_id;
-        
 
         if (last_id == unimpended_dist_data.id || unimpended_dist_data.id == -1)
             break;
@@ -671,34 +649,14 @@ void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos en
             mid_pos.pos = mid_pos_vec;
             mid_pos.theta = prev_pos.theta;
 
-            // grid->adjust_to_ground(mid_pos, max_step_up, max_drop, max_y_diff);
-
             unimpended_astar_positions.push_back(mid_pos);
-            // float dist = glm::distance(prev_pos.pos, mid_pos.pos);
-            // if (dist > 2.0f) {
-            //     std::vector<NonholonomicPathElement> dubins_path = ReedsShepp::get_optimal_dubins_path(prev_pos, mid_pos, min_radius);
-            //     dist = ReedsShepp::get_length(dubins_path) * min_radius;
-            // }
-            // dubins_segment_lengths.push_back(dist);
 
             unimpended_pos = end_pos;
             unimpended_astar_positions.push_back(unimpended_pos);
 
-            // dist = glm::distance(mid_pos.pos, unimpended_pos.pos);
-            // if (dist > 2.0f) {
-            //     std::vector<NonholonomicPathElement> dubins_path = ReedsShepp::get_optimal_dubins_path(mid_pos, unimpended_pos, min_radius);
-            //     dist = ReedsShepp::get_length(dubins_path) * min_radius;
-            // }
-
-            // dubins_segment_lengths.push_back(dist);
-
             break;
         }
         glm::vec3 dir = glm::normalize(glm::vec3(state_plain_astar_path.path[unimpended_dist_data.id + 1] - state_plain_astar_path.path[unimpended_dist_data.id]));
-
-        // glm::vec3 dir_1 = glm::normalize(glm::vec3(state_plain_astar_path.path[unimpended_dist_data.id + 1] - state_plain_astar_path.path[unimpended_dist_data.id]));
-        // glm::vec3 dir_2 = glm::normalize(glm::vec3(state_plain_astar_path.path[unimpended_dist_data.id + 2] - state_plain_astar_path.path[unimpended_dist_data.id + 1]));
-        // glm::vec3 dir = glm::normalize((dir_1 + dir_2) / 2.0f);
 
         unimpended_pos.pos = state_plain_astar_path.path[unimpended_dist_data.id];   
         unimpended_pos.pos += glm::vec3(0.5f, 0, 0.5f);
@@ -706,90 +664,30 @@ void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos en
 
         unimpended_astar_positions.push_back(unimpended_pos);
 
-        // float dist = glm::distance(cur_pos.pos, unimpended_pos.pos);
-        // if (dist > 2.0f) {
-        //     std::vector<NonholonomicPathElement> dubins_path = ReedsShepp::get_optimal_dubins_path(cur_pos, unimpended_pos, min_radius);
-        //     dist = ReedsShepp::get_length(dubins_path) * min_radius;
-        // }
-
-        // dubins_segment_lengths.push_back(dist);
-
         cur_pos = unimpended_pos;
     }
+}
 
-    // for (int i = 1; i < unimpended_astar_positions.size() - 1; i++) {
-
-    //     if (i < unimpended_astar_positions.size() - 2) {
-    //         glm::vec3 vec_1 = glm::normalize(unimpended_astar_positions[i].pos - unimpended_astar_positions[i-1].pos);
-    //         glm::vec3 vec_2 = glm::normalize(unimpended_astar_positions[i + 1].pos - unimpended_astar_positions[i].pos);
-
-    //         glm::vec3 displacement_dir = glm::normalize(vec_1 - (vec_1 + vec_2) / 2.0f);
-
-    //         displacement_dir.y = 0;
-    //         // displacement_dir.z = 0;
-    //         // displacement_dir.x = 0;
-
-    //         unimpended_astar_positions[i].pos += displacement_dir * 5.0f;
-    //     }
-
-
-    //     // glm::vec3 dir = glm::normalize(unimpended_astar_positions[i].pos - unimpended_astar_positions[i-1].pos);
-    //     // // glm::vec3 dir = glm::normalize((dir_1 + dir_2) / 2.0f);
-    //     // unimpended_astar_positions[i].theta = std::atan2(dir.z, dir.x);
-    // }
-
-    // float offset = 5.0f;
-    // std::vector<NonholonomicPos> unimpended_astar_positions_new;
-    // unimpended_astar_positions_new.reserve(unimpended_astar_positions.size() * 2 - 1);
-
-    // glm::vec3 up = {0, 1, 0};
-    // for (size_t i = 0; i < unimpended_astar_positions.size()-1; i++) {
-    //     NonholonomicPos& cur_point = unimpended_astar_positions[i];
-    //     NonholonomicPos& next_point = unimpended_astar_positions[i + 1];
-    //     glm::vec3 center_pos = (next_point.pos + cur_point.pos) / 2.0f;
-    //     float base_lenght = glm::distance(next_point.pos, cur_point.pos);
-    //     offset = base_lenght / 4.0f;
-
-    //     glm::vec3 a, b;
-    //     if (i == 0) {
-    //         NonholonomicPos& double_next_point = unimpended_astar_positions[i + 2];
-    //         a = cur_point.pos - next_point.pos;
-    //         b = double_next_point.pos - next_point.pos;
-    //     } else {
-    //         NonholonomicPos& prev_point = unimpended_astar_positions[i - 1];
-    //         a = prev_point.pos - cur_point.pos;
-    //         b = next_point.pos - cur_point.pos;
-    //     }
-
-    //     float s = glm::length(glm::cross(a, b));
-
-    //     std::cout << s << std::endl;
-
-    //     glm::vec3 dir = s > 0 ? glm::cross(next_point.pos - cur_point.pos, up) : glm::cross(up, next_point.pos - cur_point.pos) ;
-    //     dir = glm::normalize(dir);
-
-    //     NonholonomicPos new_cur_point;
-    //     NonholonomicPos new_point; // <-- target
-
-    //     new_cur_point.pos = cur_point.pos;
-    //     new_point.pos = center_pos + dir * offset; //!!!
-
-    //     // theta
-    //     glm::vec3 cur_dir(0);
-    //     if (i != 0)
-    //         cur_dir = glm::normalize(cur_point.pos - unimpended_astar_positions_new.back().pos);
-
-    //     glm::vec3 new_dir = glm::normalize(new_point.pos - cur_point.pos);
-
-    //     new_cur_point.theta = i == 0 ? cur_point.theta : std::atan2(cur_dir.z, cur_dir.x);
-    //     new_point.theta = std::atan2(new_dir.z, new_dir.x);
-
-    //     unimpended_astar_positions_new.push_back(new_cur_point);
-    //     unimpended_astar_positions_new.push_back(new_point);
-    // }
-    // unimpended_astar_positions_new.push_back(unimpended_astar_positions.back());
+void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos end_pos) {
+    state_pq = std::priority_queue<NonholonomicAStarCell, std::vector<NonholonomicAStarCell>, NonholonomicByPriority>();
+    state_closed_heap = std::unordered_map<uint64_t, NonholonomicAStarCell>();
+    state_g_score = std::unordered_map<uint64_t, float>();
+    state_path = std::vector<NonholonomicPos>();
+    state_explored_paths = std::vector<LineInstance>();
+    state_start_pos = start_pos;
+    state_end_pos = end_pos;
+    state_counter = 0;
     
-    // unimpended_astar_positions = std::move(unimpended_astar_positions_new);
+    min_radius = wheel_base / std::tan(max_steer);
+
+    state_plain_astar_path = find_path(glm::ivec3(glm::floor(start_pos.pos)), glm::ivec3(glm::floor(end_pos.pos)));
+
+    if (state_plain_astar_path.path.empty())
+        return;
+
+    // move assigment
+    unimpended_astar_positions = find_unimpended_path(start_pos, state_plain_astar_path);
+
     dubins_segment_lengths = std::vector<float>();
     dubins_segment_lengths.reserve(unimpended_astar_positions.size() - 1);
 
@@ -804,46 +702,13 @@ void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos en
         }
 
         dubins_segment_lengths.push_back(dist);
-
-
-
-        // if (i < unimpended_astar_positions.size() - 2) {
-        //     glm::vec3 vec_1 = glm::normalize(unimpended_astar_positions[i].pos - unimpended_astar_positions[i-1].pos);
-        //     glm::vec3 vec_2 = glm::normalize(unimpended_astar_positions[i + 1].pos - unimpended_astar_positions[i].pos);
-
-        //     glm::vec3 displacement_dir = glm::normalize(vec_1 - (vec_1 + vec_2) / 2.0f);
-
-        //     displacement_dir.y = 0;
-        //     // displacement_dir.z = 0;
-        //     // displacement_dir.x = 0;
-
-        //     unimpended_astar_positions[i].pos += displacement_dir * 10.0f;
-        // }
-
-
-        // glm::vec3 dir = glm::normalize(unimpended_astar_positions[i].pos - unimpended_astar_positions[i-1].pos);
-        // // glm::vec3 dir = glm::normalize((dir_1 + dir_2) / 2.0f);
-        // unimpended_astar_positions[i].theta = std::atan2(dir.z, dir.x);
     }
-
-    
-
 
     for (int i = 1; i < unimpended_astar_positions.size() - 1; i++) {
         
         glm::vec3 dir = glm::normalize(unimpended_astar_positions[i].pos - unimpended_astar_positions[i-1].pos);
-        // glm::vec3 dir = glm::normalize((dir_1 + dir_2) / 2.0f);
         unimpended_astar_positions[i].theta = std::atan2(dir.z, dir.x);
     }
-
-    // float cur_length = 0;
-    // for (int i = 0; i < dubins_segment_lengths.size(); i++) {
-    //     int id = (dubins_segment_lengths.size() - 1) - i;
-    //     cur_length += dubins_segment_lengths[i];
-
-    //     dubins_distance_to_end.push_back(cur_length);
-    // }
-    // std::reverse(dubins_distance_to_end.begin(), dubins_distance_to_end.end());
 
     dubins_distance_to_end = std::vector<float>(dubins_segment_lengths.size(), 0.0f);
     float cur = 0.0f;
@@ -851,8 +716,6 @@ void NonholonomicAStar::initialize(NonholonomicPos start_pos, NonholonomicPos en
         cur += dubins_segment_lengths[i];
         dubins_distance_to_end[i] = cur; 
     }
-
-    // std::reverse(dubins_distance_to_end.begin(), dubins_distance_to_end.end());
 
     state_start_cell = NonholonomicAStarCell();
     state_start_cell.pos = start_pos;

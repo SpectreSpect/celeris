@@ -8,8 +8,10 @@
 
 #include <glm/vec3.hpp>
 #include <glm/ext/vector_int3.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include <vector>
+#include <chrono>
 
 class Celeris;
 class NonholonomicPos;
@@ -30,8 +32,20 @@ public:
     void set_start(const Transform& transform);
     void set_goal(const Transform& transform);
 
+    glm::vec3 get_start_marker_pos();
+
     void update();
 private:
+    struct MarkerInterpolationState {
+        glm::vec3 previous_position{0.0f};
+        glm::vec3 target_position{0.0f};
+        glm::quat previous_rotation{1.0f, 0.0f, 0.0f, 0.0f};
+        glm::quat target_rotation{1.0f, 0.0f, 0.0f, 0.0f};
+        std::chrono::steady_clock::time_point sample_time;
+        float sample_interval = 1.0f / 30.0f;
+        bool initialized = false;
+    };
+
     uint32_t max_path_line_count = 0;
     uint32_t scan_generation = 0;
     
@@ -42,9 +56,29 @@ private:
 
     LineCloud m_path_line_cloud;
     LineCloud m_guide_path_line_cloud;
+    LineCloud m_explored_paths_line_cloud;
+    LineCloud m_unimpended_path_line_cloud;
+
+    MarkerInterpolationState m_start_marker_interpolation;
+    MarkerInterpolationState m_goal_marker_interpolation;
+
+private:
+    glm::vec3 voxel_size() noexcept;
+    glm::vec3 marker_vertical_offset() noexcept;
 
     void set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position);
-    std::vector<LineInstance> make_path_lines(const std::vector<NonholonomicPos>& path);
+    void reset_marker_interpolation(
+        SphericalPoseMarker& marker,
+        MarkerInterpolationState& state
+    );
+    void interpolate_marker_pose(
+        SphericalPoseMarker& marker,
+        MarkerInterpolationState& state,
+        const NonholonomicPos& target,
+        std::chrono::steady_clock::time_point now,
+        bool force_new_sample = false
+    );
+    std::vector<LineInstance> make_path_lines(const std::vector<NonholonomicPos>& path, bool override_color = false);
     std::vector<LineInstance> make_path_lines(const std::vector<glm::vec3>& path);
     std::vector<LineInstance> make_path_lines(const std::vector<glm::ivec3>& path);
 };

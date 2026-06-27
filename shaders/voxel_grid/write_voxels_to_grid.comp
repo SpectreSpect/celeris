@@ -15,6 +15,7 @@ layout(std430, set = 0, binding=4) buffer DirtyListBuf { uint dirty_count; uint 
 
 layout(std430, set = 0, binding=5) readonly buffer VoxelsWriteData { uint count_voxel_writes; uint pad_[3u]; VoxelWrite voxel_writes[]; };
 layout(std430, set = 0, binding=6) buffer ChunkVoxels { VoxelData voxels[]; };
+layout(std430, set = 0, binding=7) buffer ToInflateListBuf { uint to_inflate_count; uint to_inflate_list[]; };
 
 layout(push_constant) uniform WriteVoxelsToGridPushConstants {
     ivec4 u_chunk_dim;
@@ -59,12 +60,14 @@ void main() {
     if ((voxel_write.set_flags & OVERWRITE_BIT) > 0u) {
         voxels[global_voxel_id] = voxel_write.voxel_data;
 
-        mark_dirty_around(chunk_id, chunk_pos);
+        mark_dirty_mesh_around(chunk_id, chunk_pos);
+        mark_inflate_around(chunk_id, chunk_pos);
     }
     else {
         if ((read_voxel_flags(voxels[global_voxel_id].type_flags) & VOXEL_EASY_OVERWRITE_FLAG_BIT) > 0u) {
             voxels[global_voxel_id] = voxel_write.voxel_data;
-            mark_dirty_around(chunk_id, chunk_pos);
+            mark_dirty_mesh_around(chunk_id, chunk_pos);
+            mark_inflate_around(chunk_id, chunk_pos);
         }
     }
 }

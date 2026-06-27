@@ -67,6 +67,9 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         clear_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "clear_chunk_hash_table.comp.spv"),
         fill_chunk_hash_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "fill_chunk_hash_table.comp.spv"),
         read_voxel_grid_chunk_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "read_voxel_grid_chunk.comp.spv"),
+        check_footprint_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "check_footprint.comp.spv"),
+        read_and_inflate_voxel_grid_chunk_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "read_and_inflate_voxel_grid_chunk.comp.spv"),
+        inflate_chunks_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "inflate_chunks.comp.spv"),
 
         voxel_writes_from_point_cloud_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "voxel_writes_from_point_cloud.comp.spv"),
 
@@ -91,4 +94,10 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         equirect_to_cubemap_cs(device, path_utils::executable_dir() / "shaders" / "equirect_to_cubemap.comp.spv"),
         brdf_lut_cs(device, path_utils::executable_dir() / "shaders" / "brdf_lut.comp.spv"),
         generate_prefilter_map_cs(device, path_utils::executable_dir() / "shaders" / "generate_prefilter_map.comp.spv"),
-        generate_irradiance_map_cs(device, path_utils::executable_dir() / "shaders" / "generate_irradiance_map.comp.spv") {}
+        generate_irradiance_map_cs(device, path_utils::executable_dir() / "shaders" / "generate_irradiance_map.comp.spv"),
+        
+        // A*
+        find_unimpended_paths_cs(device, path_utils::executable_dir() / "shaders" / "a_star" / "find_unimpended_paths.comp.spv"),
+        check_path_passability_cs(device, path_utils::executable_dir() / "shaders" / "a_star" / "check_path_passability.comp.spv"),
+        prepare_copy_dirty_list_dispatch_args_cs(device, path_utils::executable_dir() / "shaders" / "a_star" / "prepare_copy_dirty_list_dispatch_args.comp.spv"),
+        copy_dirty_list_cs(device, path_utils::executable_dir() / "shaders" / "a_star" / "copy_dirty_list.comp.spv") {}

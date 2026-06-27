@@ -15,9 +15,18 @@ struct AStarCell {
     glm::ivec3 intermediate_pos;
 };
 
+// struct ByPriority {
+//     bool operator()(const AStarCell& a, const AStarCell& b) const {
+//         return a.f > b.f; // higher priority first
+//     }
+// };
+
 struct ByPriority {
     bool operator()(const AStarCell& a, const AStarCell& b) const {
-        return a.f > b.f; // higher priority first
+        if (a.f != b.f)
+            return a.f > b.f; // Lower f first
+
+        return a.g < b.g;     // On ties, larger g first
     }
 };
 

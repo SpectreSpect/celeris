@@ -77,6 +77,7 @@ struct MeshCountPushConstants {
 
     uint32_t u_pack_bits;
     int32_t  u_pack_offset;
+    uint32_t display_inflated_voxels;
 };
 
 struct MeshAllocPushConstants {
@@ -124,6 +125,8 @@ struct MeshEmitPushConstants {
 
     uint32_t u_chunk_hash_table_size;
     uint32_t u_voxels_per_chunk;
+    uint32_t display_inflated_voxels;
+    uint32_t inflated_voxel_color;
 };
 
 struct StreamGenerateTerrainPushConstants {
@@ -157,6 +160,41 @@ struct ReadVoxelGridChunkPushConstants {
 
     uint32_t u_pack_offset;
     uint32_t u_pack_bits;
+};
+
+struct CheckFootprintPushConstants {
+    glm::ivec4 u_chunk_dim;
+    uint32_t u_chunk_hash_table_size;
+    uint32_t u_voxels_per_chunk;
+    uint32_t u_pack_offset;
+    uint32_t u_pack_bits;
+    glm::ivec4 u_origin;
+    glm::uvec4 offset_count;
+    uint32_t max_step_up;
+};
+
+static_assert(offsetof(CheckFootprintPushConstants, u_origin) == 32);
+static_assert(offsetof(CheckFootprintPushConstants, offset_count) == 48);
+static_assert(offsetof(CheckFootprintPushConstants, max_step_up) == 64);
+
+struct ReadAndInflateVoxelGridChunkPushConstants {
+    glm::ivec4 u_chunk_dim;
+    glm::ivec4 chunk_pos;
+    uint32_t u_chunk_hash_table_size;
+    uint32_t u_voxels_per_chunk;
+    uint32_t u_pack_offset;
+    uint32_t u_pack_bits;
+    uint32_t inflation_size;
+};
+
+struct InflateChunksPushConstants {
+    glm::ivec4 u_chunk_dim;
+    uint32_t u_chunk_hash_table_size;
+    uint32_t u_voxels_per_chunk;
+    uint32_t u_pack_offset;
+    uint32_t u_pack_bits;
+    uint32_t u_inflation_size;
+    uint32_t u_car_height_voxels;
 };
 
 struct EvictBucketsBuildPushConstants {
@@ -313,4 +351,43 @@ struct RemoveNearOriginLidarPointsPushConstants {
 
 struct MarkAndCountFailSlotsPushConstants {
     uint32_t u_counter_hash_table_size;
+};
+
+struct FindUnimpendedPathsPushConstants {
+    glm::ivec4 u_chunk_dim;
+
+    uint32_t u_exclusive_window_size; // Количество точек в окне, но кроме текущей точки
+    uint32_t u_start_id;
+    uint32_t u_max_step_up;
+    uint32_t u_max_drop;
+    uint32_t u_count_astar_points;
+
+    uint32_t u_chunk_hash_table_size;
+    uint32_t u_voxels_per_chunk;
+    uint32_t u_pack_offset;
+    uint32_t u_pack_bits;
+    uint32_t u_allow_flying_over_precipices;
+    uint32_t u_allow_diagonal_moves;
+};
+
+struct CheckPathPassabilityPushConstants {
+    glm::ivec4 u_chunk_dim;
+    glm::vec4 u_voxel_size;
+
+    uint32_t u_count_path_points;
+    uint32_t u_max_step_up;
+    uint32_t u_max_drop;
+    uint32_t u_chunk_hash_table_size;
+
+    uint32_t u_voxels_per_chunk;
+    uint32_t u_pack_offset;
+    uint32_t u_pack_bits;
+    uint32_t u_allow_flying_over_precipices;
+
+    uint32_t u_allow_diagonal_moves;
+};
+
+struct CopyDirtyListPushConstants {
+    uint32_t u_pack_bits;
+    int32_t u_pack_offset;
 };

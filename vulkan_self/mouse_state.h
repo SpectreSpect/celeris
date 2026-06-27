@@ -5,6 +5,8 @@ struct MouseState {
     bool initialized = false;
     double x = 0; 
     double y = 0;
+    double scroll_x = 0;
+    double scroll_y = 0;
     bool left_pressed = false;
     bool right_pressed = false;
     bool middle_pressed = false;

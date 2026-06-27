@@ -70,10 +70,19 @@
 #include "autopilot/celeris.h"
 #include "autopilot/celeris_visualizer.h"
 #include "voxel_grid_vulkan/voxel_grid_gpu_debugger.h"
+#include "camera/controllers/third_person_camera_controller.h"
+#include "autopilot/vehicle_command_sender.h"
+#include "vulkan_self/vulkan_submit_context.h"
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 #include <random>
+
+
+void test_callback_func(VulkanCommandBuffer& command_buffere, VoxelGrid& voxel_grid) {
+    std::cout << "It worked!" << std::endl;
+}
 
 // static std::mt19937 rng(std::random_device{}());
 // static std::uniform_real_distribution<double> dist(0.0, 1.0);
@@ -93,8 +102,15 @@ int main() {
 
     UI ui(window, engine);
     Camera camera;
-    FPSCameraController camera_controller(camera);
-    camera_controller.speed = 20;
+    FPSCameraController fps_camera_controller(camera);
+    fps_camera_controller.speed = 20.0f;
+    ThirdPersonCameraController third_person_camera_controller(camera);
+
+    enum class CameraControllerMode {
+        FPS,
+        ThirdPerson
+    };
+    CameraControllerMode camera_controller_mode = CameraControllerMode::ThirdPerson;
 
     VulkanResourceLoader resource_loader(engine, 154217728); // 1 Мб
 
@@ -113,6 +129,8 @@ int main() {
     ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, 
                                  material_instance_manager, mesh_manager, compute_pass_manager);
 
+    VulkanSubmitContext compute_submit_context(engine.device(), engine.compute_queue());
+
     PointCloudPreprocessor point_cloud_preprocessor(
         engine.device(), 
         engine.compute_queue(),
@@ -125,7 +143,7 @@ int main() {
     std::unique_ptr<LidarScan> network_scan;
     std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
 
-    glm::vec3 voxel_size(1.0f);
+    glm::vec3 voxel_size(0.5f);
     glm::ivec3 chunk_size(16);
     VoxelGrid::VoxelGridDesc voxel_grid_desc {
         .chunk_size = chunk_size,
@@ -143,6 +161,10 @@ int main() {
         .render_distance = chunk_size.x * voxel_size.x * 30,
         .generation_distance = 5,
         .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000),
+        .inflation_size = 1u,
+        .car_height_voxels = 3u,
+        .display_inflated_voxels = 0u,
+        .inflated_voxel_color = 0xFF0707FFu, // 0xFF3355FFu
     };
 
     VoxelGrid voxel_grid(
@@ -154,6 +176,26 @@ int main() {
         voxel_grid_desc,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
     );
+
+    bool display_inflated_voxels = voxel_grid.params().display_inflated_voxels != 0u;
+    float inflated_voxel_color[4] = {
+        float((voxel_grid.params().inflated_voxel_color >> 24u) & 0xFFu) / 255.0f,
+        float((voxel_grid.params().inflated_voxel_color >> 16u) & 0xFFu) / 255.0f,
+        float((voxel_grid.params().inflated_voxel_color >> 8u) & 0xFFu) / 255.0f,
+        float(voxel_grid.params().inflated_voxel_color & 0xFFu) / 255.0f
+    };
+    int inflation_size = voxel_grid.params().inflation_size;
+    auto pack_inflated_voxel_color = [](const float color[4]) -> uint32_t {
+        auto pack_channel = [](float value) -> uint32_t {
+            return static_cast<uint32_t>(std::clamp(value, 0.0f, 1.0f) * 255.0f + 0.5f);
+        };
+
+        return (pack_channel(color[0]) << 24u) |
+               (pack_channel(color[1]) << 16u) |
+               (pack_channel(color[2]) << 8u) |
+               pack_channel(color[3]);
+    };
+
     VoxelGridGPUDebugger debugger(
         voxel_grid,
         engine.device(),
@@ -319,19 +361,27 @@ int main() {
     bool has_end_pos = true;
     bool has_planned_path = false;
 
-    Celeris celeris(engine, 
-                    engine.compute_queue(), 
-                    manager_bundle,
-                    material_instance_manager,
-                    voxel_grid,
-                    voxelizator,
-                    scan_vertex_buffer,
-                    scan_index_buffer,
-                    mesher,
-                    Celeris::CelerisDesc());
-    celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69, 1.92, -51.30)});
-    // celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-50.69, 1.92, 0)});
-    celeris.start();
+    VulkanSubmitContext planner_submit_context(
+        engine.device(),
+        engine.compute_queue()
+    );
+    Celeris celeris(
+        engine,
+        engine.compute_queue(),
+        compute_submit_context,
+        manager_bundle, 
+        material_instance_manager,
+        voxel_grid, 
+        voxelizator,
+        scan_vertex_buffer,
+        scan_index_buffer,
+        mesher,
+        Celeris::CelerisDesc()
+    );
+    celeris.set_start(NonholonomicPos{.pos = glm::vec3(0.0f, 1.5f, 0.0f)});
+    celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.92f, -51.30f)});
+    // celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.5f, -0.0f)});
+    celeris.start(std::move(planner_submit_context));
     celeris.start_lidar_receiver();
 
     CelerisVisualizer celeris_visualizer(mesh_manager, 
@@ -340,9 +390,27 @@ int main() {
                                          20000, 
                                          skybox_exposure);
 
+    auto use_fps_camera_controller = [&]() {
+        if (camera_controller_mode == CameraControllerMode::FPS)
+            return;
+
+        const glm::vec3 front = glm::normalize(camera.front);
+        fps_camera_controller.yaw = glm::degrees(std::atan2(front.z, front.x));
+        fps_camera_controller.pitch = glm::degrees(std::asin(glm::clamp(front.y, -1.0f, 1.0f)));
+        fps_camera_controller.first_mouse = true;
+        camera_controller_mode = CameraControllerMode::FPS;
+    };
+
+    auto use_third_person_camera_controller = [&]() {
+        camera_controller_mode = CameraControllerMode::ThirdPerson;
+    };
+
+    float car_speed = celeris.car_speed();
+
+
     auto start_path_planning = [&]() {
         if (has_start_pos && has_end_pos) {
-            celeris.find_path();
+            celeris.find_path(compute_submit_context);
             has_planned_path = !celeris.planner().state().path.empty();
         }
     };
@@ -378,10 +446,101 @@ int main() {
 
     vox_box.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
 
+    // LidarVideo lidar_video(
+    //     manager_bundle, 
+    //     point_cloud_preprocessor, 
+    //     "/home/spectre/TEMP_lidar_output_mesh/recording_16/index.csv", 
+    //     0,
+    //     2
+    // );
+
+    // for (int i = static_cast<int>(lidar_video.get_scan_count()) - 1; i >= 1; --i) {
+    //     glm::vec3 p_prev = lidar_video.get_scan(i - 1).point_cloud().transform.position;
+    //     glm::vec3 p_curr = lidar_video.get_scan(i).point_cloud().transform.position;
+
+    //     glm::quat q_prev = glm::normalize(lidar_video.get_scan(i - 1).point_cloud().transform.rotation);
+    //     glm::quat q_curr = glm::normalize(lidar_video.get_scan(i).point_cloud().transform.rotation);
+
+    //     if (glm::dot(q_prev, q_curr) < 0.0f) {
+    //         q_curr = -q_curr;
+    //     }
+
+    //     glm::vec3 delta_position = p_curr - p_prev;
+    //     glm::quat delta_rotation = glm::normalize(q_curr * glm::inverse(q_prev));
+
+    //     lidar_video.get_scan(i).point_cloud().transform.position = delta_position;
+    //     lidar_video.get_scan(i).point_cloud().transform.rotation = delta_rotation;
+    // }
+
+    // lidar_video.get_scan(0).point_cloud().transform.position = glm::vec3(0.0f);
+    // lidar_video.get_scan(0).point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+
+    LidarScan target_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
+    LidarScan source_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
+
+    target_scan.point_cloud().set_color(glm::vec4(0, 0, 1, 1));
+    source_scan.point_cloud().set_color(glm::vec4(1, 0, 0, 1));
+
+    source_scan.point_cloud().transform.position += glm::vec3(-2, 2, -2);
+
+    // celeris.voxel_map_reseter().reset(celeris.voxel_point_map());
+    // celeris.voxel_map_point_inserter().insert(
+    //     celeris.voxel_point_map(), 
+    //     lidar_video.get_scan(0).point_cloud(), 
+    //     lidar_video.get_scan(0).normal_buffer()
+    // );
+
+    PointCloud voxel_point_map(
+        manager_bundle, 
+        celeris.voxel_point_map().map_point_buffer, 
+        celeris.voxel_point_map().m_map_point_count
+    );
+    voxel_point_map.set_color(glm::vec4(0, 0, 0, 1));
+    uint32_t rendered_celeris_scan_count = celeris.received_scan_count();
+
+    // auto process_current_lidar_frame = [&]() {
+    //     uint32_t current_frame_id = lidar_video.current_frame_id();
+
+    //     if (current_frame_id > 0) {
+    //         LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
+    //         LidarScan& previous_scan = lidar_video.get_scan(current_frame_id - 1);
+
+    //         PointCloud& current_point_cloud = current_scan.point_cloud();
+    //         PointCloud& previous_point_cloud = previous_scan.point_cloud();
+
+    //         current_point_cloud.transform.position =
+    //             previous_point_cloud.transform.position + current_point_cloud.transform.position;
+    //         current_point_cloud.transform.rotation =
+    //             glm::normalize(current_point_cloud.transform.rotation * previous_point_cloud.transform.rotation);
+
+    //         celeris.gicp_pass().fit(
+    //             celeris.voxel_point_map(),
+    //             current_scan.point_cloud(),
+    //             current_scan.normal_buffer(),
+    //             10
+    //         );
+
+    //         celeris.voxel_map_point_inserter().insert(
+    //             celeris.voxel_point_map(),
+    //             current_scan.point_cloud(),
+    //             current_scan.normal_buffer()
+    //         );
+
+    //         voxel_point_map.set_instance_view(celeris.voxel_point_map().get_map_instance_view());
+    //     }
+
+    //     lidar_video.next_frame();
+    // };
+
     Scene scene;
 
     scene.add(skybox);
     scene.add(celeris_visualizer);
+    // scene.add(target_scan);
+    // scene.add(voxel_point_map);
+    // scene.add(source_scan);
+
+    // scene.add(lidar_video);
     
     skybox.update(scene);
 
@@ -390,6 +549,8 @@ int main() {
     bool place_start_pressed = false;
     bool place_end_pressed = false;
     bool start_path_planning_pressed = false;
+    bool fps_camera_pressed = false;
+    bool third_person_camera_pressed = false;
 
     int step = 0;
     
@@ -402,7 +563,7 @@ int main() {
 
     std::vector<glm::mat4> transform_mem(3);
 
-    uint32_t received_scan_count = 0;
+    use_fps_camera_controller();
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
@@ -451,14 +612,40 @@ int main() {
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
 
-        camera_controller.update(window, delta_time);
-        frame_resources.update_camera(engine.current_frame(), window, camera);
-        lighting_system.update(engine.current_frame(), window, camera);
 
+        // celeris.update();
         celeris.update();
+        if (rendered_celeris_scan_count != celeris.received_scan_count()) {
+            voxel_point_map.set_instance_view(celeris.voxel_point_map().get_map_instance_view());
+            rendered_celeris_scan_count = celeris.received_scan_count();
+        }
         celeris_visualizer.update();
 
-        voxel_grid.update(window, camera);
+        if (!fps_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_F) == GLFW_PRESS) {
+            fps_camera_pressed = true;
+            use_fps_camera_controller();
+        }
+        if (fps_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_F) == GLFW_RELEASE)
+            fps_camera_pressed = false;
+
+        if (!third_person_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_R) == GLFW_PRESS) {
+            third_person_camera_pressed = true;
+            use_third_person_camera_controller();
+        }
+        if (third_person_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_R) == GLFW_RELEASE)
+            third_person_camera_pressed = false;
+
+        third_person_camera_controller.set_target(celeris_visualizer.get_start_marker_pos());
+        if (camera_controller_mode == CameraControllerMode::FPS)
+            fps_camera_controller.update(window, delta_time);
+        else
+            third_person_camera_controller.update(window, delta_time);
+
+        frame_resources.update_camera(engine.current_frame(), window, camera);
+
+        lighting_system.update(engine.current_frame(), window, camera);
+
+        voxel_grid.update(window, camera);        
 
         if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
             place_start_pressed = true;
@@ -506,8 +693,7 @@ int main() {
 
         if (!n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_PRESS) {
             n_pressed = true;
-            
-            // next_frame();
+            // process_current_lidar_frame();
         }
 
         if (n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_RELEASE) {
@@ -555,6 +741,43 @@ int main() {
                 ImGui::SameLine();
                 ImGui::TextColored(ImVec4(0.0f, 0.35f, 1.0f, 1.0f), "z: %.2f", camera.position.z);
 
+                if (ImGui::CollapsingHeader("Voxel grid debug")) {
+                    bool inflated_settings_changed = false;
+                    inflated_settings_changed |= ImGui::Checkbox(
+                        "Display inflated voxels",
+                        &display_inflated_voxels
+                    );
+                    inflated_settings_changed |= ImGui::ColorEdit4(
+                        "Inflated voxel color",
+                        inflated_voxel_color,
+                        ImGuiColorEditFlags_AlphaBar
+                    );
+
+                    inflated_settings_changed |= ImGui::SliderInt("Inflation size", &inflation_size, 0, 12);
+
+                    if (inflated_settings_changed) {
+                        voxel_grid.set_inflated_voxel_debug_display(
+                            display_inflated_voxels ? 1u : 0u,
+                            pack_inflated_voxel_color(inflated_voxel_color),
+                            inflation_size
+                        );
+                    }
+                }
+                
+                // ImGui::TextColored(ImVec4(1.0f, 0.35f, 1.0f, 1.0f), "Current frame id: %d", lidar_video.current_frame_id());
+
+                // if (ImGui::Button("FPS controller")) {
+                //     use_fps_camera_controller();
+                // }
+                // ImGui::SameLine();
+                // ImGui::TextUnformatted("Key: F");
+
+                // if (ImGui::Button("Third person controller")) {
+                //     use_third_person_camera_controller();
+                // }
+                // ImGui::SameLine();
+                // ImGui::TextUnformatted("Key: R");
+
                 if (ImGui::Button("Next frame")) {
                     // next_frame();
                 }
@@ -577,7 +800,23 @@ int main() {
                 ImGui::SameLine();
                 ImGui::TextUnformatted("Key: 3");
 
-                // ImGui::Text("Path: %s", path_planning_status.c_str());
+                // if (ImGui::InputFloat("Celeris car speed", &car_speed, 1.0f, 10.0f, "%.1f")) {
+                //     celeris.set_car_speed(car_speed);
+                // }
+
+                if (ImGui::Button("GICP step")) {
+                    // celeris.gicp_pass().step(
+                    //     celeris.voxel_point_map(), 
+                    //     source_scan.point_cloud(), 
+                    //     source_scan.normal_buffer()
+                    // );
+
+                    
+                }
+
+                if (ImGui::Button("Next frame")) {
+                    // process_current_lidar_frame();
+                }
 
                 ImGui::End();
                 

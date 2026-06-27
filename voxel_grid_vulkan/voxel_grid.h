@@ -1,11 +1,13 @@
 #pragma once
 
+#include <vector>
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
-#include <vector>
+#include <functional>
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
+
 
 #include "../vulkan_self/logger/logger_header.h"
 #include "../vulkan_self/vulkan_buffer.h"
@@ -29,6 +31,7 @@ class VulkanQueue;
 class Camera;
 class Window;
 class PointCloud;
+
 
 class VoxelGridChunk {
 public:
@@ -79,6 +82,10 @@ public:
         float render_distance;
         uint32_t generation_distance;
         uint32_t max_write_count;
+        uint32_t inflation_size = 1u;
+        uint32_t car_height_voxels = 3u;
+        uint32_t display_inflated_voxels = 0u;
+        uint32_t inflated_voxel_color = 0xFF3355FFu;
     };
 
     struct BuddyAllocatorParams {
@@ -90,7 +97,7 @@ public:
 
     struct VoxelGridParams {
         glm::uvec3 chunk_size = {0u, 0u, 0u};
-        glm::uvec3 voxel_size = {0u, 0u, 0u};
+        glm::vec3 voxel_size = {0.0f, 0.0f, 0.0f};
         uint32_t count_active_chunks = 0u;
         uint32_t count_evict_buckets = 0u;
         uint32_t max_write_count = 0u;
@@ -100,6 +107,10 @@ public:
         float eviction_bucket_shell_thickness = 0.0f;
         float render_distance = 0.0f;
         float generation_distance = 0.0f;
+        uint32_t inflation_size = 1u;
+        uint32_t car_height_voxels = 3u;
+        uint32_t display_inflated_voxels = 0u;
+        uint32_t inflated_voxel_color = 0xFF3355FFu;
 
         BuddyAllocatorParams vb_allocator_params;
         BuddyAllocatorParams ib_allocator_params;
@@ -126,6 +137,7 @@ public:
         VulkanBuffer mesh_buffers_status;
         VulkanBuffer dirty_list;
         VulkanBuffer load_list;
+        VulkanBuffer to_inflate_list;
         VulkanBuffer local_voxel_write_list;
         VulkanBuffer voxel_write_list;
         VulkanBuffer voxels;
@@ -161,6 +173,8 @@ public:
 
         VulkanBuffer build_indirect_cmds_uniform;
         VulkanBuffer read_chunk_output;
+        VulkanBuffer check_footprint_result;
+        VulkanBuffer read_and_inflate_chunk_output;
 
         VulkanBuffer debug_counter;
     };
@@ -189,8 +203,7 @@ public:
     VoxelGridBuffers& buffers() noexcept;
     ShaderHelper& shader_helper() noexcept;
 
-
-    glm::uvec3 voxel_size();
+    glm::vec3 voxel_size() noexcept;
     void voxelize_point_cloud(VulkanCommandBuffer& command_buffer, VulkanEngine& engine, 
                               PointCloud& point_cloud, VulkanBuffer& voxel_writes, uint32_t max_write_count);
     void voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud, 
@@ -199,10 +212,16 @@ public:
     void update(Window& window, Camera& camera);
     void set_voxels(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src);
     void set_render_distance(float value);
+    void set_inflated_voxel_debug_display(uint32_t display_inflated_voxels, uint32_t inflated_voxel_color, uint32_t inflation_size);
     VoxelGridChunk read_chunk(glm::ivec3 chunk_pos);
+    bool check_footprint(glm::vec3 origin, glm::vec3 offsets, uint32_t max_step_up);
+    std::vector<VoxelGridChunk> read_and_inflate_chunk(glm::ivec3 chunk_pos, uint32_t inflation_size);
     glm::ivec3 chunk_pos_from_voxel_pos(glm::ivec3 voxel_pos);
     glm::ivec3 pos_in_chunk_from_global_voxel_pos(glm::ivec3 voxel_pos);
     glm::ivec3 pos_in_chunk_from_global_voxel_pos(glm::ivec3 chunk_pos, glm::ivec3 voxel_pos);
+
+    void add_next_to_stream_chunks_sphere_callback(std::function<void(VulkanCommandBuffer&, VoxelGrid&)> callback);
+    void add_next_to_update_submit_callbacks(std::function<void(VoxelGrid&)> callback);
 
 public:
     struct VoxelGridPassInstances {
@@ -236,6 +255,9 @@ public:
         PassInstance clear_chunk_hash_table_pi;
         PassInstance fill_chunk_hash_table_pi;
         PassInstance read_voxel_grid_chunk_pi;
+        PassInstance check_footprint_pi;
+        PassInstance read_and_inflate_voxel_grid_chunk_pi;
+        PassInstance inflate_chunks_pi;
         
         PassInstance voxel_writes_from_point_cloud_pi;
     };
@@ -257,9 +279,13 @@ private:
     IndirectRenderObject m_render_object;
 
     ShaderHelper m_shader_helper;
+
+    std::vector<std::function<void(VulkanCommandBuffer&, VoxelGrid&)>> m_next_to_stream_chunks_sphere_callbacks;
+    std::vector<std::function<void(VoxelGrid&)>> m_next_to_update_submit_callbacks;
     
 private:
     uint64_t vox_per_chunk() const noexcept;
+    void mark_all_used_chunks_dirty_mesh_cpu();
 
     VoxelGridParams create_params(const VoxelGridDesc& desc) const;
     VoxelGridPassInstances create_pass_instances(VulkanDevice& device, ComputePassManager& compute_pass_manager) const;
@@ -288,6 +314,7 @@ private:
     void submit_compute_commands();
     
     void reset_load_list_counter(VulkanCommandBuffer& command_buffer);
+    void reset_to_inflate_list_counter(VulkanCommandBuffer& command_buffer);
     void mark_chunk_to_generate(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks);
     void mark_write_chunks_to_generate(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void generate_terrain(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t seed);
@@ -355,4 +382,7 @@ private:
         uint32_t pack_bits,
         int pack_offset
     );
+
+    void inflate_chunks(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_arg);
+    void inflate_marked_chunks(VulkanCommandBuffer& command_buffer);
 };

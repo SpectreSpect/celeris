@@ -23,14 +23,17 @@ static constexpr uint32_t SLOT_OCCUPIED = 0xFFFFFFFCu;
 
 static constexpr uint32_t OVERWRITE_BIT = 1u;
 
-static constexpr uint32_t DIRTY_FLAG_BIT = 1u;
+static constexpr uint32_t DIRTY_MESH_FLAG_BIT = 1u;
 static constexpr uint32_t NEED_GENERATION_FLAG_BIT = 2u;
+static constexpr uint32_t DIRTY_INFLATE_FLAG_BIT = 4u;
+static constexpr uint32_t ENQUEUED_FAILED_DIRTY_MESH_FLAG_BIT = 8u;
 
 static constexpr uint32_t VOXEL_TYPE_BITS = 16u;
 static constexpr uint32_t VOXEL_TYPE_MASK = (1u << VOXEL_TYPE_BITS) - 1u;
 
 static constexpr uint32_t VOXEL_VISABILITY_FLAG_BIT = 1u; // Определяет, видим ли воксель
 static constexpr uint32_t VOXEL_EASY_OVERWRITE_FLAG_BIT = 2u; // Определяет, можно ли заменять воксель как будто бы он "воздух" или "вода" в майне
+static constexpr uint32_t VOXEL_INFLATED_BIT = 4u; // Определяет, пересекает ли воксель раздутые видимые воксели
 
 struct alignas(8) VoxelDataGPU {
     uint32_t type_flags;
@@ -68,6 +71,10 @@ struct alignas(8) VoxelDataGPU {
 
     inline bool is_solid() const {
         return ((type_flags >> VOXEL_TYPE_BITS) & VOXEL_VISABILITY_FLAG_BIT) > 0;
+    }
+
+    inline bool is_inflated() const {
+        return ((type_flags >> VOXEL_TYPE_BITS) & VOXEL_INFLATED_BIT) > 0;
     }
 };
 
