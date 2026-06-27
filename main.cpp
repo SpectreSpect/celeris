@@ -370,14 +370,19 @@ int main() {
         engine.compute_queue(),
         compute_submit_context,
         manager_bundle, 
+        material_instance_manager,
         voxel_grid, 
+        voxelizator,
+        scan_vertex_buffer,
+        scan_index_buffer,
+        mesher,
         Celeris::CelerisDesc()
     );
     celeris.set_start(NonholonomicPos{.pos = glm::vec3(0.0f, 1.5f, 0.0f)});
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.92f, -51.30f)});
     // celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.5f, -0.0f)});
     celeris.start(std::move(planner_submit_context));
-    // celeris.start_lidar_receiver();
+    celeris.start_lidar_receiver();
 
     CelerisVisualizer celeris_visualizer(mesh_manager, 
                                          material_instance_manager, 

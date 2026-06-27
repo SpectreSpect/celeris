@@ -28,11 +28,21 @@ Celeris::Celeris(VulkanEngine& engine,
                  VulkanQueue& compute_queue,
                  VulkanSubmitContext& submit_context,
                  ManagerBundle& manager_bundle,
+                 MaterialInstanceManager& material_instance_manager,
                  VoxelGrid& voxel_grid,
+                 Voxelizator& voxelizator,
+                 VulkanBuffer& scan_vertex_buffer,
+                 VulkanBuffer& scan_index_buffer,
+                 PointCloudMesher& mesher,
                  const CelerisDesc& desc)
     :   m_engine(&engine),
         m_manager_bundle(&manager_bundle),
+        m_material_instance_manager(&material_instance_manager),
         m_voxel_grid(&voxel_grid),
+        m_voxelizator(&voxelizator),
+        m_scan_vertex_buffer(&scan_vertex_buffer),
+        m_scan_index_buffer(&scan_index_buffer),
+        m_mesher(&mesher),
         m_desc(desc),
         m_gicp_pass(engine, manager_bundle.compute_pass_manager()),
         m_point_cloud_preprocessor(engine.device(), compute_queue, manager_bundle.compute_pass_manager()),
@@ -109,6 +119,18 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         while (m_retired_network_scans.size() > m_engine->num_frames_in_flight())
             m_retired_network_scans.pop_front();
 
+        // uint32_t scan_index_count = m_mesher->convert_to_mesh<PBRVertex, PointInstance>(
+        //     m_network_scan->point_cloud(),
+        //     *m_scan_vertex_buffer,
+        //     *m_scan_index_buffer
+        // );
+
+        // MeshView scan_mesh_view(
+        //     m_scan_vertex_buffer->get_view(),
+        //     m_scan_index_buffer->get_view(),
+        //     scan_index_count
+        // );
+
         if (!m_has_previous_lidar_pose) {
             m_network_scan->point_cloud().transform.position = glm::vec3(0.0f);
             m_network_scan->point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
@@ -156,6 +178,23 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
             voxel_write_list, 
             m_desc.max_write_count
         );
+
+        // VoxelWriteGPU blue_voxelize_prefab;
+        // blue_voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
+        // blue_voxelize_prefab.set_flags = OVERWRITE_BIT;
+
+        // RenderObject scan_object(scan_mesh_view, m_material_instance_manager->pbr);
+        // scan_object.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
+
+        // glm::mat4 mesh_matrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f)) * 
+        //     m_network_scan->point_cloud().transform.get_model_matrix();
+
+        // m_voxelizator->voxelize<PBRVertex>(
+        //     blue_voxelize_prefab,
+        //     scan_object.mesh_view(),
+        //     mesh_matrix,
+        //     &m_voxel_grid->local_voxel_write_list()
+        // );
 
         m_path_planner.request_adjust_to_ground(
             m_start_position.pos, 
