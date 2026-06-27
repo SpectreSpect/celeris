@@ -96,7 +96,7 @@ int main() {
     QueueRequest queue_request;
     queue_request.graphics_count = 2;
     queue_request.present_count = 1;
-    queue_request.compute_count = 1;
+    queue_request.compute_count = 2;
 
     VulkanEngine engine(glfw_context, window, queue_request);
 
@@ -129,7 +129,7 @@ int main() {
     ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, 
                                  material_instance_manager, mesh_manager, compute_pass_manager);
 
-    VulkanSubmitContext compute_submit_context(engine.device(), engine.compute_queue());
+    VulkanSubmitContext compute_submit_context(engine.device(), engine.compute_queue(0));
 
     PointCloudPreprocessor point_cloud_preprocessor(
         engine.device(), 
@@ -363,7 +363,7 @@ int main() {
 
     VulkanSubmitContext planner_submit_context(
         engine.device(),
-        engine.compute_queue()
+        engine.compute_queue(1)
     );
     Celeris celeris(
         engine,
@@ -404,10 +404,11 @@ int main() {
 
 
     auto start_path_planning = [&]() {
-        if (has_start_pos && has_end_pos) {
-            celeris.find_path(compute_submit_context);
-            has_planned_path = !celeris.planner().state().path.empty();
-        }
+        celeris.request_path_replan();
+        // if (has_start_pos && has_end_pos) {
+            
+        //     has_planned_path = celeris.has_planned_path();
+        // }
     };
 
     auto make_pose_from_camera = [&](NonholonomicPos& out_pose) {
@@ -418,7 +419,7 @@ int main() {
         out_pose.pos = camera.position;
         out_pose.theta = std::atan2(horizontal_front.z, horizontal_front.x);
 
-        return celeris.planner().occupancy_grid().adjust_to_ground(out_pose.pos);
+        return celeris.adjust_to_ground(out_pose.pos);
     };
 
     auto place_start = [&]() {
@@ -609,7 +610,7 @@ int main() {
 
 
         // celeris.update();
-        celeris.update();
+        celeris.update(compute_submit_context);
         if (rendered_celeris_scan_count != celeris.received_scan_count()) {
             voxel_point_map.set_instance_view(celeris.voxel_point_map().get_map_instance_view());
             rendered_celeris_scan_count = celeris.received_scan_count();
