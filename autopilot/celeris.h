@@ -1,13 +1,17 @@
 #pragma once
 
+#include "../managers/material_instance_manager.h"
+#include "../managers/material_manager.h"
 #include "../renderer/point_cloud/lidar/lidar_scan_receiver.h"
 #include "../renderer/point_cloud/point_cloud_preprocessor.h"
 #include "../renderer/point_cloud/gicp/voxel_point_map.h"
 #include "../renderer/point_cloud/gicp/voxel_map_point_reseter.h"
 #include "../renderer/point_cloud/gicp/voxel_map_point_inserter.h"
+#include "../renderer/point_cloud/point_cloud_mesher.h"
 #include "../a_star/nonholonomic_a_star.h"
 #include "../a_star/occupancy_grid_3d.h"
 #include "../renderer/point_cloud/gicp/gicp_pass.h"
+#include "../voxel_grid_vulkan/voxelizator.h"
 #include "../vulkan_self/vulkan_engine.h"
 #include "../vulkan_self/logger/logger_header.h"
 
@@ -32,7 +36,12 @@ public:
     Celeris(VulkanEngine& engine, 
             VulkanQueue& compute_queue, 
             ManagerBundle& manager_bundle, 
-            VoxelGrid& voxel_grid,
+            MaterialInstanceManager& material_instance_manager, 
+            VoxelGrid& voxel_grid, 
+            Voxelizator& voxelizator, 
+            VulkanBuffer& scan_vertex_buffer, 
+            VulkanBuffer& scan_index_buffer, 
+            PointCloudMesher& mesher, 
             CelerisDesc desc);
             
     void start_lidar_receiver();
@@ -59,7 +68,12 @@ public:
 private:
     VulkanEngine* m_engine = nullptr;
     ManagerBundle* m_manager_bundle = nullptr;
+    MaterialInstanceManager* m_material_instance_manager = nullptr;
     VoxelGrid* m_voxel_grid = nullptr;
+    Voxelizator* m_voxelizator = nullptr;
+    VulkanBuffer* m_scan_vertex_buffer = nullptr;
+    VulkanBuffer* m_scan_index_buffer = nullptr;
+    PointCloudMesher* m_mesher = nullptr;
     CelerisDesc m_desc;
 
     GICPPass m_gicp_pass;
