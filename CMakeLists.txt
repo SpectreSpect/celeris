@@ -143,6 +143,7 @@ add_executable(app
   a_star/path_intersection_detector.cpp
   vulkan_self/vulkan_submit_context.cpp
   utils/avg_timer.cpp
+  a_star/vehichle.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
