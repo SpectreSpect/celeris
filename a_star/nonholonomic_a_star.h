@@ -45,7 +45,7 @@ public:
         bool track_explored_paths = true;
         int max_step_up = 1;
         int max_drop = 1;
-        int max_y_diff = 1;
+        int max_y_diff = 2;
         float max_goal_position_error = 0.7f;
         float max_goal_heading_error_radians = 0.3f;
     };
