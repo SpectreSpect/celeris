@@ -124,6 +124,8 @@ void main()
             float mipLevel = (ubo.roughness == 0.0)
                 ? 0.0
                 : 0.5 * log2(saSample / saTexel);
+            float maxEnvironmentMip = max(float(textureQueryLevels(uEnvironmentMap)) - 1.0, 0.0);
+            mipLevel = clamp(mipLevel + ubo.roughness * 2.0, 0.0, maxEnvironmentMip);
 
             prefilteredColor += textureLod(uEnvironmentMap, L, mipLevel).rgb * NdotL;
             totalWeight += NdotL;

@@ -135,6 +135,7 @@ add_executable(app
   a_star/nonholonomic_a_star.cpp
   a_star/reeds_shepp.cpp
   autopilot/spherical_pose_marker.cpp
+  autopilot/gazzel_next.cpp
   autopilot/vehicle_command_sender.cpp
   autopilot/path_planner.cpp
   autopilot/celeris.cpp

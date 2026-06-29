@@ -66,6 +66,7 @@
 #include "a_star/a_star.h"
 #include "a_star/a_star_structures.h"
 #include "a_star/nonholonomic_a_star.h"
+#include "autopilot/gazzel_next.h"
 #include "autopilot/spherical_pose_marker.h"
 #include "autopilot/celeris.h"
 #include "autopilot/celeris_visualizer.h"
@@ -352,12 +353,9 @@ int main() {
     VulkanBuffer voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * max_write_count);
 
     Renderer renderer(engine, frame_resources);
-    
-    RenderObject vox_box(mesh_manager.cube, material_instance_manager.pbr);
-    vox_box.transform.position = glm::vec3(0.0f, 80.0f, 0.0f);
-    vox_box.transform.scale = glm::vec3(20.0f);
 
     const float skybox_exposure = 1.8f;
+    GazzelNext gazzel_next(mesh_manager, material_instance_manager, skybox_exposure);
 
     Skybox skybox(
         mesh_manager.skybox_cube,
@@ -456,8 +454,6 @@ int main() {
         }
     };
 
-    vox_box.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
-
     // LidarVideo lidar_video(
     //     manager_bundle, 
     //     point_cloud_preprocessor, 
@@ -547,7 +543,9 @@ int main() {
     Scene scene;
 
     scene.add(skybox);
-    scene.add(celeris_visualizer);
+    scene.add(gazzel_next);
+
+    // scene.add(celeris_visualizer);
     // scene.add(target_scan);
     // scene.add(voxel_point_map);
     // scene.add(source_scan);

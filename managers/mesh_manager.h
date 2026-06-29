@@ -9,6 +9,7 @@ class VulkanResourceLoader;
 class MeshManager {
 public:
     Mesh cube;
+    Mesh cylinder;
     Mesh sphere;
     Mesh point_cloud_quad;
     Mesh line_quad;
