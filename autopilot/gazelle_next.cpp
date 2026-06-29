@@ -137,7 +137,10 @@ void GazelleNext::update_layout() {
     const float lidar_y = car_model_bottom_y + lidar_height_from_wheel_bottom - car_model_center_y;
 
     m_lidar_mount.transform.position = glm::vec3(lidar_x, lidar_y + lidar_scale.y / 2.0f, 0.0f);
-    m_lidar_mount.transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    m_lidar_mount.transform.rotation = glm::angleAxis(
+        glm::pi<float>(),
+        glm::vec3(0.0f, 1.0f, 0.0f)
+    );
     m_lidar_mount.transform.scale = glm::vec3(1.0f);
 
     m_lidar.transform.position = glm::vec3(0.0f);
