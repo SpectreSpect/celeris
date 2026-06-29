@@ -199,6 +199,7 @@ void CelerisVisualizer::set_marker_pose(SphericalPoseMarker& marker, Nonholonomi
 
 void CelerisVisualizer::set_gazelle_pose_from_lidar_transform() {
     m_gazelle_next.set_lidar_transform(m_celeris->lidar_transform());
+    m_gazelle_next.transform.position += marker_vertical_offset();
     // m_gazelle_next.transform = m_celeris->lidar_transform();
     // m_gazelle_next.transform.rotation = glm::normalize(
     //     m_gazelle_next.transform.rotation *
