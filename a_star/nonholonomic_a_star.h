@@ -117,7 +117,24 @@ public:
     uint32_t is_solid_count();
 
 private:
+    struct SegmentWallIntersection {
+        float t = 0.0f;
+        float top_y = 0.0f;
+    };
+
     static void insert_y_transition_points(std::vector<NonholonomicPos>& path);
+    bool segment_intersects_voxel_xz(
+        const NonholonomicPos& from,
+        const NonholonomicPos& to,
+        const glm::ivec3& voxel_pos,
+        float& t_enter,
+        float& t_exit
+    );
+    std::vector<SegmentWallIntersection> find_segment_wall_intersections(
+        const NonholonomicPos& from,
+        const NonholonomicPos& to
+    );
+    void insert_wall_avoidance_points(std::vector<NonholonomicPos>& path);
 
     NonholonomicAStarParams m_params;
     NonholonomicAStarState m_state;

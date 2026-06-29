@@ -42,6 +42,175 @@ void NonholonomicAStar::insert_y_transition_points(std::vector<NonholonomicPos>&
     path = std::move(corrected_path);
 }
 
+bool NonholonomicAStar::segment_intersects_voxel_xz(
+    const NonholonomicPos& from,
+    const NonholonomicPos& to,
+    const glm::ivec3& voxel_pos,
+    float& t_enter,
+    float& t_exit)
+{
+    LOG_METHOD();
+
+    constexpr float eps = 1e-6f;
+
+    const glm::vec3 voxel_min = m_grid->voxel_to_world_pos(voxel_pos);
+    const glm::vec3 voxel_max = voxel_min + m_grid->voxel_size();
+    const glm::vec3 delta = to.pos - from.pos;
+
+    t_enter = 0.0f;
+    t_exit = 1.0f;
+
+    auto clip_axis = [&](float start, float dir, float min_value, float max_value) {
+        if (std::abs(dir) <= eps) {
+            return start >= min_value && start <= max_value;
+        }
+
+        float t0 = (min_value - start) / dir;
+        float t1 = (max_value - start) / dir;
+        if (t0 > t1) {
+            std::swap(t0, t1);
+        }
+
+        t_enter = std::max(t_enter, t0);
+        t_exit = std::min(t_exit, t1);
+
+        return t_enter <= t_exit;
+    };
+
+    return clip_axis(from.pos.x, delta.x, voxel_min.x, voxel_max.x) &&
+           clip_axis(from.pos.z, delta.z, voxel_min.z, voxel_max.z) &&
+           t_exit > eps &&
+           t_enter < 1.0f - eps;
+}
+
+std::vector<NonholonomicAStar::SegmentWallIntersection>
+NonholonomicAStar::find_segment_wall_intersections(
+    const NonholonomicPos& from,
+    const NonholonomicPos& to)
+{
+    LOG_METHOD();
+
+    constexpr float eps = 1e-5f;
+
+    std::vector<SegmentWallIntersection> intersections;
+    const std::vector<glm::ivec3> xz_voxels = m_grid->line_intersects_xz(from.pos, to.pos);
+    const glm::vec3 segment = to.pos - from.pos;
+    const glm::vec2 segment_xz(segment.x, segment.z);
+    const float segment_xz_length = glm::length(segment_xz);
+    const glm::vec3 voxel_size = m_grid->voxel_size();
+    const float clearance = std::min({voxel_size.x, voxel_size.y, voxel_size.z}) * 0.03f;
+    const float t_padding = segment_xz_length > eps
+        ? std::min(clearance / segment_xz_length, 0.25f)
+        : 0.0f;
+
+    auto add_intersection = [&](float t, float top_y) {
+        if (t <= eps || t >= 1.0f - eps) {
+            return;
+        }
+
+        intersections.push_back(SegmentWallIntersection{
+            .t = t,
+            .top_y = top_y
+        });
+    };
+
+    for (const glm::ivec3& base_voxel_pos : xz_voxels) {
+        const glm::ivec3 candidate_voxels[] = {
+            base_voxel_pos,
+            base_voxel_pos + glm::ivec3(0, 1, 0)
+        };
+
+        for (const glm::ivec3& voxel_pos : candidate_voxels) {
+            if (!m_grid->is_solid(voxel_pos)) {
+                continue;
+            }
+
+            float t_enter = 0.0f;
+            float t_exit = 0.0f;
+            if (!segment_intersects_voxel_xz(from, to, voxel_pos, t_enter, t_exit)) {
+                continue;
+            }
+
+            const float top_y =
+                m_grid->voxel_to_world_pos(voxel_pos + glm::ivec3(0, 1, 0)).y +
+                clearance;
+            add_intersection(t_enter - t_padding, top_y);
+            add_intersection(t_exit + t_padding, top_y);
+        }
+    }
+
+    std::sort(
+        intersections.begin(),
+        intersections.end(),
+        [](const SegmentWallIntersection& a, const SegmentWallIntersection& b) {
+            return a.t < b.t;
+        }
+    );
+
+    std::vector<SegmentWallIntersection> merged_intersections;
+    merged_intersections.reserve(intersections.size());
+    for (const SegmentWallIntersection& intersection : intersections) {
+        if (!merged_intersections.empty() &&
+            std::abs(merged_intersections.back().t - intersection.t) <= eps)
+        {
+            merged_intersections.back().top_y =
+                std::max(merged_intersections.back().top_y, intersection.top_y);
+            continue;
+        }
+
+        merged_intersections.push_back(intersection);
+    }
+
+    return merged_intersections;
+}
+
+void NonholonomicAStar::insert_wall_avoidance_points(std::vector<NonholonomicPos>& path) {
+    LOG_METHOD();
+
+    constexpr float eps = 1e-5f;
+
+    if (path.size() < 2) {
+        return;
+    }
+
+    std::vector<NonholonomicPos> corrected_path;
+    corrected_path.reserve(path.size() * 2);
+    corrected_path.push_back(path.front());
+
+    for (size_t i = 1; i < path.size(); i++) {
+        const NonholonomicPos previous = corrected_path.back();
+        const NonholonomicPos& current = path[i];
+
+        const glm::vec2 previous_xz(previous.pos.x, previous.pos.z);
+        const glm::vec2 current_xz(current.pos.x, current.pos.z);
+        const bool vertical_segment =
+            glm::distance(previous_xz, current_xz) <= eps;
+
+        if (!vertical_segment) {
+            const std::vector<SegmentWallIntersection> intersections =
+                find_segment_wall_intersections(previous, current);
+
+            for (const SegmentWallIntersection& intersection : intersections) {
+                NonholonomicPos waypoint = current;
+                waypoint.pos = glm::mix(previous.pos, current.pos, intersection.t);
+                waypoint.pos.y = intersection.top_y;
+                waypoint.theta =
+                    previous.theta + angle_diff(previous.theta, current.theta) * intersection.t;
+
+                if (glm::distance(corrected_path.back().pos, waypoint.pos) > eps &&
+                    glm::distance(current.pos, waypoint.pos) > eps)
+                {
+                    corrected_path.push_back(waypoint);
+                }
+            }
+        }
+
+        corrected_path.push_back(current);
+    }
+
+    path = std::move(corrected_path);
+}
+
 NonholonomicAStar::NonholonomicAStar(
     OccupancyGrid3D& occupancy_grid, 
     const NonholonomicAStarDesc& desc,
@@ -175,6 +344,8 @@ std::vector<NonholonomicPos> NonholonomicAStar::reconstruct_path(std::unordered_
         path = std::move(grounded_path);
     }
 
+    insert_y_transition_points(path);
+    insert_wall_avoidance_points(path);
     insert_y_transition_points(path);
 
     return path;
