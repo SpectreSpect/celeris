@@ -92,6 +92,7 @@ VkClearValue clear_color = {0.05f, 0.05f, 0.05f, 1.0f};
 int main() {
     GlfwContext glfw_context;
     Window window(glfw_context, 1280, 720, "Celeris");
+    window.set_icon(path_utils::executable_dir() / "assets" / "icon" / "celeris_icon_2.png");
 
     QueueRequest queue_request;
     queue_request.graphics_count = 2;

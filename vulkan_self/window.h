@@ -1,4 +1,5 @@
 #pragma once
+#include <filesystem>
 #include <string>
 #include <cstdint>
 #include <utility>
@@ -37,6 +38,7 @@ public:
     void disable_cursor();
     void hide_cursor();
     void show_cursor();
+    void set_icon(const std::filesystem::path& path);
 
     uint32_t width() const noexcept;
     uint32_t height() const noexcept;
