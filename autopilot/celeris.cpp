@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <imgui.h>
 #include <iostream>
 #include <limits>
 #include <utility>
@@ -104,7 +105,7 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
             m_retired_network_scans.push_back(std::move(m_network_scan));
 
         m_network_scan = std::move(scan);
-        std::cout << "Received scan #" << m_received_scan_count << std::endl;
+        // std::cout << "Received scan #" << m_received_scan_count << std::endl;
 
         while (m_retired_network_scans.size() > m_engine->num_frames_in_flight())
             m_retired_network_scans.pop_front();
@@ -502,6 +503,28 @@ bool Celeris::has_planned_path() const {
 
 PathPlanner::PathPlannerResult Celeris::path_result_snapshot() const {
     return m_path_planner.request_result_snapshot();
+}
+
+void Celeris::display_path_planner_debug_controls() const {
+    if (!ImGui::CollapsingHeader("Path planner")) {
+        return;
+    }
+
+    PathPlanner::PathPlannerResult result = path_result_snapshot();
+
+    ImGui::Text("Generation: %llu", static_cast<unsigned long long>(result.generation));
+    ImGui::Text("Total: %.3f ms", result.total_time_ms);
+    ImGui::Separator();
+    ImGui::Text("Initialize: %.3f ms", result.initialize_time_ms);
+    ImGui::Text("Plain A*: %.3f ms", result.plain_astar_time_ms);
+    ImGui::Text("Unimpeded path: %.3f ms", result.unimpended_path_time_ms);
+    ImGui::Text("Nonholonomic A*: %.3f ms", result.nonholonomic_astar_time_ms);
+    ImGui::Text("is_solid: %.3f ms (%u checks)", result.is_solid_time_ms, result.is_solid_count);
+    ImGui::Separator();
+    ImGui::Text("Plain A* points: %zu", result.plain_astar_path.path.size());
+    ImGui::Text("Unimpeded points: %zu", result.unimpended_path.size());
+    ImGui::Text("Nonholonomic points: %zu", result.nonholonomic_astar_path.size());
+    ImGui::Text("Explored segments: %zu", result.explored_paths.size());
 }
 
 glm::vec3 Celeris::voxel_size() {

@@ -106,7 +106,15 @@ public:
     OccupancyGrid3D& occupancy_grid() noexcept;
     NonholonomicAStarState& state() noexcept;
 
-    DistToPathData max_unimpended_dist_to_path(glm::vec3 pos, std::vector<glm::ivec3>& path, int start_id, glm::vec3 last_pos, bool replace_last_pos);
+    // DistToPathData max_unimpended_dist_to_path(glm::vec3 pos, std::vector<glm::ivec3>& path, int start_id, glm::vec3 last_pos, bool replace_last_pos);
+
+    float total_time_ms();
+    float initialize_time_ms();
+    float nonholonomic_astar_time_ms();
+    float plain_astar_time_ms();
+    float unimpended_path_time_ms();
+    float is_solid_time_ms();
+    uint32_t is_solid_count();
 
 private:
     NonholonomicAStarParams m_params;
@@ -114,4 +122,9 @@ private:
     OccupancyGrid3D* m_grid = nullptr;
     UnimpendedPathFinder* m_unimpened_path_finder = nullptr;
     AStar m_plain_astar;
+    
+    AvgTimer m_initialize_time;
+    AvgTimer m_unimpended_path_time;
+    AvgTimer m_nonholonomic_astar_time;
+    AvgTimer m_plain_astar_time;
 };

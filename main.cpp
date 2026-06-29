@@ -143,7 +143,7 @@ int main() {
     std::unique_ptr<LidarScan> network_scan;
     std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
 
-    glm::vec3 voxel_size(0.2f);
+    glm::vec3 voxel_size(1.0f);
     glm::ivec3 chunk_size(16);
     VoxelGrid::VoxelGridDesc voxel_grid_desc {
         .chunk_size = chunk_size,
@@ -414,11 +414,10 @@ int main() {
 
 
     auto start_path_planning = [&]() {
+        if (!has_start_pos || !has_end_pos)
+            return;
+
         celeris.request_path_replan();
-        // if (has_start_pos && has_end_pos) {
-            
-        //     has_planned_path = celeris.has_planned_path();
-        // }
     };
 
     auto make_pose_from_camera = [&](NonholonomicPos& out_pose) {
@@ -438,6 +437,7 @@ int main() {
             celeris.set_start(pose);
             has_start_pos = true;
             has_planned_path = false;
+            start_path_planning();
         }
     };
 
@@ -447,6 +447,7 @@ int main() {
             celeris.set_goal(pose);
             has_end_pos = true;
             has_planned_path = false;
+            start_path_planning();
         }
     };
 
@@ -773,6 +774,7 @@ int main() {
                 }
 
                 celeris_visualizer.display_debug_controls();
+                celeris.display_path_planner_debug_controls();
                 
                 // ImGui::TextColored(ImVec4(1.0f, 0.35f, 1.0f, 1.0f), "Current frame id: %d", lidar_video.current_frame_id());
 
@@ -788,45 +790,31 @@ int main() {
                 // ImGui::SameLine();
                 // ImGui::TextUnformatted("Key: R");
 
-                if (ImGui::Button("Next frame")) {
-                    // next_frame();
-                }
+                if (ImGui::CollapsingHeader("Path planning controls")) {
+                    if (ImGui::Button("Place start")) {
+                        place_start();
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("Key: 1");
 
-                if (ImGui::Button("Place start")) {
-                    place_start();
-                }
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Key: 1");
+                    if (ImGui::Button("Place end")) {
+                        place_end();
+                    }
+                    
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("Key: 2");
 
-                if (ImGui::Button("Place end")) {
-                    place_end();
-                }
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Key: 2");
+                    if (ImGui::Button("Start path planning")) {
+                        start_path_planning();
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("Key: 3");
 
-                if (ImGui::Button("Start path planning")) {
-                    start_path_planning();
                 }
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Key: 3");
 
                 // if (ImGui::InputFloat("Celeris car speed", &car_speed, 1.0f, 10.0f, "%.1f")) {
                 //     celeris.set_car_speed(car_speed);
                 // }
-
-                if (ImGui::Button("GICP step")) {
-                    // celeris.gicp_pass().step(
-                    //     celeris.voxel_point_map(), 
-                    //     source_scan.point_cloud(), 
-                    //     source_scan.normal_buffer()
-                    // );
-
-                    
-                }
-
-                if (ImGui::Button("Next frame")) {
-                    // process_current_lidar_frame();
-                }
 
                 ImGui::End();
                 

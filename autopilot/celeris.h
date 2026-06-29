@@ -75,6 +75,7 @@ public:
     bool adjust_to_ground(glm::vec3& output);
     bool has_planned_path() const;
     PathPlanner::PathPlannerResult path_result_snapshot() const;
+    void display_path_planner_debug_controls() const;
     glm::vec3 voxel_size();
     glm::vec3 voxel_center_world_pos(const glm::ivec3& voxel_pos);
 

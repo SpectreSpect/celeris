@@ -108,8 +108,28 @@ OccupancyGrid3D::OccupancyGrid3D(
 }
 
 void OccupancyGrid3D::clear_cache() {
-    std::lock_guard lock(m_chunk_cache_mutex);
-    m_chunk_cache.clear();
+    {
+        std::lock_guard lock(m_chunk_cache_mutex);
+        m_chunk_cache.clear();
+    }
+
+    {
+        std::lock_guard lock(m_metrics_mutex);
+        read_and_inflate_chunk_time = AvgTimer();
+        is_solid_time = AvgTimer();
+        read_and_inflate_chunk_count = 0;
+        is_solid_count = 0;
+    }
+}
+
+float OccupancyGrid3D::is_solid_time_ms() {
+    std::lock_guard lock(m_metrics_mutex);
+    return static_cast<float>(is_solid_time.total_ms());
+}
+
+uint32_t OccupancyGrid3D::solid_check_count() {
+    std::lock_guard lock(m_metrics_mutex);
+    return is_solid_count;
 }
 
 glm::ivec3 OccupancyGrid3D::floor_pos(const glm::vec3& p) {
@@ -276,13 +296,18 @@ glm::vec3 OccupancyGrid3D::voxel_center_world_pos(const glm::ivec3& p) const {
 }
 
 bool OccupancyGrid3D::is_solid(glm::ivec3 pos) {
-    is_solid_count++;
     // // LOG_METHOD();
     // return pos.y <= 0;
     
     // logger().check(m_voxel_grid, "Voxel grid was null");
 
-    is_solid_time.start();
+    const auto is_solid_start = std::chrono::steady_clock::now();
+    auto record_is_solid_time = [&] {
+        const auto is_solid_end = std::chrono::steady_clock::now();
+        std::lock_guard lock(m_metrics_mutex);
+        is_solid_count++;
+        is_solid_time.add(is_solid_end - is_solid_start);
+    };
 
     glm::ivec3 chunk_pos = m_voxel_grid->chunk_pos_from_voxel_pos(pos);
 
@@ -295,18 +320,20 @@ bool OccupancyGrid3D::is_solid(glm::ivec3 pos) {
         auto cached_chunk_it = m_chunk_cache.find(chunk_key);
         if (cached_chunk_it != m_chunk_cache.end()) {
             VoxelDataGPU voxel = cached_chunk_it->second.voxel(glm::uvec3(local_pos));
-            is_solid_time.end();
+            record_is_solid_time();
             return voxel.is_solid() || voxel.is_inflated();
         }
     }
 
     VoxelGridChunk loaded_chunk;
     {
-        read_and_inflate_chunk_count++;
-
-        read_and_inflate_chunk_time.start();
+        const auto read_and_inflate_start = std::chrono::steady_clock::now();
         loaded_chunk = m_voxel_grid->read_chunk(chunk_pos);
-        read_and_inflate_chunk_time.end();
+        const auto read_and_inflate_end = std::chrono::steady_clock::now();
+
+        std::lock_guard lock(m_metrics_mutex);
+        read_and_inflate_chunk_count++;
+        read_and_inflate_chunk_time.add(read_and_inflate_end - read_and_inflate_start);
     }
 
     VoxelDataGPU voxel;
@@ -316,7 +343,7 @@ bool OccupancyGrid3D::is_solid(glm::ivec3 pos) {
         voxel = cached_chunk_it->second.voxel(glm::uvec3(local_pos));
     }
 
-    is_solid_time.end();
+    record_is_solid_time();
 
     return voxel.is_solid() || voxel.is_inflated();
     // return pos.y <= 0;

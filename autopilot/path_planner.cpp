@@ -119,7 +119,6 @@ void PathPlanner::plan_path(
     m_planner.find_nonholomic_path();
 
     total_path_finding_time.end();
-    std::cout << "Total path finding time: " << total_path_finding_time.average_ms() << " ms" << std::endl;
 
     {
         std::lock_guard result_lock(m_result_mutex);
@@ -128,6 +127,13 @@ void PathPlanner::plan_path(
         m_result.explored_paths = m_planner.state().explored_paths;
         m_result.unimpended_path = m_planner.state().unimpended_astar_positions;
         m_result.total_path_finding_time = total_path_finding_time;
+        m_result.total_time_ms = static_cast<float>(total_path_finding_time.total_ms());
+        m_result.initialize_time_ms = m_planner.initialize_time_ms();
+        m_result.plain_astar_time_ms = m_planner.plain_astar_time_ms();
+        m_result.unimpended_path_time_ms = m_planner.unimpended_path_time_ms();
+        m_result.nonholonomic_astar_time_ms = m_planner.nonholonomic_astar_time_ms();
+        m_result.is_solid_time_ms = m_planner.is_solid_time_ms();
+        m_result.is_solid_count = m_planner.is_solid_count();
         m_result.generation++;
     }
 }

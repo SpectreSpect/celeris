@@ -196,39 +196,44 @@ float NonholonomicAStar::angle_diff(float a, float b) {
     return d;
 }
 
-DistToPathData NonholonomicAStar::max_unimpended_dist_to_path(glm::vec3 pos, std::vector<glm::ivec3>& path, int start_id, glm::vec3 last_pos, bool replace_last_pos) {
-    LOG_METHOD();
+// DistToPathData NonholonomicAStar::max_unimpended_dist_to_path(glm::vec3 pos, std::vector<glm::ivec3>& path, int start_id, glm::vec3 last_pos, bool replace_last_pos) {
+//     LOG_METHOD();
 
-    int id = -1;
-    float max_dist = 0;
+//     int id = -1;
+//     float max_dist = 0;
 
-    glm::vec3 cur_pos = (glm::vec3)pos;
-    for (int i = start_id; i < path.size(); i++) {
-        glm::vec3 path_pos = m_grid->voxel_center_world_pos(path[i]);
+//     glm::vec3 cur_pos = (glm::vec3)pos;
+//     for (int i = start_id; i < path.size(); i++) {
+//         glm::vec3 path_pos = m_grid->voxel_center_world_pos(path[i]);
 
-//         if (replace_last_pos && i == path.size() - 1)
-//             path_pos = last_pos;
+// //         if (replace_last_pos && i == path.size() - 1)
+// //             path_pos = last_pos;
             
 
-//         path_pos.y = cur_pos.y;
+// //         path_pos.y = cur_pos.y;
 
-        std::vector<glm::vec3> line = {cur_pos, path_pos};
+//         std::vector<glm::vec3> line = {cur_pos, path_pos};
 
-        std::vector<glm::ivec3> ground_positions;
-        if (!m_grid->get_ground_positions(
-                line, 
-                ground_positions, 
-                m_params.max_step_up, 
-                m_params.max_drop, 
-                m_params.max_y_diff,
-                m_params.allow_flying_over_precipices)) {
-            continue;
-        }
+//         std::vector<glm::ivec3> ground_positions;
+//         if (!m_grid->get_ground_positions(
+//                 line, 
+//                 ground_positions, 
+//                 m_params.max_step_up, 
+//                 m_params.max_drop, 
+//                 m_params.max_y_diff,
+//                 m_params.allow_flying_over_precipices)) {
+//             continue;
+//         }
         
-        id = i;
-        max_dist = glm::distance(cur_pos, path_pos); 
-    }
-}
+//         id = i;
+//         max_dist = glm::distance(cur_pos, path_pos); 
+//     }
+
+//     return DistToPathData{
+//         .dist = max_dist,
+//         .id = id
+//     };
+// }
 
 int NonholonomicAStar::discretize_angle(float value, int num_bins) {
     LOG_NAMED("NonholonomicAStar");
@@ -381,11 +386,11 @@ void NonholonomicAStar::initialize(
     NonholonomicPos end_pos)
 {
     LOG_METHOD();
-
-    m_grid->read_and_inflate_chunk_time = AvgTimer();
-    m_grid->is_solid_time = AvgTimer();
-    m_grid->read_and_inflate_chunk_count = 0;
-    m_grid->is_solid_count = 0;
+    m_initialize_time = AvgTimer();
+    m_unimpended_path_time = AvgTimer();
+    m_nonholonomic_astar_time = AvgTimer();
+    m_plain_astar_time = AvgTimer();
+    m_initialize_time.start();
 
     m_grid->clear_cache();
 
@@ -395,18 +400,19 @@ void NonholonomicAStar::initialize(
     m_state.end_pos = end_pos;
     m_params.min_radius = m_params.wheel_base / std::tan(m_params.max_steer);
 
+    m_plain_astar_time.start();
     m_state.plain_astar_path = m_plain_astar.find_path(
         m_grid->world_to_voxel_pos(start_pos.pos),
         m_grid->world_to_voxel_pos(end_pos.pos)
     );
+    m_plain_astar_time.end();
 
-    std::cout << "Plain A* is solid time: " << m_grid->is_solid_time.total_ms() << " ms" << std::endl;
-    std::cout << "Is solid count: " << m_grid->is_solid_count << std::endl;
+    // logger().log() << std::to_string(m_state.plain_astar_path.path.size()) << "\n";
 
-    logger().log() << std::to_string(m_state.plain_astar_path.path.size()) << "\n";
-
-    if (m_state.plain_astar_path.path.empty())
+    if (m_state.plain_astar_path.path.empty()) {
+        m_initialize_time.end();
         return; 
+    }
     
     if (m_state.plain_astar_path.reached_precipice) {
         glm::vec3 pos = m_grid->voxel_center_world_pos(m_state.plain_astar_path.path.back());
@@ -417,7 +423,9 @@ void NonholonomicAStar::initialize(
         end_pos.theta = theta;
     }
 
+    m_unimpended_path_time.start();
     std::vector<glm::ivec3> unimpended_points = find_unimpended_points(submit_context, m_state.plain_astar_path);
+    m_unimpended_path_time.end();
 
     m_state.unimpended_astar_positions = prepare_unimpended_points(unimpended_points, start_pos, end_pos);
 
@@ -495,7 +503,8 @@ void NonholonomicAStar::initialize(
 
     m_state.pq.push(start_cell);   
 
-    logger().log("Finished initialization");
+    // logger().log("Finished initialization");
+    m_initialize_time.end();
 }
 
 bool NonholonomicAStar::try_reeds_shepp_shot(NonholonomicPos& start, NonholonomicPos& end, std::vector<NonholonomicPos>& out_path) {
@@ -563,7 +572,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
     LOG_METHOD();
 
     if (m_state.pq.empty()) {
-        logger().log("1. Priotirty queue is empty");
+        // logger().log("1. Priotirty queue is empty");
         return true;
     }
 
@@ -588,7 +597,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
         }
 
     if (m_state.counter >= m_params.iteration_limit) {
-        logger().log("Limit exceeded");
+        // logger().log("Limit exceeded");
         return true;
     }
     
@@ -604,14 +613,14 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
         m_state.path = reconstruct_path(m_state.closed_heap, cur_cell.pos);
 
         if (!m_params.use_reed_shepps_fallback) {
-            logger().log("2. Almost equal = true");
+            // logger().log("2. Almost equal = true");
             return true;
         }
 
         bool status = try_finish_with_reeds_shepp(cur_cell.pos, m_state.end_pos);
         
-        if (status)
-            logger().log("3. Almost equal = true (with reeds-shepp fallback)");
+        // if (status)
+        //     logger().log("3. Almost equal = true (with reeds-shepp fallback)");
         
         return true;
     }
@@ -621,7 +630,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
             m_params.force_reeds_shepp_shot = false;
             bool status = try_finish_with_reeds_shepp(cur_cell.pos, m_state.end_pos);
             if (status) {
-                logger().log("4. Reeds-shepp shot succeeded");
+                // logger().log("4. Reeds-shepp shot succeeded");
                 return true;
             }
         }
@@ -695,15 +704,13 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
 void NonholonomicAStar::find_nonholomic_path() {
     LOG_METHOD();
 
+    m_nonholonomic_astar_time.start();
     while (true) {
         if (find_nonholomic_path_step())
             break;
     }
+    m_nonholonomic_astar_time.end();
 
-    std::cout << "Read and infalte chunk time: " << m_grid->read_and_inflate_chunk_time.total_ms() << " ms" << std::endl;
-    std::cout << "Is solid time: " << m_grid->is_solid_time.total_ms() << " ms" << std::endl;
-    
-    std::cout << "Read and inflate count: " << m_grid->read_and_inflate_chunk_count << std::endl;
 }
 
 OccupancyGrid3D& NonholonomicAStar::occupancy_grid() noexcept {
@@ -712,4 +719,32 @@ OccupancyGrid3D& NonholonomicAStar::occupancy_grid() noexcept {
 
 NonholonomicAStar::NonholonomicAStarState& NonholonomicAStar::state() noexcept {
     return m_state;
+}
+
+float NonholonomicAStar::total_time_ms() {
+    return initialize_time_ms() + nonholonomic_astar_time_ms();
+}
+
+float NonholonomicAStar::initialize_time_ms() {
+    return static_cast<float>(m_initialize_time.total_ms());
+}
+
+float NonholonomicAStar::nonholonomic_astar_time_ms() {
+    return static_cast<float>(m_nonholonomic_astar_time.total_ms());
+}
+
+float NonholonomicAStar::plain_astar_time_ms() {
+    return static_cast<float>(m_plain_astar_time.total_ms());
+}
+
+float NonholonomicAStar::unimpended_path_time_ms() {
+    return static_cast<float>(m_unimpended_path_time.total_ms());
+}
+
+float NonholonomicAStar::is_solid_time_ms() {
+    return m_grid ? m_grid->is_solid_time_ms() : 0.0f;
+}
+
+uint32_t NonholonomicAStar::is_solid_count() {
+    return m_grid ? m_grid->solid_check_count() : 0;
 }
