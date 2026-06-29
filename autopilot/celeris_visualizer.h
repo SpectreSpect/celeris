@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gazelle_next.h"
 #include "spherical_pose_marker.h"
 #include "../renderer/scene_object.h"
 #include "../renderer/lines/line_cloud.h"
@@ -55,6 +56,7 @@ private:
 
     SphericalPoseMarker m_start_marker;
     SphericalPoseMarker m_goal_marker;
+    GazelleNext m_gazelle_next;
 
     LineCloud m_path_line_cloud;
     LineCloud m_guide_path_line_cloud;
@@ -68,12 +70,15 @@ private:
     bool show_guide_path = true;
     bool show_explored_paths = false;
     bool show_unimpeded_path = true;
+    bool show_start_marker = false;
+    bool show_gazelle_next = true;
 
 private:
     glm::vec3 voxel_size() noexcept;
     glm::vec3 marker_vertical_offset() noexcept;
 
     void set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position);
+    void set_gazelle_pose_from_lidar_transform();
     void reset_marker_interpolation(
         SphericalPoseMarker& marker,
         MarkerInterpolationState& state

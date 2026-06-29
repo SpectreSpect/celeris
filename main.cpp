@@ -66,7 +66,6 @@
 #include "a_star/a_star.h"
 #include "a_star/a_star_structures.h"
 #include "a_star/nonholonomic_a_star.h"
-#include "autopilot/gazelle_next.h"
 #include "autopilot/spherical_pose_marker.h"
 #include "autopilot/celeris.h"
 #include "autopilot/celeris_visualizer.h"
@@ -145,7 +144,7 @@ int main() {
     std::unique_ptr<LidarScan> network_scan;
     std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
 
-    glm::vec3 voxel_size(1.0f);
+    glm::vec3 voxel_size(0.2f);
     glm::ivec3 chunk_size(16);
     VoxelGrid::VoxelGridDesc voxel_grid_desc {
         .chunk_size = chunk_size,
@@ -355,7 +354,7 @@ int main() {
     Renderer renderer(engine, frame_resources);
 
     const float skybox_exposure = 1.8f;
-    GazelleNext gazelle_next(mesh_manager, material_instance_manager, skybox_exposure);
+    GazelleNext gazelle(mesh_manager, material_instance_manager, skybox_exposure);
 
     Skybox skybox(
         mesh_manager.skybox_cube,
@@ -543,9 +542,9 @@ int main() {
     Scene scene;
 
     scene.add(skybox);
-    scene.add(gazelle_next);
 
-    // scene.add(celeris_visualizer);
+    scene.add(celeris_visualizer);
+    // scene.add(gazelle);
     // scene.add(target_scan);
     // scene.add(voxel_point_map);
     // scene.add(source_scan);

@@ -71,6 +71,7 @@ public:
     void set_car_speed(float speed) noexcept;
 
     LidarScan* network_scan();
+    const Transform& lidar_transform() const noexcept;
     NonholonomicPos start_position() const noexcept;
     NonholonomicPos goal_position() const noexcept;
     float car_speed() const noexcept;
@@ -117,6 +118,7 @@ private:
 
     NonholonomicPos m_start_position;
     NonholonomicPos m_goal_position;
+    Transform m_lidar_transform;
     float m_car_speed = 10.0f;
 
     std::unique_ptr<LidarScan> m_network_scan;
@@ -162,6 +164,8 @@ private:
     bool is_path_impended(VulkanSubmitContext& submit_context);
 
     void sync_path_planner_result();
+    Transform rear_axle_transform_from_lidar_transform(const Transform& lidar_transform) const;
+    glm::vec3 rear_axle_bottom_offset() const;
 
     bool find_closest_next_path_point(uint32_t current_id, uint32_t& output_id, uint32_t& output_dist);
     VehicleCommand get_path_following_command();

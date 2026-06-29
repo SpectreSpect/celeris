@@ -7,6 +7,7 @@
 #include <limits>
 #include <utility>
 
+#include <glm/gtc/constants.hpp>
 #include "../vulkan_self/vulkan_device.h"
 #include "../vulkan_self/vulkan_queue.h"
 #include "../vulkan_self/vulkan_submit_context.h"
@@ -92,7 +93,7 @@ void Celeris::start_lidar_receiver() {
 }
 
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
-    // start_lidar_receiver();
+    start_lidar_receiver();
     // m_command_sender.start();
     m_path_planner.start(std::move(planner_submit_context));
 }
@@ -162,7 +163,8 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
                             m_desc.max_gicp_iterations);
         }
         
-        m_start_position.from_transform(m_network_scan->point_cloud().transform);        
+        m_lidar_transform = m_network_scan->point_cloud().transform;
+        m_start_position.from_transform(rear_axle_transform_from_lidar_transform(m_lidar_transform));
 
         // m_start_position.pos = m_network_scan->point_cloud().transform.position;
         // glm::quat q = glm::normalize(m_network_scan->point_cloud().transform.rotation);
@@ -180,7 +182,6 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
             m_desc.max_write_count
         );
 
-        m_start_position.pos.y -= 1.1f;
         // VoxelWriteGPU blue_voxelize_prefab;
         // blue_voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
         // blue_voxelize_prefab.set_flags = OVERWRITE_BIT;
@@ -241,6 +242,10 @@ void Celeris::set_car_speed(float speed) noexcept {
 
 LidarScan* Celeris::network_scan() {
     return m_network_scan.get();
+}
+
+const Transform& Celeris::lidar_transform() const noexcept {
+    return m_lidar_transform;
 }
 
 NonholonomicPos Celeris::start_position() const noexcept {
@@ -590,6 +595,41 @@ void Celeris::sync_path_planner_result() {
     total_path_finding_time = result.total_path_finding_time;
     m_synced_path_generation = result.generation;
     current_target_path_point_id = 0;
+}
+
+Transform Celeris::rear_axle_transform_from_lidar_transform(const Transform& lidar_transform) const {
+    Transform rear_axle_transform = lidar_transform;
+    const glm::quat scan_rotation = glm::normalize(lidar_transform.rotation);
+    const glm::quat model_rotation = glm::normalize(
+        scan_rotation * glm::angleAxis(glm::pi<float>(), glm::vec3(0.0f, 1.0f, 0.0f))
+    );
+
+    rear_axle_transform.rotation = scan_rotation;
+    rear_axle_transform.position =
+        lidar_transform.position +
+        model_rotation * (rear_axle_bottom_offset() * lidar_transform.scale);
+
+    return rear_axle_transform;
+}
+
+glm::vec3 Celeris::rear_axle_bottom_offset() const {
+    const float car_length = 6.6f;
+    const float rear_axle_x_portion = 0.2f;
+    const float car_body_height = 2.30f;
+    const glm::vec3 wheel_scale(0.75f, 0.2f, 0.75f);
+
+    const float car_rear_x = -car_length / 2.0f;
+    const float car_body_bottom_y = -car_body_height / 2.0f;
+    const float wheel_radius_y = wheel_scale.x * 0.5f;
+    const float car_model_bottom_y = car_body_bottom_y - wheel_radius_y;
+    const float car_model_top_y = car_body_bottom_y + car_body_height;
+    const float car_model_center_y = (car_model_bottom_y + car_model_top_y) / 2.0f;
+
+    const float rear_axle_x = car_rear_x + car_length * rear_axle_x_portion;
+    const float wheel_center_y = car_body_bottom_y - car_model_center_y;
+    const float wheel_bottom_y = wheel_center_y - wheel_radius_y;
+
+    return glm::vec3(rear_axle_x, wheel_bottom_y, 0.0f);
 }
 
 bool Celeris::find_closest_next_path_point(uint32_t current_id, uint32_t& output_id, uint32_t& output_dist) {

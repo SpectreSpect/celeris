@@ -36,6 +36,7 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
         m_goal_marker(mesh_manager, 
                     material_instance_manager, 
                     PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(0, 0, 1, 1))),
+        m_gazelle_next(mesh_manager, material_instance_manager, skybox_exposure),
         m_path_line_cloud(*m_celeris->engine(),
                    mesh_manager.line_quad,
                    material_instance_manager.line,
@@ -73,6 +74,7 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
     });
 
     add_child(m_start_marker);
+    add_child(m_gazelle_next);
     add_child(m_goal_marker);
     add_child(m_path_line_cloud);
     add_child(m_guide_path_line_cloud);
@@ -85,6 +87,7 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
 
 void CelerisVisualizer::set_start(const NonholonomicPos& nonholonomic_position) {
     set_marker_pose(m_start_marker, nonholonomic_position);
+    set_gazelle_pose_from_lidar_transform();
     reset_marker_interpolation(m_start_marker, m_start_marker_interpolation);
 }
 
@@ -96,6 +99,7 @@ void CelerisVisualizer::set_goal(const NonholonomicPos& nonholonomic_position) {
 void CelerisVisualizer::set_start(const Transform& transform) {
     m_start_marker.transform = transform;
     m_start_marker.transform.position += marker_vertical_offset();
+    set_gazelle_pose_from_lidar_transform();
     reset_marker_interpolation(m_start_marker, m_start_marker_interpolation);
 }
 
@@ -121,6 +125,10 @@ void CelerisVisualizer::update() {
 
     set_start(m_celeris->start_position());
     set_goal(m_celeris->goal_position());
+    set_gazelle_pose_from_lidar_transform();
+
+    m_start_marker.visible = show_start_marker;
+    m_gazelle_next.visible = show_gazelle_next;
 
     // interpolate_marker_pose(
     //     m_start_marker,
@@ -168,6 +176,8 @@ void CelerisVisualizer::display_debug_controls() {
         ImGui::Checkbox("Plain A* path", &show_guide_path);
         ImGui::Checkbox("Explored paths", &show_explored_paths);
         ImGui::Checkbox("Unimpeded path", &show_unimpeded_path);
+        ImGui::Checkbox("Start pose marker", &show_start_marker);
+        ImGui::Checkbox("Gazelle Next", &show_gazelle_next);
     }
 }
 
@@ -184,6 +194,14 @@ void CelerisVisualizer::set_marker_pose(SphericalPoseMarker& marker, Nonholonomi
     marker.transform.rotation = glm::angleAxis(
         glm::pi<float>() - nonholonomic_position.theta,
         glm::vec3(0.0f, 1.0f, 0.0f)
+    );
+}
+
+void CelerisVisualizer::set_gazelle_pose_from_lidar_transform() {
+    m_gazelle_next.transform = m_celeris->lidar_transform();
+    m_gazelle_next.transform.rotation = glm::normalize(
+        m_gazelle_next.transform.rotation *
+        glm::angleAxis(glm::pi<float>(), glm::vec3(0.0f, 1.0f, 0.0f))
     );
 }
 

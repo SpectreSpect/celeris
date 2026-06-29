@@ -120,6 +120,9 @@ void Renderer::render(VulkanCommandBuffer& command_buffer, IndirectRenderObject&
 
 void Renderer::render(VulkanCommandBuffer& command_buffer, std::vector<SceneObject*> scene_objects, glm::mat4 transform) {
     for (SceneObject* scene_object : scene_objects) {
+        if (!scene_object->visible)
+            continue;
+
         glm::mat4 local_transform = scene_object->transform.get_model_matrix();
         glm::mat4 world_transform = transform * local_transform;
 
