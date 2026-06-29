@@ -615,19 +615,15 @@ Transform Celeris::rear_axle_transform_from_lidar_transform(const Transform& lid
 glm::vec3 Celeris::rear_axle_bottom_offset() const {
     const float car_length = 6.6f;
     const float rear_axle_x_portion = 0.2f;
-    const float car_body_height = 2.30f;
-    const glm::vec3 wheel_scale(0.75f, 0.2f, 0.75f);
+    const float car_body_height = 2.75f;
 
     const float car_rear_x = -car_length / 2.0f;
-    const float car_body_bottom_y = -car_body_height / 2.0f;
-    const float wheel_radius_y = wheel_scale.x * 0.5f;
-    const float car_model_bottom_y = car_body_bottom_y - wheel_radius_y;
-    const float car_model_top_y = car_body_bottom_y + car_body_height;
+    const float car_model_bottom_y = 0.0f;
+    const float car_model_top_y = car_model_bottom_y + car_body_height;
     const float car_model_center_y = (car_model_bottom_y + car_model_top_y) / 2.0f;
 
     const float rear_axle_x = car_rear_x + car_length * rear_axle_x_portion;
-    const float wheel_center_y = car_body_bottom_y - car_model_center_y;
-    const float wheel_bottom_y = wheel_center_y - wheel_radius_y;
+    const float wheel_bottom_y = car_model_bottom_y - car_model_center_y;
 
     return glm::vec3(rear_axle_x, wheel_bottom_y, 0.0f);
 }

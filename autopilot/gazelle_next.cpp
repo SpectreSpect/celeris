@@ -59,29 +59,28 @@ void GazelleNext::update_layout() {
     const float compartment_2_length = car_length - compartment_1_length - compartment_3_actual_length;
     const float car_rear_x = -car_length / 2.0f;
 
-    const float compartment_height_scale = car_body_height / compartment_1_height_weight;
-    const float compartment_1_height = compartment_1_height_weight * compartment_height_scale;
-    const float compartment_2_height = compartment_2_height_weight * compartment_height_scale;
-    const float car_body_bottom_y = -car_body_height / 2.0f;
     const float wheel_radius_y = wheel_scale.x * 0.5f;
-    const float compartment_3_actual_height = std::max(0.0f, compartment_3_height);
-    const float car_model_bottom_y = car_body_bottom_y - wheel_radius_y;
-    const float car_model_top_y = car_body_bottom_y + car_body_height;
+    const float car_model_bottom_y = 0.0f;
+    const float wheel_center_y = car_model_bottom_y + wheel_radius_y;
+    const float compartment_1_height = std::max(0.0f, compartment_1_top_height_from_rear_wheel_center);
+    const float compartment_2_height = std::max(0.0f, compartment_2_top_height_from_rear_wheel_center);
+    const float compartment_3_actual_height = std::max(0.0f, compartment_3_top_height_from_rear_wheel_center);
+    const float car_model_top_y = car_model_bottom_y + car_body_height;
     const float car_model_center_y = (car_model_bottom_y + car_model_top_y) / 2.0f;
 
-    m_compartment_1.transform.position = glm::vec3(car_rear_x + compartment_1_length / 2.0f, car_body_bottom_y + compartment_1_height / 2.0f - car_model_center_y, 0.0f);
+    m_compartment_1.transform.position = glm::vec3(car_rear_x + compartment_1_length / 2.0f, wheel_center_y + compartment_1_height / 2.0f - car_model_center_y, 0.0f);
     m_compartment_1.transform.scale = glm::vec3(compartment_1_length, compartment_1_height, 2.0f);
 
-    m_compartment_2.transform.position = glm::vec3(car_rear_x + compartment_1_length + compartment_2_length / 2.0f, car_body_bottom_y + compartment_2_height / 2.0f - car_model_center_y, 0.0f);
+    m_compartment_2.transform.position = glm::vec3(car_rear_x + compartment_1_length + compartment_2_length / 2.0f, wheel_center_y + compartment_2_height / 2.0f - car_model_center_y, 0.0f);
     m_compartment_2.transform.scale = glm::vec3(compartment_2_length, compartment_2_height, 2.0f);
 
-    m_compartment_3.transform.position = glm::vec3(car_rear_x + compartment_1_length + compartment_2_length + compartment_3_actual_length / 2.0f, car_body_bottom_y + compartment_3_actual_height / 2.0f - car_model_center_y, 0.0f);
+    m_compartment_3.transform.position = glm::vec3(car_rear_x + compartment_1_length + compartment_2_length + compartment_3_actual_length / 2.0f, wheel_center_y + compartment_3_actual_height / 2.0f - car_model_center_y, 0.0f);
     m_compartment_3.transform.scale = glm::vec3(compartment_3_actual_length, compartment_3_actual_height, 2.0f);
 
     const float car_front_x = car_rear_x + car_length;
     const float compartment_2_front_x = car_rear_x + compartment_1_length + compartment_2_length;
-    const float compartment_2_top_y = car_body_bottom_y + compartment_2_height - car_model_center_y;
-    const float compartment_3_top_y = car_body_bottom_y + compartment_3_actual_height - car_model_center_y;
+    const float compartment_2_top_y = wheel_center_y + compartment_2_height - car_model_center_y;
+    const float compartment_3_top_y = wheel_center_y + compartment_3_actual_height - car_model_center_y;
     const float connector_end_x =
         car_front_x - compartment_3_actual_length * connector_end_offset_from_car_front_portion;
     const glm::vec2 connector_start(compartment_2_front_x, compartment_2_top_y);
@@ -112,7 +111,7 @@ void GazelleNext::update_layout() {
 
     const float rear_axle_x = car_rear_x + car_length * rear_axle_x_portion;
     const float front_axle_x = car_rear_x + car_length * front_axle_x_portion;
-    const float wheel_y = car_body_bottom_y - car_model_center_y;
+    const float wheel_y = wheel_center_y - car_model_center_y;
     const float left_wheel_z = -axle_length / 2.0f;
     const float right_wheel_z = axle_length / 2.0f;
     const glm::quat wheel_rotation = glm::angleAxis(glm::half_pi<float>(), glm::vec3(1.0f, 0.0f, 0.0f));
@@ -195,17 +194,13 @@ glm::quat GazelleNext::parent_rotation_from_lidar_mount_rotation(const glm::quat
 glm::vec3 GazelleNext::rear_axle_bottom_offset() const {
     const float car_rear_x = -car_length / 2.0f;
 
-    const float compartment_height_scale = car_body_height / compartment_1_height_weight;
-    const float compartment_1_height = compartment_1_height_weight * compartment_height_scale;
-    const float car_body_bottom_y = -car_body_height / 2.0f;
     const float wheel_radius_y = wheel_scale.x * 0.5f;
-    const float car_model_bottom_y = car_body_bottom_y - wheel_radius_y;
-    const float car_model_top_y = car_body_bottom_y + car_body_height;
+    const float car_model_bottom_y = 0.0f;
+    const float car_model_top_y = car_model_bottom_y + car_body_height;
     const float car_model_center_y = (car_model_bottom_y + car_model_top_y) / 2.0f;
 
     const float rear_axle_x = car_rear_x + car_length * rear_axle_x_portion;
-    const float wheel_center_y = car_body_bottom_y - car_model_center_y;
-    const float wheel_bottom_y = wheel_center_y - wheel_radius_y;
+    const float wheel_bottom_y = car_model_bottom_y - car_model_center_y;
 
     return glm::vec3(rear_axle_x, wheel_bottom_y, 0.0f);
 }

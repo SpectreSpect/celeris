@@ -19,18 +19,17 @@ public:
     float compartment_3_weight = 1.0f;
     float compartment_3_length = 1.5f;
 
-    float car_body_height = 2.30f;
-    float compartment_1_height_weight = 2.30f;
-    float compartment_2_height_weight = 1.7f;
-    float compartment_3_height_weight = 1.0f;
-    float compartment_3_height = 0.85f;
-    float lidar_height_from_wheel_bottom = 1.67f;
+    float car_body_height = 2.75f;
+    float compartment_1_top_height_from_rear_wheel_center = 2.30f;
+    float compartment_2_top_height_from_rear_wheel_center = 1.70f;
+    float compartment_3_top_height_from_rear_wheel_center = 0.70f;
+    float lidar_height_from_wheel_bottom = 1.51f;
 
     float axle_length = 1.805f;
     float rear_axle_x_portion = 0.2f;
     float front_axle_x_portion = 0.85f;
 
-    glm::vec3 wheel_scale = glm::vec3(0.75f, 0.2f, 0.75f);
+    glm::vec3 wheel_scale = glm::vec3(0.78f, 0.2f, 0.78f);
     float connector_depth = 2.0f;
     float connector_thickness = 0.8f;
     float connector_end_offset_from_car_front_portion = 0.0f;
