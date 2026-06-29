@@ -6,42 +6,40 @@
 
 #include <iostream>
 
-namespace {
-    void insert_y_transition_points(std::vector<NonholonomicPos>& path) {
-        constexpr float eps = 1e-6f;
+void NonholonomicAStar::insert_y_transition_points(std::vector<NonholonomicPos>& path) {
+    constexpr float eps = 1e-6f;
 
-        if (path.size() < 2) {
-            return;
-        }
+    if (path.size() < 2) {
+        return;
+    }
 
-        std::vector<NonholonomicPos> corrected_path;
-        corrected_path.reserve(path.size() * 2);
-        corrected_path.push_back(path.front());
+    std::vector<NonholonomicPos> corrected_path;
+    corrected_path.reserve(path.size() * 2);
+    corrected_path.push_back(path.front());
 
-        for (size_t i = 1; i < path.size(); i++) {
-            const NonholonomicPos& previous = path[i - 1];
-            const NonholonomicPos& current = path[i];
+    for (size_t i = 1; i < path.size(); i++) {
+        const NonholonomicPos& previous = path[i - 1];
+        const NonholonomicPos& current = path[i];
 
-            float y_delta = current.pos.y - previous.pos.y;
-            if (std::abs(y_delta) > eps) {
-                NonholonomicPos intermediate_point;
+        float y_delta = current.pos.y - previous.pos.y;
+        if (std::abs(y_delta) > eps) {
+            NonholonomicPos intermediate_point;
 
-                if (y_delta > 0.0f) {
-                    intermediate_point = previous;
-                    intermediate_point.pos.y = current.pos.y;
-                } else {
-                    intermediate_point = current;
-                    intermediate_point.pos.y = previous.pos.y;
-                }
-
-                corrected_path.push_back(intermediate_point);
+            if (y_delta > 0.0f) {
+                intermediate_point = previous;
+                intermediate_point.pos.y = current.pos.y;
+            } else {
+                intermediate_point = current;
+                intermediate_point.pos.y = previous.pos.y;
             }
 
-            corrected_path.push_back(current);
+            corrected_path.push_back(intermediate_point);
         }
 
-        path = std::move(corrected_path);
+        corrected_path.push_back(current);
     }
+
+    path = std::move(corrected_path);
 }
 
 NonholonomicAStar::NonholonomicAStar(

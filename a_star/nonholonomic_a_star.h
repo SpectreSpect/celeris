@@ -117,6 +117,8 @@ public:
     uint32_t is_solid_count();
 
 private:
+    static void insert_y_transition_points(std::vector<NonholonomicPos>& path);
+
     NonholonomicAStarParams m_params;
     NonholonomicAStarState m_state;
     OccupancyGrid3D* m_grid = nullptr;
