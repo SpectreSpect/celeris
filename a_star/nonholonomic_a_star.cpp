@@ -132,8 +132,9 @@ bool NonholonomicAStar::almost_equal(
 std::vector<NonholonomicPos> NonholonomicAStar::reconstruct_path(std::unordered_map<uint64_t, NonholonomicAStarCell> closed_heap, NonholonomicPos pos) {
     LOG_METHOD();
 
-    std::vector<NonholonomicPos> path;
+    std::vector<std::vector<NonholonomicPos>> segments;
     NonholonomicPos cur_pos = pos;
+    NonholonomicPos start_pos;
 
     while (true) {
         uint64_t cur_key = state_key(cur_pos);
@@ -145,31 +146,27 @@ std::vector<NonholonomicPos> NonholonomicAStar::reconstruct_path(std::unordered_
             
         NonholonomicAStarCell cur_cell = it->second;
 
-        path.push_back(cur_pos);
-
-        if (cur_cell.no_parent)
+        if (cur_cell.no_parent) {
+            start_pos = cur_pos;
             break;
-        
-        float eps = 1e-6f;
-        float y_delta = cur_pos.pos.y - cur_cell.came_from.pos.y;
-        if (std::abs(y_delta) > eps) {
-            NonholonomicPos intermediate_point;
-
-            if (y_delta > 0.0f) {
-                intermediate_point = cur_cell.came_from;
-                intermediate_point.pos.y = cur_pos.pos.y;
-            } else {
-                intermediate_point = cur_pos;
-                intermediate_point.pos.y = cur_cell.came_from.pos.y;
-            }
-
-            path.push_back(intermediate_point);
         }
+
+        if (!cur_cell.simulated_motion.empty())
+            segments.push_back(cur_cell.simulated_motion);
+        else
+            segments.push_back({cur_pos});
         
         cur_pos = cur_cell.came_from;
     }
 
-    std::reverse(path.begin(), path.end());
+    std::vector<NonholonomicPos> path;
+    path.push_back(start_pos);
+
+    for (auto segment_it = segments.rbegin(); segment_it != segments.rend(); ++segment_it) {
+        path.insert(path.end(), segment_it->begin(), segment_it->end());
+    }
+
+    insert_y_transition_points(path);
 
     return path;
 }
@@ -691,6 +688,14 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
             new_cell.pos.steer = steer;
             new_cell.pos.dir = dir;
             new_cell.came_from = cur_cell.pos;
+            new_cell.simulated_motion = motion;
+            for (NonholonomicPos& motion_pos : new_cell.simulated_motion) {
+                motion_pos.steer = steer;
+                motion_pos.dir = dir;
+            }
+            if (!new_cell.simulated_motion.empty()) {
+                new_cell.simulated_motion.back() = new_pos;
+            }
             new_cell.no_parent = false;
             new_cell.g = new_g;
             new_cell.f = new_g + get_nonholonomic_f(new_cell.pos, m_state.end_pos, cur_cell.pos);

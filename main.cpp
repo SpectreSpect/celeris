@@ -392,7 +392,6 @@ int main() {
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.92f, -51.30f)});
     // celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.5f, -0.0f)});
     celeris.start(std::move(planner_submit_context));
-    celeris.start_lidar_receiver();
 
     CelerisVisualizer celeris_visualizer(mesh_manager, 
                                          material_instance_manager, 

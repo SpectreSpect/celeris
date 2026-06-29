@@ -58,6 +58,7 @@ struct NonholonomicAStarCell {
     float f;
     NonholonomicPos pos;
     NonholonomicPos came_from;
+    std::vector<NonholonomicPos> simulated_motion;
     bool no_parent = true;
 };
 
