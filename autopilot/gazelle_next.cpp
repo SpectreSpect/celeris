@@ -1,4 +1,4 @@
-#include "gazzel_next.h"
+#include "gazelle_next.h"
 
 #include "../managers/material_instance_manager.h"
 #include "../managers/mesh_manager.h"
@@ -7,7 +7,7 @@
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-GazzelNext::GazzelNext(
+GazelleNext::GazelleNext(
     MeshManager& mesh_manager,
     MaterialInstanceManager& material_instance_manager,
     float skybox_exposure)
@@ -40,7 +40,7 @@ GazzelNext::GazzelNext(
     add_child(m_right_front_wheel);
 }
 
-void GazzelNext::update_layout() {
+void GazelleNext::update_layout() {
     const float compartment_weight_sum = compartment_1_weight + compartment_2_weight + compartment_3_weight;
     const float compartment_1_portion = compartment_1_weight / compartment_weight_sum;
     const float compartment_2_portion = compartment_2_weight / compartment_weight_sum;
@@ -94,27 +94,27 @@ void GazzelNext::update_layout() {
     m_right_front_wheel.transform.position = glm::vec3(front_axle_x, wheel_y, right_wheel_z);
 }
 
-void GazzelNext::set_rear_axle_position(const glm::vec3& position) {
+void GazelleNext::set_rear_axle_position(const glm::vec3& position) {
     transform.position = position - rear_axle_world_offset();
 }
 
-void GazzelNext::set_rear_axle_rotation(const glm::quat& rotation) {
+void GazelleNext::set_rear_axle_rotation(const glm::quat& rotation) {
     const glm::vec3 rear_axle_position = transform.position + rear_axle_world_offset();
     transform.rotation = glm::normalize(rotation);
     set_rear_axle_position(rear_axle_position);
 }
 
-void GazzelNext::set_rear_axle_transform(const Transform& rear_axle_transform) {
+void GazelleNext::set_rear_axle_transform(const Transform& rear_axle_transform) {
     transform.rotation = rear_axle_transform.rotation;
     transform.scale = rear_axle_transform.scale;
     set_rear_axle_position(rear_axle_transform.position);
 }
 
-glm::vec3 GazzelNext::rear_axle_world_offset() const {
+glm::vec3 GazelleNext::rear_axle_world_offset() const {
     return glm::normalize(transform.rotation) * (rear_axle_bottom_offset() * transform.scale);
 }
 
-glm::vec3 GazzelNext::rear_axle_bottom_offset() const {
+glm::vec3 GazelleNext::rear_axle_bottom_offset() const {
     const float car_rear_x = -car_length / 2.0f;
 
     const float compartment_height_scale = car_body_height / compartment_1_height_weight;

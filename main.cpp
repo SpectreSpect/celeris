@@ -66,7 +66,7 @@
 #include "a_star/a_star.h"
 #include "a_star/a_star_structures.h"
 #include "a_star/nonholonomic_a_star.h"
-#include "autopilot/gazzel_next.h"
+#include "autopilot/gazelle_next.h"
 #include "autopilot/spherical_pose_marker.h"
 #include "autopilot/celeris.h"
 #include "autopilot/celeris_visualizer.h"
@@ -355,7 +355,7 @@ int main() {
     Renderer renderer(engine, frame_resources);
 
     const float skybox_exposure = 1.8f;
-    GazzelNext gazzel_next(mesh_manager, material_instance_manager, skybox_exposure);
+    GazelleNext gazelle_next(mesh_manager, material_instance_manager, skybox_exposure);
 
     Skybox skybox(
         mesh_manager.skybox_cube,
@@ -543,7 +543,7 @@ int main() {
     Scene scene;
 
     scene.add(skybox);
-    scene.add(gazzel_next);
+    scene.add(gazelle_next);
 
     // scene.add(celeris_visualizer);
     // scene.add(target_scan);
