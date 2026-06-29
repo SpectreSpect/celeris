@@ -6,42 +6,224 @@
 
 #include <iostream>
 
-namespace {
-    void insert_y_transition_points(std::vector<NonholonomicPos>& path) {
-        constexpr float eps = 1e-6f;
+void NonholonomicAStar::insert_y_transition_points(std::vector<NonholonomicPos>& path) {
+    constexpr float eps = 1e-6f;
 
-        if (path.size() < 2) {
+    if (path.size() < 2) {
+        return;
+    }
+
+    std::vector<NonholonomicPos> corrected_path;
+    corrected_path.reserve(path.size() * 2);
+    corrected_path.push_back(path.front());
+
+    for (size_t i = 1; i < path.size(); i++) {
+        const NonholonomicPos& previous = path[i - 1];
+        const NonholonomicPos& current = path[i];
+
+        float y_delta = current.pos.y - previous.pos.y;
+        if (std::abs(y_delta) > eps) {
+            NonholonomicPos intermediate_point;
+
+            if (y_delta > 0.0f) {
+                intermediate_point = previous;
+                intermediate_point.pos.y = current.pos.y;
+            } else {
+                intermediate_point = current;
+                intermediate_point.pos.y = previous.pos.y;
+            }
+
+            corrected_path.push_back(intermediate_point);
+        }
+
+        corrected_path.push_back(current);
+    }
+
+    path = std::move(corrected_path);
+}
+
+bool NonholonomicAStar::segment_intersects_voxel_xz(
+    const NonholonomicPos& from,
+    const NonholonomicPos& to,
+    const glm::ivec3& voxel_pos,
+    float& t_enter,
+    float& t_exit)
+{
+    LOG_METHOD();
+
+    constexpr float eps = 1e-6f;
+
+    const glm::vec3 voxel_min = m_grid->voxel_to_world_pos(voxel_pos);
+    const glm::vec3 voxel_max = voxel_min + m_grid->voxel_size();
+    const glm::vec3 delta = to.pos - from.pos;
+
+    t_enter = 0.0f;
+    t_exit = 1.0f;
+
+    auto clip_axis = [&](float start, float dir, float min_value, float max_value) {
+        if (std::abs(dir) <= eps) {
+            return start >= min_value && start <= max_value;
+        }
+
+        float t0 = (min_value - start) / dir;
+        float t1 = (max_value - start) / dir;
+        if (t0 > t1) {
+            std::swap(t0, t1);
+        }
+
+        t_enter = std::max(t_enter, t0);
+        t_exit = std::min(t_exit, t1);
+
+        return t_enter <= t_exit;
+    };
+
+    return clip_axis(from.pos.x, delta.x, voxel_min.x, voxel_max.x) &&
+           clip_axis(from.pos.z, delta.z, voxel_min.z, voxel_max.z) &&
+           t_exit > eps &&
+           t_enter < 1.0f - eps;
+}
+
+std::vector<NonholonomicAStar::SegmentWallIntersection>
+NonholonomicAStar::find_segment_wall_intersections(
+    const NonholonomicPos& from,
+    const NonholonomicPos& to)
+{
+    LOG_METHOD();
+
+    constexpr float eps = 1e-5f;
+
+    std::vector<SegmentWallIntersection> intersections;
+    const std::vector<glm::ivec3> xz_voxels = m_grid->line_intersects_xz(from.pos, to.pos);
+    const glm::vec3 segment = to.pos - from.pos;
+    const glm::vec2 segment_xz(segment.x, segment.z);
+    const float segment_xz_length = glm::length(segment_xz);
+    const glm::vec3 voxel_size = m_grid->voxel_size();
+    const float clearance = std::min({voxel_size.x, voxel_size.y, voxel_size.z}) * 0.03f;
+    const float vertical_tolerance = clearance;
+    const float t_padding = segment_xz_length > eps
+        ? std::min(clearance / segment_xz_length, 0.25f)
+        : 0.0f;
+    const float min_segment_y = std::min(from.pos.y, to.pos.y);
+    const float max_segment_y = std::max(from.pos.y, to.pos.y);
+
+    auto segment_is_vertically_near_voxel = [&](const glm::ivec3& voxel_pos) {
+        const float voxel_min_y = m_grid->voxel_to_world_pos(voxel_pos).y;
+        const float voxel_max_y = voxel_min_y + voxel_size.y;
+
+        return max_segment_y >= voxel_min_y - vertical_tolerance &&
+               min_segment_y <= voxel_max_y + vertical_tolerance;
+    };
+
+    auto add_intersection = [&](float t, float top_y) {
+        if (t <= eps || t >= 1.0f - eps) {
             return;
         }
 
-        std::vector<NonholonomicPos> corrected_path;
-        corrected_path.reserve(path.size() * 2);
-        corrected_path.push_back(path.front());
+        intersections.push_back(SegmentWallIntersection{
+            .t = t,
+            .top_y = top_y
+        });
+    };
 
-        for (size_t i = 1; i < path.size(); i++) {
-            const NonholonomicPos& previous = path[i - 1];
-            const NonholonomicPos& current = path[i];
+    for (const glm::ivec3& base_voxel_pos : xz_voxels) {
+        const glm::ivec3 candidate_voxels[] = {
+            base_voxel_pos,
+            base_voxel_pos + glm::ivec3(0, 1, 0)
+        };
 
-            float y_delta = current.pos.y - previous.pos.y;
-            if (std::abs(y_delta) > eps) {
-                NonholonomicPos intermediate_point;
-
-                if (y_delta > 0.0f) {
-                    intermediate_point = previous;
-                    intermediate_point.pos.y = current.pos.y;
-                } else {
-                    intermediate_point = current;
-                    intermediate_point.pos.y = previous.pos.y;
-                }
-
-                corrected_path.push_back(intermediate_point);
+        for (const glm::ivec3& voxel_pos : candidate_voxels) {
+            if (!segment_is_vertically_near_voxel(voxel_pos)) {
+                continue;
             }
 
-            corrected_path.push_back(current);
+            if (!m_grid->is_solid(voxel_pos)) {
+                continue;
+            }
+
+            float t_enter = 0.0f;
+            float t_exit = 0.0f;
+            if (!segment_intersects_voxel_xz(from, to, voxel_pos, t_enter, t_exit)) {
+                continue;
+            }
+
+            const float top_y =
+                m_grid->voxel_to_world_pos(voxel_pos + glm::ivec3(0, 1, 0)).y +
+                clearance;
+            add_intersection(t_enter - t_padding, top_y);
+            add_intersection(t_exit + t_padding, top_y);
+        }
+    }
+
+    std::sort(
+        intersections.begin(),
+        intersections.end(),
+        [](const SegmentWallIntersection& a, const SegmentWallIntersection& b) {
+            return a.t < b.t;
+        }
+    );
+
+    std::vector<SegmentWallIntersection> merged_intersections;
+    merged_intersections.reserve(intersections.size());
+    for (const SegmentWallIntersection& intersection : intersections) {
+        if (!merged_intersections.empty() &&
+            std::abs(merged_intersections.back().t - intersection.t) <= eps)
+        {
+            merged_intersections.back().top_y =
+                std::max(merged_intersections.back().top_y, intersection.top_y);
+            continue;
         }
 
-        path = std::move(corrected_path);
+        merged_intersections.push_back(intersection);
     }
+
+    return merged_intersections;
+}
+
+void NonholonomicAStar::insert_wall_avoidance_points(std::vector<NonholonomicPos>& path) {
+    LOG_METHOD();
+
+    constexpr float eps = 1e-5f;
+
+    if (path.size() < 2) {
+        return;
+    }
+
+    std::vector<NonholonomicPos> corrected_path;
+    corrected_path.reserve(path.size() * 2);
+    corrected_path.push_back(path.front());
+
+    for (size_t i = 1; i < path.size(); i++) {
+        const NonholonomicPos previous = corrected_path.back();
+        const NonholonomicPos& current = path[i];
+
+        const glm::vec2 previous_xz(previous.pos.x, previous.pos.z);
+        const glm::vec2 current_xz(current.pos.x, current.pos.z);
+        const bool vertical_segment =
+            glm::distance(previous_xz, current_xz) <= eps;
+
+        if (!vertical_segment) {
+            const std::vector<SegmentWallIntersection> intersections =
+                find_segment_wall_intersections(previous, current);
+
+            for (const SegmentWallIntersection& intersection : intersections) {
+                NonholonomicPos waypoint = current;
+                waypoint.pos = glm::mix(previous.pos, current.pos, intersection.t);
+                waypoint.pos.y = intersection.top_y;
+                waypoint.theta =
+                    previous.theta + angle_diff(previous.theta, current.theta) * intersection.t;
+
+                if (glm::distance(corrected_path.back().pos, waypoint.pos) > eps &&
+                    glm::distance(current.pos, waypoint.pos) > eps)
+                {
+                    corrected_path.push_back(waypoint);
+                }
+            }
+        }
+
+        corrected_path.push_back(current);
+    }
+
+    path = std::move(corrected_path);
 }
 
 NonholonomicAStar::NonholonomicAStar(
@@ -132,8 +314,9 @@ bool NonholonomicAStar::almost_equal(
 std::vector<NonholonomicPos> NonholonomicAStar::reconstruct_path(std::unordered_map<uint64_t, NonholonomicAStarCell> closed_heap, NonholonomicPos pos) {
     LOG_METHOD();
 
-    std::vector<NonholonomicPos> path;
+    std::vector<std::vector<NonholonomicPos>> segments;
     NonholonomicPos cur_pos = pos;
+    NonholonomicPos start_pos;
 
     while (true) {
         uint64_t cur_key = state_key(cur_pos);
@@ -145,31 +328,40 @@ std::vector<NonholonomicPos> NonholonomicAStar::reconstruct_path(std::unordered_
             
         NonholonomicAStarCell cur_cell = it->second;
 
-        path.push_back(cur_pos);
-
-        if (cur_cell.no_parent)
+        if (cur_cell.no_parent) {
+            start_pos = cur_pos;
             break;
-        
-        float eps = 1e-6f;
-        float y_delta = cur_pos.pos.y - cur_cell.came_from.pos.y;
-        if (std::abs(y_delta) > eps) {
-            NonholonomicPos intermediate_point;
-
-            if (y_delta > 0.0f) {
-                intermediate_point = cur_cell.came_from;
-                intermediate_point.pos.y = cur_pos.pos.y;
-            } else {
-                intermediate_point = cur_pos;
-                intermediate_point.pos.y = cur_cell.came_from.pos.y;
-            }
-
-            path.push_back(intermediate_point);
         }
+
+        if (!cur_cell.simulated_motion.empty())
+            segments.push_back(cur_cell.simulated_motion);
+        else
+            segments.push_back({cur_cell.pos});
         
         cur_pos = cur_cell.came_from;
     }
 
-    std::reverse(path.begin(), path.end());
+    std::vector<NonholonomicPos> path;
+    path.push_back(start_pos);
+
+    for (auto segment_it = segments.rbegin(); segment_it != segments.rend(); ++segment_it) {
+        path.insert(path.end(), segment_it->begin(), segment_it->end());
+    }
+
+    std::vector<NonholonomicPos> grounded_path = path;
+    if (m_grid->adjust_to_ground(
+            grounded_path,
+            m_params.max_step_up,
+            m_params.max_drop,
+            m_params.max_y_diff,
+            m_params.allow_flying_over_precipices))
+    {
+        path = std::move(grounded_path);
+    }
+
+    insert_y_transition_points(path);
+    insert_wall_avoidance_points(path);
+    insert_y_transition_points(path);
 
     return path;
 }
@@ -691,6 +883,14 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
             new_cell.pos.steer = steer;
             new_cell.pos.dir = dir;
             new_cell.came_from = cur_cell.pos;
+            new_cell.simulated_motion = motion;
+            for (NonholonomicPos& motion_pos : new_cell.simulated_motion) {
+                motion_pos.steer = steer;
+                motion_pos.dir = dir;
+            }
+            if (!new_cell.simulated_motion.empty()) {
+                new_cell.simulated_motion.back() = new_pos;
+            }
             new_cell.no_parent = false;
             new_cell.g = new_g;
             new_cell.f = new_g + get_nonholonomic_f(new_cell.pos, m_state.end_pos, cur_cell.pos);

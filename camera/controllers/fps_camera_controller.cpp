@@ -9,13 +9,25 @@ void FPSCameraController::update_keyboard(Window& window, float delta_time) {
     if (window.mouse_state().mode != MouseMode::DISABLED)
         return;
 
-    glm::vec3 right = glm::normalize(glm::cross(m_camera.front, m_camera.up));
-    if (glfwGetKey(window.handle(), GLFW_KEY_W) == GLFW_PRESS) move_forward(delta_time);
-    if (glfwGetKey(window.handle(), GLFW_KEY_S) == GLFW_PRESS) move_backward(delta_time);
-    if (glfwGetKey(window.handle(), GLFW_KEY_A) == GLFW_PRESS) move_left(delta_time);
-    if (glfwGetKey(window.handle(), GLFW_KEY_D) == GLFW_PRESS) move_right(delta_time);
-    if (glfwGetKey(window.handle(), GLFW_KEY_SPACE) == GLFW_PRESS) move_up(delta_time);
-    if (glfwGetKey(window.handle(), GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) move_down(delta_time);
+    float speed_multiplier = 1.0f;
+    if (glfwGetKey(window.handle(), GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+        glfwGetKey(window.handle(), GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS) {
+        speed_multiplier *= 4.0f;
+    }
+
+    if (glfwGetKey(window.handle(), GLFW_KEY_LEFT_ALT) == GLFW_PRESS ||
+        glfwGetKey(window.handle(), GLFW_KEY_RIGHT_ALT) == GLFW_PRESS) {
+        speed_multiplier *= 0.25f;
+    }
+
+    const float adjusted_delta_time = delta_time * speed_multiplier;
+
+    if (glfwGetKey(window.handle(), GLFW_KEY_W) == GLFW_PRESS) move_forward(adjusted_delta_time);
+    if (glfwGetKey(window.handle(), GLFW_KEY_S) == GLFW_PRESS) move_backward(adjusted_delta_time);
+    if (glfwGetKey(window.handle(), GLFW_KEY_A) == GLFW_PRESS) move_left(adjusted_delta_time);
+    if (glfwGetKey(window.handle(), GLFW_KEY_D) == GLFW_PRESS) move_right(adjusted_delta_time);
+    if (glfwGetKey(window.handle(), GLFW_KEY_SPACE) == GLFW_PRESS) move_up(adjusted_delta_time);
+    if (glfwGetKey(window.handle(), GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) move_down(adjusted_delta_time);
 
     if (glfwGetKey(window.handle(), GLFW_KEY_ESCAPE) == GLFW_PRESS)
         if (window.mouse_state().mode != MouseMode::NORMAL)
