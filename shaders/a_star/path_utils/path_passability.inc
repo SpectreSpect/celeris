@@ -67,7 +67,9 @@ bool is_blocking_voxel(ivec3 pos, inout VoxelLookupCache cache) {
 }
 
 bool is_ground_voxel(ivec3 pos, inout VoxelLookupCache cache) {
-    return (voxel_flags(pos, cache) & VOXEL_VISABILITY_FLAG_BIT) != 0u;
+    // return (voxel_flags(pos, cache) & VOXEL_VISABILITY_FLAG_BIT) != 0u;
+    uint flags = voxel_flags(pos, cache);
+    return (flags & (VOXEL_VISABILITY_FLAG_BIT | VOXEL_INFLATED_BIT)) != 0u;
 }
 
 int voxel_y_offset(ivec3 pos, uint max_step_up_u, uint max_drop_u, inout VoxelLookupCache cache) {

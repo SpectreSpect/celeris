@@ -36,6 +36,13 @@ public:
         std::vector<LineInstance> explored_paths;
         std::vector<NonholonomicPos> unimpended_path;
         AvgTimer total_path_finding_time;
+        float total_time_ms = 0.0f;
+        float initialize_time_ms = 0.0f;
+        float plain_astar_time_ms = 0.0f;
+        float unimpended_path_time_ms = 0.0f;
+        float nonholonomic_astar_time_ms = 0.0f;
+        float is_solid_time_ms = 0.0f;
+        uint32_t is_solid_count = 0;
         uint64_t generation = 0;
     };
 

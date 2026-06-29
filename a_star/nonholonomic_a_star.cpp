@@ -4,6 +4,8 @@
 #include "unimpended_path_finder.h"
 #include "reeds_shepp.h"
 
+#include <iostream>
+
 namespace {
     void insert_y_transition_points(std::vector<NonholonomicPos>& path) {
         constexpr float eps = 1e-6f;
@@ -20,9 +22,18 @@ namespace {
             const NonholonomicPos& previous = path[i - 1];
             const NonholonomicPos& current = path[i];
 
-            if (std::abs(previous.pos.y - current.pos.y) > eps) {
-                NonholonomicPos intermediate_point = previous;
-                intermediate_point.pos.y = current.pos.y;
+            float y_delta = current.pos.y - previous.pos.y;
+            if (std::abs(y_delta) > eps) {
+                NonholonomicPos intermediate_point;
+
+                if (y_delta > 0.0f) {
+                    intermediate_point = previous;
+                    intermediate_point.pos.y = current.pos.y;
+                } else {
+                    intermediate_point = current;
+                    intermediate_point.pos.y = previous.pos.y;
+                }
+
                 corrected_path.push_back(intermediate_point);
             }
 
@@ -41,7 +52,12 @@ NonholonomicAStar::NonholonomicAStar(
         m_grid(&occupancy_grid),
         m_unimpened_path_finder(&unimpened_path_finder),
         m_plain_astar(occupancy_grid, AStar::AStarDesc{
-            .allow_diagonal_moves = desc.allow_diagonal_moves
+            .max_step_up = desc.max_step_up,
+            .max_drop = desc.max_drop,
+            .max_y_diff = desc.max_y_diff,
+            .iteration_limit = desc.iteration_limit,
+            .allow_diagonal_moves = desc.allow_diagonal_moves,
+            .allow_flying_over_precepices = desc.allow_flying_over_precipices
         }) {}
 
 std::vector<NonholonomicPos> NonholonomicAStar::simulate_motion(NonholonomicPos start, int steer, int direction)
@@ -134,10 +150,19 @@ std::vector<NonholonomicPos> NonholonomicAStar::reconstruct_path(std::unordered_
         if (cur_cell.no_parent)
             break;
         
-        float eps = 1e-6;
-        if (std::abs(cur_pos.pos.y - cur_cell.came_from.pos.y) > eps) {
-            NonholonomicPos intermediate_point = cur_cell.came_from;
-            intermediate_point.pos.y = cur_pos.pos.y;
+        float eps = 1e-6f;
+        float y_delta = cur_pos.pos.y - cur_cell.came_from.pos.y;
+        if (std::abs(y_delta) > eps) {
+            NonholonomicPos intermediate_point;
+
+            if (y_delta > 0.0f) {
+                intermediate_point = cur_cell.came_from;
+                intermediate_point.pos.y = cur_pos.pos.y;
+            } else {
+                intermediate_point = cur_pos;
+                intermediate_point.pos.y = cur_cell.came_from.pos.y;
+            }
+
             path.push_back(intermediate_point);
         }
         
@@ -187,7 +212,7 @@ float NonholonomicAStar::angle_diff(float a, float b) {
 
 // //         path_pos.y = cur_pos.y;
 
-// //         std::vector<glm::vec3> line = {cur_pos, path_pos};
+//         std::vector<glm::vec3> line = {cur_pos, path_pos};
 
 //         std::vector<glm::ivec3> ground_positions;
 //         if (!m_grid->get_ground_positions(
@@ -203,6 +228,11 @@ float NonholonomicAStar::angle_diff(float a, float b) {
 //         id = i;
 //         max_dist = glm::distance(cur_pos, path_pos); 
 //     }
+
+//     return DistToPathData{
+//         .dist = max_dist,
+//         .id = id
+//     };
 // }
 
 int NonholonomicAStar::discretize_angle(float value, int num_bins) {
@@ -356,11 +386,11 @@ void NonholonomicAStar::initialize(
     NonholonomicPos end_pos)
 {
     LOG_METHOD();
-
-    m_grid->read_and_inflate_chunk_time = AvgTimer();
-    m_grid->is_solid_time = AvgTimer();
-    m_grid->read_and_inflate_chunk_count = 0;
-    m_grid->is_solid_count = 0;
+    m_initialize_time = AvgTimer();
+    m_unimpended_path_time = AvgTimer();
+    m_nonholonomic_astar_time = AvgTimer();
+    m_plain_astar_time = AvgTimer();
+    m_initialize_time.start();
 
     m_grid->clear_cache();
 
@@ -370,18 +400,19 @@ void NonholonomicAStar::initialize(
     m_state.end_pos = end_pos;
     m_params.min_radius = m_params.wheel_base / std::tan(m_params.max_steer);
 
+    m_plain_astar_time.start();
     m_state.plain_astar_path = m_plain_astar.find_path(
         m_grid->world_to_voxel_pos(start_pos.pos),
         m_grid->world_to_voxel_pos(end_pos.pos)
     );
+    m_plain_astar_time.end();
 
-    std::cout << "Plain A* is solid time: " << m_grid->is_solid_time.total_ms() << " ms" << std::endl;
-    std::cout << "Is solid count: " << m_grid->is_solid_count << std::endl;
+    // logger().log() << std::to_string(m_state.plain_astar_path.path.size()) << "\n";
 
-    logger().log() << std::to_string(m_state.plain_astar_path.path.size()) << "\n";
-
-    if (m_state.plain_astar_path.path.empty())
+    if (m_state.plain_astar_path.path.empty()) {
+        m_initialize_time.end();
         return; 
+    }
     
     if (m_state.plain_astar_path.reached_precipice) {
         glm::vec3 pos = m_grid->voxel_center_world_pos(m_state.plain_astar_path.path.back());
@@ -392,8 +423,45 @@ void NonholonomicAStar::initialize(
         end_pos.theta = theta;
     }
 
+    m_unimpended_path_time.start();
     std::vector<glm::ivec3> unimpended_points = find_unimpended_points(submit_context, m_state.plain_astar_path);
+    m_unimpended_path_time.end();
+
     m_state.unimpended_astar_positions = prepare_unimpended_points(unimpended_points, start_pos, end_pos);
+
+    const float desired_distance_from_last = 5.0f;
+    const float min_segment_length = 2.0f;
+
+    if (m_state.unimpended_astar_positions.size() >= 2) {
+        NonholonomicPos& previous_pos =
+            m_state.unimpended_astar_positions[m_state.unimpended_astar_positions.size() - 2];
+        NonholonomicPos& last_pos =
+            m_state.unimpended_astar_positions[m_state.unimpended_astar_positions.size() - 1];
+
+        const glm::vec3 segment = last_pos.pos - previous_pos.pos;
+        const float segment_length = glm::length(segment);
+
+        if (segment_length > desired_distance_from_last) {
+            NonholonomicPos intermediate_pos = last_pos;
+
+            const float previous_to_intermediate_length =
+                segment_length - desired_distance_from_last;
+
+            if (previous_to_intermediate_length < min_segment_length ||
+                desired_distance_from_last < min_segment_length)
+            {
+                intermediate_pos.pos = (previous_pos.pos + last_pos.pos) * 0.5f;
+            } else {
+                intermediate_pos.pos =
+                    last_pos.pos - glm::normalize(segment) * desired_distance_from_last;
+            }
+
+            m_state.unimpended_astar_positions.insert(
+                m_state.unimpended_astar_positions.end() - 1,
+                intermediate_pos
+            );
+        }
+    }
 
     m_state.dubins_segment_lengths.reserve(m_state.unimpended_astar_positions.size() - 1);
 
@@ -413,7 +481,10 @@ void NonholonomicAStar::initialize(
 
     for (int i = 1; i < m_state.unimpended_astar_positions.size() - 1; i++) {
         
-        glm::vec3 dir = glm::normalize(m_state.unimpended_astar_positions[i].pos - m_state.unimpended_astar_positions[i-1].pos);
+        glm::vec3 dir = glm::normalize(
+            m_state.unimpended_astar_positions[i].pos - 
+            m_state.unimpended_astar_positions[i-1].pos
+        );
         m_state.unimpended_astar_positions[i].theta = std::atan2(dir.z, dir.x);
     }
 
@@ -432,7 +503,8 @@ void NonholonomicAStar::initialize(
 
     m_state.pq.push(start_cell);   
 
-    logger().log("Finished initialization");
+    // logger().log("Finished initialization");
+    m_initialize_time.end();
 }
 
 bool NonholonomicAStar::try_reeds_shepp_shot(NonholonomicPos& start, NonholonomicPos& end, std::vector<NonholonomicPos>& out_path) {
@@ -500,7 +572,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
     LOG_METHOD();
 
     if (m_state.pq.empty()) {
-        logger().log("1. Priotirty queue is empty");
+        // logger().log("1. Priotirty queue is empty");
         return true;
     }
 
@@ -525,7 +597,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
         }
 
     if (m_state.counter >= m_params.iteration_limit) {
-        logger().log("Limit exceeded");
+        // logger().log("Limit exceeded");
         return true;
     }
     
@@ -541,14 +613,14 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
         m_state.path = reconstruct_path(m_state.closed_heap, cur_cell.pos);
 
         if (!m_params.use_reed_shepps_fallback) {
-            logger().log("2. Almost equal = true");
+            // logger().log("2. Almost equal = true");
             return true;
         }
 
         bool status = try_finish_with_reeds_shepp(cur_cell.pos, m_state.end_pos);
         
-        if (status)
-            logger().log("3. Almost equal = true (with reeds-shepp fallback)");
+        // if (status)
+        //     logger().log("3. Almost equal = true (with reeds-shepp fallback)");
         
         return true;
     }
@@ -558,7 +630,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
             m_params.force_reeds_shepp_shot = false;
             bool status = try_finish_with_reeds_shepp(cur_cell.pos, m_state.end_pos);
             if (status) {
-                logger().log("4. Reeds-shepp shot succeeded");
+                // logger().log("4. Reeds-shepp shot succeeded");
                 return true;
             }
         }
@@ -632,15 +704,13 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
 void NonholonomicAStar::find_nonholomic_path() {
     LOG_METHOD();
 
+    m_nonholonomic_astar_time.start();
     while (true) {
         if (find_nonholomic_path_step())
             break;
     }
+    m_nonholonomic_astar_time.end();
 
-    std::cout << "Read and infalte chunk time: " << m_grid->read_and_inflate_chunk_time.total_ms() << " ms" << std::endl;
-    std::cout << "Is solid time: " << m_grid->is_solid_time.total_ms() << " ms" << std::endl;
-    
-    std::cout << "Read and inflate count: " << m_grid->read_and_inflate_chunk_count << std::endl;
 }
 
 OccupancyGrid3D& NonholonomicAStar::occupancy_grid() noexcept {
@@ -649,4 +719,32 @@ OccupancyGrid3D& NonholonomicAStar::occupancy_grid() noexcept {
 
 NonholonomicAStar::NonholonomicAStarState& NonholonomicAStar::state() noexcept {
     return m_state;
+}
+
+float NonholonomicAStar::total_time_ms() {
+    return initialize_time_ms() + nonholonomic_astar_time_ms();
+}
+
+float NonholonomicAStar::initialize_time_ms() {
+    return static_cast<float>(m_initialize_time.total_ms());
+}
+
+float NonholonomicAStar::nonholonomic_astar_time_ms() {
+    return static_cast<float>(m_nonholonomic_astar_time.total_ms());
+}
+
+float NonholonomicAStar::plain_astar_time_ms() {
+    return static_cast<float>(m_plain_astar_time.total_ms());
+}
+
+float NonholonomicAStar::unimpended_path_time_ms() {
+    return static_cast<float>(m_unimpended_path_time.total_ms());
+}
+
+float NonholonomicAStar::is_solid_time_ms() {
+    return m_grid ? m_grid->is_solid_time_ms() : 0.0f;
+}
+
+uint32_t NonholonomicAStar::is_solid_count() {
+    return m_grid ? m_grid->solid_check_count() : 0;
 }

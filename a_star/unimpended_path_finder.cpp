@@ -56,6 +56,25 @@ std::vector<glm::ivec3> UnimpendedPathFinder::find_unimpended_path(
         return {};
     }
 
+    if (astar_path.size() == 1) {
+        return {glm::ivec3(astar_path.front())};
+    }
+
+    if (is_direct_path_unimpended(
+            submit_context,
+            astar_path.front(),
+            astar_path.back(),
+            max_step_up,
+            max_drop,
+            allow_flying_over_precipices,
+            allow_diagonal_moves))
+    {
+        return {
+            glm::ivec3(astar_path.front()),
+            glm::ivec3(astar_path.back())
+        };
+    }
+
     if (astar_path.size() > m_max_astar_points) {
         realloc_buffers(
             submit_context,
@@ -80,6 +99,37 @@ std::vector<glm::ivec3> UnimpendedPathFinder::find_unimpended_path(
     }
 
     return build_path_from_max_unimpended_path_indices(astar_path);
+}
+
+bool UnimpendedPathFinder::is_direct_path_unimpended(
+    VulkanSubmitContext& submit_context,
+    const glm::ivec4& from,
+    const glm::ivec4& to,
+    uint32_t max_step_up,
+    uint32_t max_drop,
+    bool allow_flying_over_precipices,
+    bool allow_diagonal_moves)
+{
+    LOG_METHOD();
+
+    std::vector<glm::ivec4> direct_path{from, to};
+    m_buffers.astar_path.upload(direct_path);
+
+    {
+        auto scope = submit_context.submit_and_wait_scope();
+        fill_max_unimpended_path_indices(
+            scope.command_buffer(),
+            static_cast<uint32_t>(direct_path.size()),
+            max_step_up,
+            max_drop,
+            allow_flying_over_precipices,
+            allow_diagonal_moves,
+            0u
+        );
+    }
+
+    std::vector<uint32_t> direct_indices = m_buffers.max_unimpended_path_indices.read_vector<uint32_t>(direct_path.size());
+    return !direct_indices.empty() && direct_indices.front() == 1u;
 }
 
 UnimpendedPathFinder::FinderPassInstances UnimpendedPathFinder::create_pass_instances(

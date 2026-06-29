@@ -7,6 +7,7 @@
 
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <imgui.h>
 
 #include <algorithm>
 #include <cmath>
@@ -135,13 +136,39 @@ void CelerisVisualizer::update() {
     //     now
     // );
 
-    PathPlanner::PathPlannerResult path_result = m_celeris->path_result_snapshot();
-    m_guide_path_line_cloud.set_lines(make_path_lines(path_result.plain_astar_path.path));
-    m_path_line_cloud.set_lines(make_path_lines(path_result.nonholonomic_astar_path, true));
-    if (path_result.explored_paths.size() > 0)
-        m_explored_paths_line_cloud.set_lines(path_result.explored_paths);
-    m_unimpended_path_line_cloud.set_lines(make_path_lines(path_result.unimpended_path));
+    static const std::vector<LineInstance> hidden_lines{
+        LineInstance{
+            .p0 = glm::vec3(0.0f),
+            .p1 = glm::vec3(0.0f),
+            .color = glm::vec4(0.0f)
+        }
+    };
 
+    PathPlanner::PathPlannerResult path_result = m_celeris->path_result_snapshot();
+    m_guide_path_line_cloud.set_lines(
+        show_guide_path ? make_path_lines(path_result.plain_astar_path.path) : hidden_lines
+    );
+    m_path_line_cloud.set_lines(
+        show_path ? make_path_lines(path_result.nonholonomic_astar_path, true) : hidden_lines
+    );
+    m_explored_paths_line_cloud.set_lines(
+        show_explored_paths && !path_result.explored_paths.empty()
+            ? path_result.explored_paths
+            : hidden_lines
+    );
+    m_unimpended_path_line_cloud.set_lines(
+        show_unimpeded_path ? make_path_lines(path_result.unimpended_path) : hidden_lines
+    );
+
+}
+
+void CelerisVisualizer::display_debug_controls() {
+    if (ImGui::CollapsingHeader("Celeris path visualization")) {
+        ImGui::Checkbox("Nonholonomic path", &show_path);
+        ImGui::Checkbox("Plain A* path", &show_guide_path);
+        ImGui::Checkbox("Explored paths", &show_explored_paths);
+        ImGui::Checkbox("Unimpeded path", &show_unimpeded_path);
+    }
 }
 
 glm::vec3 CelerisVisualizer::voxel_size() noexcept {
@@ -282,9 +309,14 @@ std::vector<LineInstance> CelerisVisualizer::make_path_lines(const std::vector<g
     path_lines.reserve(std::min<size_t>(path.size(), max_path_line_count));
 
     for (uint32_t i = 1; i < path.size() && path_lines.size() < max_path_line_count; i++) {
+        glm::vec3 p0 = m_celeris->voxel_center_world_pos(path[i - 1]);
+        glm::vec3 p1 = m_celeris->voxel_center_world_pos(path[i]);
+        p0.y -= 0.5f * voxel_size().y;
+        p1.y -= 0.5f * voxel_size().y;
+
         path_lines.push_back(LineInstance{
-            .p0 = m_celeris->voxel_center_world_pos(path[i - 1]) + glm::vec3(0, 0.2f, 0),
-            .p1 = m_celeris->voxel_center_world_pos(path[i]) + glm::vec3(0, 0.2f, 0),
+            .p0 = p0 + glm::vec3(0, 0.2f, 0),
+            .p1 = p1 + glm::vec3(0, 0.2f, 0),
             .color = glm::vec4(1, 1, 1, 1)
         });
     }

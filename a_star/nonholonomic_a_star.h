@@ -40,7 +40,7 @@ public:
         bool use_reed_shepps_fallback = false;
         bool force_reeds_shepp_shot = false;
         bool allow_flying_over_precipices = true;
-        bool allow_diagonal_moves = true;
+        bool allow_diagonal_moves = false;
         int iteration_limit = 20000;
         bool track_explored_paths = true;
         int max_step_up = 1;
@@ -106,10 +106,25 @@ public:
     OccupancyGrid3D& occupancy_grid() noexcept;
     NonholonomicAStarState& state() noexcept;
 
+    // DistToPathData max_unimpended_dist_to_path(glm::vec3 pos, std::vector<glm::ivec3>& path, int start_id, glm::vec3 last_pos, bool replace_last_pos);
+
+    float total_time_ms();
+    float initialize_time_ms();
+    float nonholonomic_astar_time_ms();
+    float plain_astar_time_ms();
+    float unimpended_path_time_ms();
+    float is_solid_time_ms();
+    uint32_t is_solid_count();
+
 private:
     NonholonomicAStarParams m_params;
     NonholonomicAStarState m_state;
     OccupancyGrid3D* m_grid = nullptr;
     UnimpendedPathFinder* m_unimpened_path_finder = nullptr;
     AStar m_plain_astar;
+    
+    AvgTimer m_initialize_time;
+    AvgTimer m_unimpended_path_time;
+    AvgTimer m_nonholonomic_astar_time;
+    AvgTimer m_plain_astar_time;
 };
