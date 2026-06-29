@@ -154,7 +154,7 @@ std::vector<NonholonomicPos> NonholonomicAStar::reconstruct_path(std::unordered_
         if (!cur_cell.simulated_motion.empty())
             segments.push_back(cur_cell.simulated_motion);
         else
-            segments.push_back({cur_pos});
+            segments.push_back({cur_cell.pos});
         
         cur_pos = cur_cell.came_from;
     }
@@ -164,6 +164,17 @@ std::vector<NonholonomicPos> NonholonomicAStar::reconstruct_path(std::unordered_
 
     for (auto segment_it = segments.rbegin(); segment_it != segments.rend(); ++segment_it) {
         path.insert(path.end(), segment_it->begin(), segment_it->end());
+    }
+
+    std::vector<NonholonomicPos> grounded_path = path;
+    if (m_grid->adjust_to_ground(
+            grounded_path,
+            m_params.max_step_up,
+            m_params.max_drop,
+            m_params.max_y_diff,
+            m_params.allow_flying_over_precipices))
+    {
+        path = std::move(grounded_path);
     }
 
     insert_y_transition_points(path);
