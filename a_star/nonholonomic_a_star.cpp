@@ -99,9 +99,20 @@ NonholonomicAStar::find_segment_wall_intersections(
     const float segment_xz_length = glm::length(segment_xz);
     const glm::vec3 voxel_size = m_grid->voxel_size();
     const float clearance = std::min({voxel_size.x, voxel_size.y, voxel_size.z}) * 0.03f;
+    const float vertical_tolerance = clearance;
     const float t_padding = segment_xz_length > eps
         ? std::min(clearance / segment_xz_length, 0.25f)
         : 0.0f;
+    const float min_segment_y = std::min(from.pos.y, to.pos.y);
+    const float max_segment_y = std::max(from.pos.y, to.pos.y);
+
+    auto segment_is_vertically_near_voxel = [&](const glm::ivec3& voxel_pos) {
+        const float voxel_min_y = m_grid->voxel_to_world_pos(voxel_pos).y;
+        const float voxel_max_y = voxel_min_y + voxel_size.y;
+
+        return max_segment_y >= voxel_min_y - vertical_tolerance &&
+               min_segment_y <= voxel_max_y + vertical_tolerance;
+    };
 
     auto add_intersection = [&](float t, float top_y) {
         if (t <= eps || t >= 1.0f - eps) {
@@ -121,6 +132,10 @@ NonholonomicAStar::find_segment_wall_intersections(
         };
 
         for (const glm::ivec3& voxel_pos : candidate_voxels) {
+            if (!segment_is_vertically_near_voxel(voxel_pos)) {
+                continue;
+            }
+
             if (!m_grid->is_solid(voxel_pos)) {
                 continue;
             }
