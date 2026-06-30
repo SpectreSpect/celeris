@@ -2205,7 +2205,7 @@ void VoxelGrid::stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::v
 
     m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, BufferDispatchArg(&m_buffers.voxel_write_list, 0u));
     write_voxels_to_grid(command_buffer, m_buffers.dispatch_args);
-    
+
     inflate_voxel_writes(command_buffer, m_buffers.dispatch_args);
 
     reset_voxel_write_list_counter(command_buffer, m_buffers.voxel_write_list);
