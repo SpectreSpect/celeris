@@ -1,0 +1,69 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+layout(local_size_x = 256) in;
+
+// ----- include -----
+#include "../common/buffer_structures.inc"
+// -------------------
+
+layout(std430, set = 0, binding = 0) coherent buffer ChunkHashTable { HashTableCounters chunk_hash_table_counters; ChunkHashTableSlot chunk_hash_table_slots[]; };
+layout(std430, set = 0, binding = 1) readonly buffer VoxelsWriteData { uint count_voxel_writes; uint pad_[3u]; VoxelWrite voxel_writes[]; };
+layout(std430, set = 0, binding = 2) buffer ChunkVoxels { VoxelData voxels[]; };
+
+layout(push_constant) uniform InflateVoxelWritesPushConstants {
+    ivec4 u_chunk_dim;
+    uint u_chunk_hash_table_size;
+    uint u_voxels_per_chunk;
+    uint u_pack_offset;
+    uint u_pack_bits;
+    uint u_negative_x_inflation_size;
+    uint u_positive_x_inflation_size;
+    uint u_negative_y_inflation_size;
+    uint u_positive_y_inflation_size;
+    uint u_negative_z_inflation_size;
+    uint u_positive_z_inflation_size;
+};
+
+// ----- include -----
+#include "../common/utils.inc"
+#include "chunk_hash_table/common.inc"
+#include "chunk_hash_table/lookup_remove.inc"
+#include "chunk_pool/voxel_index.inc"
+// -------------------
+
+void mark_inflated_if_loaded(ivec3 world_voxel)
+{
+    ivec3 chunk_pos = floor_div(world_voxel, u_chunk_dim.xyz);
+    ivec3 local_voxel_pos = world_voxel - chunk_pos * u_chunk_dim.xyz;
+
+    uint slot_id = chunk_hash_table_lookup_hash_table_slot_id(
+        pack_key_uvec2(chunk_pos, u_pack_offset, u_pack_bits),
+        true
+    );
+    if (slot_id == INVALID_ID) return;
+
+    uint chunk_id = chunk_hash_table_slots[slot_id].value;
+    uint voxel_id = voxel_index(local_voxel_pos);
+    uint global_voxel_id = chunk_id * u_voxels_per_chunk + voxel_id;
+    uint inflated_type_flag = VOXEL_INFLATED_BIT << VOXEL_TYPE_BITS;
+
+    atomicOr(voxels[global_voxel_id].type_flags, inflated_type_flag);
+}
+
+void main()
+{
+    uint voxel_write_id = gl_GlobalInvocationID.x;
+    if (voxel_write_id >= count_voxel_writes) return;
+
+    VoxelWrite voxel_write = voxel_writes[voxel_write_id];
+    ivec3 write_voxel = voxel_write.world_voxel.xyz;
+
+    for (int z = -int(u_negative_z_inflation_size); z <= int(u_positive_z_inflation_size); ++z) {
+        for (int y = -int(u_negative_y_inflation_size); y <= int(u_positive_y_inflation_size); ++y) {
+            for (int x = -int(u_negative_x_inflation_size); x <= int(u_positive_x_inflation_size); ++x) {
+                mark_inflated_if_loaded(write_voxel + ivec3(x, y, z));
+            }
+        }
+    }
+}

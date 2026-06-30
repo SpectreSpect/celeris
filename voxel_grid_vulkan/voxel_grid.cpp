@@ -963,6 +963,7 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(VulkanDevice&
         .check_footprint_pi = PassInstance(compute_pass_manager.check_footprint_cp, dp),
         .read_and_inflate_voxel_grid_chunk_pi = PassInstance(compute_pass_manager.read_and_inflate_voxel_grid_chunk_cp, dp),
         .inflate_chunks_pi = PassInstance(compute_pass_manager.inflate_chunks_cp, dp),
+        .inflate_voxel_writes_pi = PassInstance(compute_pass_manager.inflate_voxel_writes_cp, dp),
 
         .voxel_writes_from_point_cloud_pi = PassInstance(compute_pass_manager.voxel_writes_from_point_cloud_cp, dp)
     };
@@ -1946,7 +1947,7 @@ void VoxelGrid::update(Window& window, Camera& camera) {
         auto scope = m_command_buffer.begin_scope();
         stream_chunks_sphere(m_command_buffer, camera.position, -1, 42);
 
-        inflate_marked_chunks(m_command_buffer);
+        // inflate_marked_chunks(m_command_buffer);
 
         for (auto& callback : m_next_to_stream_chunks_sphere_callbacks) {
             callback(m_command_buffer, *this);
@@ -2134,6 +2135,46 @@ void VoxelGrid::write_voxels_to_grid(VulkanCommandBuffer& command_buffer, const 
     m_buffers.voxels.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
+void VoxelGrid::inflate_voxel_writes(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args) {
+    LOG_METHOD();
+
+    const bool has_inflation =
+        m_params.negative_x_inflation_size != 0u ||
+        m_params.positive_x_inflation_size != 0u ||
+        m_params.negative_y_inflation_size != 0u ||
+        m_params.positive_y_inflation_size != 0u ||
+        m_params.negative_z_inflation_size != 0u ||
+        m_params.positive_z_inflation_size != 0u;
+
+    if (!has_inflation) {
+        return;
+    }
+
+    m_pass_instances.inflate_voxel_writes_pi.set_storage_buffer(0, m_buffers.chunk_hash_table);
+    m_pass_instances.inflate_voxel_writes_pi.set_storage_buffer(1, m_buffers.voxel_write_list);
+    m_pass_instances.inflate_voxel_writes_pi.set_storage_buffer(2, m_buffers.voxels);
+
+    m_pass_instances.inflate_voxel_writes_pi.bind(command_buffer);
+
+    m_pass_instances.inflate_voxel_writes_pi.push_constants(command_buffer, InflateChunksPushConstants{
+        .u_chunk_dim = glm::ivec4(m_params.chunk_size, 0),
+        .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
+        .u_voxels_per_chunk = static_cast<uint32_t>(vox_per_chunk()),
+        .u_pack_offset = static_cast<uint32_t>(math_utils::OFFSET),
+        .u_pack_bits = math_utils::BITS,
+        .u_negative_x_inflation_size = m_params.negative_x_inflation_size,
+        .u_positive_x_inflation_size = m_params.positive_x_inflation_size,
+        .u_negative_y_inflation_size = m_params.negative_y_inflation_size,
+        .u_positive_y_inflation_size = m_params.positive_y_inflation_size,
+        .u_negative_z_inflation_size = m_params.negative_z_inflation_size,
+        .u_positive_z_inflation_size = m_params.positive_z_inflation_size
+    });
+
+    command_buffer.dispatch_indirect(dispatch_args);
+
+    m_buffers.voxels.memory_barrier_compute_write_to_compute_write_read(command_buffer);
+}
+
 void VoxelGrid::reset_voxel_write_list_counter(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_write_list) {
     LOG_METHOD();
     
@@ -2164,6 +2205,7 @@ void VoxelGrid::stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::v
 
     m_shader_helper.prepare_dispatch_args(command_buffer, m_buffers.dispatch_args, BufferDispatchArg(&m_buffers.voxel_write_list, 0u));
     write_voxels_to_grid(command_buffer, m_buffers.dispatch_args);
+    inflate_voxel_writes(command_buffer, m_buffers.dispatch_args);
 
     reset_voxel_write_list_counter(command_buffer, m_buffers.voxel_write_list);
 }

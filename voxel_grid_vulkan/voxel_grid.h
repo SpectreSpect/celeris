@@ -278,6 +278,7 @@ public:
         PassInstance check_footprint_pi;
         PassInstance read_and_inflate_voxel_grid_chunk_pi;
         PassInstance inflate_chunks_pi;
+        PassInstance inflate_voxel_writes_pi;
         
         PassInstance voxel_writes_from_point_cloud_pi;
     };
@@ -339,6 +340,7 @@ private:
     void mark_write_chunks_to_generate(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void generate_terrain(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t seed);
     void write_voxels_to_grid(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void inflate_voxel_writes(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
     void reset_voxel_write_list_counter(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_write_list);
     void stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks, uint32_t seed);
     
