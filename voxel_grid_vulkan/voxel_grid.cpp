@@ -858,6 +858,21 @@ VoxelGrid::VoxelGridParams VoxelGrid::create_params(const VoxelGridDesc& desc) c
         desc.inflation_size <= static_cast<uint32_t>(std::min(desc.chunk_size.x, desc.chunk_size.z)),
         "inflation_size must fit within one chunk in XZ"
     );
+    logger().check(
+        desc.negative_x_inflation_size <= static_cast<uint32_t>(desc.chunk_size.x) &&
+        desc.positive_x_inflation_size <= static_cast<uint32_t>(desc.chunk_size.x),
+        "X inflation sizes must fit within one chunk"
+    );
+    logger().check(
+        desc.negative_y_inflation_size <= static_cast<uint32_t>(desc.chunk_size.y) &&
+        desc.positive_y_inflation_size <= static_cast<uint32_t>(desc.chunk_size.y),
+        "Y inflation sizes must fit within one chunk"
+    );
+    logger().check(
+        desc.negative_z_inflation_size <= static_cast<uint32_t>(desc.chunk_size.z) &&
+        desc.positive_z_inflation_size <= static_cast<uint32_t>(desc.chunk_size.z),
+        "Z inflation sizes must fit within one chunk"
+    );
 
     VoxelGridParams params;
 
@@ -874,6 +889,12 @@ VoxelGrid::VoxelGridParams VoxelGrid::create_params(const VoxelGridDesc& desc) c
     params.allocation_retry_list_size = desc.allocation_retry_list_size;
     params.inflation_size = desc.inflation_size;
     params.car_height_voxels = desc.car_height_voxels;
+    params.negative_x_inflation_size = desc.negative_x_inflation_size;
+    params.positive_x_inflation_size = desc.positive_x_inflation_size;
+    params.negative_y_inflation_size = desc.negative_y_inflation_size;
+    params.positive_y_inflation_size = desc.positive_y_inflation_size;
+    params.negative_z_inflation_size = desc.negative_z_inflation_size;
+    params.positive_z_inflation_size = desc.positive_z_inflation_size;
     params.display_inflated_voxels = desc.display_inflated_voxels;
     params.inflated_voxel_color = desc.inflated_voxel_color;
 
@@ -1429,19 +1450,50 @@ void VoxelGrid::set_render_distance(float value) {
 void VoxelGrid::set_inflated_voxel_debug_display(
     uint32_t display_inflated_voxels, 
     uint32_t inflated_voxel_color,
-    uint32_t inflation_size) 
+    uint32_t negative_x_inflation_size,
+    uint32_t positive_x_inflation_size,
+    uint32_t negative_y_inflation_size,
+    uint32_t positive_y_inflation_size,
+    uint32_t negative_z_inflation_size,
+    uint32_t positive_z_inflation_size)
 {
     std::lock_guard lock(m_compute_mutex);
 
+    logger().check(
+        negative_x_inflation_size <= m_params.chunk_size.x &&
+        positive_x_inflation_size <= m_params.chunk_size.x,
+        "X inflation sizes must fit within one chunk"
+    );
+    logger().check(
+        negative_y_inflation_size <= m_params.chunk_size.y &&
+        positive_y_inflation_size <= m_params.chunk_size.y,
+        "Y inflation sizes must fit within one chunk"
+    );
+    logger().check(
+        negative_z_inflation_size <= m_params.chunk_size.z &&
+        positive_z_inflation_size <= m_params.chunk_size.z,
+        "Z inflation sizes must fit within one chunk"
+    );
+
     if (m_params.display_inflated_voxels == display_inflated_voxels &&
-        m_params.inflated_voxel_color == inflated_voxel_color && 
-        m_params.inflation_size == inflation_size) {
+        m_params.inflated_voxel_color == inflated_voxel_color &&
+        m_params.negative_x_inflation_size == negative_x_inflation_size &&
+        m_params.positive_x_inflation_size == positive_x_inflation_size &&
+        m_params.negative_y_inflation_size == negative_y_inflation_size &&
+        m_params.positive_y_inflation_size == positive_y_inflation_size &&
+        m_params.negative_z_inflation_size == negative_z_inflation_size &&
+        m_params.positive_z_inflation_size == positive_z_inflation_size) {
         return;
     }
 
     m_params.display_inflated_voxels = display_inflated_voxels;
     m_params.inflated_voxel_color = inflated_voxel_color;
-    m_params.inflation_size = inflation_size;
+    m_params.negative_x_inflation_size = negative_x_inflation_size;
+    m_params.positive_x_inflation_size = positive_x_inflation_size;
+    m_params.negative_y_inflation_size = negative_y_inflation_size;
+    m_params.positive_y_inflation_size = positive_y_inflation_size;
+    m_params.negative_z_inflation_size = negative_z_inflation_size;
+    m_params.positive_z_inflation_size = positive_z_inflation_size;
 
     mark_all_used_chunks_dirty_mesh_cpu();
 }
@@ -1894,7 +1946,7 @@ void VoxelGrid::update(Window& window, Camera& camera) {
         auto scope = m_command_buffer.begin_scope();
         stream_chunks_sphere(m_command_buffer, camera.position, -1, 42);
 
-        // inflate_marked_chunks(m_command_buffer);
+        inflate_marked_chunks(m_command_buffer);
 
         for (auto& callback : m_next_to_stream_chunks_sphere_callbacks) {
             callback(m_command_buffer, *this);
@@ -2133,8 +2185,12 @@ void VoxelGrid::inflate_chunks(VulkanCommandBuffer& command_buffer, const Vulkan
         .u_voxels_per_chunk = static_cast<uint32_t>(vox_per_chunk()),
         .u_pack_offset = static_cast<uint32_t>(math_utils::OFFSET),
         .u_pack_bits = math_utils::BITS,
-        .u_inflation_size = m_params.inflation_size,
-        .u_car_height_voxels = m_params.car_height_voxels
+        .u_negative_x_inflation_size = m_params.negative_x_inflation_size,
+        .u_positive_x_inflation_size = m_params.positive_x_inflation_size,
+        .u_negative_y_inflation_size = m_params.negative_y_inflation_size,
+        .u_positive_y_inflation_size = m_params.positive_y_inflation_size,
+        .u_negative_z_inflation_size = m_params.negative_z_inflation_size,
+        .u_positive_z_inflation_size = m_params.positive_z_inflation_size
     });
 
     command_buffer.dispatch_indirect(dispatch_arg);

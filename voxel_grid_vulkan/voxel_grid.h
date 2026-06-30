@@ -84,6 +84,12 @@ public:
         uint32_t max_write_count;
         uint32_t inflation_size = 1u;
         uint32_t car_height_voxels = 3u;
+        uint32_t negative_x_inflation_size = 0u;
+        uint32_t positive_x_inflation_size = 0u;
+        uint32_t negative_y_inflation_size = 0u;
+        uint32_t positive_y_inflation_size = 0u;
+        uint32_t negative_z_inflation_size = 0u;
+        uint32_t positive_z_inflation_size = 0u;
         uint32_t display_inflated_voxels = 0u;
         uint32_t inflated_voxel_color = 0xFF3355FFu;
     };
@@ -109,6 +115,12 @@ public:
         float generation_distance = 0.0f;
         uint32_t inflation_size = 1u;
         uint32_t car_height_voxels = 3u;
+        uint32_t negative_x_inflation_size = 0u;
+        uint32_t positive_x_inflation_size = 0u;
+        uint32_t negative_y_inflation_size = 0u;
+        uint32_t positive_y_inflation_size = 0u;
+        uint32_t negative_z_inflation_size = 0u;
+        uint32_t positive_z_inflation_size = 0u;
         uint32_t display_inflated_voxels = 0u;
         uint32_t inflated_voxel_color = 0xFF3355FFu;
 
@@ -212,7 +224,15 @@ public:
     void update(Window& window, Camera& camera);
     void set_voxels(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src);
     void set_render_distance(float value);
-    void set_inflated_voxel_debug_display(uint32_t display_inflated_voxels, uint32_t inflated_voxel_color, uint32_t inflation_size);
+    void set_inflated_voxel_debug_display(
+        uint32_t display_inflated_voxels,
+        uint32_t inflated_voxel_color,
+        uint32_t negative_x_inflation_size,
+        uint32_t positive_x_inflation_size,
+        uint32_t negative_y_inflation_size,
+        uint32_t positive_y_inflation_size,
+        uint32_t negative_z_inflation_size,
+        uint32_t positive_z_inflation_size);
     VoxelGridChunk read_chunk(glm::ivec3 chunk_pos);
     bool check_footprint(glm::vec3 origin, glm::vec3 offsets, uint32_t max_step_up);
     std::vector<VoxelGridChunk> read_and_inflate_chunk(glm::ivec3 chunk_pos, uint32_t inflation_size);
@@ -383,6 +403,10 @@ private:
         int pack_offset
     );
 
+    // void inflate_chunks_x(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_arg);
+    // void inflate_chunks_y(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_arg);
+    // void inflate_chunks_z(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_arg);
+    
     void inflate_chunks(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_arg);
     void inflate_marked_chunks(VulkanCommandBuffer& command_buffer);
 };
