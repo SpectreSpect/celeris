@@ -32,7 +32,7 @@ layout(push_constant) uniform InflateVoxelWritesPushConstants {
 #include "chunk_pool/voxel_index.inc"
 // -------------------
 
-void mark_inflated_if_loaded(ivec3 world_voxel)
+bool loaded_voxel_id(ivec3 world_voxel, out uint global_voxel_id)
 {
     ivec3 chunk_pos = floor_div(world_voxel, u_chunk_dim.xyz);
     ivec3 local_voxel_pos = world_voxel - chunk_pos * u_chunk_dim.xyz;
@@ -41,11 +41,28 @@ void mark_inflated_if_loaded(ivec3 world_voxel)
         pack_key_uvec2(chunk_pos, u_pack_offset, u_pack_bits),
         true
     );
-    if (slot_id == INVALID_ID) return;
+    if (slot_id == INVALID_ID) return false;
 
     uint chunk_id = chunk_hash_table_slots[slot_id].value;
     uint voxel_id = voxel_index(local_voxel_pos);
-    uint global_voxel_id = chunk_id * u_voxels_per_chunk + voxel_id;
+    global_voxel_id = chunk_id * u_voxels_per_chunk + voxel_id;
+    return true;
+}
+
+bool visible_voxel_loaded(ivec3 world_voxel)
+{
+    uint global_voxel_id;
+    if (!loaded_voxel_id(world_voxel, global_voxel_id)) return false;
+
+    uint type_flags = atomicOr(voxels[global_voxel_id].type_flags, 0u);
+    return (read_voxel_flags(type_flags) & VOXEL_VISABILITY_FLAG_BIT) != 0u;
+}
+
+void mark_inflated_if_loaded(ivec3 world_voxel)
+{
+    uint global_voxel_id;
+    if (!loaded_voxel_id(world_voxel, global_voxel_id)) return;
+
     uint inflated_type_flag = VOXEL_INFLATED_BIT << VOXEL_TYPE_BITS;
 
     atomicOr(voxels[global_voxel_id].type_flags, inflated_type_flag);
@@ -59,9 +76,16 @@ void main()
     VoxelWrite voxel_write = voxel_writes[voxel_write_id];
     ivec3 write_voxel = voxel_write.world_voxel.xyz;
 
-    for (int z = -int(u_negative_z_inflation_size); z <= int(u_positive_z_inflation_size); ++z) {
-        for (int y = -int(u_negative_y_inflation_size); y <= int(u_positive_y_inflation_size); ++y) {
-            for (int x = -int(u_negative_x_inflation_size); x <= int(u_positive_x_inflation_size); ++x) {
+    int min_x = visible_voxel_loaded(write_voxel + ivec3(-1, 0, 0)) ? 0 : -int(u_negative_x_inflation_size);
+    int max_x = visible_voxel_loaded(write_voxel + ivec3( 1, 0, 0)) ? 0 :  int(u_positive_x_inflation_size);
+    int min_y = visible_voxel_loaded(write_voxel + ivec3(0, -1, 0)) ? 0 : -int(u_negative_y_inflation_size);
+    int max_y = visible_voxel_loaded(write_voxel + ivec3(0,  1, 0)) ? 0 :  int(u_positive_y_inflation_size);
+    int min_z = visible_voxel_loaded(write_voxel + ivec3(0, 0, -1)) ? 0 : -int(u_negative_z_inflation_size);
+    int max_z = visible_voxel_loaded(write_voxel + ivec3(0, 0,  1)) ? 0 :  int(u_positive_z_inflation_size);
+
+    for (int z = min_z; z <= max_z; ++z) {
+        for (int y = min_y; y <= max_y; ++y) {
+            for (int x = min_x; x <= max_x; ++x) {
                 mark_inflated_if_loaded(write_voxel + ivec3(x, y, z));
             }
         }
