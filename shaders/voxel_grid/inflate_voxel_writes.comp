@@ -32,40 +32,146 @@ layout(push_constant) uniform InflateVoxelWritesPushConstants {
 #include "chunk_pool/voxel_index.inc"
 // -------------------
 
-bool loaded_voxel_id(ivec3 world_voxel, out uint global_voxel_id)
+const int CACHED_CHUNK_AXIS = 3;
+const int CACHED_CHUNK_COUNT = CACHED_CHUNK_AXIS * CACHED_CHUNK_AXIS * CACHED_CHUNK_AXIS;
+const uint UNKNOWN_CHUNK_ID = 0xFFFFFFFEu;
+
+int cached_chunk_index(ivec3 chunk_delta)
 {
-    ivec3 chunk_pos = floor_div(world_voxel, u_chunk_dim.xyz);
-    ivec3 local_voxel_pos = world_voxel - chunk_pos * u_chunk_dim.xyz;
+    ivec3 cache_pos = chunk_delta + ivec3(1);
+    return (cache_pos.z * CACHED_CHUNK_AXIS + cache_pos.y) * CACHED_CHUNK_AXIS + cache_pos.x;
+}
+
+void init_cached_chunk_ids(out uint cached_chunk_ids[CACHED_CHUNK_COUNT])
+{
+    for (int i = 0; i < CACHED_CHUNK_COUNT; ++i) {
+        cached_chunk_ids[i] = UNKNOWN_CHUNK_ID;
+    }
+}
+
+uint cached_chunk_id(
+    ivec3 base_chunk_pos,
+    ivec3 chunk_delta,
+    inout uint cached_chunk_ids[CACHED_CHUNK_COUNT])
+{
+    int cache_index = cached_chunk_index(chunk_delta);
+    uint chunk_id = cached_chunk_ids[cache_index];
+    if (chunk_id != UNKNOWN_CHUNK_ID) {
+        return chunk_id;
+    }
 
     uint slot_id = chunk_hash_table_lookup_hash_table_slot_id(
-        pack_key_uvec2(chunk_pos, u_pack_offset, u_pack_bits),
+        pack_key_uvec2(base_chunk_pos + chunk_delta, u_pack_offset, u_pack_bits),
         true
     );
-    if (slot_id == INVALID_ID) return false;
 
-    uint chunk_id = chunk_hash_table_slots[slot_id].value;
+    chunk_id = INVALID_ID;
+    if (slot_id != INVALID_ID) {
+        chunk_id = chunk_hash_table_slots[slot_id].value;
+    }
+
+    cached_chunk_ids[cache_index] = chunk_id;
+    return chunk_id;
+}
+
+bool cached_loaded_voxel_id(
+    ivec3 world_voxel,
+    ivec3 base_chunk_pos,
+    inout uint cached_chunk_ids[CACHED_CHUNK_COUNT],
+    out uint global_voxel_id)
+{
+    ivec3 chunk_pos = floor_div(world_voxel, u_chunk_dim.xyz);
+    ivec3 chunk_delta = chunk_pos - base_chunk_pos;
+    if (any(lessThan(chunk_delta, ivec3(-1))) || any(greaterThan(chunk_delta, ivec3(1)))) {
+        return false;
+    }
+
+    uint chunk_id = cached_chunk_id(base_chunk_pos, chunk_delta, cached_chunk_ids);
+    if (chunk_id == INVALID_ID) return false;
+
+    ivec3 local_voxel_pos = world_voxel - chunk_pos * u_chunk_dim.xyz;
     uint voxel_id = voxel_index(local_voxel_pos);
     global_voxel_id = chunk_id * u_voxels_per_chunk + voxel_id;
     return true;
 }
 
-bool visible_voxel_loaded(ivec3 world_voxel)
+bool cached_visible_voxel_loaded(
+    ivec3 world_voxel,
+    ivec3 base_chunk_pos,
+    inout uint cached_chunk_ids[CACHED_CHUNK_COUNT])
 {
     uint global_voxel_id;
-    if (!loaded_voxel_id(world_voxel, global_voxel_id)) return false;
+    if (!cached_loaded_voxel_id(world_voxel, base_chunk_pos, cached_chunk_ids, global_voxel_id)) return false;
 
     uint type_flags = atomicOr(voxels[global_voxel_id].type_flags, 0u);
     return (read_voxel_flags(type_flags) & VOXEL_VISABILITY_FLAG_BIT) != 0u;
 }
 
-void mark_inflated_if_loaded(ivec3 world_voxel)
+bool cached_mark_inflated_if_loaded(
+    ivec3 world_voxel,
+    ivec3 base_chunk_pos,
+    inout uint cached_chunk_ids[CACHED_CHUNK_COUNT])
 {
     uint global_voxel_id;
-    if (!loaded_voxel_id(world_voxel, global_voxel_id)) return;
+    if (!cached_loaded_voxel_id(world_voxel, base_chunk_pos, cached_chunk_ids, global_voxel_id)) return false;
 
     uint inflated_type_flag = VOXEL_INFLATED_BIT << VOXEL_TYPE_BITS;
+    uint type_flags = atomicOr(voxels[global_voxel_id].type_flags, inflated_type_flag);
 
-    atomicOr(voxels[global_voxel_id].type_flags, inflated_type_flag);
+    return (read_voxel_flags(type_flags) & VOXEL_VISABILITY_FLAG_BIT) != 0u;
+}
+
+int max_abs_bound(int min_x, int max_x, int min_y, int max_y, int min_z, int max_z)
+{
+    int max_x_abs = max(abs(min_x), abs(max_x));
+    int max_y_abs = max(abs(min_y), abs(max_y));
+    int max_z_abs = max(abs(min_z), abs(max_z));
+    return max(max_x_abs, max(max_y_abs, max_z_abs));
+}
+
+bool offset_inside_bounds(ivec3 offset, int min_x, int max_x, int min_y, int max_y, int min_z, int max_z)
+{
+    return
+        offset.x >= min_x && offset.x <= max_x &&
+        offset.y >= min_y && offset.y <= max_y &&
+        offset.z >= min_z && offset.z <= max_z;
+}
+
+void clamp_bounds_to_offset(
+    ivec3 offset,
+    inout int min_x,
+    inout int max_x,
+    inout int min_y,
+    inout int max_y,
+    inout int min_z,
+    inout int max_z)
+{
+    if (offset.x < 0) min_x = max(min_x, offset.x);
+    if (offset.x > 0) max_x = min(max_x, offset.x);
+    if (offset.y < 0) min_y = max(min_y, offset.y);
+    if (offset.y > 0) max_y = min(max_y, offset.y);
+    if (offset.z < 0) min_z = max(min_z, offset.z);
+    if (offset.z > 0) max_z = min(max_z, offset.z);
+}
+
+void process_inflation_offset(
+    ivec3 write_voxel,
+    ivec3 base_chunk_pos,
+    inout uint cached_chunk_ids[CACHED_CHUNK_COUNT],
+    ivec3 offset,
+    inout int min_x,
+    inout int max_x,
+    inout int min_y,
+    inout int max_y,
+    inout int min_z,
+    inout int max_z)
+{
+    if (!offset_inside_bounds(offset, min_x, max_x, min_y, max_y, min_z, max_z)) return;
+
+    bool is_visible = cached_mark_inflated_if_loaded(write_voxel + offset, base_chunk_pos, cached_chunk_ids);
+    if (is_visible) {
+        clamp_bounds_to_offset(offset, min_x, max_x, min_y, max_y, min_z, max_z);
+    }
 }
 
 void main()
@@ -75,18 +181,143 @@ void main()
 
     VoxelWrite voxel_write = voxel_writes[voxel_write_id];
     ivec3 write_voxel = voxel_write.world_voxel.xyz;
+    ivec3 base_chunk_pos = floor_div(write_voxel, u_chunk_dim.xyz);
+    uint cached_chunk_ids[CACHED_CHUNK_COUNT];
+    init_cached_chunk_ids(cached_chunk_ids);
 
-    int min_x = visible_voxel_loaded(write_voxel + ivec3(-1, 0, 0)) ? 0 : -int(u_negative_x_inflation_size);
-    int max_x = visible_voxel_loaded(write_voxel + ivec3( 1, 0, 0)) ? 0 :  int(u_positive_x_inflation_size);
-    int min_y = visible_voxel_loaded(write_voxel + ivec3(0, -1, 0)) ? 0 : -int(u_negative_y_inflation_size);
-    int max_y = visible_voxel_loaded(write_voxel + ivec3(0,  1, 0)) ? 0 :  int(u_positive_y_inflation_size);
-    int min_z = visible_voxel_loaded(write_voxel + ivec3(0, 0, -1)) ? 0 : -int(u_negative_z_inflation_size);
-    int max_z = visible_voxel_loaded(write_voxel + ivec3(0, 0,  1)) ? 0 :  int(u_positive_z_inflation_size);
+    int min_x = -int(u_negative_x_inflation_size);
+    int max_x =  int(u_positive_x_inflation_size);
+    int min_y = -int(u_negative_y_inflation_size);
+    int max_y =  int(u_positive_y_inflation_size);
+    int min_z = -int(u_negative_z_inflation_size);
+    int max_z =  int(u_positive_z_inflation_size);
 
-    for (int z = min_z; z <= max_z; ++z) {
-        for (int y = min_y; y <= max_y; ++y) {
-            for (int x = min_x; x <= max_x; ++x) {
-                mark_inflated_if_loaded(write_voxel + ivec3(x, y, z));
+    if (cached_visible_voxel_loaded(write_voxel + ivec3(-1, 0, 0), base_chunk_pos, cached_chunk_ids)) min_x = 0;
+    if (cached_visible_voxel_loaded(write_voxel + ivec3( 1, 0, 0), base_chunk_pos, cached_chunk_ids)) max_x = 0;
+    if (cached_visible_voxel_loaded(write_voxel + ivec3(0, -1, 0), base_chunk_pos, cached_chunk_ids)) min_y = 0;
+    if (cached_visible_voxel_loaded(write_voxel + ivec3(0,  1, 0), base_chunk_pos, cached_chunk_ids)) max_y = 0;
+    if (cached_visible_voxel_loaded(write_voxel + ivec3(0, 0, -1), base_chunk_pos, cached_chunk_ids)) min_z = 0;
+    if (cached_visible_voxel_loaded(write_voxel + ivec3(0, 0,  1), base_chunk_pos, cached_chunk_ids)) max_z = 0;
+
+    int max_shell = max_abs_bound(min_x, max_x, min_y, max_y, min_z, max_z);
+    for (int shell = 0; shell <= max_shell; ++shell) {
+        if (shell > max_abs_bound(min_x, max_x, min_y, max_y, min_z, max_z)) break;
+
+        if (shell == 0) {
+            process_inflation_offset(
+                write_voxel,
+                base_chunk_pos,
+                cached_chunk_ids,
+                ivec3(0),
+                min_x,
+                max_x,
+                min_y,
+                max_y,
+                min_z,
+                max_z
+            );
+            continue;
+        }
+
+        int y0 = max(min_y, -shell);
+        int y1 = min(max_y,  shell);
+        int z0 = max(min_z, -shell);
+        int z1 = min(max_z,  shell);
+
+        for (int z = z0; z <= z1; ++z) {
+            for (int y = y0; y <= y1; ++y) {
+                process_inflation_offset(
+                    write_voxel,
+                    base_chunk_pos,
+                    cached_chunk_ids,
+                    ivec3(-shell, y, z),
+                    min_x,
+                    max_x,
+                    min_y,
+                    max_y,
+                    min_z,
+                    max_z
+                );
+                process_inflation_offset(
+                    write_voxel,
+                    base_chunk_pos,
+                    cached_chunk_ids,
+                    ivec3(shell, y, z),
+                    min_x,
+                    max_x,
+                    min_y,
+                    max_y,
+                    min_z,
+                    max_z
+                );
+            }
+        }
+
+        int x0 = max(min_x, -shell + 1);
+        int x1 = min(max_x,  shell - 1);
+        z0 = max(min_z, -shell);
+        z1 = min(max_z,  shell);
+
+        for (int z = z0; z <= z1; ++z) {
+            for (int x = x0; x <= x1; ++x) {
+                process_inflation_offset(
+                    write_voxel,
+                    base_chunk_pos,
+                    cached_chunk_ids,
+                    ivec3(x, -shell, z),
+                    min_x,
+                    max_x,
+                    min_y,
+                    max_y,
+                    min_z,
+                    max_z
+                );
+                process_inflation_offset(
+                    write_voxel,
+                    base_chunk_pos,
+                    cached_chunk_ids,
+                    ivec3(x, shell, z),
+                    min_x,
+                    max_x,
+                    min_y,
+                    max_y,
+                    min_z,
+                    max_z
+                );
+            }
+        }
+
+        x0 = max(min_x, -shell + 1);
+        x1 = min(max_x,  shell - 1);
+        y0 = max(min_y, -shell + 1);
+        y1 = min(max_y,  shell - 1);
+
+        for (int y = y0; y <= y1; ++y) {
+            for (int x = x0; x <= x1; ++x) {
+                process_inflation_offset(
+                    write_voxel,
+                    base_chunk_pos,
+                    cached_chunk_ids,
+                    ivec3(x, y, -shell),
+                    min_x,
+                    max_x,
+                    min_y,
+                    max_y,
+                    min_z,
+                    max_z
+                );
+                process_inflation_offset(
+                    write_voxel,
+                    base_chunk_pos,
+                    cached_chunk_ids,
+                    ivec3(x, y, shell),
+                    min_x,
+                    max_x,
+                    min_y,
+                    max_y,
+                    min_z,
+                    max_z
+                );
             }
         }
     }
