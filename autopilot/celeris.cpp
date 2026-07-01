@@ -133,35 +133,35 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         //     scan_index_count
         // );
 
-        // if (!m_has_previous_lidar_pose) {
-        m_network_scan->point_cloud().transform.position = glm::vec3(0.0f);
-        m_network_scan->point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-        m_has_previous_lidar_pose = true;
-        // } else {
-        //     if (glm::dot(m_previous_lidar_rotation, raw_rotation) < 0.0f) {
-        //         raw_rotation = -raw_rotation;
-        //     }
+        if (!m_has_previous_lidar_pose) {
+            m_network_scan->point_cloud().transform.position = glm::vec3(0.0f);
+            m_network_scan->point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+            m_has_previous_lidar_pose = true;
+        } else {
+            if (glm::dot(m_previous_lidar_rotation, raw_rotation) < 0.0f) {
+                raw_rotation = -raw_rotation;
+            }
 
-        //     glm::vec3 delta_position = raw_position - m_previous_lidar_position;
-        //     glm::quat delta_rotation = glm::normalize(raw_rotation * glm::inverse(m_previous_lidar_rotation));
+            glm::vec3 delta_position = raw_position - m_previous_lidar_position;
+            glm::quat delta_rotation = glm::normalize(raw_rotation * glm::inverse(m_previous_lidar_rotation));
 
-        //     glm::vec3 previous_map_position = glm::vec3(0.0f);
-        //     glm::quat previous_map_rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+            glm::vec3 previous_map_position = glm::vec3(0.0f);
+            glm::quat previous_map_rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
-        //     if (!m_retired_network_scans.empty()) {
-        //         PointCloud& previous_point_cloud = m_retired_network_scans.back()->point_cloud();
-        //         previous_map_position = previous_point_cloud.transform.position;
-        //         previous_map_rotation = glm::normalize(previous_point_cloud.transform.rotation);
-        //     }
+            if (!m_retired_network_scans.empty()) {
+                PointCloud& previous_point_cloud = m_retired_network_scans.back()->point_cloud();
+                previous_map_position = previous_point_cloud.transform.position;
+                previous_map_rotation = glm::normalize(previous_point_cloud.transform.rotation);
+            }
 
-        //     m_network_scan->point_cloud().transform.position = previous_map_position + delta_position;
-        //     m_network_scan->point_cloud().transform.rotation = glm::normalize(delta_rotation * previous_map_rotation);
+            m_network_scan->point_cloud().transform.position = previous_map_position + delta_position;
+            m_network_scan->point_cloud().transform.rotation = glm::normalize(delta_rotation * previous_map_rotation);
 
-        //     m_gicp_pass.fit(m_voxel_point_map,
-        //                     m_network_scan->point_cloud(),
-        //                     m_network_scan->normal_buffer(),
-        //                     m_desc.max_gicp_iterations);
-        // }
+            m_gicp_pass.fit(m_voxel_point_map,
+                            m_network_scan->point_cloud(),
+                            m_network_scan->normal_buffer(),
+                            m_desc.max_gicp_iterations);
+        }
         
         m_lidar_transform = m_network_scan->point_cloud().transform;
         m_start_position.from_transform(rear_axle_transform_from_lidar_transform(m_lidar_transform));

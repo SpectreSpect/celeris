@@ -92,7 +92,7 @@ VkClearValue clear_color = {0.05f, 0.05f, 0.05f, 1.0f};
 int main() {
     GlfwContext glfw_context;
     Window window(glfw_context, 1280, 720, "Celeris");
-    window.set_icon(path_utils::executable_dir() / "assets" / "icon" / "celeris_icon_2.png");
+    window.set_icon(path_utils::executable_dir() / "assets" / "icon" / "celeris_icon.png");
 
     QueueRequest queue_request;
     queue_request.graphics_count = 2;
@@ -144,7 +144,7 @@ int main() {
     std::unique_ptr<LidarScan> network_scan;
     std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
 
-    glm::vec3 voxel_size(0.2f);
+    glm::vec3 voxel_size(1.0f);
     glm::ivec3 chunk_size(16);
     VoxelGrid::VoxelGridDesc voxel_grid_desc {
         .chunk_size = chunk_size,
@@ -164,12 +164,12 @@ int main() {
         .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000),
         .inflation_size = 5u,
         .car_height_voxels = 3u,
-        .negative_x_inflation_size = 4u,
-        .positive_x_inflation_size = 4u,
+        .negative_x_inflation_size = 2u,
+        .positive_x_inflation_size = 2u,
         .negative_y_inflation_size = 2u,
         .positive_y_inflation_size = 0u,
-        .negative_z_inflation_size = 4u,
-        .positive_z_inflation_size = 4u,
+        .negative_z_inflation_size = 2u,
+        .positive_z_inflation_size = 2u,
         .display_inflated_voxels = 0u,
         // .inflated_voxel_color = 0xFF0707FFu, // 0xFF3355FFu
         .inflated_voxel_color = 0xFFFFFFFFu,
