@@ -62,6 +62,17 @@ Footprint::PathResult Footprint::evaluate_path(
             max_y_diff,
             allow_flying_over_precepices);
 
+    if (!result.is_passible) {
+        return result;
+    }
+
+    for (const NonholonomicPos& pose : result.path) {
+        if (!is_passible(pose)) {
+            result.is_passible = false;
+            return result;
+        }
+    }
+
     return result;
 }
 
@@ -72,7 +83,7 @@ std::vector<glm::vec3> Footprint::sample_raw_positions(const NonholonomicPos& re
     glm::vec3 origin = rear_axle_pos.pos + dir * -m_vehicle_geometry.rear_axle_from_rear;
     float first_pos_offset = static_cast<float>(m_horizontal_inflation_size) * voxel_size.x;
     float place_length = m_vehicle_geometry.size.z - first_pos_offset * 2.0f;
-    float step_size = place_length / static_cast<float>(m_sample_count);
+    float step_size = place_length / static_cast<float>(m_sample_count - 1);
 
     std::vector<glm::vec3> positions;
     positions.reserve(m_sample_count);
