@@ -17,6 +17,7 @@ find_package(glfw3 3.3 REQUIRED)
 find_package(glm REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(Threads REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 add_executable(app
   main.cpp
@@ -140,6 +141,7 @@ add_executable(app
   autopilot/path_planner.cpp
   autopilot/celeris.cpp
   autopilot/celeris_visualizer.cpp
+  autopilot/vehicle_geometry.cpp
   voxel_grid_vulkan/voxel_grid_gpu_debugger.cpp
   a_star/unimpended_path_finder.cpp
   a_star/path_intersection_detector.cpp
@@ -148,6 +150,10 @@ add_executable(app
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
+
+target_compile_definitions(app PRIVATE
+  CELERIS_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options(app PRIVATE
@@ -309,6 +315,18 @@ if(EXISTS "${ASSETS_SRC}")
   )
 endif()
 
+set(CONFIGS_SRC "${CMAKE_SOURCE_DIR}/configs")
+
+if(EXISTS "${CONFIGS_SRC}")
+  add_custom_command(TARGET app POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:app>/configs"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CONFIGS_SRC}"
+            "$<TARGET_FILE_DIR:app>/configs"
+    COMMENT "Copying configs next to app"
+  )
+endif()
+
 # ---------------- Link libraries ----------------
 
 target_link_libraries(app PRIVATE
@@ -318,6 +336,7 @@ target_link_libraries(app PRIVATE
   OpenGL::GL
   Vulkan::Vulkan
   Threads::Threads
+  yaml-cpp
 )
 
 if(WIN32)

@@ -16,6 +16,7 @@
 
 class Celeris;
 class NonholonomicPos;
+struct VehicleGeometry;
 
 class CelerisVisualizer : public SceneObject {
 public:
@@ -24,6 +25,7 @@ public:
     CelerisVisualizer(MeshManager& mesh_manager, 
                       MaterialInstanceManager& material_instance_manager, 
                       Celeris& celeris,
+                      const VehicleGeometry& vehicle_geometry,
                       uint32_t max_path_line_count = 20000,
                       float skybox_exposure = 1.8f);
    

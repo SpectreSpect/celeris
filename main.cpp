@@ -69,6 +69,7 @@
 #include "autopilot/spherical_pose_marker.h"
 #include "autopilot/celeris.h"
 #include "autopilot/celeris_visualizer.h"
+#include "autopilot/vehicle_geometry.h"
 #include "voxel_grid_vulkan/voxel_grid_gpu_debugger.h"
 #include "camera/controllers/third_person_camera_controller.h"
 #include "autopilot/vehicle_command_sender.h"
@@ -85,14 +86,16 @@ public:
         MeshManager& mesh_manager, 
         MaterialInstanceManager& material_instance_manager,
         Celeris& celeris,
+        const VehicleGeometry& vehicle_geometry,
         float skybox_exposure,
         uint32_t cube_count = 5,
-        float car_length = 6.6f,
-        float inflation_size = 4,
-        float car_height = 2.0f
-    ) : m_car_length(car_length),
-        m_inflation_size(inflation_size),
+        uint32_t horizontal_inflation_size = 1,
+        uint32_t vertical_inflation_size = 1
+    ) : m_vehicle_geometry(vehicle_geometry),
+        m_horizontal_inflation_size(horizontal_inflation_size),
+        m_vertical_inflation_size(vertical_inflation_size),
         m_celeris(&celeris) {
+        glm::vec3 voxel_size = celeris.voxel_size();
         for (int i = 0; i < cube_count; i++) {
             m_cubes.emplace_back(mesh_manager.cube, material_instance_manager.pbr);
             
@@ -100,17 +103,24 @@ public:
                 PBRMaterialData::create(0.0f, 0.95f, skybox_exposure, glm::vec4(1.0f), 1.0f)
             );
 
-            m_cubes.back().transform.scale = glm::vec3(inflation_size, car_height, inflation_size);
+            
+            m_cubes.back().transform.scale = glm::vec3(
+                static_cast<float>(m_horizontal_inflation_size) * voxel_size.x * 2.0f,
+                static_cast<float>(m_vertical_inflation_size) * voxel_size.y,
+                static_cast<float>(m_horizontal_inflation_size) * voxel_size.z * 2.0f
+            );
 
             add_child(m_cubes.back());
         }
     }
 
-    void update_cubes(const NonholonomicPos& rear_axle_pos, float rear_axle_offset) {
+    void update_cubes(const NonholonomicPos& rear_axle_pos) {
+        glm::vec3 voxel_size = m_celeris->voxel_size();
+
         glm::vec3 dir(std::cos(rear_axle_pos.theta), 0.0f, std::sin(rear_axle_pos.theta));
-        glm::vec3 origin = rear_axle_pos.pos + dir * -rear_axle_offset;
-        float first_pos_offset = m_inflation_size / 2.0f;
-        float place_length = m_car_length - first_pos_offset * 2.0f;
+        glm::vec3 origin = rear_axle_pos.pos + dir * -m_vehicle_geometry.rear_axle_from_rear;
+        float first_pos_offset = static_cast<float>(m_horizontal_inflation_size) * voxel_size.x;
+        float place_length = m_vehicle_geometry.size.z - first_pos_offset * 2.0f;
         float step_size = place_length / static_cast<float>(m_cubes.size());
 
         for (int i = 0; i < m_cubes.size(); i++) {
@@ -130,8 +140,9 @@ public:
     };
 
 private:
-    float m_car_length = 0;
-    float m_inflation_size = 0;
+    VehicleGeometry m_vehicle_geometry;
+    uint32_t m_horizontal_inflation_size = 0;
+    uint32_t m_vertical_inflation_size = 0;
     std::vector<RenderObject> m_cubes;
     Celeris* m_celeris = nullptr;
 };
@@ -148,6 +159,23 @@ int main() {
     queue_request.graphics_count = 2;
     queue_request.present_count = 1;
     queue_request.compute_count = 2;
+
+    auto vehicle_config_path = []() {
+        const std::filesystem::path relative_path =
+            std::filesystem::path("configs") / "vehicles" / "gazelle_next_sim.yaml";
+
+#ifdef CELERIS_SOURCE_DIR
+        const std::filesystem::path source_path =
+            std::filesystem::path(CELERIS_SOURCE_DIR) / relative_path;
+        if (std::filesystem::exists(source_path)) {
+            return source_path;
+        }
+#endif
+
+        return path_utils::executable_dir() / relative_path;
+    }();
+
+    const VehicleGeometry vehicle_geometry = load_vehicle_geometry(vehicle_config_path);
 
     VulkanEngine engine(glfw_context, window, queue_request);
 
@@ -194,7 +222,11 @@ int main() {
     std::unique_ptr<LidarScan> network_scan;
     std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
 
-    glm::vec3 voxel_size(0.5f);
+    glm::vec3 voxel_size(1.0f);
+    uint32_t vertical_inflation_size = 
+        static_cast<uint32_t>(std::ceil(vehicle_geometry.size.y / voxel_size.y));
+    uint32_t horizontal_inflation_size = 
+        static_cast<uint32_t>(std::ceil((vehicle_geometry.size.x / voxel_size.x) / 2.0f));
     glm::ivec3 chunk_size(16);
     VoxelGrid::VoxelGridDesc voxel_grid_desc {
         .chunk_size = chunk_size,
@@ -214,12 +246,12 @@ int main() {
         .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000),
         .inflation_size = 5u,
         .car_height_voxels = 3u,
-        .negative_x_inflation_size = 2u,
-        .positive_x_inflation_size = 2u,
-        .negative_y_inflation_size = 2u,
+        .negative_x_inflation_size = horizontal_inflation_size,
+        .positive_x_inflation_size = horizontal_inflation_size,
+        .negative_y_inflation_size = vertical_inflation_size,
         .positive_y_inflation_size = 0u,
-        .negative_z_inflation_size = 2u,
-        .positive_z_inflation_size = 2u,
+        .negative_z_inflation_size = horizontal_inflation_size,
+        .positive_z_inflation_size = horizontal_inflation_size,
         .display_inflated_voxels = 0u,
         // .inflated_voxel_color = 0xFF0707FFu, // 0xFF3355FFu
         .inflated_voxel_color = 0xFFFFFFFFu,
@@ -416,7 +448,7 @@ int main() {
     Renderer renderer(engine, frame_resources);
 
     const float skybox_exposure = 1.8f;
-    GazelleNext gazelle(mesh_manager, material_instance_manager, skybox_exposure);
+    GazelleNext gazelle(mesh_manager, material_instance_manager, vehicle_geometry, skybox_exposure);
 
     Skybox skybox(
         mesh_manager.skybox_cube,
@@ -457,6 +489,7 @@ int main() {
     CelerisVisualizer celeris_visualizer(mesh_manager, 
                                          material_instance_manager, 
                                          celeris, 
+                                         vehicle_geometry,
                                          20000, 
                                          skybox_exposure);
 
@@ -604,17 +637,17 @@ int main() {
         mesh_manager, 
         material_instance_manager, 
         celeris, 
+        vehicle_geometry,
         skybox_exposure, 
         5, 
-        6.6f, 
-        2, 
-        2
+        horizontal_inflation_size,
+        vertical_inflation_size
     );
 
     auto place_footprint = [&]() {
         NonholonomicPos pose;
         if (make_pose_from_camera(pose)) {
-            footprint.update_cubes(pose, 1.32f);
+            footprint.update_cubes(pose);
         }
     };
 
