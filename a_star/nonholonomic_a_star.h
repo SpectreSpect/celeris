@@ -43,7 +43,8 @@ public:
         bool force_reeds_shepp_shot = false;
         bool allow_flying_over_precipices = true;
         bool allow_diagonal_moves = false;
-        int iteration_limit = 20000;
+        // int iteration_limit = 20000;
+        int iteration_limit = 5000;
         bool track_explored_paths = true;
         int max_step_up = 1;
         int max_drop = 1;

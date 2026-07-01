@@ -342,27 +342,26 @@ int main() {
                 }
     };
 
-    add_test_wall(glm::ivec3(5, 0, 0), glm::ivec3(1, 5, 5));
-    add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(1, 5, 5));
-    add_test_wall(glm::ivec3(5, 0, 0), glm::ivec3(5, 5, 1));
+    // add_test_wall(glm::ivec3(5, 0, 0), glm::ivec3(1, 5, 5));
+    // add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(1, 5, 5));
+    // add_test_wall(glm::ivec3(5, 0, 0), glm::ivec3(5, 5, 1));
 
-    add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(1, 5, 5));
-    add_test_wall(glm::ivec3(15, 0, 0), glm::ivec3(1, 5, 5));
-    add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(5, 5, 1));
-    // add_test_wall(glm::ivec3(5, 0, 5), glm::ivec3(6, 5, 1));
+    // add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(1, 5, 5));
+    // add_test_wall(glm::ivec3(15, 0, 0), glm::ivec3(1, 5, 5));
+    // add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(5, 5, 1));
 
-    VulkanBuffer box_voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + Utils::size_bytes(test_voxel_writes));
-    box_voxel_write_list.upload_scalar<uint32_t>(test_voxel_writes.size(), 0);
-    box_voxel_write_list.upload(test_voxel_writes, sizeof(uint32_t) * 4);
+    // VulkanBuffer box_voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + Utils::size_bytes(test_voxel_writes));
+    // box_voxel_write_list.upload_scalar<uint32_t>(test_voxel_writes.size(), 0);
+    // box_voxel_write_list.upload(test_voxel_writes, sizeof(uint32_t) * 4);
 
-    VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
-    {
-        auto scope = compute_command_buffer.begin_scope();
-        voxel_grid.set_voxels(compute_command_buffer, box_voxel_write_list);
-    }
-    VulkanFence compute_fence(engine.device());
-    engine.compute_submit(compute_command_buffer, &compute_fence);
-    compute_fence.wait();
+    // VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
+    // {
+    //     auto scope = compute_command_buffer.begin_scope();
+    //     voxel_grid.set_voxels(compute_command_buffer, box_voxel_write_list);
+    // }
+    // VulkanFence compute_fence(engine.device());
+    // engine.compute_submit(compute_command_buffer, &compute_fence);
+    // compute_fence.wait();
 
     // voxel_grid.update(window, camera);
 
