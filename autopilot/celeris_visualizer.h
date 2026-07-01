@@ -3,6 +3,7 @@
 #include "spherical_pose_marker.h"
 #include "../renderer/scene_object.h"
 #include "../renderer/lines/line_cloud.h"
+#include "../a_star/vehichle.h"
 
 #include "../vulkan_self/logger/logger_header.h"
 
@@ -27,10 +28,13 @@ public:
                       float skybox_exposure = 1.8f);
    
     void set_start(const NonholonomicPos& nonholonomic_position);
-    void set_goal(const NonholonomicPos& nonholonomic_position);
-    
     void set_start(const Transform& transform);
+
     void set_goal(const Transform& transform);
+    void set_goal(const NonholonomicPos& nonholonomic_position);
+
+    void set_vehicle(const Transform& transform);
+    void set_vehicle(const NonholonomicPos& nonholonomic_position);
 
     glm::vec3 get_start_marker_pos();
 
@@ -53,14 +57,17 @@ private:
 
     SphericalPoseMarker m_start_marker;
     SphericalPoseMarker m_goal_marker;
+    SphericalPoseMarker m_vehicle_marker;
 
     LineCloud m_path_line_cloud;
     LineCloud m_guide_path_line_cloud;
     LineCloud m_explored_paths_line_cloud;
     LineCloud m_unimpended_path_line_cloud;
+    LineCloud m_local_candidate_line_cloud;
 
     MarkerInterpolationState m_start_marker_interpolation;
     MarkerInterpolationState m_goal_marker_interpolation;
+    MarkerInterpolationState m_vehicle_marker_interpolation;
 
 private:
     glm::vec3 voxel_size() noexcept;
@@ -81,4 +88,8 @@ private:
     std::vector<LineInstance> make_path_lines(const std::vector<NonholonomicPos>& path, bool override_color = false);
     std::vector<LineInstance> make_path_lines(const std::vector<glm::vec3>& path);
     std::vector<LineInstance> make_path_lines(const std::vector<glm::ivec3>& path);
+    std::vector<LineInstance> make_local_candidate_lines(
+        const std::vector<Vehicle::SimulationControlCandidate>& candidates,
+        float height
+    );
 };

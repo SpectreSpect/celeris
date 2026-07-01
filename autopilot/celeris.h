@@ -15,6 +15,9 @@
 #include "../vulkan_self/logger/logger_header.h"
 #include "vehicle_command_sender.h"
 #include "../utils/avg_timer.h"
+#include "../a_star/vehichle.h"
+#include "../a_star/local_planner.h"
+#include "vehicle_state_receiver.h"
 
 #include <chrono>
 #include <cstddef>
@@ -41,6 +44,11 @@ public:
         uint32_t unimpended_path_max_astar_points = 4096;
         uint32_t collision_history_size = 8;
         uint32_t collision_escape_search_radius_voxels = 8;
+        uint16_t vehicle_state_receiver_port = 5002;
+        float vehicle_state_timeout = 0.25f;
+        float max_vehicle_acceleration = 1;
+        float max_vehicle_steer_acceleration = 0.5f;
+        float vehicle_wheel_base = 4.29f;
         NonholonomicAStar::NonholonomicAStarDesc nonholonomic_astar_desc;
     };
 
@@ -55,7 +63,7 @@ public:
             
     void start_lidar_receiver();
     void start(VulkanSubmitContext&& planner_submit_context);
-    void update();
+    void update(VulkanSubmitContext& submit_context);
 
     void find_path(VulkanSubmitContext& submit_context);
     void set_start(const NonholonomicPos& position);
@@ -64,9 +72,11 @@ public:
 
     LidarScan* network_scan();
     NonholonomicPos start_position() const noexcept;
+    NonholonomicPos vehicle_position() const noexcept;
     NonholonomicPos goal_position() const noexcept;
     float car_speed() const noexcept;
     NonholonomicAStar& planner();
+    const std::vector<Vehicle::SimulationControlCandidate>& local_planner_candidates() const noexcept;
     uint32_t received_scan_count() const noexcept;
 
     std::mutex& planner_mutex() noexcept;
@@ -98,8 +108,12 @@ private:
     UnimpendedPathFinder m_unimpended_path_finder;
     PathIntersectionDetector m_path_intersection_detector;
     VehicleCommandSender m_command_sender;
+    VehicleStateReceiver m_vehicle_state_receiver;
     OccupancyGrid3D m_occupancy_grid;
+
+    Vehicle m_vehicle;
     NonholonomicAStar m_planner;
+    LocalPlanner m_local_planner;
     
     VoxelPointMap m_voxel_point_map;
     VoxelMapPointInserter m_voxel_map_inserter;
@@ -108,6 +122,7 @@ private:
     VulkanBuffer voxel_write_list;
 
     NonholonomicPos m_start_position;
+    NonholonomicPos m_vehicle_position;
     NonholonomicPos m_goal_position;
     float m_car_speed = 10.0f;
 
@@ -152,7 +167,9 @@ private:
     void start_planner_thread(VulkanSubmitContext&& submit_context);
     void request_path_replan(const NonholonomicPos& start_pos, const NonholonomicPos& end_pos);
     void planner_loop(VulkanSubmitContext submit_context);
+    void apply_vehicle_feedback(const VehicleFeedback& feedback);
+    bool is_vehicle_feedback_fresh(const VehicleFeedback& feedback) const;
 
     bool find_closest_next_path_point(uint32_t current_id, uint32_t& output_id, uint32_t& output_dist);
-    VehicleCommand get_path_following_command();
+    VehicleCommand get_path_following_command(VulkanSubmitContext& submit_context);
 };

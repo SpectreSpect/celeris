@@ -136,6 +136,7 @@ add_executable(app
   a_star/reeds_shepp.cpp
   autopilot/spherical_pose_marker.cpp
   autopilot/vehicle_command_sender.cpp
+  autopilot/vehicle_state_receiver.cpp
   autopilot/celeris.cpp
   autopilot/celeris_visualizer.cpp
   voxel_grid_vulkan/voxel_grid_gpu_debugger.cpp
@@ -144,6 +145,7 @@ add_executable(app
   vulkan_self/vulkan_submit_context.cpp
   utils/avg_timer.cpp
   a_star/vehichle.cpp
+  a_star/local_planner.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

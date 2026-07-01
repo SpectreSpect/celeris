@@ -1,8 +1,11 @@
 #pragma once
 
+#include <cmath>
 #include <glm/glm.hpp>
 #include <vector>
+
 #include "../renderer/transform.h"
+#include "../vulkan_self/utils.h"
 
 struct AStarCell {
     float g;
@@ -110,3 +113,69 @@ public:
         gear = (gear == Gear::FORWARD) ? Gear::BACKWARD : Gear::FORWARD;
     }
 };
+
+struct VehiclePathPoint {
+    glm::vec2 position = glm::vec2{0.0f};
+    float heading = 0.0f;
+    float dir = 1.0f;
+};
+
+inline std::vector<VehiclePathPoint> make_forward_vehicle_path(
+    const std::vector<glm::vec2>& polyline)
+{
+    std::vector<VehiclePathPoint> path;
+    path.reserve(polyline.size());
+
+    for (glm::vec2 position : polyline) {
+        path.push_back(VehiclePathPoint{
+            .position = position,
+            .heading = 0.0f,
+            .dir = 1.0f
+        });
+    }
+
+    float last_heading = 0.0f;
+    for (size_t i = 0; i < path.size(); i++) {
+        bool found_heading = false;
+
+        for (size_t j = i + 1; j < path.size(); j++) {
+            const glm::vec2 segment = path[j].position - path[i].position;
+            if (glm::length(segment) > Utils::eps) {
+                last_heading = std::atan2(segment.y, segment.x);
+                found_heading = true;
+                break;
+            }
+        }
+
+        if (!found_heading && i > 0) {
+            for (size_t j = i; j > 0; j--) {
+                const glm::vec2 segment = path[j].position - path[j - 1].position;
+                if (glm::length(segment) > Utils::eps) {
+                    last_heading = std::atan2(segment.y, segment.x);
+                    break;
+                }
+            }
+        }
+
+        path[i].heading = last_heading;
+    }
+
+    return path;
+}
+
+inline std::vector<VehiclePathPoint> make_vehicle_path(
+    const std::vector<NonholonomicPos>& nonholonomic_path)
+{
+    std::vector<VehiclePathPoint> path;
+    path.reserve(nonholonomic_path.size());
+
+    for (const NonholonomicPos& point : nonholonomic_path) {
+        path.push_back(VehiclePathPoint{
+            .position = glm::vec2{point.pos.x, point.pos.z},
+            .heading = point.theta,
+            .dir = point.dir < 0.0f ? -1.0f : 1.0f
+        });
+    }
+
+    return path;
+}

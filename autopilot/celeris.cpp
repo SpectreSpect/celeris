@@ -5,6 +5,7 @@
 #include <iostream>
 #include <limits>
 #include <utility>
+#include <glm/gtc/quaternion.hpp>
 
 #include "../vulkan_self/vulkan_device.h"
 #include "../vulkan_self/vulkan_queue.h"
@@ -22,6 +23,18 @@ namespace {
     float length_sq(glm::vec3 value) noexcept {
         return glm::dot(value, value);
     }
+
+    bool is_finite(float value) noexcept {
+        return std::isfinite(value);
+    }
+
+    bool is_finite(glm::vec3 value) noexcept {
+        return
+            is_finite(value.x) &&
+            is_finite(value.y) &&
+            is_finite(value.z);
+    }
+
 }
 
 Celeris::Celeris(VulkanEngine& engine,
@@ -36,7 +49,7 @@ Celeris::Celeris(VulkanEngine& engine,
         m_desc(desc),
         m_gicp_pass(engine, manager_bundle.compute_pass_manager()),
         m_point_cloud_preprocessor(engine.device(), compute_queue, manager_bundle.compute_pass_manager()),
-        m_scan_receiver(m_point_cloud_preprocessor),
+        m_scan_receiver(m_point_cloud_preprocessor, desc.receiver_port),
         m_unimpended_path_finder(
             engine.physical_device(),
             engine.device(),
@@ -55,8 +68,15 @@ Celeris::Celeris(VulkanEngine& engine,
             desc.unimpended_path_max_astar_points
         ),
         m_command_sender(),
+        m_vehicle_state_receiver(desc.vehicle_state_receiver_port),
         m_occupancy_grid(engine.physical_device(), engine.device(), voxel_grid, manager_bundle.compute_pass_manager()),
+        m_vehicle(
+            desc.max_vehicle_acceleration,
+            desc.max_vehicle_steer_acceleration,
+            desc.vehicle_wheel_base
+        ),
         m_planner(m_occupancy_grid, desc.nonholonomic_astar_desc, m_unimpended_path_finder),
+        m_local_planner(),
         m_voxel_point_map(engine,
                           desc.voxel_point_map_num_hash_table_slots,
                           desc.voxel_point_map_max_map_point_count),
@@ -90,18 +110,17 @@ void Celeris::start_lidar_receiver() {
 
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     start_lidar_receiver();
+    m_vehicle_state_receiver.start();
     m_command_sender.start();
     start_planner_thread(std::move(planner_submit_context));
 }
 
-void Celeris::update() {
+void Celeris::update(VulkanSubmitContext& submit_context) {
     LOG_METHOD();
 
     logger().check(m_engine, "Engine was null");
     logger().check(m_manager_bundle, "Manager bundle was null");
     logger().check(m_voxel_grid, "Voxel grid was null");
-
-    m_command_sender.set_command(get_path_following_command());
 
     if (auto scan = m_scan_receiver.try_pop_scan(*m_manager_bundle)) {
         glm::vec3 raw_position = scan->point_cloud().transform.position;
@@ -145,8 +164,49 @@ void Celeris::update() {
                             m_network_scan->normal_buffer(),
                             m_desc.max_gicp_iterations);
         }
+
+        m_local_planner.update_timestamp();
+
+        VehicleFeedback vehicle_feedback;
+        const bool has_vehicle_feedback =
+            m_vehicle_state_receiver.latest_feedback(vehicle_feedback) &&
+            is_vehicle_feedback_fresh(vehicle_feedback);
+
+        if (!has_vehicle_feedback || !vehicle_feedback.has_vehicle_state()) {
+            m_local_planner.predict_vehicle_state(m_vehicle); // Предсказываем состояние машины к текущему моменту
+        }
         
-        m_start_position.from_transform(m_network_scan->point_cloud().transform);        
+        // Актуализируем состояние машины в соответствии с данных с сенсоров
+        const Transform& vehicle_transform = m_network_scan->point_cloud().transform;
+        m_vehicle.state().m_position = glm::vec2{
+            vehicle_transform.position.x,
+            vehicle_transform.position.z
+        };
+
+        const glm::quat vehicle_rotation = glm::normalize(vehicle_transform.rotation);
+        const glm::vec3 vehicle_forward = vehicle_rotation * glm::vec3(-1.0f, 0.0f, 0.0f);
+        m_vehicle.state().m_heading = std::atan2(vehicle_forward.z, vehicle_forward.x);
+
+        if (has_vehicle_feedback) {
+            apply_vehicle_feedback(vehicle_feedback);
+        }
+
+        m_vehicle_position.pos = glm::vec3{
+            m_vehicle.state().m_position.x,
+            vehicle_transform.position.y,
+            m_vehicle.state().m_position.y
+        };
+        m_vehicle_position.theta = m_vehicle.state().m_heading;
+        m_vehicle_position.steer = m_vehicle.state().m_steering_angle;
+        if (std::abs(m_vehicle.state().m_speed) > 1e-4f) {
+            m_vehicle_position.dir = m_vehicle.state().m_speed < 0.0f ? -1.0f : 1.0f;
+        }
+        
+        /*
+            Отправляем следующую команду управления (состояние машины в соответствии с этой 
+            командой не обнавляется. Оно обновится когда прийдут следующие данные сенсоров)
+        */
+        m_command_sender.set_command(get_path_following_command(submit_context));
 
         // m_start_position.pos = m_network_scan->point_cloud().transform.position;
         // glm::quat q = glm::normalize(m_network_scan->point_cloud().transform.rotation);
@@ -180,7 +240,6 @@ void Celeris::update() {
         //     path_planning_status = "Could not place start: no ground found near camera.";
         // }
 
-        
         m_voxel_map_inserter.insert(m_voxel_point_map, m_network_scan->point_cloud(), m_network_scan->normal_buffer());
         m_voxel_grid->voxelize_point_cloud(
             *m_engine, 
@@ -214,6 +273,44 @@ void Celeris::update() {
     }
 }
 
+void Celeris::apply_vehicle_feedback(const VehicleFeedback& feedback) {
+    Vehicle::VehicleTransformState& state = m_vehicle.state();
+
+    if (feedback.has_odometry()) {
+        if (!feedback.has_vehicle_state() && is_finite(feedback.linear_velocity_ros)) {
+            const glm::vec3 linear_velocity_engine =
+                LidarScan::ros_pos_to_engine(feedback.linear_velocity_ros);
+            const glm::vec2 forward{
+                std::cos(state.m_heading),
+                std::sin(state.m_heading)
+            };
+            state.m_speed = glm::dot(
+                glm::vec2{linear_velocity_engine.x, linear_velocity_engine.z},
+                forward
+            );
+        }
+    }
+
+    if (feedback.has_vehicle_state()) {
+        if (std::isfinite(feedback.speed))
+            state.m_speed = feedback.speed;
+        if (std::isfinite(feedback.acceleration))
+            state.m_speed_acceleration = feedback.acceleration;
+        if (std::isfinite(feedback.steering_angle))
+            state.m_steering_angle = feedback.steering_angle;
+        if (std::isfinite(feedback.steering_angle_velocity))
+            state.m_steering_angle_velocity = feedback.steering_angle_velocity;
+        if (std::isfinite(feedback.steering_angle_acceleration))
+            state.m_steering_angle_acceleration = feedback.steering_angle_acceleration;
+    }
+}
+
+bool Celeris::is_vehicle_feedback_fresh(const VehicleFeedback& feedback) const {
+    const std::chrono::duration<float> age =
+        std::chrono::steady_clock::now() - feedback.received_at;
+    return age.count() <= m_desc.vehicle_state_timeout;
+}
+
 void Celeris::find_path(VulkanSubmitContext& submit_context) {
     total_path_finding_time = AvgTimer();
 
@@ -236,6 +333,10 @@ void Celeris::find_path(VulkanSubmitContext& submit_context) {
 
 void Celeris::set_start(const NonholonomicPos& position) {
     m_start_position = position;
+    m_vehicle_position = position;
+    m_vehicle.state().m_position = glm::vec2{position.pos.x, position.pos.z};
+    m_vehicle.state().m_heading = position.theta;
+    m_vehicle.state().m_steering_angle = position.steer;
     m_collision_raw_position_history.clear();
     m_has_collision_surface_point = false;
 }
@@ -255,6 +356,10 @@ LidarScan* Celeris::network_scan() {
 
 NonholonomicPos Celeris::start_position() const noexcept {
     return m_start_position;
+}
+
+NonholonomicPos Celeris::vehicle_position() const noexcept {
+    return m_vehicle_position;
 }
 
 NonholonomicPos Celeris::goal_position() const noexcept {
@@ -287,6 +392,12 @@ VoxelMapPointReseter& Celeris::voxel_map_reseter() {
 
 NonholonomicAStar& Celeris::planner() {
     return m_planner;
+}
+
+const std::vector<Vehicle::SimulationControlCandidate>&
+Celeris::local_planner_candidates() const noexcept
+{
+    return m_local_planner.last_simulation_candidates();
 }
 
 uint32_t Celeris::received_scan_count() const noexcept {
@@ -590,61 +701,61 @@ bool Celeris::find_closest_next_path_point(uint32_t current_id, uint32_t& output
     }
 };
 
-VehicleCommand Celeris::get_path_following_command() {
+VehicleCommand Celeris::get_path_following_command(VulkanSubmitContext& submit_context) {
     std::lock_guard<std::mutex> lock(m_planner_mutex);
 
-    if (nonholonomic_astar_path.empty() || current_target_path_point_id >= nonholonomic_astar_path.size())
-        return VehicleCommand{
-            .speed = 0,
-            .steering_angle = 0
-        };
+    // if (nonholonomic_astar_path.empty() || current_target_path_point_id >= nonholonomic_astar_path.size())
+    //     return VehicleCommand{
+    //         .speed = 0,
+    //         .steering_angle = 0
+    //     };
 
-    float reach_radius = 1;
+    // float reach_radius = 1;
 
-    float dist_to_target_point = glm::distance(
-        m_start_position.pos, 
-        nonholonomic_astar_path[current_target_path_point_id].pos
-    );
+    // float dist_to_target_point = glm::distance(
+    //     m_start_position.pos, 
+    //     nonholonomic_astar_path[current_target_path_point_id].pos
+    // );
 
-    if (dist_to_target_point <= reach_radius) {
+    // if (dist_to_target_point <= reach_radius) {
         
         
-        if (nonholonomic_astar_path[current_target_path_point_id].dir == -1) {
-            if (!is_stop_waiting) {
-                is_stop_waiting = true;
-                stop_waiting_start_timestamp = std::chrono::steady_clock::now();
-            } else {
-                auto current_timestamp = std::chrono::steady_clock::now();
-                auto elapsed_time = current_timestamp - stop_waiting_start_timestamp;
+    //     if (nonholonomic_astar_path[current_target_path_point_id].dir == -1) {
+    //         if (!is_stop_waiting) {
+    //             is_stop_waiting = true;
+    //             stop_waiting_start_timestamp = std::chrono::steady_clock::now();
+    //         } else {
+    //             auto current_timestamp = std::chrono::steady_clock::now();
+    //             auto elapsed_time = current_timestamp - stop_waiting_start_timestamp;
                 
-                double elapsed_seconds = std::chrono::duration<double>(elapsed_time).count();
+    //             double elapsed_seconds = std::chrono::duration<double>(elapsed_time).count();
 
-                if (elapsed_seconds >= stop_waiting_time) {
-                    is_stop_waiting = false;
-                    current_target_path_point_id++;
-                } else {
-                    return VehicleCommand{
-                        .speed = 0,
-                        .steering_angle = 0
-                    };
-                }
-            }
-        } 
-        else {
-            current_target_path_point_id++;
-        }    
-    }
+    //             if (elapsed_seconds >= stop_waiting_time) {
+    //                 is_stop_waiting = false;
+    //                 current_target_path_point_id++;
+    //             } else {
+    //                 return VehicleCommand{
+    //                     .speed = 0,
+    //                     .steering_angle = 0
+    //                 };
+    //             }
+    //         }
+    //     } 
+    //     else {
+    //         current_target_path_point_id++;
+    //     }    
+    // }
 
-    float target_theta = nonholonomic_astar_path[current_target_path_point_id].theta;
-    float theta_error = NonholonomicAStar::angle_diff(m_start_position.theta, target_theta);
+    // float target_theta = nonholonomic_astar_path[current_target_path_point_id].theta;
+    // float theta_error = NonholonomicAStar::angle_diff(m_start_position.theta, target_theta);
 
-    float direction = nonholonomic_astar_path[current_target_path_point_id].dir;
-    float steering = direction * theta_error;
+    // float direction = nonholonomic_astar_path[current_target_path_point_id].dir;
+    // float steering = direction * theta_error;
 
-    steering = std::clamp(steering, -0.4f, 0.4f);
+    // steering = std::clamp(steering, -0.4f, 0.4f);
 
-    return VehicleCommand{
-                .speed = m_car_speed * direction,
-                .steering_angle = steering
-            };
+
+    
+    m_local_planner.set_astar_path(nonholonomic_astar_path);
+    return m_local_planner.predict_vehicle_command(m_vehicle, m_path_intersection_detector, submit_context);
 }

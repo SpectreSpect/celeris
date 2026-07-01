@@ -64,7 +64,7 @@ void VehicleCommandSender::stop() {
 }
 
 void VehicleCommandSender::set_command(VehicleCommand command) {
-    if (!std::isfinite(command.speed) || !std::isfinite(command.steering_angle))
+    if (!std::isfinite(command.acceleration) || !std::isfinite(command.steering_angle_velocity))
         return;
 
     {
@@ -74,10 +74,10 @@ void VehicleCommandSender::set_command(VehicleCommand command) {
     m_wait_condition.notify_all();
 }
 
-void VehicleCommandSender::set_command(float speed, float steering_angle) {
+void VehicleCommandSender::set_command(float acceleration, float steering_angle_velocity) {
     set_command(VehicleCommand{
-        .speed = speed,
-        .steering_angle = steering_angle
+        .acceleration = acceleration,
+        .steering_angle_velocity = steering_angle_velocity
     });
 }
 
@@ -118,9 +118,7 @@ void VehicleCommandSender::send_loop() {
                 break;
 
             std::unique_lock lock(m_wait_mutex);
-            m_wait_condition.wait_for(lock, m_send_period, [this] {
-                return !m_running.load();
-            });
+            m_wait_condition.wait_for(lock, m_send_period);
         }
 
         if (!m_running.load())
@@ -202,10 +200,10 @@ bool VehicleCommandSender::send_command(
     const VehicleCommand& command) const
 {
     // Wire format: two IEEE-754 float32 values in little-endian order:
-    // speed followed by steering_angle.
+    // acceleration followed by steering_angle_velocity.
     std::array<uint8_t, 8> packet{};
-    write_float_little_endian(packet.data(), command.speed);
-    write_float_little_endian(packet.data() + 4, command.steering_angle);
+    write_float_little_endian(packet.data(), command.acceleration);
+    write_float_little_endian(packet.data() + 4, command.steering_angle_velocity);
 
     size_t sent = 0;
     while (sent < packet.size()) {

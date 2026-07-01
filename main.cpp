@@ -373,7 +373,7 @@ int main() {
         voxel_grid, 
         Celeris::CelerisDesc()
     );
-    celeris.set_start(NonholonomicPos{.pos = glm::vec3(0.0f, 1.5f, 0.0f)});
+    celeris.set_start(NonholonomicPos{.pos = glm::vec3(0.0f, 1.5f, 0.0f), .theta = glm::pi<float>()});
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.92f, -51.30f)});
     // celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.5f, -0.0f)});
     celeris.start(std::move(planner_submit_context));
@@ -609,7 +609,7 @@ int main() {
 
 
         // celeris.update();
-        celeris.update();
+        celeris.update(compute_submit_context);
         if (rendered_celeris_scan_count != celeris.received_scan_count()) {
             voxel_point_map.set_instance_view(celeris.voxel_point_map().get_map_instance_view());
             rendered_celeris_scan_count = celeris.received_scan_count();
