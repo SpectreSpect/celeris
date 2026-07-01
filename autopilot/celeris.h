@@ -85,7 +85,13 @@ public:
     VoxelMapPointReseter& voxel_map_reseter();
 
     void request_path_replan();
-    bool adjust_to_ground(glm::vec3& output);
+    bool adjust_to_ground(
+        glm::vec3& output, 
+        int max_step_up = 500, 
+        int max_drop = 500, 
+        int max_y_diff = -1, 
+        bool allow_flying_over_precepices = true
+    );
     bool has_planned_path() const;
     PathPlanner::PathPlannerResult path_result_snapshot() const;
     void display_path_planner_debug_controls() const;

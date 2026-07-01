@@ -93,9 +93,9 @@ void Celeris::start_lidar_receiver() {
 }
 
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
-    start_lidar_receiver();
+    // start_lidar_receiver();
     // m_command_sender.start();
-    // m_path_planner.start(std::move(planner_submit_context));
+    m_path_planner.start(std::move(planner_submit_context));
 }
 
 void Celeris::update(VulkanSubmitContext& submit_context) {
@@ -536,8 +536,19 @@ void Celeris::request_path_replan() {
     m_path_planner.request_path_replan(m_start_position, m_goal_position);
 }
 
-bool Celeris::adjust_to_ground(glm::vec3& output) {
-    return m_path_planner.request_adjust_to_ground(output);
+bool Celeris::adjust_to_ground(
+    glm::vec3& output, 
+    int max_step_up, 
+    int max_drop, 
+    int max_y_diff, 
+    bool allow_flying_over_precepices) {
+    return m_path_planner.request_adjust_to_ground(
+        output, 
+        max_step_up, 
+        max_drop, 
+        max_y_diff, 
+        allow_flying_over_precepices
+    );
 }
 
 bool Celeris::has_planned_path() const {

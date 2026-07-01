@@ -891,6 +891,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
             if (!new_cell.simulated_motion.empty()) {
                 new_cell.simulated_motion.back() = new_pos;
             }
+            
             new_cell.no_parent = false;
             new_cell.g = new_g;
             new_cell.f = new_g + get_nonholonomic_f(new_cell.pos, m_state.end_pos, cur_cell.pos);

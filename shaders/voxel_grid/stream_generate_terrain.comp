@@ -104,9 +104,9 @@ void main() {
 
     float cur_height = worldVoxel.y + (worldVoxel.x / steepeness) + (worldVoxel.z / steepeness);
 
-    // uint type = (float(worldVoxel.y) <= height) ? 1u : 0u;
+    uint type = (float(worldVoxel.y) <= height) ? 1u : 0u;
     // uint type = ((cur_height <= height) && precipice) ? 1u : 0u;
-    uint type = 0u;
+    // uint type = 0u;
     uint voxel_flags = (type != 0u) ? VOXEL_VISABILITY_FLAG_BIT : VOXEL_EASY_OVERWRITE_FLAG_BIT;
 
     VoxelData vd;
@@ -116,7 +116,10 @@ void main() {
     // vec3 col = (type != 0u) ? mix(vec3(0.40, 0.78, 0.18), vec3(0.76, 0.58, 0.24), n) : vec3(0.0);
     // vec3 col = (type != 0u) ? mix(vec3(0.1, 1, 0.1) / 1.5, vec3(0.9, 0.8, 0.1) / 1.5, n) : vec3(0.0);
     // vec3 col = (type != 0u) ? mix(vec3(0, 0, 0), vec3(1, 0, 0) , n) : vec3(0.0); // Роза
-    vec3 col = (type != 0u) ? mix(vec3(1, 1, 1), vec3(0.4, 0.8, 1) , n) : vec3(0.0);
+
+    // vec3 col = (type != 0u) ? mix(vec3(1, 1, 1), vec3(0.4, 0.8, 1) , n) : vec3(0.0);
+    vec3 col = (type != 0u) ? vec3(0.2, 0.2, 0.2) : vec3(0.0);
+
     // vec3 col = (type != 0u) ? mix(vec3(0, 0, 0), vec3(0, 0, 0) , n) : vec3(0.0);
     // vec3 col = (type != 0u) ? mix(vec3(0.2, 0.3, 0.1), vec3(0.2, 0.3, 0.1) , n) : vec3(0.0);
     vd.color = pack_color(col);

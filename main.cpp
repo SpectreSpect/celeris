@@ -79,13 +79,63 @@
 #include <vector>
 #include <random>
 
+class Footprint : public SceneObject {
+public:
+    Footprint(
+        MeshManager& mesh_manager, 
+        MaterialInstanceManager& material_instance_manager,
+        Celeris& celeris,
+        float skybox_exposure,
+        uint32_t cube_count = 5,
+        float car_length = 6.6f,
+        float inflation_size = 4,
+        float car_height = 2.0f
+    ) : m_car_length(car_length),
+        m_inflation_size(inflation_size),
+        m_celeris(&celeris) {
+        for (int i = 0; i < cube_count; i++) {
+            m_cubes.emplace_back(mesh_manager.cube, material_instance_manager.pbr);
+            
+            m_cubes.back().set_material_data(
+                PBRMaterialData::create(0.0f, 0.95f, skybox_exposure, glm::vec4(1.0f), 1.0f)
+            );
 
-void test_callback_func(VulkanCommandBuffer& command_buffere, VoxelGrid& voxel_grid) {
-    std::cout << "It worked!" << std::endl;
-}
+            m_cubes.back().transform.scale = glm::vec3(inflation_size, car_height, inflation_size);
 
-// static std::mt19937 rng(std::random_device{}());
-// static std::uniform_real_distribution<double> dist(0.0, 1.0);
+            add_child(m_cubes.back());
+        }
+    }
+
+    void update_cubes(const NonholonomicPos& rear_axle_pos, float rear_axle_offset) {
+        glm::vec3 dir(std::cos(rear_axle_pos.theta), 0.0f, std::sin(rear_axle_pos.theta));
+        glm::vec3 origin = rear_axle_pos.pos + dir * -rear_axle_offset;
+        float first_pos_offset = m_inflation_size / 2.0f;
+        float place_length = m_car_length - first_pos_offset * 2.0f;
+        float step_size = place_length / static_cast<float>(m_cubes.size());
+
+        for (int i = 0; i < m_cubes.size(); i++) {
+            glm::vec3 position = origin + dir * (first_pos_offset + step_size * i);
+
+            glm::vec4 color = glm::vec4(1, 1, 1, 1);
+            if (!m_celeris->adjust_to_ground(position, 1, 1, 2))
+                color = glm::vec4(1, 0, 0, 1);
+            
+            m_cubes[i].edit_material_data<PBRMaterialData>([&](PBRMaterialData& data){
+                data.color = color;
+            });
+
+            m_cubes[i].transform.position = position + 
+                glm::vec3(0, m_cubes[i].transform.scale.y / 2.0f, 0);
+        }
+    };
+
+private:
+    float m_car_length = 0;
+    float m_inflation_size = 0;
+    std::vector<RenderObject> m_cubes;
+    Celeris* m_celeris = nullptr;
+};
+
 
 VkClearValue clear_color = {0.05f, 0.05f, 0.05f, 1.0f};
 
@@ -144,7 +194,7 @@ int main() {
     std::unique_ptr<LidarScan> network_scan;
     std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
 
-    glm::vec3 voxel_size(1.0f);
+    glm::vec3 voxel_size(0.5f);
     glm::ivec3 chunk_size(16);
     VoxelGrid::VoxelGridDesc voxel_grid_desc {
         .chunk_size = chunk_size,
@@ -385,6 +435,7 @@ int main() {
         engine.device(),
         engine.compute_queue(1)
     );
+
     Celeris celeris(
         engine,
         engine.compute_queue(),
@@ -549,12 +600,30 @@ int main() {
 
     //     lidar_video.next_frame();
     // };
+    Footprint footprint(
+        mesh_manager, 
+        material_instance_manager, 
+        celeris, 
+        skybox_exposure, 
+        5, 
+        6.6f, 
+        2, 
+        2
+    );
+
+    auto place_footprint = [&]() {
+        NonholonomicPos pose;
+        if (make_pose_from_camera(pose)) {
+            footprint.update_cubes(pose, 1.32f);
+        }
+    };
 
     Scene scene;
 
     scene.add(skybox);
 
     scene.add(celeris_visualizer);
+    scene.add(footprint);
     // scene.add(gazelle);
     // scene.add(target_scan);
     // scene.add(voxel_point_map);
@@ -569,6 +638,7 @@ int main() {
     bool place_start_pressed = false;
     bool place_end_pressed = false;
     bool start_path_planning_pressed = false;
+    bool place_footprint_pressed = false;
     bool fps_camera_pressed = false;
     bool third_person_camera_pressed = false;
 
@@ -692,6 +762,15 @@ int main() {
 
         if (start_path_planning_pressed && glfwGetKey(window.handle(), GLFW_KEY_3) == GLFW_RELEASE) {
             start_path_planning_pressed = false;
+        }
+
+        if (!place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_PRESS) {
+            place_footprint_pressed = true;
+            place_footprint();
+        }
+
+        if (place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_RELEASE) {
+            place_footprint_pressed = false;
         }
 
         if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
@@ -862,6 +941,12 @@ int main() {
                     }
                     ImGui::SameLine();
                     ImGui::TextUnformatted("Key: 3");
+
+                    if (ImGui::Button("Place footprint")) {
+                        place_footprint();
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("Key: 4");
 
                 }
 
