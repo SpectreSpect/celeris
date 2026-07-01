@@ -92,7 +92,7 @@ VkClearValue clear_color = {0.05f, 0.05f, 0.05f, 1.0f};
 int main() {
     GlfwContext glfw_context;
     Window window(glfw_context, 1280, 720, "Celeris");
-    window.set_icon(path_utils::executable_dir() / "assets" / "icon" / "celeris_icon_2.png");
+    window.set_icon(path_utils::executable_dir() / "assets" / "icon" / "celeris_icon.png");
 
     QueueRequest queue_request;
     queue_request.graphics_count = 2;
@@ -144,7 +144,7 @@ int main() {
     std::unique_ptr<LidarScan> network_scan;
     std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
 
-    glm::vec3 voxel_size(0.2f);
+    glm::vec3 voxel_size(1.0f);
     glm::ivec3 chunk_size(16);
     VoxelGrid::VoxelGridDesc voxel_grid_desc {
         .chunk_size = chunk_size,
@@ -162,10 +162,17 @@ int main() {
         .render_distance = chunk_size.x * voxel_size.x * 30,
         .generation_distance = 5,
         .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000),
-        .inflation_size = 0u,
+        .inflation_size = 5u,
         .car_height_voxels = 3u,
+        .negative_x_inflation_size = 2u,
+        .positive_x_inflation_size = 2u,
+        .negative_y_inflation_size = 2u,
+        .positive_y_inflation_size = 0u,
+        .negative_z_inflation_size = 2u,
+        .positive_z_inflation_size = 2u,
         .display_inflated_voxels = 0u,
-        .inflated_voxel_color = 0xFF0707FFu, // 0xFF3355FFu
+        // .inflated_voxel_color = 0xFF0707FFu, // 0xFF3355FFu
+        .inflated_voxel_color = 0xFFFFFFFFu,
     };
 
     VoxelGrid voxel_grid(
@@ -185,7 +192,12 @@ int main() {
         float((voxel_grid.params().inflated_voxel_color >> 8u) & 0xFFu) / 255.0f,
         float(voxel_grid.params().inflated_voxel_color & 0xFFu) / 255.0f
     };
-    int inflation_size = voxel_grid.params().inflation_size;
+    int negative_x_inflation_size = static_cast<int>(voxel_grid.params().negative_x_inflation_size);
+    int positive_x_inflation_size = static_cast<int>(voxel_grid.params().positive_x_inflation_size);
+    int negative_y_inflation_size = static_cast<int>(voxel_grid.params().negative_y_inflation_size);
+    int positive_y_inflation_size = static_cast<int>(voxel_grid.params().positive_y_inflation_size);
+    int negative_z_inflation_size = static_cast<int>(voxel_grid.params().negative_z_inflation_size);
+    int positive_z_inflation_size = static_cast<int>(voxel_grid.params().positive_z_inflation_size);
     auto pack_inflated_voxel_color = [](const float color[4]) -> uint32_t {
         auto pack_channel = [](float value) -> uint32_t {
             return static_cast<uint32_t>(std::clamp(value, 0.0f, 1.0f) * 255.0f + 0.5f);
@@ -413,7 +425,6 @@ int main() {
     };
 
     float car_speed = celeris.car_speed();
-
 
     auto start_path_planning = [&]() {
         if (!has_start_pos || !has_end_pos)
@@ -764,13 +775,53 @@ int main() {
                         ImGuiColorEditFlags_AlphaBar
                     );
 
-                    inflated_settings_changed |= ImGui::SliderInt("Inflation size", &inflation_size, 0, 12);
+                    inflated_settings_changed |= ImGui::SliderInt(
+                        "Negative X inflation size",
+                        &negative_x_inflation_size,
+                        0,
+                        static_cast<int>(voxel_grid.params().chunk_size.x)
+                    );
+                    inflated_settings_changed |= ImGui::SliderInt(
+                        "Positive X inflation size",
+                        &positive_x_inflation_size,
+                        0,
+                        static_cast<int>(voxel_grid.params().chunk_size.x)
+                    );
+                    inflated_settings_changed |= ImGui::SliderInt(
+                        "Negative Y inflation size",
+                        &negative_y_inflation_size,
+                        0,
+                        static_cast<int>(voxel_grid.params().chunk_size.y)
+                    );
+                    inflated_settings_changed |= ImGui::SliderInt(
+                        "Positive Y inflation size",
+                        &positive_y_inflation_size,
+                        0,
+                        static_cast<int>(voxel_grid.params().chunk_size.y)
+                    );
+                    inflated_settings_changed |= ImGui::SliderInt(
+                        "Negative Z inflation size",
+                        &negative_z_inflation_size,
+                        0,
+                        static_cast<int>(voxel_grid.params().chunk_size.z)
+                    );
+                    inflated_settings_changed |= ImGui::SliderInt(
+                        "Positive Z inflation size",
+                        &positive_z_inflation_size,
+                        0,
+                        static_cast<int>(voxel_grid.params().chunk_size.z)
+                    );
 
                     if (inflated_settings_changed) {
                         voxel_grid.set_inflated_voxel_debug_display(
                             display_inflated_voxels ? 1u : 0u,
                             pack_inflated_voxel_color(inflated_voxel_color),
-                            inflation_size
+                            static_cast<uint32_t>(negative_x_inflation_size),
+                            static_cast<uint32_t>(positive_x_inflation_size),
+                            static_cast<uint32_t>(negative_y_inflation_size),
+                            static_cast<uint32_t>(positive_y_inflation_size),
+                            static_cast<uint32_t>(negative_z_inflation_size),
+                            static_cast<uint32_t>(positive_z_inflation_size)
                         );
                     }
                 }

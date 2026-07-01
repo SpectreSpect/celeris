@@ -61,13 +61,11 @@ void main() {
         voxels[global_voxel_id] = voxel_write.voxel_data;
 
         mark_dirty_mesh_around(chunk_id, chunk_pos);
-        mark_inflate_around(chunk_id, chunk_pos);
     }
     else {
         if ((read_voxel_flags(voxels[global_voxel_id].type_flags) & VOXEL_EASY_OVERWRITE_FLAG_BIT) > 0u) {
             voxels[global_voxel_id] = voxel_write.voxel_data;
             mark_dirty_mesh_around(chunk_id, chunk_pos);
-            mark_inflate_around(chunk_id, chunk_pos);
         }
     }
 }

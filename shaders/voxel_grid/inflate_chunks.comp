@@ -19,8 +19,12 @@ layout(push_constant) uniform InflateChunksPushConstants {
     uint u_voxels_per_chunk;
     uint u_pack_offset;
     uint u_pack_bits;
-    uint u_inflation_size;
-    uint u_car_height_voxels;
+    uint u_negative_x_inflation_size;
+    uint u_positive_x_inflation_size;
+    uint u_negative_y_inflation_size;
+    uint u_positive_y_inflation_size;
+    uint u_negative_z_inflation_size;
+    uint u_positive_z_inflation_size;
 };
 
 // ----- include -----
@@ -32,23 +36,43 @@ shared ivec3 shared_target_chunk_pos;
 
 bool intersects_inflated_solid(uint target_chunk_id, ivec3 target_chunk_pos, ivec3 target_local_pos)
 {
-    int radius = int(u_inflation_size);
-    int car_height_voxels = int(u_car_height_voxels);
-
     if (voxel_vis(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(0)) != 0u) {
         return true;
     }
 
-    for (int height_offset = 0; height_offset < car_height_voxels; ++height_offset) {
-        for (int z = -radius; z <= radius; ++z) {
-            for (int x = -radius; x <= radius; ++x) {
-                if (x == 0 && z == 0 && height_offset == 0) continue;
+    for (int x = 1; x <= int(u_negative_x_inflation_size); ++x) {
+        if (voxel_vis(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(-x, 0, 0)) != 0u) {
+            return true;
+        }
+    }
 
-                ivec3 sample_offset = ivec3(x, height_offset, z);
-                if (voxel_vis(target_chunk_id, target_chunk_pos, target_local_pos, sample_offset) != 0u) {
-                    return true;
-                }
-            }
+    for (int x = 1; x <= int(u_positive_x_inflation_size); ++x) {
+        if (voxel_vis(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(x, 0, 0)) != 0u) {
+            return true;
+        }
+    }
+
+    for (int y = 1; y <= int(u_negative_y_inflation_size); ++y) {
+        if (voxel_vis(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(0, -y, 0)) != 0u) {
+            return true;
+        }
+    }
+
+    for (int y = 1; y <= int(u_positive_y_inflation_size); ++y) {
+        if (voxel_vis(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(0, y, 0)) != 0u) {
+            return true;
+        }
+    }
+
+    for (int z = 1; z <= int(u_negative_z_inflation_size); ++z) {
+        if (voxel_vis(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(0, 0, -z)) != 0u) {
+            return true;
+        }
+    }
+
+    for (int z = 1; z <= int(u_positive_z_inflation_size); ++z) {
+        if (voxel_vis(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(0, 0, z)) != 0u) {
+            return true;
         }
     }
 
