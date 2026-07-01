@@ -13,10 +13,12 @@
 #include <cstdint>
 
 #include "../renderer/lines/line_instance.h"
+#include "footprint/footprint.h"
 #include "../utils/avg_timer.h"
 #include "a_star_structures.h"
 #include "../math_utils.h"
 #include "a_star.h"
+
 
 #include "../vulkan_self/logger/logger_header.h"
 
@@ -74,7 +76,8 @@ public:
     NonholonomicAStar(
         OccupancyGrid3D& occupancy_grid,
         const NonholonomicAStarDesc& desc,
-        UnimpendedPathFinder& unimpened_path_finder
+        UnimpendedPathFinder& unimpened_path_finder,
+        Footprint& footprint
     );
 
     uint64_t state_key(const NonholonomicPos& s) const;
@@ -140,6 +143,7 @@ private:
     NonholonomicAStarState m_state;
     OccupancyGrid3D* m_grid = nullptr;
     UnimpendedPathFinder* m_unimpened_path_finder = nullptr;
+    Footprint* m_footprint = nullptr;
     AStar m_plain_astar;
     
     AvgTimer m_initialize_time;

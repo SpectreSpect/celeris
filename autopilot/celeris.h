@@ -18,6 +18,7 @@
 #include "../vulkan_self/logger/logger_header.h"
 #include "path_planner.h"
 #include "vehicle_command_sender.h"
+#include "vehicle_geometry.h"
 #include "../utils/avg_timer.h"
 
 #include <chrono>
@@ -45,6 +46,10 @@ public:
         uint32_t unimpended_path_max_astar_points = 4096;
         uint32_t collision_history_size = 8;
         uint32_t collision_escape_search_radius_voxels = 8;
+        VehicleGeometry vehicle_geometry;
+        uint32_t footprint_sample_count = 5;
+        uint32_t footprint_horizontal_inflation_size = 1;
+        uint32_t footprint_vertical_inflation_size = 1;
         NonholonomicAStar::NonholonomicAStarDesc nonholonomic_astar_desc;
     };
 
@@ -83,6 +88,7 @@ public:
     VoxelPointMap& voxel_point_map();
     VoxelMapPointInserter& voxel_map_point_inserter();
     VoxelMapPointReseter& voxel_map_reseter();
+    Footprint& footprint() noexcept;
 
     void request_path_replan();
     bool adjust_to_ground(
@@ -91,6 +97,21 @@ public:
         int max_drop = 500, 
         int max_y_diff = -1, 
         bool allow_flying_over_precepices = true
+    );
+    bool adjust_to_ground(
+        std::vector<glm::vec3>& output,
+        int max_step_up = 500,
+        int max_drop = 500,
+        int max_y_diff = -1,
+        bool allow_flying_over_precepices = true
+    );
+    bool get_ground_positions(
+        const std::vector<glm::vec3>& polyline,
+        std::vector<glm::ivec3>& output,
+        int max_step_up = 500,
+        int max_drop = 500,
+        int max_y_diff = -1,
+        bool allow_flying_over_precepices = false
     );
     bool has_planned_path() const;
     PathPlanner::PathPlannerResult path_result_snapshot() const;

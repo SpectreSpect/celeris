@@ -66,6 +66,8 @@
 #include "a_star/a_star.h"
 #include "a_star/a_star_structures.h"
 #include "a_star/nonholonomic_a_star.h"
+#include "a_star/footprint/footprint.h"
+#include "a_star/footprint/footprint_visualizer.h"
 #include "autopilot/spherical_pose_marker.h"
 #include "autopilot/celeris.h"
 #include "autopilot/celeris_visualizer.h"
@@ -79,74 +81,6 @@
 #include <cmath>
 #include <vector>
 #include <random>
-
-class Footprint : public SceneObject {
-public:
-    Footprint(
-        MeshManager& mesh_manager, 
-        MaterialInstanceManager& material_instance_manager,
-        Celeris& celeris,
-        const VehicleGeometry& vehicle_geometry,
-        float skybox_exposure,
-        uint32_t cube_count = 5,
-        uint32_t horizontal_inflation_size = 1,
-        uint32_t vertical_inflation_size = 1
-    ) : m_vehicle_geometry(vehicle_geometry),
-        m_horizontal_inflation_size(horizontal_inflation_size),
-        m_vertical_inflation_size(vertical_inflation_size),
-        m_celeris(&celeris) {
-        glm::vec3 voxel_size = celeris.voxel_size();
-        for (int i = 0; i < cube_count; i++) {
-            m_cubes.emplace_back(mesh_manager.cube, material_instance_manager.pbr);
-            
-            m_cubes.back().set_material_data(
-                PBRMaterialData::create(0.0f, 0.95f, skybox_exposure, glm::vec4(1.0f), 1.0f)
-            );
-
-            
-            m_cubes.back().transform.scale = glm::vec3(
-                static_cast<float>(m_horizontal_inflation_size) * voxel_size.x * 2.0f,
-                static_cast<float>(m_vertical_inflation_size) * voxel_size.y,
-                static_cast<float>(m_horizontal_inflation_size) * voxel_size.z * 2.0f
-            );
-
-            add_child(m_cubes.back());
-        }
-    }
-
-    void update_cubes(const NonholonomicPos& rear_axle_pos) {
-        glm::vec3 voxel_size = m_celeris->voxel_size();
-
-        glm::vec3 dir(std::cos(rear_axle_pos.theta), 0.0f, std::sin(rear_axle_pos.theta));
-        glm::vec3 origin = rear_axle_pos.pos + dir * -m_vehicle_geometry.rear_axle_from_rear;
-        float first_pos_offset = static_cast<float>(m_horizontal_inflation_size) * voxel_size.x;
-        float place_length = m_vehicle_geometry.size.z - first_pos_offset * 2.0f;
-        float step_size = place_length / static_cast<float>(m_cubes.size());
-
-        for (int i = 0; i < m_cubes.size(); i++) {
-            glm::vec3 position = origin + dir * (first_pos_offset + step_size * i);
-
-            glm::vec4 color = glm::vec4(1, 1, 1, 1);
-            if (!m_celeris->adjust_to_ground(position, 1, 1, 2))
-                color = glm::vec4(1, 0, 0, 1);
-            
-            m_cubes[i].edit_material_data<PBRMaterialData>([&](PBRMaterialData& data){
-                data.color = color;
-            });
-
-            m_cubes[i].transform.position = position + 
-                glm::vec3(0, m_cubes[i].transform.scale.y / 2.0f, 0);
-        }
-    };
-
-private:
-    VehicleGeometry m_vehicle_geometry;
-    uint32_t m_horizontal_inflation_size = 0;
-    uint32_t m_vertical_inflation_size = 0;
-    std::vector<RenderObject> m_cubes;
-    Celeris* m_celeris = nullptr;
-};
-
 
 VkClearValue clear_color = {0.05f, 0.05f, 0.05f, 1.0f};
 
@@ -408,8 +342,9 @@ int main() {
                 }
     };
 
-    add_test_wall(glm::ivec3(5, 0, 0), glm::ivec3(1, 5, 6));
-    add_test_wall(glm::ivec3(5, 0, 5), glm::ivec3(6, 5, 1));
+    add_test_wall(glm::ivec3(5, 0, 0), glm::ivec3(1, 5, 20));
+    add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(1, 5, 20));
+    // add_test_wall(glm::ivec3(5, 0, 5), glm::ivec3(6, 5, 1));
 
     VulkanBuffer box_voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + Utils::size_bytes(test_voxel_writes));
     box_voxel_write_list.upload_scalar<uint32_t>(test_voxel_writes.size(), 0);
@@ -479,7 +414,12 @@ int main() {
         scan_vertex_buffer,
         scan_index_buffer,
         mesher,
-        Celeris::CelerisDesc()
+        Celeris::CelerisDesc{
+            .vehicle_geometry = vehicle_geometry,
+            .footprint_sample_count = 5,
+            .footprint_horizontal_inflation_size = horizontal_inflation_size,
+            .footprint_vertical_inflation_size = vertical_inflation_size
+        }
     );
     celeris.set_start(NonholonomicPos{.pos = glm::vec3(0.0f, 1.5f, 0.0f)});
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.92f, -51.30f)});
@@ -633,21 +573,18 @@ int main() {
 
     //     lidar_video.next_frame();
     // };
-    Footprint footprint(
-        mesh_manager, 
-        material_instance_manager, 
-        celeris, 
-        vehicle_geometry,
-        skybox_exposure, 
-        5, 
-        horizontal_inflation_size,
-        vertical_inflation_size
+    FootprintVisualizer footprint_visualizer(
+        mesh_manager,
+        material_instance_manager,
+        celeris,
+        celeris.footprint(),
+        skybox_exposure
     );
 
     auto place_footprint = [&]() {
         NonholonomicPos pose;
         if (make_pose_from_camera(pose)) {
-            footprint.update_cubes(pose);
+            footprint_visualizer.update_footprint(pose);
         }
     };
 
@@ -656,7 +593,7 @@ int main() {
     scene.add(skybox);
 
     scene.add(celeris_visualizer);
-    scene.add(footprint);
+    scene.add(footprint_visualizer);
     // scene.add(gazelle);
     // scene.add(target_scan);
     // scene.add(voxel_point_map);

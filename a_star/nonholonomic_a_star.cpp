@@ -229,10 +229,12 @@ void NonholonomicAStar::insert_wall_avoidance_points(std::vector<NonholonomicPos
 NonholonomicAStar::NonholonomicAStar(
     OccupancyGrid3D& occupancy_grid, 
     const NonholonomicAStarDesc& desc,
-    UnimpendedPathFinder& unimpened_path_finder)
+    UnimpendedPathFinder& unimpened_path_finder,
+    Footprint& footprint)
     :   m_params(desc),
         m_grid(&occupancy_grid),
         m_unimpened_path_finder(&unimpened_path_finder),
+        m_footprint(&footprint),
         m_plain_astar(occupancy_grid, AStar::AStarDesc{
             .max_step_up = desc.max_step_up,
             .max_drop = desc.max_drop,
@@ -830,37 +832,33 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
     for (int dir = -1; dir <= 1; dir += 2)
         for (int steer = -1; steer <= 1; steer++) {
             std::vector<NonholonomicPos> motion = NonholonomicAStar::simulate_motion(cur_cell.pos, steer, dir);
-            std::vector<NonholonomicPos> simplified_motion = {motion[0], motion[motion.size() - 1]};
+            // std::vector<NonholonomicPos> simplified_motion = {motion[0], motion[motion.size() - 1]};
 
             auto adjust_to_ground_start = std::chrono::steady_clock::now();
-            if (!m_grid->adjust_to_ground(
-                    simplified_motion, 
-                    m_params.max_step_up, 
-                    m_params.max_drop, 
-                    m_params.max_y_diff, 
-                    m_params.allow_flying_over_precipices)) {
-                continue;
-            }
+            Footprint::PathResult footprint_path = m_footprint->evaluate_path(
+                motion,
+                m_params.max_step_up,
+                m_params.max_drop,
+                m_params.max_y_diff,
+                m_params.allow_flying_over_precipices
+            );
                 
             auto adjust_to_ground_end = std::chrono::steady_clock::now();
 
-            std::vector<glm::ivec3> ground_positions;
-            if (!m_grid->get_ground_positions(
-                simplified_motion, 
-                ground_positions, 
-                m_params.max_step_up, 
-                m_params.max_drop, 
-                m_params.max_y_diff,
-                m_params.allow_flying_over_precipices)) {
+            if (!footprint_path.is_passible) {
                 continue;
             }
+
+            motion = std::move(footprint_path.path);
 
             float motion_dist = 0;
             for (int i = 0; i < motion.size() -1; i++) {
                 motion_dist += glm::distance(motion[i].pos, motion[i+1].pos);
             }
             
-            NonholonomicPos new_pos = simplified_motion[simplified_motion.size() - 1];
+            // NonholonomicPos new_pos = simplified_motion[simplified_motion.size() - 1];
+            NonholonomicPos new_pos = motion.back();
+            
 
             uint64_t new_key = state_key(new_pos);
             auto heap_it = m_state.closed_heap.find(new_key);
@@ -891,7 +889,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
             if (!new_cell.simulated_motion.empty()) {
                 new_cell.simulated_motion.back() = new_pos;
             }
-            
+
             new_cell.no_parent = false;
             new_cell.g = new_g;
             new_cell.f = new_g + get_nonholonomic_f(new_cell.pos, m_state.end_pos, cur_cell.pos);

@@ -135,6 +135,8 @@ add_executable(app
   a_star/a_star.cpp
   a_star/nonholonomic_a_star.cpp
   a_star/reeds_shepp.cpp
+  a_star/footprint/footprint.cpp
+  a_star/footprint/footprint_visualizer.cpp
   autopilot/spherical_pose_marker.cpp
   autopilot/gazelle_next.cpp
   autopilot/vehicle_command_sender.cpp
