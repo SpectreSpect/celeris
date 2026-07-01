@@ -732,13 +732,18 @@ bool NonholonomicAStar::try_reeds_shepp_shot(NonholonomicPos& start, Nonholonomi
     if (out_path.empty())
         return false;
 
-    if (!m_grid->adjust_to_ground(
-            out_path, 
-            m_params.max_step_up, 
-            m_params.max_drop, 
-            m_params.max_y_diff, 
-            m_params.allow_flying_over_precipices))
+    Footprint::PathResult footprint_path = m_footprint->evaluate_path(
+        out_path,
+        m_params.max_step_up,
+        m_params.max_drop,
+        m_params.max_y_diff,
+        m_params.allow_flying_over_precipices
+    );
+
+    if (!footprint_path.is_passible)
         return false;
+
+    out_path = std::move(footprint_path.path);
 
     insert_y_transition_points(out_path);
     
