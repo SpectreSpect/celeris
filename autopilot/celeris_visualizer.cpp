@@ -25,6 +25,7 @@
 CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager, 
                                      MaterialInstanceManager& material_instance_manager, 
                                      Celeris& celeris,
+                                     const VehicleGeometry& vehicle_geometry,
                                      uint32_t max_path_line_count,
                                      float skybox_exposure)
     :   max_path_line_count(max_path_line_count),
@@ -36,7 +37,7 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
         m_goal_marker(mesh_manager, 
                     material_instance_manager, 
                     PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(0, 0, 1, 1))),
-        m_gazelle_next(mesh_manager, material_instance_manager, skybox_exposure),
+        m_gazelle_next(mesh_manager, material_instance_manager, vehicle_geometry, skybox_exposure),
         m_path_line_cloud(*m_celeris->engine(),
                    mesh_manager.line_quad,
                    material_instance_manager.line,
@@ -109,6 +110,15 @@ void CelerisVisualizer::set_goal(const Transform& transform) {
     reset_marker_interpolation(m_goal_marker, m_goal_marker_interpolation);
 }
 
+void CelerisVisualizer::set_car_pose_override(const NonholonomicPos& nonholonomic_position) {
+    m_has_car_pose_override = true;
+    m_car_pose_override = nonholonomic_position;
+}
+
+void CelerisVisualizer::clear_car_pose_override() {
+    m_has_car_pose_override = false;
+}
+
 glm::vec3 CelerisVisualizer::get_start_marker_pos() {
     return m_start_marker.transform.position;
 }
@@ -125,7 +135,10 @@ void CelerisVisualizer::update() {
 
     set_start(m_celeris->start_position());
     set_goal(m_celeris->goal_position());
-    set_gazelle_pose_from_lidar_transform();
+    if (m_has_car_pose_override)
+        set_gazelle_pose(m_car_pose_override);
+    else
+        set_gazelle_pose_from_lidar_transform();
 
     m_start_marker.visible = show_start_marker;
     m_gazelle_next.visible = show_gazelle_next;
@@ -195,6 +208,17 @@ void CelerisVisualizer::set_marker_pose(SphericalPoseMarker& marker, Nonholonomi
         glm::pi<float>() - nonholonomic_position.theta,
         glm::vec3(0.0f, 1.0f, 0.0f)
     );
+}
+
+void CelerisVisualizer::set_gazelle_pose(const NonholonomicPos& nonholonomic_position) {
+    Transform rear_axle_transform;
+    rear_axle_transform.position = nonholonomic_position.pos + marker_vertical_offset();
+    rear_axle_transform.rotation = glm::angleAxis(
+        -nonholonomic_position.theta,
+        glm::vec3(0.0f, 1.0f, 0.0f)
+    );
+
+    m_gazelle_next.set_rear_axle_transform(rear_axle_transform);
 }
 
 void CelerisVisualizer::set_gazelle_pose_from_lidar_transform() {

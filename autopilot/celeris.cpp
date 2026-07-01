@@ -58,6 +58,10 @@ Celeris::Celeris(VulkanEngine& engine,
             PathPlanner::PathPlannerDesc{
                 .unimpended_path_window_size = desc.unimpended_path_window_size,
                 .unimpended_path_max_astar_points = desc.unimpended_path_max_astar_points,
+                .vehicle_geometry = desc.vehicle_geometry,
+                .footprint_sample_count = desc.footprint_sample_count,
+                .footprint_horizontal_inflation_size = desc.footprint_horizontal_inflation_size,
+                .footprint_vertical_inflation_size = desc.footprint_vertical_inflation_size,
                 .nonholonomic_astar_desc = desc.nonholonomic_astar_desc
             }
         ),
@@ -95,7 +99,7 @@ void Celeris::start_lidar_receiver() {
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     start_lidar_receiver();
     // m_command_sender.start();
-    // m_path_planner.start(std::move(planner_submit_context));
+    m_path_planner.start(std::move(planner_submit_context));
 }
 
 void Celeris::update(VulkanSubmitContext& submit_context) {
@@ -278,6 +282,10 @@ VoxelMapPointInserter& Celeris::voxel_map_point_inserter() {
 
 VoxelMapPointReseter& Celeris::voxel_map_reseter() {
     return m_voxel_map_reseter;
+}
+
+Footprint& Celeris::footprint() noexcept {
+    return m_path_planner.footprint();
 }
 
 uint32_t Celeris::received_scan_count() const noexcept {
@@ -536,8 +544,51 @@ void Celeris::request_path_replan() {
     m_path_planner.request_path_replan(m_start_position, m_goal_position);
 }
 
-bool Celeris::adjust_to_ground(glm::vec3& output) {
-    return m_path_planner.request_adjust_to_ground(output);
+bool Celeris::adjust_to_ground(
+    glm::vec3& output, 
+    int max_step_up, 
+    int max_drop, 
+    int max_y_diff, 
+    bool allow_flying_over_precepices) {
+    return m_path_planner.request_adjust_to_ground(
+        output, 
+        max_step_up, 
+        max_drop, 
+        max_y_diff, 
+        allow_flying_over_precepices
+    );
+}
+
+bool Celeris::adjust_to_ground(
+    std::vector<glm::vec3>& output,
+    int max_step_up,
+    int max_drop,
+    int max_y_diff,
+    bool allow_flying_over_precepices) {
+    return m_path_planner.request_adjust_to_ground(
+        output,
+        max_step_up,
+        max_drop,
+        max_y_diff,
+        allow_flying_over_precepices
+    );
+}
+
+bool Celeris::get_ground_positions(
+    const std::vector<glm::vec3>& polyline,
+    std::vector<glm::ivec3>& output,
+    int max_step_up,
+    int max_drop,
+    int max_y_diff,
+    bool allow_flying_over_precepices) {
+    return m_path_planner.request_get_ground_positions(
+        polyline,
+        output,
+        max_step_up,
+        max_drop,
+        max_y_diff,
+        allow_flying_over_precepices
+    );
 }
 
 bool Celeris::has_planned_path() const {

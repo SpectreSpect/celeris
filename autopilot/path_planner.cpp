@@ -37,10 +37,18 @@ PathPlanner::PathPlanner(
             voxel_grid,
             manager_bundle.compute_pass_manager()
         ),
+        m_footprint(
+            m_occupancy_grid,
+            desc.vehicle_geometry,
+            desc.footprint_sample_count,
+            desc.footprint_horizontal_inflation_size,
+            desc.footprint_vertical_inflation_size
+        ),
         m_planner(
             m_occupancy_grid,
             desc.nonholonomic_astar_desc,
-            m_unimpended_path_finder
+            m_unimpended_path_finder,
+            m_footprint
         )
 {
     LOG_METHOD();
@@ -172,6 +180,42 @@ bool PathPlanner::request_adjust_to_ground(
     );
 }
 
+bool PathPlanner::request_adjust_to_ground(
+    std::vector<glm::vec3>& output,
+    int max_step_up,
+    int max_drop,
+    int max_y_diff,
+    bool allow_flying_over_precepices)
+{
+    std::lock_guard lock(m_occupancy_grid_mutex);
+    return m_occupancy_grid.adjust_to_ground(
+        output,
+        max_step_up,
+        max_drop,
+        max_y_diff,
+        allow_flying_over_precepices
+    );
+}
+
+bool PathPlanner::request_get_ground_positions(
+    const std::vector<glm::vec3>& polyline,
+    std::vector<glm::ivec3>& output,
+    int max_step_up,
+    int max_drop,
+    int max_y_diff,
+    bool allow_flying_over_precepices)
+{
+    std::lock_guard lock(m_occupancy_grid_mutex);
+    return m_occupancy_grid.get_ground_positions(
+        polyline,
+        output,
+        max_step_up,
+        max_drop,
+        max_y_diff,
+        allow_flying_over_precepices
+    );
+}
+
 bool PathPlanner::request_is_solid(glm::ivec3 voxel_pos) {
     std::lock_guard lock(m_occupancy_grid_mutex);
     return m_occupancy_grid.is_solid(voxel_pos);
@@ -200,6 +244,10 @@ glm::vec3 PathPlanner::request_voxel_to_world_pos(const glm::ivec3& voxel_pos) {
 glm::vec3 PathPlanner::request_voxel_center_world_pos(const glm::ivec3& voxel_pos) {
     std::lock_guard lock(m_occupancy_grid_mutex);
     return m_occupancy_grid.voxel_center_world_pos(voxel_pos);
+}
+
+Footprint& PathPlanner::footprint() noexcept {
+    return m_footprint;
 }
 
 void PathPlanner::planner_loop(VulkanSubmitContext submit_context) {

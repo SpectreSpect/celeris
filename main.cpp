@@ -66,9 +66,12 @@
 #include "a_star/a_star.h"
 #include "a_star/a_star_structures.h"
 #include "a_star/nonholonomic_a_star.h"
+#include "a_star/footprint/footprint.h"
+#include "a_star/footprint/footprint_visualizer.h"
 #include "autopilot/spherical_pose_marker.h"
 #include "autopilot/celeris.h"
 #include "autopilot/celeris_visualizer.h"
+#include "autopilot/vehicle_geometry.h"
 #include "voxel_grid_vulkan/voxel_grid_gpu_debugger.h"
 #include "camera/controllers/third_person_camera_controller.h"
 #include "autopilot/vehicle_command_sender.h"
@@ -78,14 +81,6 @@
 #include <cmath>
 #include <vector>
 #include <random>
-
-
-void test_callback_func(VulkanCommandBuffer& command_buffere, VoxelGrid& voxel_grid) {
-    std::cout << "It worked!" << std::endl;
-}
-
-// static std::mt19937 rng(std::random_device{}());
-// static std::uniform_real_distribution<double> dist(0.0, 1.0);
 
 VkClearValue clear_color = {0.05f, 0.05f, 0.05f, 1.0f};
 
@@ -98,6 +93,23 @@ int main() {
     queue_request.graphics_count = 2;
     queue_request.present_count = 1;
     queue_request.compute_count = 2;
+
+    auto vehicle_config_path = []() {
+        const std::filesystem::path relative_path =
+            std::filesystem::path("configs") / "vehicles" / "gazelle_next_sim.yaml";
+
+#ifdef CELERIS_SOURCE_DIR
+        const std::filesystem::path source_path =
+            std::filesystem::path(CELERIS_SOURCE_DIR) / relative_path;
+        if (std::filesystem::exists(source_path)) {
+            return source_path;
+        }
+#endif
+
+        return path_utils::executable_dir() / relative_path;
+    }();
+
+    const VehicleGeometry vehicle_geometry = load_vehicle_geometry(vehicle_config_path);
 
     VulkanEngine engine(glfw_context, window, queue_request);
 
@@ -145,6 +157,10 @@ int main() {
     std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
 
     glm::vec3 voxel_size(1.0f);
+    uint32_t vertical_inflation_size = 
+        static_cast<uint32_t>(std::ceil(vehicle_geometry.size.y / voxel_size.y));
+    uint32_t horizontal_inflation_size = 
+        static_cast<uint32_t>(std::ceil((vehicle_geometry.size.x / voxel_size.x) / 2.0f));
     glm::ivec3 chunk_size(16);
     VoxelGrid::VoxelGridDesc voxel_grid_desc {
         .chunk_size = chunk_size,
@@ -164,12 +180,12 @@ int main() {
         .max_write_count = chunk_size.x * chunk_size.y * chunk_size.z * static_cast<uint32_t>(2'000),
         .inflation_size = 5u,
         .car_height_voxels = 3u,
-        .negative_x_inflation_size = 2u,
-        .positive_x_inflation_size = 2u,
-        .negative_y_inflation_size = 2u,
+        .negative_x_inflation_size = horizontal_inflation_size,
+        .positive_x_inflation_size = horizontal_inflation_size,
+        .negative_y_inflation_size = vertical_inflation_size,
         .positive_y_inflation_size = 0u,
-        .negative_z_inflation_size = 2u,
-        .positive_z_inflation_size = 2u,
+        .negative_z_inflation_size = horizontal_inflation_size,
+        .positive_z_inflation_size = horizontal_inflation_size,
         .display_inflated_voxels = 0u,
         // .inflated_voxel_color = 0xFF0707FFu, // 0xFF3355FFu
         .inflated_voxel_color = 0xFFFFFFFFu,
@@ -326,21 +342,26 @@ int main() {
                 }
     };
 
-    add_test_wall(glm::ivec3(5, 0, 0), glm::ivec3(1, 5, 6));
-    add_test_wall(glm::ivec3(5, 0, 5), glm::ivec3(6, 5, 1));
+    // add_test_wall(glm::ivec3(5, 0, 0), glm::ivec3(1, 5, 5));
+    // add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(1, 5, 5));
+    // add_test_wall(glm::ivec3(5, 0, 0), glm::ivec3(5, 5, 1));
 
-    VulkanBuffer box_voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + Utils::size_bytes(test_voxel_writes));
-    box_voxel_write_list.upload_scalar<uint32_t>(test_voxel_writes.size(), 0);
-    box_voxel_write_list.upload(test_voxel_writes, sizeof(uint32_t) * 4);
+    // add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(1, 5, 5));
+    // add_test_wall(glm::ivec3(15, 0, 0), glm::ivec3(1, 5, 5));
+    // add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(5, 5, 1));
 
-    VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
-    {
-        auto scope = compute_command_buffer.begin_scope();
-        voxel_grid.set_voxels(compute_command_buffer, box_voxel_write_list);
-    }
-    VulkanFence compute_fence(engine.device());
-    engine.compute_submit(compute_command_buffer, &compute_fence);
-    compute_fence.wait();
+    // VulkanBuffer box_voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + Utils::size_bytes(test_voxel_writes));
+    // box_voxel_write_list.upload_scalar<uint32_t>(test_voxel_writes.size(), 0);
+    // box_voxel_write_list.upload(test_voxel_writes, sizeof(uint32_t) * 4);
+
+    // VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
+    // {
+    //     auto scope = compute_command_buffer.begin_scope();
+    //     voxel_grid.set_voxels(compute_command_buffer, box_voxel_write_list);
+    // }
+    // VulkanFence compute_fence(engine.device());
+    // engine.compute_submit(compute_command_buffer, &compute_fence);
+    // compute_fence.wait();
 
     // voxel_grid.update(window, camera);
 
@@ -366,7 +387,7 @@ int main() {
     Renderer renderer(engine, frame_resources);
 
     const float skybox_exposure = 1.8f;
-    GazelleNext gazelle(mesh_manager, material_instance_manager, skybox_exposure);
+    GazelleNext gazelle(mesh_manager, material_instance_manager, vehicle_geometry, skybox_exposure);
 
     Skybox skybox(
         mesh_manager.skybox_cube,
@@ -385,6 +406,7 @@ int main() {
         engine.device(),
         engine.compute_queue(1)
     );
+
     Celeris celeris(
         engine,
         engine.compute_queue(),
@@ -396,16 +418,23 @@ int main() {
         scan_vertex_buffer,
         scan_index_buffer,
         mesher,
-        Celeris::CelerisDesc()
+        Celeris::CelerisDesc{
+            .vehicle_geometry = vehicle_geometry,
+            .footprint_sample_count = 5,
+            .footprint_horizontal_inflation_size = horizontal_inflation_size,
+            .footprint_vertical_inflation_size = vertical_inflation_size
+        }
     );
     celeris.set_start(NonholonomicPos{.pos = glm::vec3(0.0f, 1.5f, 0.0f)});
-    celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.92f, -51.30f)});
+    // celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.92f, -51.30f)});
+    celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
     // celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.5f, -0.0f)});
     celeris.start(std::move(planner_submit_context));
 
     CelerisVisualizer celeris_visualizer(mesh_manager, 
                                          material_instance_manager, 
                                          celeris, 
+                                         vehicle_geometry,
                                          20000, 
                                          skybox_exposure);
 
@@ -549,12 +578,27 @@ int main() {
 
     //     lidar_video.next_frame();
     // };
+    FootprintVisualizer footprint_visualizer(
+        mesh_manager,
+        material_instance_manager,
+        celeris,
+        celeris.footprint(),
+        skybox_exposure
+    );
+
+    auto place_footprint = [&]() {
+        NonholonomicPos pose;
+        if (make_pose_from_camera(pose)) {
+            footprint_visualizer.update_footprint(pose);
+        }
+    };
 
     Scene scene;
 
     scene.add(skybox);
 
     scene.add(celeris_visualizer);
+    scene.add(footprint_visualizer);
     // scene.add(gazelle);
     // scene.add(target_scan);
     // scene.add(voxel_point_map);
@@ -569,6 +613,7 @@ int main() {
     bool place_start_pressed = false;
     bool place_end_pressed = false;
     bool start_path_planning_pressed = false;
+    bool place_footprint_pressed = false;
     bool fps_camera_pressed = false;
     bool third_person_camera_pressed = false;
 
@@ -582,6 +627,70 @@ int main() {
     float angular_speed = glm::half_pi<float>() * 0.5f;
 
     std::vector<glm::mat4> transform_mem(3);
+    std::vector<NonholonomicPos> car_playback_path;
+    bool car_playback_active = false;
+    bool car_playback_loop = false;
+    float car_playback_distance = 0.0f;
+    float car_playback_total_length = 0.0f;
+    float car_playback_speed = 4.0f;
+
+    auto path_length = [](const std::vector<NonholonomicPos>& path) {
+        float length = 0.0f;
+        for (size_t i = 1; i < path.size(); i++) {
+            length += glm::distance(path[i - 1].pos, path[i].pos);
+        }
+
+        return length;
+    };
+
+    auto sample_path_pose = [](const std::vector<NonholonomicPos>& path, float target_distance) {
+        if (path.empty())
+            return NonholonomicPos{};
+
+        if (path.size() == 1)
+            return path.front();
+
+        float traversed_distance = 0.0f;
+        for (size_t i = 1; i < path.size(); i++) {
+            const NonholonomicPos& from = path[i - 1];
+            const NonholonomicPos& to = path[i];
+            const float segment_length = glm::distance(from.pos, to.pos);
+
+            if (segment_length <= 0.0f)
+                continue;
+
+            if (traversed_distance + segment_length >= target_distance) {
+                const float t = glm::clamp(
+                    (target_distance - traversed_distance) / segment_length,
+                    0.0f,
+                    1.0f
+                );
+
+                NonholonomicPos pose = from;
+                pose.pos = glm::mix(from.pos, to.pos, t);
+                pose.theta = from.theta + NonholonomicAStar::angle_diff(from.theta, to.theta) * t;
+                pose.steer = to.steer;
+                pose.dir = to.dir;
+                pose.dubins_segment_id = to.dubins_segment_id;
+                return pose;
+            }
+
+            traversed_distance += segment_length;
+        }
+
+        return path.back();
+    };
+
+    auto start_car_playback = [&]() {
+        car_playback_path = celeris.path_result_snapshot().nonholonomic_astar_path;
+        car_playback_total_length = path_length(car_playback_path);
+        car_playback_distance = 0.0f;
+        car_playback_active = car_playback_path.size() >= 2 && car_playback_total_length > 0.0f;
+
+        if (car_playback_active) {
+            celeris_visualizer.set_car_pose_override(car_playback_path.front());
+        }
+    };
 
     use_fps_camera_controller();
 
@@ -639,6 +748,24 @@ int main() {
             voxel_point_map.set_instance_view(celeris.voxel_point_map().get_map_instance_view());
             rendered_celeris_scan_count = celeris.received_scan_count();
         }
+
+        if (car_playback_active) {
+            car_playback_distance += car_playback_speed * delta_time;
+
+            if (car_playback_distance >= car_playback_total_length) {
+                if (car_playback_loop) {
+                    car_playback_distance = std::fmod(car_playback_distance, car_playback_total_length);
+                } else {
+                    car_playback_distance = car_playback_total_length;
+                    car_playback_active = false;
+                }
+            }
+
+            celeris_visualizer.set_car_pose_override(
+                sample_path_pose(car_playback_path, car_playback_distance)
+            );
+        }
+
         celeris_visualizer.update();
 
         if (!fps_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_F) == GLFW_PRESS) {
@@ -692,6 +819,15 @@ int main() {
 
         if (start_path_planning_pressed && glfwGetKey(window.handle(), GLFW_KEY_3) == GLFW_RELEASE) {
             start_path_planning_pressed = false;
+        }
+
+        if (!place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_PRESS) {
+            place_footprint_pressed = true;
+            place_footprint();
+        }
+
+        if (place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_RELEASE) {
+            place_footprint_pressed = false;
         }
 
         if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
@@ -862,6 +998,28 @@ int main() {
                     }
                     ImGui::SameLine();
                     ImGui::TextUnformatted("Key: 3");
+
+                    if (ImGui::Button("Place footprint")) {
+                        place_footprint();
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("Key: 4");
+
+                    if (ImGui::Button("Play car path")) {
+                        start_car_playback();
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Stop")) {
+                        car_playback_active = false;
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset car")) {
+                        car_playback_active = false;
+                        celeris_visualizer.clear_car_pose_override();
+                    }
+
+                    ImGui::Checkbox("Loop car path", &car_playback_loop);
+                    ImGui::SliderFloat("Car playback speed", &car_playback_speed, 0.1f, 20.0f, "%.1f m/s");
 
                 }
 

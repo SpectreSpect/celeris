@@ -2,6 +2,7 @@
 
 #include "gazelle_next.h"
 #include "spherical_pose_marker.h"
+#include "../a_star/a_star_structures.h"
 #include "../renderer/scene_object.h"
 #include "../renderer/lines/line_cloud.h"
 
@@ -15,7 +16,7 @@
 #include <chrono>
 
 class Celeris;
-class NonholonomicPos;
+struct VehicleGeometry;
 
 class CelerisVisualizer : public SceneObject {
 public:
@@ -24,6 +25,7 @@ public:
     CelerisVisualizer(MeshManager& mesh_manager, 
                       MaterialInstanceManager& material_instance_manager, 
                       Celeris& celeris,
+                      const VehicleGeometry& vehicle_geometry,
                       uint32_t max_path_line_count = 20000,
                       float skybox_exposure = 1.8f);
    
@@ -32,6 +34,8 @@ public:
     
     void set_start(const Transform& transform);
     void set_goal(const Transform& transform);
+    void set_car_pose_override(const NonholonomicPos& nonholonomic_position);
+    void clear_car_pose_override();
 
     glm::vec3 get_start_marker_pos();
 
@@ -72,12 +76,15 @@ private:
     bool show_unimpeded_path = true;
     bool show_start_marker = false;
     bool show_gazelle_next = true;
+    bool m_has_car_pose_override = false;
+    NonholonomicPos m_car_pose_override;
 
 private:
     glm::vec3 voxel_size() noexcept;
     glm::vec3 marker_vertical_offset() noexcept;
 
     void set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position);
+    void set_gazelle_pose(const NonholonomicPos& nonholonomic_position);
     void set_gazelle_pose_from_lidar_transform();
     void reset_marker_interpolation(
         SphericalPoseMarker& marker,
