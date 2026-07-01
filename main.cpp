@@ -342,8 +342,13 @@ int main() {
                 }
     };
 
-    add_test_wall(glm::ivec3(5, 0, 0), glm::ivec3(1, 5, 20));
-    add_test_wall(glm::ivec3(13, 0, 0), glm::ivec3(1, 5, 20));
+    add_test_wall(glm::ivec3(5, 0, 0), glm::ivec3(1, 5, 5));
+    add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(1, 5, 5));
+    add_test_wall(glm::ivec3(5, 0, 0), glm::ivec3(5, 5, 1));
+
+    add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(1, 5, 5));
+    add_test_wall(glm::ivec3(15, 0, 0), glm::ivec3(1, 5, 5));
+    add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(5, 5, 1));
     // add_test_wall(glm::ivec3(5, 0, 5), glm::ivec3(6, 5, 1));
 
     VulkanBuffer box_voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + Utils::size_bytes(test_voxel_writes));
