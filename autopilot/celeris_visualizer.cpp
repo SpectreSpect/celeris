@@ -7,9 +7,11 @@
 
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <imgui.h>
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 // namespace {
 //     void set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position) {
@@ -44,6 +46,7 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
             material_instance_manager, 
             PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(0, 1, 0, 1))
         ),
+        m_gazelle_next(mesh_manager, material_instance_manager, skybox_exposure),
         m_path_line_cloud(*m_celeris->engine(),
                    mesh_manager.line_quad,
                    material_instance_manager.line,
@@ -90,6 +93,7 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
     });
 
     add_child(m_start_marker);
+    add_child(m_gazelle_next);
     add_child(m_goal_marker);
     add_child(m_vehicle_marker);
     add_child(m_path_line_cloud);
@@ -105,12 +109,14 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
 
 void CelerisVisualizer::set_start(const NonholonomicPos& nonholonomic_position) {
     set_marker_pose(m_start_marker, nonholonomic_position);
+    set_gazelle_pose_from_lidar_transform();
     reset_marker_interpolation(m_start_marker, m_start_marker_interpolation);
 }
 
 void CelerisVisualizer::set_start(const Transform& transform) {
     m_start_marker.transform = transform;
     m_start_marker.transform.position += marker_vertical_offset();
+    set_gazelle_pose_from_lidar_transform();
     reset_marker_interpolation(m_start_marker, m_start_marker_interpolation);
 }
 
@@ -150,18 +156,49 @@ void CelerisVisualizer::update() {
     const bool received_new_scan = received_scan_count != scan_generation;
     scan_generation = received_scan_count;
 
-    interpolate_marker_pose(
-        m_start_marker,
-        m_start_marker_interpolation,
-        m_celeris->start_position(),
-        now,
-        received_new_scan
+    set_start(m_celeris->start_position());
+    set_goal(m_celeris->goal_position());
+    set_gazelle_pose_from_lidar_transform();
+
+    m_start_marker.visible = show_start_marker;
+    m_gazelle_next.visible = show_gazelle_next;
+
+    // interpolate_marker_pose(
+    //     m_start_marker,
+    //     m_start_marker_interpolation,
+    //     m_celeris->start_position(),
+    //     now,
+    //     received_new_scan
+    // );
+    // interpolate_marker_pose(
+    //     m_goal_marker,
+    //     m_goal_marker_interpolation,
+    //     m_celeris->goal_position(),
+    //     now
+    // );
+
+    static const std::vector<LineInstance> hidden_lines{
+        LineInstance{
+            .p0 = glm::vec3(0.0f),
+            .p1 = glm::vec3(0.0f),
+            .color = glm::vec4(0.0f)
+        }
+    };
+
+    PathPlanner::PathPlannerResult path_result = m_celeris->path_result_snapshot();
+    m_guide_path_line_cloud.set_lines(
+        show_guide_path ? make_path_lines(path_result.plain_astar_path.path) : hidden_lines
     );
-    interpolate_marker_pose(
-        m_goal_marker,
-        m_goal_marker_interpolation,
-        m_celeris->goal_position(),
-        now
+    m_path_line_cloud.set_lines(
+        show_path ? make_path_lines(path_result.nonholonomic_astar_path, true) : hidden_lines
+    );
+    m_explored_paths_line_cloud.set_lines(
+        show_explored_paths && !path_result.explored_paths.empty()
+            ? path_result.explored_paths
+            : hidden_lines
+    );
+    m_unimpended_path_line_cloud.set_lines(
+        show_unimpeded_path ? make_path_lines(path_result.unimpended_path) : hidden_lines
     );
 
     interpolate_marker_pose(
@@ -171,37 +208,33 @@ void CelerisVisualizer::update() {
         now,
         received_new_scan
     );
+    m_vehicle_marker.visible = show_vehicle_marker;
 
-    {
-        std::lock_guard<std::mutex> lock(m_celeris->planner_mutex());
-        m_guide_path_line_cloud.set_lines(make_path_lines(m_celeris->plain_astar_path.path));
-        m_path_line_cloud.set_lines(make_path_lines(m_celeris->nonholonomic_astar_path, true));
-        if (m_celeris->explored_paths.size() > 0)
-            m_explored_paths_line_cloud.set_lines(m_celeris->explored_paths);
-        m_unimpended_path_line_cloud.set_lines(make_path_lines(m_celeris->unimpended_path));
-        m_local_candidate_line_cloud.set_lines(make_local_candidate_lines(
-            m_celeris->local_planner_candidates(),
-            m_celeris->vehicle_position().pos.y
-        ));
+    m_local_candidate_line_cloud.set_lines(
+        show_local_candidates
+            ? make_local_candidate_lines(
+                m_celeris->local_planner_candidates(),
+                m_celeris->vehicle_position().pos.y
+            )
+            : hidden_lines
+    );
+}
+
+void CelerisVisualizer::display_debug_controls() {
+    if (ImGui::CollapsingHeader("Celeris path visualization")) {
+        ImGui::Checkbox("Nonholonomic path", &show_path);
+        ImGui::Checkbox("Plain A* path", &show_guide_path);
+        ImGui::Checkbox("Explored paths", &show_explored_paths);
+        ImGui::Checkbox("Unimpeded path", &show_unimpeded_path);
+        ImGui::Checkbox("Start pose marker", &show_start_marker);
+        ImGui::Checkbox("Vehicle pose marker", &show_vehicle_marker);
+        ImGui::Checkbox("Gazelle Next", &show_gazelle_next);
+        ImGui::Checkbox("Local candidates", &show_local_candidates);
     }
-
-    
-    // if (m_celeris->planner().state_explored_paths.size() > 0)
-    
-
-    // if (scan_generation != m_celeris->received_scan_count()) {
-    //     scan_generation = m_celeris->received_scan_count();
-
-    //     if (m_celeris->network_scan()) {
-    //         set_start(m_celeris->network_scan()->point_cloud().transform);
-    //         set_goal(m_celeris->goal_position());
-    //         m_path_line_cloud.set_lines(make_path_lines(m_celeris->planner().state_path));
-    //     }
-    // }
 }
 
 glm::vec3 CelerisVisualizer::voxel_size() noexcept {
-    return m_celeris->planner().occupancy_grid().voxel_size();
+    return m_celeris->voxel_size();
 }
 
 glm::vec3 CelerisVisualizer::marker_vertical_offset() noexcept {
@@ -214,6 +247,16 @@ void CelerisVisualizer::set_marker_pose(SphericalPoseMarker& marker, Nonholonomi
         glm::pi<float>() - nonholonomic_position.theta,
         glm::vec3(0.0f, 1.0f, 0.0f)
     );
+}
+
+void CelerisVisualizer::set_gazelle_pose_from_lidar_transform() {
+    m_gazelle_next.set_lidar_transform(m_celeris->lidar_transform());
+    m_gazelle_next.transform.position += marker_vertical_offset();
+    // m_gazelle_next.transform = m_celeris->lidar_transform();
+    // m_gazelle_next.transform.rotation = glm::normalize(
+    //     m_gazelle_next.transform.rotation *
+    //     glm::angleAxis(glm::pi<float>(), glm::vec3(0.0f, 1.0f, 0.0f))
+    // );
 }
 
 void CelerisVisualizer::reset_marker_interpolation(
@@ -338,9 +381,14 @@ std::vector<LineInstance> CelerisVisualizer::make_path_lines(const std::vector<g
     path_lines.reserve(std::min<size_t>(path.size(), max_path_line_count));
 
     for (uint32_t i = 1; i < path.size() && path_lines.size() < max_path_line_count; i++) {
+        glm::vec3 p0 = m_celeris->voxel_center_world_pos(path[i - 1]);
+        glm::vec3 p1 = m_celeris->voxel_center_world_pos(path[i]);
+        p0.y -= 0.5f * voxel_size().y;
+        p1.y -= 0.5f * voxel_size().y;
+
         path_lines.push_back(LineInstance{
-            .p0 = m_celeris->planner().occupancy_grid().voxel_center_world_pos(path[i - 1]) + glm::vec3(0, 0.2f, 0),
-            .p1 = m_celeris->planner().occupancy_grid().voxel_center_world_pos(path[i]) + glm::vec3(0, 0.2f, 0),
+            .p0 = p0 + glm::vec3(0, 0.2f, 0),
+            .p1 = p1 + glm::vec3(0, 0.2f, 0),
             .color = glm::vec4(1, 1, 1, 1)
         });
     }
@@ -360,22 +408,50 @@ std::vector<LineInstance> CelerisVisualizer::make_local_candidate_lines(
     std::vector<LineInstance> candidate_lines;
     candidate_lines.reserve(max_path_line_count);
 
-    constexpr glm::vec4 selected_color = glm::vec4(1.0f, 0.92f, 0.15f, 1.0f);
-    constexpr glm::vec4 candidate_color = glm::vec4(0.1f, 0.65f, 1.0f, 0.55f);
-
     const glm::vec3 base_offset(0.0f, 0.35f, 0.0f);
-    const glm::vec3 selected_offset(0.0f, 0.45f, 0.0f);
+    const glm::vec3 selected_offset(0.0f, 0.7f, 0.0f);
+    const glm::vec3 good_color(0.0f, 0.95f, 0.18f);
+    const glm::vec3 bad_color(1.0f, 0.08f, 0.02f);
+    constexpr glm::vec4 selected_color = glm::vec4(0.0f, 0.95f, 1.0f, 1.0f);
 
-    for (size_t candidate_id = 0;
-         candidate_id < candidates.size() && candidate_lines.size() < max_path_line_count;
-         candidate_id++) {
-        const std::vector<glm::vec2>& trajectory = candidates[candidate_id].trajectory;
-        if (trajectory.size() < 2)
+    float min_loss = std::numeric_limits<float>::infinity();
+    float max_loss = -std::numeric_limits<float>::infinity();
+    for (const Vehicle::SimulationControlCandidate& candidate : candidates) {
+        if (!std::isfinite(candidate.loss))
             continue;
 
-        const bool selected = candidate_id == 0;
-        const glm::vec4 color = selected ? selected_color : candidate_color;
-        const glm::vec3 offset = selected ? selected_offset : base_offset;
+        min_loss = std::min(min_loss, candidate.loss);
+        max_loss = std::max(max_loss, candidate.loss);
+    }
+
+    auto candidate_color = [&](size_t candidate_id) -> glm::vec4 {
+        const float rank_t = candidates.size() > 1
+            ? static_cast<float>(candidate_id) / static_cast<float>(candidates.size() - 1)
+            : 0.0f;
+
+        float loss_t = rank_t;
+        if (std::isfinite(min_loss) && std::isfinite(max_loss) && max_loss > min_loss + 1e-5f) {
+            loss_t = std::clamp(
+                (candidates[candidate_id].loss - min_loss) / (max_loss - min_loss),
+                0.0f,
+                1.0f
+            );
+        }
+
+        const glm::vec3 color = good_color * (1.0f - loss_t) + bad_color * loss_t;
+        const float alpha = 0.78f - 0.34f * loss_t;
+        return glm::vec4(color, alpha);
+    };
+
+    auto append_candidate = [&](size_t candidate_id, bool selected) {
+        const std::vector<glm::vec2>& trajectory = candidates[candidate_id].trajectory;
+        if (trajectory.size() < 2)
+            return;
+
+        const glm::vec4 color = selected ? selected_color : candidate_color(candidate_id);
+        const glm::vec3 offset = selected
+            ? selected_offset
+            : base_offset + glm::vec3(0.0f, 0.0025f * static_cast<float>(candidate_id), 0.0f);
 
         for (size_t i = 1; i < trajectory.size() && candidate_lines.size() < max_path_line_count; i++) {
             candidate_lines.push_back(LineInstance{
@@ -384,7 +460,13 @@ std::vector<LineInstance> CelerisVisualizer::make_local_candidate_lines(
                 .color = color
             });
         }
+    };
+
+    for (size_t remaining = candidates.size(); remaining > 1 && candidate_lines.size() < max_path_line_count; remaining--) {
+        append_candidate(remaining - 1, false);
     }
+    if (!candidates.empty() && candidate_lines.size() < max_path_line_count)
+        append_candidate(0, true);
 
     if (candidate_lines.empty())
         candidate_lines.push_back(LineInstance{.p0 = glm::vec3(0.0f),

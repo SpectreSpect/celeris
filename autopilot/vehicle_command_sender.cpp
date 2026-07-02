@@ -98,6 +98,14 @@ bool VehicleCommandSender::is_connected() const noexcept {
     return m_connected.load();
 }
 
+uint64_t VehicleCommandSender::sent_packet_count() const noexcept {
+    return m_sent_packet_count.load();
+}
+
+uint64_t VehicleCommandSender::send_failure_count() const noexcept {
+    return m_send_failure_count.load();
+}
+
 void VehicleCommandSender::send_loop() {
     while (m_running.load()) {
         int socket = connect_to_receiver();
@@ -114,8 +122,12 @@ void VehicleCommandSender::send_loop() {
         m_connected = true;
 
         while (m_running.load()) {
-            if (!send_command(socket, command()))
+            if (!send_command(socket, command())) {
+                m_send_failure_count++;
                 break;
+            }
+
+            m_sent_packet_count++;
 
             std::unique_lock lock(m_wait_mutex);
             m_wait_condition.wait_for(lock, m_send_period);

@@ -77,6 +77,7 @@ OccupancyGrid3D::OccupancyGrid3D(
             sizeof(uint32_t)
         );
 
+        std::lock_guard lock(m_chunk_cache_mutex);
         for (int i = 0; i < dirty_chunk_position_count; i++) {
             glm::ivec4 center_chunk_pos = m_dirty_chunk_positions[i];
             uint64_t center_chunk_key = math_utils::pack_key(
@@ -107,7 +108,28 @@ OccupancyGrid3D::OccupancyGrid3D(
 }
 
 void OccupancyGrid3D::clear_cache() {
-    m_chunk_cache.clear();
+    {
+        std::lock_guard lock(m_chunk_cache_mutex);
+        m_chunk_cache.clear();
+    }
+
+    {
+        std::lock_guard lock(m_metrics_mutex);
+        read_and_inflate_chunk_time = AvgTimer();
+        is_solid_time = AvgTimer();
+        read_and_inflate_chunk_count = 0;
+        is_solid_count = 0;
+    }
+}
+
+float OccupancyGrid3D::is_solid_time_ms() {
+    std::lock_guard lock(m_metrics_mutex);
+    return static_cast<float>(is_solid_time.total_ms());
+}
+
+uint32_t OccupancyGrid3D::solid_check_count() {
+    std::lock_guard lock(m_metrics_mutex);
+    return is_solid_count;
 }
 
 glm::ivec3 OccupancyGrid3D::floor_pos(const glm::vec3& p) {
@@ -274,35 +296,54 @@ glm::vec3 OccupancyGrid3D::voxel_center_world_pos(const glm::ivec3& p) const {
 }
 
 bool OccupancyGrid3D::is_solid(glm::ivec3 pos) {
-    is_solid_count++;
     // // LOG_METHOD();
     // return pos.y <= 0;
     
     // logger().check(m_voxel_grid, "Voxel grid was null");
 
-    is_solid_time.start();
+    const auto is_solid_start = std::chrono::steady_clock::now();
+    auto record_is_solid_time = [&] {
+        const auto is_solid_end = std::chrono::steady_clock::now();
+        std::lock_guard lock(m_metrics_mutex);
+        is_solid_count++;
+        is_solid_time.add(is_solid_end - is_solid_start);
+    };
 
     glm::ivec3 chunk_pos = m_voxel_grid->chunk_pos_from_voxel_pos(pos);
 
     uint64_t chunk_key = math_utils::pack_key(chunk_pos.x, chunk_pos.y, chunk_pos.z);
 
-    auto cached_chunk_it = m_chunk_cache.find(chunk_key);
-    if (cached_chunk_it == m_chunk_cache.end()) {
-        read_and_inflate_chunk_count++;
-
-        read_and_inflate_chunk_time.start();
-        cached_chunk_it = m_chunk_cache.emplace(
-            chunk_key,
-            m_voxel_grid->read_chunk(chunk_pos)
-        ).first;
-        read_and_inflate_chunk_time.end();
-    }
-
     glm::ivec3 local_pos = m_voxel_grid->pos_in_chunk_from_global_voxel_pos(chunk_pos, pos);
 
-    VoxelDataGPU voxel = cached_chunk_it->second.voxel(glm::uvec3(local_pos));
+    {
+        std::lock_guard lock(m_chunk_cache_mutex);
+        auto cached_chunk_it = m_chunk_cache.find(chunk_key);
+        if (cached_chunk_it != m_chunk_cache.end()) {
+            VoxelDataGPU voxel = cached_chunk_it->second.voxel(glm::uvec3(local_pos));
+            record_is_solid_time();
+            return voxel.is_solid() || voxel.is_inflated();
+        }
+    }
 
-    is_solid_time.end();
+    VoxelGridChunk loaded_chunk;
+    {
+        const auto read_and_inflate_start = std::chrono::steady_clock::now();
+        loaded_chunk = m_voxel_grid->read_chunk(chunk_pos);
+        const auto read_and_inflate_end = std::chrono::steady_clock::now();
+
+        std::lock_guard lock(m_metrics_mutex);
+        read_and_inflate_chunk_count++;
+        read_and_inflate_chunk_time.add(read_and_inflate_end - read_and_inflate_start);
+    }
+
+    VoxelDataGPU voxel;
+    {
+        std::lock_guard lock(m_chunk_cache_mutex);
+        auto [cached_chunk_it, inserted] = m_chunk_cache.emplace(chunk_key, std::move(loaded_chunk));
+        voxel = cached_chunk_it->second.voxel(glm::uvec3(local_pos));
+    }
+
+    record_is_solid_time();
 
     return voxel.is_solid() || voxel.is_inflated();
     // return pos.y <= 0;
@@ -425,7 +466,9 @@ bool OccupancyGrid3D::adjust_to_ground(
     glm::ivec3 norm_pos = output;
     glm::ivec3 result_pos = norm_pos;
 
-    if(!get_closest_visible_bottom_pos(norm_pos, result_pos, max_drop)) {
+    const int ground_search_drop = max_drop + 1;
+
+    if(!get_closest_visible_bottom_pos(norm_pos, result_pos, ground_search_drop)) {
         if (status)
             *status = 1;
         return allow_flying_over_precepices;
@@ -442,9 +485,10 @@ bool OccupancyGrid3D::adjust_to_ground(
         result_pos += glm::ivec3(0, 1, 0);
     
     if (max_y_diff >= 0) {
-        float diff = std::abs(result_pos.y - norm_pos.y);
-        if (diff > max_y_diff) {
-            if (allow_flying_over_precepices)
+        int y_diff = result_pos.y - norm_pos.y;
+        int abs_y_diff = std::abs(y_diff);
+        if (abs_y_diff > max_y_diff) {
+            if (allow_flying_over_precepices && y_diff < 0)
                 return true;
 
             if (status)

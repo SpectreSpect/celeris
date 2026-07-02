@@ -193,8 +193,12 @@ struct InflateChunksPushConstants {
     uint32_t u_voxels_per_chunk;
     uint32_t u_pack_offset;
     uint32_t u_pack_bits;
-    uint32_t u_inflation_size;
-    uint32_t u_car_height_voxels;
+    uint32_t u_negative_x_inflation_size;
+    uint32_t u_positive_x_inflation_size;
+    uint32_t u_negative_y_inflation_size;
+    uint32_t u_positive_y_inflation_size;
+    uint32_t u_negative_z_inflation_size;
+    uint32_t u_positive_z_inflation_size;
 };
 
 struct EvictBucketsBuildPushConstants {

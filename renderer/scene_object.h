@@ -16,6 +16,7 @@ public:
     _XPARENT_NAME(SceneObject);
 
     Transform transform;
+    bool visible = true;
 
     SceneObject* parent = nullptr;
     std::vector<SceneObject*> children;

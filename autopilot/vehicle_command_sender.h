@@ -35,6 +35,8 @@ public:
     VehicleCommand command() const;
     bool is_running() const noexcept;
     bool is_connected() const noexcept;
+    uint64_t sent_packet_count() const noexcept;
+    uint64_t send_failure_count() const noexcept;
 
 private:
     std::string m_host;
@@ -49,6 +51,8 @@ private:
 
     std::atomic<bool> m_running{false};
     std::atomic<bool> m_connected{false};
+    std::atomic<uint64_t> m_sent_packet_count{0};
+    std::atomic<uint64_t> m_send_failure_count{0};
     std::thread m_thread;
 
     void send_loop();

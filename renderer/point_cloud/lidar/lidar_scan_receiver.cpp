@@ -129,7 +129,7 @@ void LidarScanReceiver::receive_loop() {
 
     sockaddr_in address{};
     address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     address.sin_port = htons(m_port);
 
     if (bind(m_listen_socket, reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0) {
@@ -202,14 +202,12 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
 
         frame.ring_count = 16;
 
-        uint32_t freq = 5;
-
-        frame.samples.resize(point_count / freq);
+        frame.samples.resize(point_count / m_points_freq);
         const uint8_t* p = payload.data();
 
         uint32_t valid_count = 0;
 
-        for (uint32_t i = 0; i < point_count / freq; ++i) {
+        for (uint32_t i = 0; i < point_count / m_points_freq; ++i) {
             float x, y, z;
             float time;
             float px, py, pz;
@@ -226,7 +224,7 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
             std::memcpy(&roll,  local_p, 4); local_p += 4;
             std::memcpy(&pitch, local_p, 4); local_p += 4;
             std::memcpy(&yaw,   local_p, 4); local_p += 4;
-            p += 4 * 10 * freq;
+            p += 4 * 10 * m_points_freq;
 
             frame.samples[i].p_local_ros = glm::vec3(x, y, z);
             frame.samples[i].time = time;

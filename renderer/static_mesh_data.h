@@ -123,6 +123,130 @@ namespace StaticMeshData{
     inline std::vector<float> sphere_vertices = sphere_mesh_data.vertices;
     inline std::vector<uint32_t> sphere_indices = sphere_mesh_data.indices;
 
+    inline void push_pbr_vertex(
+        std::vector<float>& vertices,
+        float px, float py, float pz,
+        float nx, float ny, float nz,
+        float u, float v,
+        float tx, float ty, float tz, float tw
+    ) {
+        vertices.push_back(px);
+        vertices.push_back(py);
+        vertices.push_back(pz);
+        vertices.push_back(1.0f);
+
+        vertices.push_back(nx);
+        vertices.push_back(ny);
+        vertices.push_back(nz);
+        vertices.push_back(0.0f);
+
+        vertices.push_back(u);
+        vertices.push_back(v);
+
+        vertices.push_back(tx);
+        vertices.push_back(ty);
+        vertices.push_back(tz);
+        vertices.push_back(tw);
+    }
+
+    inline MeshData generate_cylinder(
+        uint32_t sector_count = 48,
+        float radius = 0.5f,
+        float height = 1.0f
+    ) {
+        sector_count = std::max(sector_count, 3u);
+
+        constexpr float pi = 3.14159265358979323846f;
+        const float half_height = height * 0.5f;
+
+        MeshData mesh{};
+        mesh.vertices.reserve(static_cast<size_t>((sector_count + 1) * 4 + 2) * 14);
+        mesh.indices.reserve(static_cast<size_t>(sector_count) * 12);
+
+        for (uint32_t sector = 0; sector <= sector_count; ++sector) {
+            float u = static_cast<float>(sector) / static_cast<float>(sector_count);
+            float theta = u * 2.0f * pi;
+            float cos_theta = std::cos(theta);
+            float sin_theta = std::sin(theta);
+            float x = radius * cos_theta;
+            float z = radius * sin_theta;
+            float tx = -sin_theta;
+            float tz = cos_theta;
+
+            push_pbr_vertex(mesh.vertices, x, -half_height, z, cos_theta, 0.0f, sin_theta, u, 1.0f, tx, 0.0f, tz, 1.0f);
+            push_pbr_vertex(mesh.vertices, x,  half_height, z, cos_theta, 0.0f, sin_theta, u, 0.0f, tx, 0.0f, tz, 1.0f);
+        }
+
+        for (uint32_t sector = 0; sector < sector_count; ++sector) {
+            uint32_t bottom0 = sector * 2;
+            uint32_t top0 = bottom0 + 1;
+            uint32_t bottom1 = (sector + 1) * 2;
+            uint32_t top1 = bottom1 + 1;
+
+            mesh.indices.push_back(bottom0);
+            mesh.indices.push_back(bottom1);
+            mesh.indices.push_back(top1);
+
+            mesh.indices.push_back(top1);
+            mesh.indices.push_back(top0);
+            mesh.indices.push_back(bottom0);
+        }
+
+        const uint32_t top_center = static_cast<uint32_t>(mesh.vertices.size() / 14);
+        push_pbr_vertex(mesh.vertices, 0.0f, half_height, 0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f);
+
+        const uint32_t top_ring_start = static_cast<uint32_t>(mesh.vertices.size() / 14);
+        for (uint32_t sector = 0; sector <= sector_count; ++sector) {
+            float u = static_cast<float>(sector) / static_cast<float>(sector_count);
+            float theta = u * 2.0f * pi;
+            float cos_theta = std::cos(theta);
+            float sin_theta = std::sin(theta);
+
+            push_pbr_vertex(
+                mesh.vertices,
+                radius * cos_theta, half_height, radius * sin_theta,
+                0.0f, 1.0f, 0.0f,
+                cos_theta * 0.5f + 0.5f, sin_theta * 0.5f + 0.5f,
+                1.0f, 0.0f, 0.0f, 1.0f
+            );
+        }
+
+        const uint32_t bottom_center = static_cast<uint32_t>(mesh.vertices.size() / 14);
+        push_pbr_vertex(mesh.vertices, 0.0f, -half_height, 0.0f, 0.0f, -1.0f, 0.0f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f);
+
+        const uint32_t bottom_ring_start = static_cast<uint32_t>(mesh.vertices.size() / 14);
+        for (uint32_t sector = 0; sector <= sector_count; ++sector) {
+            float u = static_cast<float>(sector) / static_cast<float>(sector_count);
+            float theta = u * 2.0f * pi;
+            float cos_theta = std::cos(theta);
+            float sin_theta = std::sin(theta);
+
+            push_pbr_vertex(
+                mesh.vertices,
+                radius * cos_theta, -half_height, radius * sin_theta,
+                0.0f, -1.0f, 0.0f,
+                cos_theta * 0.5f + 0.5f, sin_theta * 0.5f + 0.5f,
+                1.0f, 0.0f, 0.0f, 1.0f
+            );
+        }
+
+        for (uint32_t sector = 0; sector < sector_count; ++sector) {
+            mesh.indices.push_back(top_center);
+            mesh.indices.push_back(top_ring_start + sector);
+            mesh.indices.push_back(top_ring_start + sector + 1);
+
+            mesh.indices.push_back(bottom_center);
+            mesh.indices.push_back(bottom_ring_start + sector + 1);
+            mesh.indices.push_back(bottom_ring_start + sector);
+        }
+
+        return mesh;
+    }
+
+    inline MeshData cylinder_mesh_data = generate_cylinder(128, 0.5f, 1.0f);
+    inline std::vector<float> cylinder_vertices = cylinder_mesh_data.vertices;
+    inline std::vector<uint32_t> cylinder_indices = cylinder_mesh_data.indices;
+
 
     struct TwoSphereIndirectTestData {
         MeshData mesh;

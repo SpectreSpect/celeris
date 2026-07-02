@@ -41,12 +41,12 @@ const std::vector<uint8_t>& CpuImage::image_data() const {
     return m_image_data;
 }
 
-CpuImage CpuImage::load_rgba8_image(const std::filesystem::path& path, VkFormat format) {
+CpuImage CpuImage::load_rgba8_image(const std::filesystem::path& path, VkFormat format, bool flip_vertically) {
     LOG_NAMED("CpuImage");
 
     std::vector<std::uint8_t> file_data = Utils::read_binary_file(path);
 
-    stbi_set_flip_vertically_on_load(true);
+    stbi_set_flip_vertically_on_load(flip_vertically);
 
     int width, height, channels;
     stbi_uc* raw_pixels = stbi_load_from_memory(

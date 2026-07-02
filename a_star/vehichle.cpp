@@ -9,16 +9,8 @@
 #include "../vulkan_self/utils.h"
 
 namespace {
-    constexpr float kPositionLossWeight = 4.0f;
-    constexpr float kHeadingLossWeight = 0.6f;
-    constexpr float kSpeedLossWeight = 0.25f;
-    constexpr float kBackwardProgressLossWeight = 3.0f;
-    constexpr float kControlLossWeight = 0.04f;
-    constexpr float kSteeringRateLossWeight = 0.2f;
-
-    constexpr float kCruiseSpeed = 3.0f;
-    constexpr float kSlowdownDistanceFromPath = 2.5f;
-    constexpr float kMinOffPathSpeedFactor = 0.25f;
+    constexpr float kMaxSteeringAngle = 0.7f;
+    constexpr float kSteeringVelocityLossFactor = 0.08f;
     constexpr float kProjectionBacktrackWindow = 0.75f;
     constexpr float kProjectionLookaheadBase = 6.0f;
 }
@@ -52,6 +44,30 @@ void Vehicle::simulate_vehicle(
     bool debug) 
 {
     simulate_vehicle(m_vehicle_state, speed_acceleration, steer_acceleration, simulation_time, dt, debug);
+}
+
+Vehicle::SimulationLossWeights& Vehicle::loss_weights() noexcept {
+    return m_loss_weights;
+}
+
+const Vehicle::SimulationLossWeights& Vehicle::loss_weights() const noexcept {
+    return m_loss_weights;
+}
+
+void Vehicle::reset_loss_weights() noexcept {
+    m_loss_weights = SimulationLossWeights{};
+}
+
+Vehicle::SimulationFollowParams& Vehicle::follow_params() noexcept {
+    return m_follow_params;
+}
+
+const Vehicle::SimulationFollowParams& Vehicle::follow_params() const noexcept {
+    return m_follow_params;
+}
+
+void Vehicle::reset_follow_params() noexcept {
+    m_follow_params = SimulationFollowParams{};
 }
 
 Vehicle::PolylineFollowStepResult Vehicle::follow_polyline_step(
@@ -190,6 +206,7 @@ std::vector<Vehicle::SimulationControlCandidate> Vehicle::find_best_simulation_c
 
             VehicleTransformState predicted_state = state;
             std::vector<glm::vec2> trajectory;
+            SimulationControlCandidateDebug candidate_debug;
             const float loss = compute_simulation_loss(
                 predicted_state,
                 path,
@@ -198,7 +215,10 @@ std::vector<Vehicle::SimulationControlCandidate> Vehicle::find_best_simulation_c
                 desc.simulation_time,
                 desc.dt,
                 desc.debug,
-                &trajectory
+                desc.initial_projection_min_s,
+                desc.initial_projection_max_s,
+                &trajectory,
+                &candidate_debug
             );
 
             candidates.push_back(SimulationControlCandidate{
@@ -208,7 +228,8 @@ std::vector<Vehicle::SimulationControlCandidate> Vehicle::find_best_simulation_c
                 },
                 .loss = loss,
                 .predicted_state = predicted_state,
-                .trajectory = std::move(trajectory)
+                .trajectory = std::move(trajectory),
+                .debug = candidate_debug
             });
         }
     }
@@ -291,19 +312,40 @@ void Vehicle::vehicle_simulation_step(
 
     const float speed0 = state.m_speed;
     const float heading0 = state.m_heading;
-    const float steering_angle0 = state.m_steering_angle;
-    const float steering_angle_velocity0 = state.m_steering_angle_velocity;
+    const float steering_angle0 = std::clamp(
+        state.m_steering_angle,
+        -kMaxSteeringAngle,
+        kMaxSteeringAngle
+    );
+    float steering_angle_velocity0 = state.m_steering_angle_velocity;
+    if ((steering_angle0 <= -kMaxSteeringAngle + Utils::eps && steering_angle_velocity0 < 0.0f) ||
+        (steering_angle0 >= kMaxSteeringAngle - Utils::eps && steering_angle_velocity0 > 0.0f))
+    {
+        steering_angle_velocity0 = 0.0f;
+    }
 
     const glm::vec2 velocity0 =
         glm::vec2{std::cos(heading0), std::sin(heading0)} * speed0;
     const float heading_velocity0 = speed0 * std::tan(steering_angle0) / m_wheel_base;
 
     const float speed1 = speed0 + speed_acceleration * dt;
-    const float steering_angle_velocity1 = steering_angle_velocity0 + steer_acceleration * dt;
-    const float steering_angle1 =
+    float steering_angle_velocity1 = steering_angle_velocity0 + steer_acceleration * dt;
+    float steering_angle1 =
         steering_angle0 +
         steering_angle_velocity0 * dt +
         0.5f * steer_acceleration * dt * dt;
+
+    steering_angle1 = std::clamp(
+        steering_angle1,
+        -kMaxSteeringAngle,
+        kMaxSteeringAngle
+    );
+    if ((steering_angle1 <= -kMaxSteeringAngle + Utils::eps && steering_angle_velocity1 < 0.0f) ||
+        (steering_angle1 >= kMaxSteeringAngle - Utils::eps && steering_angle_velocity1 > 0.0f))
+    {
+        steering_angle_velocity1 = 0.0f;
+    }
+
     const float heading_velocity1 = speed1 * std::tan(steering_angle1) / m_wheel_base;
     const float heading1 = heading0 + 0.5f * (heading_velocity0 + heading_velocity1) * dt;
 
@@ -486,6 +528,80 @@ Vehicle::PointProjection Vehicle::find_polyline_projection(
     return best_projection;
 }
 
+Vehicle::PointProjection Vehicle::sample_polyline_at_s(
+    const std::vector<VehiclePathPoint>& path,
+    float s)
+{
+    LOG_NAMED("Vehicle");
+
+    logger().check(!path.empty(), "path must contain at least one point");
+    logger().check(!std::isnan(s), "s must not be NaN");
+
+    const auto point_projection_from_path_point =
+        [](const VehiclePathPoint& path_point) {
+            const glm::vec2 tangent = glm::vec2{
+                std::cos(path_point.heading),
+                std::sin(path_point.heading)
+            };
+
+            return PointProjection{
+                .s = 0.0f,
+                .dist = 0.0f,
+                .point = path_point.position,
+                .tangent = tangent,
+                .heading = path_point.heading,
+                .dir = Utils::normalized_dir(path_point.dir)
+            };
+        };
+
+    if (path.size() == 1) {
+        return point_projection_from_path_point(path.front());
+    }
+
+    const float total_length = polyline_length(path);
+    if (total_length <= Utils::eps) {
+        return point_projection_from_path_point(path.front());
+    }
+
+    const float clamped_s = std::clamp(s, 0.0f, total_length);
+    float segment_start_s = 0.0f;
+
+    for (size_t i = 1; i < path.size(); i++) {
+        const glm::vec2 segment_start = path[i - 1].position;
+        const glm::vec2 segment = path[i].position - segment_start;
+        const float segment_length = glm::length(segment);
+
+        if (segment_length <= Utils::eps) {
+            continue;
+        }
+
+        const float segment_end_s = segment_start_s + segment_length;
+        if (clamped_s <= segment_end_s || i + 1 == path.size()) {
+            const float t = std::clamp(
+                (clamped_s - segment_start_s) / segment_length,
+                0.0f,
+                1.0f
+            );
+            const glm::vec2 tangent = segment / segment_length;
+
+            return PointProjection{
+                .s = segment_start_s + t * segment_length,
+                .dist = 0.0f,
+                .point = segment_start + segment * t,
+                .tangent = tangent,
+                .heading = Utils::lerp_angle(path[i - 1].heading, path[i].heading, t),
+                .dir = Utils::normalized_dir(t < 0.5f ? path[i - 1].dir : path[i].dir)
+            };
+        }
+
+        segment_start_s = segment_end_s;
+    }
+
+    PointProjection projection = point_projection_from_path_point(path.back());
+    projection.s = total_length;
+    return projection;
+}
+
 float Vehicle::polyline_length(const std::vector<VehiclePathPoint>& path)
 {
     float length = 0.0f;
@@ -516,54 +632,131 @@ glm::vec2 Vehicle::forward_vector(const VehicleTransformState& state)
     return glm::vec2{std::cos(state.m_heading), std::sin(state.m_heading)};
 }
 
+float Vehicle::compute_reference_progress(
+    float initial_path_speed,
+    float time) const
+{
+    if (time <= 0.0f) {
+        return 0.0f;
+    }
+
+    const float acceleration = std::max(m_max_acceleration, Utils::eps);
+    const float speed0 = std::max(0.0f, initial_path_speed);
+    const float cruise_speed = std::max(0.0f, m_follow_params.cruise_speed);
+    if (cruise_speed <= Utils::eps) {
+        return 0.0f;
+    }
+
+    if (speed0 < cruise_speed) {
+        const float acceleration_time = std::min(time, (cruise_speed - speed0) / acceleration);
+        const float cruise_time = time - acceleration_time;
+        return
+            speed0 * acceleration_time +
+            0.5f * acceleration * acceleration_time * acceleration_time +
+            cruise_speed * cruise_time;
+    }
+
+    const float deceleration_time = std::min(time, (speed0 - cruise_speed) / acceleration);
+    const float cruise_time = time - deceleration_time;
+    return
+        speed0 * deceleration_time -
+        0.5f * acceleration * deceleration_time * deceleration_time +
+        cruise_speed * cruise_time;
+}
+
 float Vehicle::compute_position_loss_coefficient(
     const VehicleTransformState& state,
-    const PointProjection& projection)
+    const PointProjection& target_projection) const
 {
-    const glm::vec2 diff = state.m_position - projection.point;
-    return kPositionLossWeight * glm::dot(diff, diff);
+    const glm::vec2 diff = state.m_position - target_projection.point;
+    return m_loss_weights.position * glm::dot(diff, diff);
 }
 
 float Vehicle::compute_heading_loss_coefficient(
     const VehicleTransformState& state,
-    const PointProjection& projection)
+    const PointProjection& target_projection) const
 {
-    const float heading_error = angle_diff(state.m_heading, projection.heading);
-    const float speed_factor = std::clamp(std::abs(state.m_speed) / kCruiseSpeed, 0.25f, 1.0f);
+    const float heading_error = angle_diff(state.m_heading, target_projection.heading);
+    const float cruise_speed = std::max(m_follow_params.cruise_speed, Utils::eps);
+    const float speed_factor = std::clamp(std::abs(state.m_speed) / cruise_speed, 0.25f, 1.0f);
 
-    return kHeadingLossWeight * speed_factor * heading_error * heading_error;
+    return m_loss_weights.heading * speed_factor * heading_error * heading_error;
 }
 
 float Vehicle::compute_speed_loss_coefficient(
     const VehicleTransformState& state,
     const PointProjection& projection,
+    const PointProjection& target_projection,
     float total_polyline_length) const
 {
-    const float remaining_s = std::max(0.0f, total_polyline_length - projection.s);
+    const float remaining_s = std::max(0.0f, total_polyline_length - target_projection.s);
     const float braking_speed = std::sqrt(std::max(0.0f, 2.0f * m_max_acceleration * remaining_s));
-    float target_speed_abs = std::min(kCruiseSpeed, braking_speed);
+    const float cruise_speed = std::max(0.0f, m_follow_params.cruise_speed);
+    float target_speed_abs = std::min(cruise_speed, braking_speed);
 
-    const float off_path_speed_factor = std::clamp(
-        1.0f - projection.dist / kSlowdownDistanceFromPath,
-        kMinOffPathSpeedFactor,
-        1.0f
-    );
+    float off_path_speed_factor = 1.0f;
+    if (m_follow_params.slowdown_distance_from_path > Utils::eps) {
+        off_path_speed_factor = std::clamp(
+            1.0f - projection.dist / m_follow_params.slowdown_distance_from_path,
+            std::clamp(m_follow_params.min_off_path_speed_factor, 0.0f, 1.0f),
+            1.0f
+        );
+    }
     target_speed_abs *= off_path_speed_factor;
 
-    const float target_speed = target_speed_abs * projection.dir;
+    const float target_speed = target_speed_abs * target_projection.dir;
     const float speed_error = state.m_speed - target_speed;
 
-    return kSpeedLossWeight * speed_error * speed_error;
+    return m_loss_weights.speed * speed_error * speed_error;
 }
 
 float Vehicle::compute_progress_loss_coefficient(
     const VehicleTransformState& state,
-    const PointProjection& projection)
+    const PointProjection& projection,
+    float progress_reference_s) const
 {
     const float path_speed = glm::dot(forward_vector(state) * state.m_speed, projection.tangent);
     const float backwards_speed = std::max(0.0f, -path_speed);
+    const float forward_progress = std::max(0.0f, projection.s - progress_reference_s);
 
-    return kBackwardProgressLossWeight * backwards_speed * backwards_speed;
+    return
+        m_loss_weights.backward_progress * backwards_speed * backwards_speed -
+        m_loss_weights.forward_progress * forward_progress;
+}
+
+float Vehicle::compute_steering_loss_coefficient(
+    const VehicleTransformState& state,
+    const PointProjection& target_projection) const
+{
+    const glm::vec2 to_target = target_projection.point - state.m_position;
+    const float target_distance = glm::length(to_target);
+    if (target_distance <= Utils::eps) {
+        return m_loss_weights.steering *
+            kSteeringVelocityLossFactor *
+            state.m_steering_angle_velocity *
+            state.m_steering_angle_velocity;
+    }
+
+    const float target_heading = std::atan2(to_target.y, to_target.x);
+    const float motion_heading = target_projection.dir < 0.0f
+        ? state.m_heading + 3.14159265358979323846f
+        : state.m_heading;
+    const float heading_error = angle_diff(motion_heading, target_heading);
+
+    const float target_steering_angle = std::clamp(
+        std::atan2(2.0f * m_wheel_base * std::sin(heading_error), target_distance) *
+            target_projection.dir,
+        -kMaxSteeringAngle,
+        kMaxSteeringAngle
+    );
+    const float steering_error = angle_diff(state.m_steering_angle, target_steering_angle);
+
+    return m_loss_weights.steering * (
+        steering_error * steering_error +
+        kSteeringVelocityLossFactor *
+            state.m_steering_angle_velocity *
+            state.m_steering_angle_velocity
+    );
 }
 
 float Vehicle::compute_control_loss_coefficient(
@@ -576,25 +769,28 @@ float Vehicle::compute_control_loss_coefficient(
     const float normalized_speed_acceleration = speed_acceleration / speed_acceleration_scale;
     const float normalized_steer_acceleration = steer_acceleration / steer_acceleration_scale;
 
-    return kControlLossWeight * (
+    return m_loss_weights.control * (
         normalized_speed_acceleration * normalized_speed_acceleration +
         normalized_steer_acceleration * normalized_steer_acceleration +
-        kSteeringRateLossWeight * state.m_steering_angle_velocity * state.m_steering_angle_velocity
+        m_loss_weights.steering_rate * state.m_steering_angle_velocity * state.m_steering_angle_velocity
     );
 }
 
 Vehicle::SimulationLossCoefficients Vehicle::compute_simulation_loss_coefficients(
     const VehicleTransformState& state,
     const PointProjection& projection,
+    const PointProjection& target_projection,
     float total_polyline_length,
+    float progress_reference_s,
     float speed_acceleration,
     float steer_acceleration) const
 {
     return SimulationLossCoefficients{
-        .position = compute_position_loss_coefficient(state, projection),
-        .heading = compute_heading_loss_coefficient(state, projection),
-        .speed = compute_speed_loss_coefficient(state, projection, total_polyline_length),
-        .progress = compute_progress_loss_coefficient(state, projection),
+        .position = compute_position_loss_coefficient(state, target_projection),
+        .heading = compute_heading_loss_coefficient(state, target_projection),
+        .speed = compute_speed_loss_coefficient(state, projection, target_projection, total_polyline_length),
+        .progress = compute_progress_loss_coefficient(state, projection, progress_reference_s),
+        .steering = compute_steering_loss_coefficient(state, target_projection),
         .control = compute_control_loss_coefficient(state, speed_acceleration, steer_acceleration)
     };
 }
@@ -607,7 +803,10 @@ float Vehicle::compute_simulation_loss(
     float simulation_time, 
     float dt,
     bool debug,
-    std::vector<glm::vec2>* trajectory) const
+    float initial_projection_min_s,
+    float initial_projection_max_s,
+    std::vector<glm::vec2>* trajectory,
+    SimulationControlCandidateDebug* candidate_debug) const
 {
     LOG_METHOD();
 
@@ -620,22 +819,42 @@ float Vehicle::compute_simulation_loss(
     const float total_polyline_length = polyline_length(path);
     logger().check(total_polyline_length > Utils::eps, "path length must be greater than zero");
 
+    const glm::vec2 start_position = state.m_position;
+    float trajectory_length = 0.0f;
+    glm::vec2 previous_trajectory_position = state.m_position;
+
     if (trajectory) {
         trajectory->clear();
         trajectory->reserve(static_cast<size_t>(std::ceil(simulation_time / dt)) + 1u);
         trajectory->push_back(state.m_position);
     }
 
-    PointProjection previous_projection = find_polyline_projection(path, state.m_position);
+    PointProjection previous_projection = find_polyline_projection(
+        path,
+        state.m_position,
+        initial_projection_min_s,
+        initial_projection_max_s
+    );
+    const float progress_reference_s = previous_projection.s;
+    const float progress_reference_dist = previous_projection.dist;
+    const float reference_initial_path_speed = std::max(
+        0.0f,
+        glm::dot(forward_vector(state) * state.m_speed, previous_projection.tangent)
+    );
+    PointProjection previous_target_projection = sample_polyline_at_s(path, progress_reference_s);
     SimulationLossCoefficients previous_loss_coefficients = compute_simulation_loss_coefficients(
         state,
         previous_projection,
+        previous_target_projection,
         total_polyline_length,
+        progress_reference_s,
         speed_acceleration,
         steer_acceleration
     );
 
     float loss = 0.0f;
+    PointProjection last_projection = previous_projection;
+    PointProjection last_target_projection = previous_target_projection;
     for (float time = 0.0f; time < simulation_time;) {
         const float step_dt = std::min(dt, simulation_time - time);
         const float projection_min_s = previous_projection.s - kProjectionBacktrackWindow;
@@ -646,6 +865,8 @@ float Vehicle::compute_simulation_loss(
             0.5f * std::abs(speed_acceleration) * step_dt * step_dt;
 
         vehicle_simulation_step(state, speed_acceleration, steer_acceleration, step_dt, false);
+        trajectory_length += glm::length(state.m_position - previous_trajectory_position);
+        previous_trajectory_position = state.m_position;
         if (trajectory) {
             trajectory->push_back(state.m_position);
         }
@@ -656,10 +877,18 @@ float Vehicle::compute_simulation_loss(
             projection_min_s,
             projection_max_s
         );
+        const float current_target_s = std::min(
+            total_polyline_length,
+            progress_reference_s +
+                compute_reference_progress(reference_initial_path_speed, time + step_dt)
+        );
+        PointProjection current_target_projection = sample_polyline_at_s(path, current_target_s);
         SimulationLossCoefficients current_loss_coefficients = compute_simulation_loss_coefficients(
             state,
             current_projection,
+            current_target_projection,
             total_polyline_length,
+            progress_reference_s,
             speed_acceleration,
             steer_acceleration
         );
@@ -671,7 +900,23 @@ float Vehicle::compute_simulation_loss(
 
         previous_projection = current_projection;
         previous_loss_coefficients = current_loss_coefficients;
+        last_projection = current_projection;
+        last_target_projection = current_target_projection;
         time += step_dt;
+    }
+
+    if (candidate_debug) {
+        candidate_debug->start_s = progress_reference_s;
+        candidate_debug->end_s = last_projection.s;
+        candidate_debug->target_end_s = last_target_projection.s;
+        candidate_debug->start_dist = progress_reference_dist;
+        candidate_debug->end_dist = last_projection.dist;
+        candidate_debug->target_end_dist = glm::length(state.m_position - last_target_projection.point);
+        candidate_debug->reference_initial_path_speed = reference_initial_path_speed;
+        candidate_debug->trajectory_length = trajectory_length;
+        candidate_debug->start_position = start_position;
+        candidate_debug->end_position = state.m_position;
+        candidate_debug->target_end_point = last_target_projection.point;
     }
 
     return loss;

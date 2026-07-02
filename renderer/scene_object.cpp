@@ -4,6 +4,7 @@ SceneObject::SceneObject() = default;
 
 SceneObject::SceneObject(SceneObject&& other) noexcept
     : transform(std::move(other.transform)),
+      visible(other.visible),
       parent(other.parent),
       children(std::move(other.children))
 {
@@ -28,6 +29,7 @@ SceneObject& SceneObject::operator=(SceneObject&& other) noexcept {
     detach_children();
 
     transform = std::move(other.transform);
+    visible = other.visible;
     parent = other.parent;
     children = std::move(other.children);
 

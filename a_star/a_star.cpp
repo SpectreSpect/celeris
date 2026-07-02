@@ -60,7 +60,12 @@ bool AStar::try_straight_shot(glm::ivec3& start, glm::ivec3& end, std::vector<gl
     if (out_path.empty())
         return false;
 
-    if (!m_grid->adjust_to_ground(out_path, m_params.max_step_up, m_params.max_drop, m_params.max_y_diff))
+    if (!m_grid->adjust_to_ground(
+            out_path,
+            m_params.max_step_up,
+            m_params.max_drop,
+            m_params.max_y_diff,
+            m_params.allow_flying_over_precepices))
         return false;
     
     return true;

@@ -28,7 +28,7 @@ TextureManager::TextureManager(VulkanEngine& engine, VulkanResourceLoader& resou
         irradiance_maps(
             engine.physical_device(),
             engine.device(),
-            VkExtent2D{32, 32},
+            VkExtent2D{64, 64},
             VK_FORMAT_R32G32B32A32_SFLOAT,
             max_pbr_cubemap_count,
             CubemapArray::StorageImageUsage::Enabled,

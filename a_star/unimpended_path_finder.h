@@ -90,5 +90,15 @@ private:
         uint32_t start_id = 0u
     );
 
+    bool is_direct_path_unimpended(
+        VulkanSubmitContext& submit_context,
+        const glm::ivec4& from,
+        const glm::ivec4& to,
+        uint32_t max_step_up,
+        uint32_t max_drop,
+        bool allow_flying_over_precipices,
+        bool allow_diagonal_moves
+    );
+
     std::vector<glm::ivec3> build_path_from_max_unimpended_path_indices(const std::vector<glm::ivec4>& astar_path);
 };

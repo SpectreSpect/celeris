@@ -1,5 +1,6 @@
 #pragma once
 
+#include <mutex>
 #include <unordered_set>
 #include <vector>
 
@@ -22,6 +23,8 @@ public:
     );
 
     void clear_cache();
+    float is_solid_time_ms();
+    uint32_t solid_check_count();
 
     static glm::ivec3 floor_pos(const glm::vec3& p);
     static std::vector<glm::ivec3> line_intersects(glm::vec3 pos1, glm::vec3 pos2);
@@ -138,5 +141,7 @@ private:
     VulkanBuffer m_dirty_chunk_position_buffer;
 
     std::unordered_map<uint64_t, VoxelGridChunk> m_chunk_cache;
+    std::mutex m_chunk_cache_mutex;
+    std::mutex m_metrics_mutex;
     std::vector<glm::vec4> m_dirty_chunk_positions;
 };

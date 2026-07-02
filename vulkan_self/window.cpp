@@ -1,5 +1,7 @@
 #include "window.h"
 
+#include "image/cpu_image.h"
+
 Window::Window(const GlfwContext&, uint32_t width, uint32_t height, std::string_view title)
     :   m_width(width), m_height(height), m_title(title) {
     LOG_METHOD();
@@ -88,6 +90,17 @@ void Window::show_cursor() {
     LOG_METHOD();
     glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     m_mouse_state.mode = MouseMode::NORMAL;
+}
+
+void Window::set_icon(const std::filesystem::path& path) {
+    CpuImage icon = CpuImage::load_rgba8_image(path, VK_FORMAT_R8G8B8A8_SRGB, false);
+
+    GLFWimage glfw_image{};
+    glfw_image.width = static_cast<int>(icon.extent().width);
+    glfw_image.height = static_cast<int>(icon.extent().height);
+    glfw_image.pixels = icon.image_data().data();
+
+    glfwSetWindowIcon(m_window, 1, &glfw_image);
 }
 
 uint32_t Window::width() const noexcept {

@@ -3,6 +3,7 @@
 #include <vector>
 #include <limits>
 #include <chrono>
+#include <cstdint>
 #include <optional>
 
 #include "../vulkan_self/logger/logger_header.h"
@@ -36,18 +37,29 @@ public:
     LocalPlanner(LocalPlanner&&) noexcept = default;
     LocalPlanner& operator=(LocalPlanner&&) noexcept = default;
 
-    void set_astar_path(const std::vector<NonholonomicPos>& astar_path);
     void update_timestamp();
     float calculate_delta_time();
     void predict_vehicle_state(Vehicle& vehicle);
 
+    void set_astar_path(const std::vector<NonholonomicPos>& astar_path);
+    void set_astar_path(const std::vector<NonholonomicPos>& astar_path, uint64_t generation);
     VehicleCommand predict_vehicle_command(
         const Vehicle& vehicle,
         PathIntersectionDetector& intersection_detector,
         VulkanSubmitContext& submit_context
     );
 
+    VehicleCommand step(
+        const Vehicle& vehicle,
+        PathIntersectionDetector& intersection_detector,
+        VulkanSubmitContext& submit_context,
+        const std::vector<NonholonomicPos>* astar_path = nullptr
+    );
+
     const std::vector<Vehicle::SimulationControlCandidate>& last_simulation_candidates() const noexcept;
+    float path_progress_s() const noexcept;
+    float path_length() const noexcept;
+    uint64_t path_generation() const noexcept;
 
 private:
     struct AppliedVehicleCommand {
@@ -63,6 +75,12 @@ private:
     std::optional<Vehicle::VehicleControlCommand> last_control_command = std::nullopt;
     std::optional<AppliedVehicleCommand> m_last_applied_command = std::nullopt;
     std::vector<Vehicle::SimulationControlCandidate> m_last_simulation_candidates;
+    float m_path_progress_s = 0.0f;
+    float m_path_length = 0.0f;
+    uint64_t m_path_generation = 0;
     float m_step_dt_min = std::numeric_limits<float>::min();
     float m_step_dt_max = std::numeric_limits<float>::max();
+
+    void set_vehicle_path(std::vector<VehiclePathPoint> path, bool reset_tracking);
+    void reset_tracking_state();
 };
