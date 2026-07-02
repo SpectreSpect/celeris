@@ -56,15 +56,11 @@ LocalPlanner::LocalPlanner(float step_dt_min, float step_dt_max)
         m_step_dt_max(step_dt_max) {}
 
 void LocalPlanner::update_timestamp() {
-    LOG_METHOD();
-
     m_previous_timestamp = m_current_timestamp;
     m_current_timestamp = Clock::now();
 }
 
 float LocalPlanner::calculate_delta_time() {
-    LOG_METHOD();
-
     float delta_time = m_step_dt_min;
     if (m_previous_timestamp.has_value() && m_current_timestamp.has_value()) {
         delta_time = std::chrono::duration<float>(*m_current_timestamp - *m_previous_timestamp).count();
@@ -74,9 +70,22 @@ float LocalPlanner::calculate_delta_time() {
     return delta_time;
 }
 
-void LocalPlanner::predict_vehicle_state(Vehicle& vehicle) {
-    LOG_METHOD();
+float LocalPlanner::calculate_command_delta_time() {
+    float delta_time = calculate_delta_time();
+    if (m_previous_command_timestamp.has_value() && m_current_timestamp.has_value()) {
+        delta_time = std::chrono::duration<float>(
+            *m_current_timestamp - *m_previous_command_timestamp
+        ).count();
+        delta_time = std::clamp(delta_time, m_step_dt_min, m_step_dt_max);
+    }
 
+    if (m_current_timestamp.has_value())
+        m_previous_command_timestamp = m_current_timestamp;
+
+    return delta_time;
+}
+
+void LocalPlanner::predict_vehicle_state(Vehicle& vehicle) {
     const float speed_acceleration = 
         m_last_applied_command.has_value() ? m_last_applied_command->speed_acceleration : 0.0f;
 
@@ -117,12 +126,15 @@ void LocalPlanner::reset_tracking_state()
     m_last_simulation_candidates.clear();
     last_control_command.reset();
     m_last_applied_command.reset();
+    m_previous_command_timestamp.reset();
 }
 
 void LocalPlanner::set_vehicle_path(std::vector<VehiclePathPoint> path, bool reset_tracking)
 {
     m_global_astar_path = std::move(path);
-    m_path_length = Vehicle::polyline_length(m_global_astar_path);
+    m_global_astar_path_arc_lengths =
+        Vehicle::build_path_arc_length_table(m_global_astar_path);
+    m_path_length = Vehicle::polyline_length(m_global_astar_path_arc_lengths);
 
     if (reset_tracking)
         reset_tracking_state();
@@ -156,8 +168,6 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
     PathIntersectionDetector& intersection_detector,
     VulkanSubmitContext& submit_context)
 {
-    LOG_METHOD();
-
     if (m_global_astar_path.empty()) {
         m_last_simulation_candidates.clear();
         last_control_command = Vehicle::VehicleControlCommand{};
@@ -174,10 +184,11 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
         return VehicleCommand{};
     }
 
+    const float command_delta_time = calculate_command_delta_time();
+    const Vehicle::SimulationFollowParams& follow_params = vehicle.follow_params();
     float projection_min_s = 0.0f;
     float projection_max_s = std::numeric_limits<float>::infinity();
     if (m_has_path_progress) {
-        const Vehicle::SimulationFollowParams& follow_params = vehicle.follow_params();
         projection_min_s = std::max(
             0.0f,
             m_path_progress_s - follow_params.projection_backtrack_window
@@ -186,12 +197,13 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
             m_path_length,
             m_path_progress_s +
                 follow_params.projection_lookahead_base +
-                std::abs(vehicle.state().m_speed) * calculate_delta_time()
+                std::abs(vehicle.state().m_speed) * command_delta_time
         );
     }
 
     const Vehicle::PointProjection current_projection = Vehicle::find_polyline_projection(
         m_global_astar_path,
+        m_global_astar_path_arc_lengths,
         vehicle.state().m_position,
         projection_min_s,
         projection_max_s
@@ -200,15 +212,27 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
     m_path_progress_s = current_projection.s;
     m_has_path_progress = true;
 
+    const float candidate_projection_min_s = std::max(
+        0.0f,
+        current_projection.s - follow_params.projection_backtrack_window
+    );
+    const float candidate_projection_max_s = std::min(
+        m_path_length,
+        current_projection.s +
+            follow_params.projection_lookahead_base +
+            std::abs(vehicle.state().m_speed) * command_delta_time
+    );
+
     Vehicle::SimulationControlSearchDesc search_desc;
     search_desc.max_results =
         search_desc.speed_acceleration_samples *
         search_desc.steer_acceleration_samples;
-    search_desc.initial_projection_min_s = projection_min_s;
-    search_desc.initial_projection_max_s = projection_max_s;
+    search_desc.initial_projection_min_s = candidate_projection_min_s;
+    search_desc.initial_projection_max_s = candidate_projection_max_s;
 
     m_last_simulation_candidates = vehicle.find_best_simulation_controls(
         m_global_astar_path,
+        m_global_astar_path_arc_lengths,
         search_desc
     );
     
@@ -228,7 +252,7 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
         effective_steering_angle_velocity = 0.0f;
     }
     float steering_angle_velocity_target =
-        effective_steering_angle_velocity + 0.5f * control.steer_acceleration * calculate_delta_time();
+        effective_steering_angle_velocity + 0.5f * control.steer_acceleration * command_delta_time;
     if ((vehicle.state().m_steering_angle <= -kMaxSteeringAngle + Utils::eps &&
          steering_angle_velocity_target < 0.0f) ||
         (vehicle.state().m_steering_angle >= kMaxSteeringAngle - Utils::eps &&
@@ -254,8 +278,6 @@ VehicleCommand LocalPlanner::step(
     VulkanSubmitContext& submit_context,
     const std::vector<NonholonomicPos>* astar_path)
 {
-    LOG_METHOD();
-
     if (astar_path)
         set_astar_path(*astar_path);
 

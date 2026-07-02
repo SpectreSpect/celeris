@@ -9,8 +9,10 @@
 
 #include "../a_star/nonholonomic_a_star.h"
 #include "../a_star/occupancy_grid_3d.h"
+#include "../a_star/footprint/footprint.h"
 #include "../a_star/path_intersection_detector.h"
 #include "../a_star/unimpended_path_finder.h"
+#include "vehicle_geometry.h"
 #include "../utils/avg_timer.h"
 #include "../vulkan_self/logger/logger_header.h"
 
@@ -27,6 +29,10 @@ public:
     struct PathPlannerDesc {
         uint32_t unimpended_path_window_size = 64;
         uint32_t unimpended_path_max_astar_points = 4096;
+        VehicleGeometry vehicle_geometry;
+        uint32_t footprint_sample_count = 5;
+        uint32_t footprint_horizontal_inflation_size = 1;
+        uint32_t footprint_vertical_inflation_size = 1;
         NonholonomicAStar::NonholonomicAStarDesc nonholonomic_astar_desc;
     };
 
@@ -75,12 +81,28 @@ public:
         bool allow_flying_over_precepices = true,
         uint32_t* status = nullptr
     );
+    bool request_adjust_to_ground(
+        std::vector<glm::vec3>& output,
+        int max_step_up = 500,
+        int max_drop = 500,
+        int max_y_diff = -1,
+        bool allow_flying_over_precepices = true
+    );
+    bool request_get_ground_positions(
+        const std::vector<glm::vec3>& polyline,
+        std::vector<glm::ivec3>& output,
+        int max_step_up = 500,
+        int max_drop = 500,
+        int max_y_diff = -1,
+        bool allow_flying_over_precepices = false
+    );
     bool request_is_solid(glm::ivec3 voxel_pos);
     bool request_is_solid_world(glm::vec3 point);
     glm::vec3 request_voxel_size();
     glm::ivec3 request_world_to_voxel_pos(const glm::vec3& point);
     glm::vec3 request_voxel_to_world_pos(const glm::ivec3& voxel_pos);
     glm::vec3 request_voxel_center_world_pos(const glm::ivec3& voxel_pos);
+    Footprint& footprint() noexcept;
 
     PathPlannerResult request_result_snapshot() const;
     uint64_t request_result_generation() const noexcept;
@@ -90,7 +112,7 @@ private:
     UnimpendedPathFinder m_unimpended_path_finder;
     PathIntersectionDetector* m_path_intersection_detector = nullptr;
     OccupancyGrid3D m_occupancy_grid;
-
+    Footprint m_footprint;
     NonholonomicAStar m_planner;
 
     mutable std::mutex m_result_mutex;

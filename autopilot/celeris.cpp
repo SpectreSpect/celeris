@@ -86,6 +86,10 @@ Celeris::Celeris(VulkanEngine& engine,
             PathPlanner::PathPlannerDesc{
                 .unimpended_path_window_size = desc.unimpended_path_window_size,
                 .unimpended_path_max_astar_points = desc.unimpended_path_max_astar_points,
+                .vehicle_geometry = desc.vehicle_geometry,
+                .footprint_sample_count = desc.footprint_sample_count,
+                .footprint_horizontal_inflation_size = desc.footprint_horizontal_inflation_size,
+                .footprint_vertical_inflation_size = desc.footprint_vertical_inflation_size,
                 .nonholonomic_astar_desc = desc.nonholonomic_astar_desc
             }
         ),
@@ -145,8 +149,6 @@ void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
 }
 
 void Celeris::update(VulkanSubmitContext& submit_context) {
-    LOG_METHOD();
-
     logger().check(m_engine, "Engine was null");
     logger().check(m_manager_bundle, "Manager bundle was null");
     logger().check(m_voxel_grid, "Voxel grid was null");
@@ -271,17 +273,25 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
 
     sync_vehicle_position_from_state(vehicle_height);
 
-    /*
-        Локальное управление пересчитывается на каждом update, а не только при новом lidar scan.
-        Скан корректирует позу через GICP, а между сканами состояние ведется коротким предсказанием.
-    */
-    VehicleCommand vehicle_command = m_local_planner.step(
-        m_vehicle,
-        m_path_intersection_detector,
-        submit_context
-    );
+    const auto now = std::chrono::steady_clock::now();
+    const float local_planner_update_period = std::max(0.0f, m_desc.local_planner_update_period);
+    const bool should_update_local_planner =
+        !m_has_last_local_planner_update_timestamp ||
+        local_planner_update_period <= 0.0f ||
+        std::chrono::duration<float>(now - m_last_local_planner_update_timestamp).count() >=
+            local_planner_update_period;
 
-    m_command_sender.set_command(vehicle_command);
+    if (should_update_local_planner) {
+        VehicleCommand vehicle_command = m_local_planner.step(
+            m_vehicle,
+            m_path_intersection_detector,
+            submit_context
+        );
+
+        m_command_sender.set_command(vehicle_command);
+        m_last_local_planner_update_timestamp = now;
+        m_has_last_local_planner_update_timestamp = true;
+    }
 }
 
 void Celeris::apply_vehicle_feedback(const VehicleFeedback& feedback) {
@@ -407,6 +417,10 @@ const std::vector<Vehicle::SimulationControlCandidate>&
 Celeris::local_planner_candidates() const noexcept
 {
     return m_local_planner.last_simulation_candidates();
+}
+
+Footprint& Celeris::footprint() noexcept {
+    return m_path_planner.footprint();
 }
 
 uint32_t Celeris::received_scan_count() const noexcept {
@@ -665,8 +679,51 @@ void Celeris::request_path_replan() {
     m_path_planner.request_path_replan(m_start_position, m_goal_position);
 }
 
-bool Celeris::adjust_to_ground(glm::vec3& output) {
-    return m_path_planner.request_adjust_to_ground(output);
+bool Celeris::adjust_to_ground(
+    glm::vec3& output,
+    int max_step_up,
+    int max_drop,
+    int max_y_diff,
+    bool allow_flying_over_precepices) {
+    return m_path_planner.request_adjust_to_ground(
+        output,
+        max_step_up,
+        max_drop,
+        max_y_diff,
+        allow_flying_over_precepices
+    );
+}
+
+bool Celeris::adjust_to_ground(
+    std::vector<glm::vec3>& output,
+    int max_step_up,
+    int max_drop,
+    int max_y_diff,
+    bool allow_flying_over_precepices) {
+    return m_path_planner.request_adjust_to_ground(
+        output,
+        max_step_up,
+        max_drop,
+        max_y_diff,
+        allow_flying_over_precepices
+    );
+}
+
+bool Celeris::get_ground_positions(
+    const std::vector<glm::vec3>& polyline,
+    std::vector<glm::ivec3>& output,
+    int max_step_up,
+    int max_drop,
+    int max_y_diff,
+    bool allow_flying_over_precepices) {
+    return m_path_planner.request_get_ground_positions(
+        polyline,
+        output,
+        max_step_up,
+        max_drop,
+        max_y_diff,
+        allow_flying_over_precepices
+    );
 }
 
 bool Celeris::has_planned_path() const {
@@ -742,6 +799,9 @@ void Celeris::display_path_planner_debug_controls() {
     const std::vector<Vehicle::SimulationControlCandidate>& candidates =
         m_local_planner.last_simulation_candidates();
     ImGui::Text("Local candidates: %zu", candidates.size());
+    if (ImGui::DragFloat("Local planner update period", &m_desc.local_planner_update_period, 0.001f, 0.0f, 0.2f, "%.3f")) {
+        m_desc.local_planner_update_period = std::max(0.0f, m_desc.local_planner_update_period);
+    }
     ImGui::Text(
         "Local path progress: %.2f / %.2f",
         m_local_planner.path_progress_s(),

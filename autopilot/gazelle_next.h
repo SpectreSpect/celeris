@@ -1,5 +1,7 @@
 #pragma once
 
+#include "vehicle_geometry.h"
+
 #include "../renderer/scene_object.h"
 #include "../renderer/render_object.h"
 #include "../renderer/transform.h"
@@ -12,34 +14,25 @@ class MaterialInstanceManager;
 
 class GazelleNext : public SceneObject {
 public:
-    float car_length = 6.6f;
-
     float compartment_1_weight = 3.41f;
     float compartment_2_weight = 2.0f;
     float compartment_3_weight = 1.0f;
     float compartment_3_length = 1.5f;
 
-    float car_body_height = 2.75f;
     float compartment_1_top_height_from_rear_wheel_center = 2.30f;
     float compartment_2_top_height_from_rear_wheel_center = 1.70f;
     float compartment_3_top_height_from_rear_wheel_center = 0.70f;
-    float lidar_height_from_wheel_bottom = 1.51f;
 
-    float axle_length = 1.805f;
-    float rear_axle_x_portion = 0.2f;
-    float front_axle_x_portion = 0.85f;
-
-    glm::vec3 wheel_scale = glm::vec3(0.78f, 0.2f, 0.78f);
-    float connector_depth = 2.0f;
+    float wheel_depth = 0.2f;
     float connector_thickness = 0.8f;
     float connector_end_offset_from_car_front_portion = 0.0f;
 
-    float lidar_x_portion = 1.0f - 0.6f / 6.6f;
     glm::vec3 lidar_scale = glm::vec3(0.2f, 0.1f, 0.2f);
 
     GazelleNext(
         MeshManager& mesh_manager,
         MaterialInstanceManager& material_instance_manager,
+        const VehicleGeometry& vehicle_geometry,
         float skybox_exposure
     );
 
@@ -56,6 +49,8 @@ private:
     glm::vec3 rear_axle_world_offset() const;
     glm::vec3 lidar_world_offset() const;
     glm::quat parent_rotation_from_lidar_mount_rotation(const glm::quat& lidar_rotation) const;
+
+    VehicleGeometry m_vehicle_geometry;
 
     RenderObject m_compartment_1;
     RenderObject m_compartment_2;

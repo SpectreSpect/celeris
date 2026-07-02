@@ -1,0 +1,17 @@
+name: gazelle_next_sim
+
+size:
+  width: 2.0
+  height: 2.75
+  length: 6.6
+
+axles:
+  track_width: 1.805
+  wheel_radius: 0.39
+  rear_from_rear: 1.32
+  front_from_rear: 5.61
+
+lidar:
+  from_rear: 6.0
+  height: 1.51
+  from_left: 1.0

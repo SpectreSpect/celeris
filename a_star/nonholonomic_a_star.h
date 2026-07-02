@@ -13,10 +13,12 @@
 #include <cstdint>
 
 #include "../renderer/lines/line_instance.h"
+#include "footprint/footprint.h"
 #include "../utils/avg_timer.h"
 #include "a_star_structures.h"
 #include "../math_utils.h"
 #include "a_star.h"
+
 
 #include "../vulkan_self/logger/logger_header.h"
 
@@ -41,7 +43,8 @@ public:
         bool force_reeds_shepp_shot = false;
         bool allow_flying_over_precipices = true;
         bool allow_diagonal_moves = false;
-        int iteration_limit = 20000;
+        // int iteration_limit = 20000;
+        int iteration_limit = 5000;
         bool track_explored_paths = true;
         int max_step_up = 1;
         int max_drop = 1;
@@ -74,7 +77,8 @@ public:
     NonholonomicAStar(
         OccupancyGrid3D& occupancy_grid,
         const NonholonomicAStarDesc& desc,
-        UnimpendedPathFinder& unimpened_path_finder
+        UnimpendedPathFinder& unimpened_path_finder,
+        Footprint& footprint
     );
 
     uint64_t state_key(const NonholonomicPos& s) const;
@@ -140,6 +144,7 @@ private:
     NonholonomicAStarState m_state;
     OccupancyGrid3D* m_grid = nullptr;
     UnimpendedPathFinder* m_unimpened_path_finder = nullptr;
+    Footprint* m_footprint = nullptr;
     AStar m_plain_astar;
     
     AvgTimer m_initialize_time;

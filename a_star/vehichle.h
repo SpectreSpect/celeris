@@ -22,6 +22,12 @@ public:
         float dir = 1.0f;
     };
 
+    struct PathArcLengthTable {
+        std::vector<float> point_s;
+        std::vector<float> direction_change_s;
+        float total_length = 0.0f;
+    };
+
 public:
     struct VehicleTransformState {
         glm::vec2 m_position = glm::vec2{0.0f}; // p(t). Позиция машины
@@ -228,6 +234,13 @@ public:
     ) const;
 
     std::vector<SimulationControlCandidate> find_best_simulation_controls(
+        const VehicleTransformState& state,
+        const std::vector<VehiclePathPoint>& path,
+        const PathArcLengthTable& path_arc_lengths,
+        const SimulationControlSearchDesc& desc
+    ) const;
+
+    std::vector<SimulationControlCandidate> find_best_simulation_controls(
         const std::vector<glm::vec2>& polyline
     ) const;
 
@@ -245,8 +258,22 @@ public:
         const SimulationControlSearchDesc& desc
     ) const;
 
+    std::vector<SimulationControlCandidate> find_best_simulation_controls(
+        const std::vector<VehiclePathPoint>& path,
+        const PathArcLengthTable& path_arc_lengths,
+        const SimulationControlSearchDesc& desc
+    ) const;
+
     static PointProjection find_polyline_projection(
         const std::vector<VehiclePathPoint>& path,
+        glm::vec2 point,
+        float min_s = 0.0f,
+        float max_s = std::numeric_limits<float>::infinity()
+    );
+
+    static PointProjection find_polyline_projection(
+        const std::vector<VehiclePathPoint>& path,
+        const PathArcLengthTable& path_arc_lengths,
         glm::vec2 point,
         float min_s = 0.0f,
         float max_s = std::numeric_limits<float>::infinity()
@@ -257,9 +284,25 @@ public:
         float s
     );
 
+    static PointProjection sample_polyline_at_s(
+        const std::vector<VehiclePathPoint>& path,
+        const PathArcLengthTable& path_arc_lengths,
+        float s
+    );
+
+    static PathArcLengthTable build_path_arc_length_table(
+        const std::vector<VehiclePathPoint>& path
+    );
     static float polyline_length(const std::vector<VehiclePathPoint>& path);
+    static float polyline_length(const PathArcLengthTable& path_arc_lengths) noexcept;
     static float next_direction_change_s(
         const std::vector<VehiclePathPoint>& path,
+        float s,
+        bool include_current = false
+    );
+    static float next_direction_change_s(
+        const std::vector<VehiclePathPoint>& path,
+        const PathArcLengthTable& path_arc_lengths,
         float s,
         bool include_current = false
     );
@@ -322,10 +365,10 @@ private:
 
     float compute_speed_loss_coefficient(
         const VehicleTransformState& state,
-        const std::vector<VehiclePathPoint>& path,
         const PointProjection& projection,
         const PointProjection& target_projection,
-        float total_polyline_length
+        float total_polyline_length,
+        float next_direction_change_s
     ) const;
 
     float compute_progress_loss_coefficient(
@@ -348,11 +391,11 @@ private:
 
     SimulationLossCoefficients compute_simulation_loss_coefficients(
         const VehicleTransformState& state,
-        const std::vector<VehiclePathPoint>& path,
         const PointProjection& projection,
         const PointProjection& target_projection,
         float total_polyline_length,
         float progress_reference_s,
+        float next_direction_change_s,
         float speed_acceleration,
         float steer_acceleration
     ) const;
@@ -360,6 +403,8 @@ private:
     float compute_simulation_loss(
         VehicleTransformState& state,
         const std::vector<VehiclePathPoint>& path,
+        const PathArcLengthTable& path_arc_lengths,
+        float total_polyline_length,
         float speed_acceleration,
         float steer_acceleration,
         float simulation_time, 

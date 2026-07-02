@@ -70,8 +70,10 @@ private:
     LocalPlannerMode m_mode = LocalPlannerMode::FOLLOWING_ASTAR;
     std::vector<VehiclePathPoint> m_global_astar_path;
     std::vector<VehiclePathPoint> m_mini_reeds_shepp_path;
+    Vehicle::PathArcLengthTable m_global_astar_path_arc_lengths;
     std::optional<Clock::time_point> m_previous_timestamp = std::nullopt;
     std::optional<Clock::time_point> m_current_timestamp = std::nullopt;
+    std::optional<Clock::time_point> m_previous_command_timestamp = std::nullopt;
     std::optional<Vehicle::VehicleControlCommand> last_control_command = std::nullopt;
     std::optional<AppliedVehicleCommand> m_last_applied_command = std::nullopt;
     std::vector<Vehicle::SimulationControlCandidate> m_last_simulation_candidates;
@@ -84,4 +86,5 @@ private:
 
     void set_vehicle_path(std::vector<VehiclePathPoint> path, bool reset_tracking);
     void reset_tracking_state();
+    float calculate_command_delta_time();
 };
