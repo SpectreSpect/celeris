@@ -49,6 +49,7 @@ public:
         float position = 4.0f;
         float heading = 0.6f;
         float speed = 0.25f;
+        float progress_tracking = 1.0f;
         float forward_progress = 0.25f;
         float backward_progress = 3.0f;
         float steering = 0.8f;
@@ -60,6 +61,8 @@ public:
         float cruise_speed = 3.0f;
         float slowdown_distance_from_path = 2.5f;
         float min_off_path_speed_factor = 0.25f;
+        float projection_backtrack_window = 0.75f;
+        float projection_lookahead_base = 3.0f;
     };
 
     struct VehicleControlCommand {
@@ -255,6 +258,11 @@ public:
     );
 
     static float polyline_length(const std::vector<VehiclePathPoint>& path);
+    static float next_direction_change_s(
+        const std::vector<VehiclePathPoint>& path,
+        float s,
+        bool include_current = false
+    );
 
 private:
     VehicleTransformState m_vehicle_state;
@@ -314,6 +322,7 @@ private:
 
     float compute_speed_loss_coefficient(
         const VehicleTransformState& state,
+        const std::vector<VehiclePathPoint>& path,
         const PointProjection& projection,
         const PointProjection& target_projection,
         float total_polyline_length
@@ -322,6 +331,7 @@ private:
     float compute_progress_loss_coefficient(
         const VehicleTransformState& state,
         const PointProjection& projection,
+        const PointProjection& target_projection,
         float progress_reference_s
     ) const;
 
@@ -338,6 +348,7 @@ private:
 
     SimulationLossCoefficients compute_simulation_loss_coefficients(
         const VehicleTransformState& state,
+        const std::vector<VehiclePathPoint>& path,
         const PointProjection& projection,
         const PointProjection& target_projection,
         float total_polyline_length,

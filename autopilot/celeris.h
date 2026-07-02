@@ -56,6 +56,8 @@ public:
         float vehicle_cruise_speed = 10.0f;
         float vehicle_slowdown_distance_from_path = 2.5f;
         float vehicle_min_off_path_speed_factor = 0.25f;
+        float vehicle_projection_backtrack_window = 0.75f;
+        float vehicle_projection_lookahead_base = 3.0f;
         NonholonomicAStar::NonholonomicAStarDesc nonholonomic_astar_desc;
     };
 

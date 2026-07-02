@@ -113,6 +113,7 @@ uint64_t LocalPlanner::path_generation() const noexcept {
 void LocalPlanner::reset_tracking_state()
 {
     m_path_progress_s = 0.0f;
+    m_has_path_progress = false;
     m_last_simulation_candidates.clear();
     last_control_command.reset();
     m_last_applied_command.reset();
@@ -173,17 +174,38 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
         return VehicleCommand{};
     }
 
+    float projection_min_s = 0.0f;
+    float projection_max_s = std::numeric_limits<float>::infinity();
+    if (m_has_path_progress) {
+        const Vehicle::SimulationFollowParams& follow_params = vehicle.follow_params();
+        projection_min_s = std::max(
+            0.0f,
+            m_path_progress_s - follow_params.projection_backtrack_window
+        );
+        projection_max_s = std::min(
+            m_path_length,
+            m_path_progress_s +
+                follow_params.projection_lookahead_base +
+                std::abs(vehicle.state().m_speed) * calculate_delta_time()
+        );
+    }
+
     const Vehicle::PointProjection current_projection = Vehicle::find_polyline_projection(
         m_global_astar_path,
-        vehicle.state().m_position
+        vehicle.state().m_position,
+        projection_min_s,
+        projection_max_s
     );
 
     m_path_progress_s = current_projection.s;
+    m_has_path_progress = true;
 
     Vehicle::SimulationControlSearchDesc search_desc;
     search_desc.max_results =
         search_desc.speed_acceleration_samples *
         search_desc.steer_acceleration_samples;
+    search_desc.initial_projection_min_s = projection_min_s;
+    search_desc.initial_projection_max_s = projection_max_s;
 
     m_last_simulation_candidates = vehicle.find_best_simulation_controls(
         m_global_astar_path,

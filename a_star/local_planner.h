@@ -78,6 +78,7 @@ private:
     float m_path_progress_s = 0.0f;
     float m_path_length = 0.0f;
     uint64_t m_path_generation = 0;
+    bool m_has_path_progress = false;
     float m_step_dt_min = std::numeric_limits<float>::min();
     float m_step_dt_max = std::numeric_limits<float>::max();
 

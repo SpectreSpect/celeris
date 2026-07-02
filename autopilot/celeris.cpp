@@ -115,6 +115,8 @@ Celeris::Celeris(VulkanEngine& engine,
         0.0f,
         1.0f
     );
+    follow_params.projection_backtrack_window = std::max(0.0f, desc.vehicle_projection_backtrack_window);
+    follow_params.projection_lookahead_base = std::max(0.0f, desc.vehicle_projection_lookahead_base);
     m_car_speed = follow_params.cruise_speed;
 
     m_voxel_map_reseter.reset(m_voxel_point_map);
@@ -809,6 +811,12 @@ void Celeris::display_path_planner_debug_controls() {
         if (ImGui::DragFloat("Min off-path speed factor", &params.min_off_path_speed_factor, 0.01f, 0.0f, 1.0f, "%.3f")) {
             params.min_off_path_speed_factor = std::clamp(params.min_off_path_speed_factor, 0.0f, 1.0f);
         }
+        if (ImGui::DragFloat("Projection backtrack window", &params.projection_backtrack_window, 0.05f, 0.0f, 20.0f, "%.3f")) {
+            params.projection_backtrack_window = std::max(0.0f, params.projection_backtrack_window);
+        }
+        if (ImGui::DragFloat("Projection lookahead base", &params.projection_lookahead_base, 0.05f, 0.0f, 50.0f, "%.3f")) {
+            params.projection_lookahead_base = std::max(0.0f, params.projection_lookahead_base);
+        }
 
         if (ImGui::Button("Reset follow params")) {
             params.cruise_speed = std::max(0.0f, m_desc.vehicle_cruise_speed);
@@ -818,6 +826,8 @@ void Celeris::display_path_planner_debug_controls() {
                 0.0f,
                 1.0f
             );
+            params.projection_backtrack_window = std::max(0.0f, m_desc.vehicle_projection_backtrack_window);
+            params.projection_lookahead_base = std::max(0.0f, m_desc.vehicle_projection_lookahead_base);
             m_car_speed = params.cruise_speed;
         }
 
@@ -837,6 +847,7 @@ void Celeris::display_path_planner_debug_controls() {
         drag_non_negative_float("Position", weights.position, 0.05f, 100.0f);
         drag_non_negative_float("Heading", weights.heading, 0.01f, 20.0f);
         drag_non_negative_float("Speed", weights.speed, 0.01f, 20.0f);
+        drag_non_negative_float("Progress tracking", weights.progress_tracking, 0.01f, 50.0f);
         drag_non_negative_float("Forward progress", weights.forward_progress, 0.01f, 20.0f);
         drag_non_negative_float("Backward motion", weights.backward_progress, 0.05f, 100.0f);
         drag_non_negative_float("Steering", weights.steering, 0.01f, 20.0f);
