@@ -141,11 +141,6 @@ void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     m_vehicle_state_receiver.start();
     m_command_sender.start();
     m_path_planner.start(std::move(planner_submit_context));
-
-    const glm::vec2 start{m_start_position.pos.x, m_start_position.pos.z};
-    const glm::vec2 goal{m_goal_position.pos.x, m_goal_position.pos.z};
-    if (glm::distance(start, goal) > 1e-3f)
-        request_path_replan();
 }
 
 void Celeris::update(VulkanSubmitContext& submit_context) {
@@ -222,7 +217,8 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         
         m_lidar_transform = m_network_scan->point_cloud().transform;
         const Transform vehicle_transform = rear_axle_transform_from_lidar_transform(m_lidar_transform);
-        m_start_position.from_transform(vehicle_transform);
+        NonholonomicPos vehicle_pose;
+        vehicle_pose.from_transform(vehicle_transform);
         vehicle_height = vehicle_transform.position.y;
 
         // Корректируем позу машины по lidar/GICP. Скорость и руль приходят отдельно.
@@ -244,22 +240,22 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         );
 
         m_path_planner.request_adjust_to_ground(
-            m_start_position.pos, 
+            vehicle_pose.pos,
             0, 
             6, 
             6, 
             false
         );
 
-        const glm::vec3 collision_raw_position = m_start_position.pos;
+        const glm::vec3 collision_raw_position = vehicle_pose.pos;
 
         collision(
             m_collision_raw_position_history,
-            m_start_position.pos
+            vehicle_pose.pos
         );
         remember_collision_raw_position(collision_raw_position);
 
-        if (is_path_impended(submit_context))
+        if (has_planned_path() && is_path_impended(submit_context))
             request_path_replan();
 
         m_previous_lidar_position = raw_position;
@@ -349,16 +345,12 @@ void Celeris::sync_vehicle_position_from_state(float height) {
 
 void Celeris::set_start(const NonholonomicPos& position) {
     m_start_position = position;
-    m_vehicle_position = position;
-    m_vehicle.state().m_position = glm::vec2{position.pos.x, position.pos.z};
-    m_vehicle.state().m_heading = position.theta;
-    m_vehicle.state().m_steering_angle = position.steer;
-    m_collision_raw_position_history.clear();
-    m_has_collision_surface_point = false;
+    m_has_start_position = true;
 }
 
 void Celeris::set_goal(const NonholonomicPos& position) {
     m_goal_position = position;
+    m_has_goal_position = true;
 }
 
 void Celeris::set_car_speed(float speed) noexcept {
@@ -375,6 +367,14 @@ LidarScan* Celeris::network_scan() {
 
 const Transform& Celeris::lidar_transform() const noexcept {
     return m_lidar_transform;
+}
+
+bool Celeris::has_start_position() const noexcept {
+    return m_has_start_position;
+}
+
+bool Celeris::has_goal_position() const noexcept {
+    return m_has_goal_position;
 }
 
 NonholonomicPos Celeris::start_position() const noexcept {
@@ -675,8 +675,12 @@ void Celeris::remember_collision_raw_position(glm::vec3 point_pos) {
     }
 }
 
-void Celeris::request_path_replan() {
+bool Celeris::request_path_replan() {
+    if (!m_has_start_position || !m_has_goal_position)
+        return false;
+
     m_path_planner.request_path_replan(m_start_position, m_goal_position);
+    return true;
 }
 
 bool Celeris::adjust_to_ground(
@@ -748,6 +752,15 @@ void Celeris::display_path_planner_debug_controls() {
 
     PathPlanner::PathPlannerResult result = path_result_snapshot();
 
+    ImGui::Text("Start marker: %s", m_has_start_position ? "set" : "missing");
+    ImGui::Text("Goal marker: %s", m_has_goal_position ? "set" : "missing");
+    ImGui::Text(
+        "Replan: requests=%llu started=%llu pending=%d planning=%d",
+        static_cast<unsigned long long>(m_path_planner.request_replan_request_count()),
+        static_cast<unsigned long long>(m_path_planner.request_replan_start_count()),
+        m_path_planner.request_has_pending_replan() ? 1 : 0,
+        m_path_planner.request_is_planning() ? 1 : 0
+    );
     ImGui::Text("Generation: %llu", static_cast<unsigned long long>(result.generation));
     ImGui::Text("Total: %.3f ms", result.total_time_ms);
     ImGui::Separator();

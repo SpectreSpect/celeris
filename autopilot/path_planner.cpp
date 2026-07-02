@@ -92,6 +92,7 @@ void PathPlanner::request_path_replan(NonholonomicPos start_pos, NonholonomicPos
         m_requested_start = start_pos;
         m_requested_goal = goal_pos;
         m_replan_requested = true;
+        m_replan_request_count++;
     }
 
     m_request_cv.notify_one();
@@ -153,6 +154,23 @@ uint64_t PathPlanner::request_result_generation() const noexcept {
 bool PathPlanner::request_has_path() const {
     std::lock_guard lock(m_result_mutex);
     return !m_result.nonholonomic_astar_path.empty();
+}
+
+bool PathPlanner::request_has_pending_replan() const {
+    std::lock_guard lock(m_request_mutex);
+    return m_replan_requested;
+}
+
+bool PathPlanner::request_is_planning() const noexcept {
+    return m_is_planning.load();
+}
+
+uint64_t PathPlanner::request_replan_request_count() const noexcept {
+    return m_replan_request_count.load();
+}
+
+uint64_t PathPlanner::request_replan_start_count() const noexcept {
+    return m_replan_start_count.load();
 }
 
 bool PathPlanner::request_adjust_to_ground(
@@ -265,7 +283,10 @@ void PathPlanner::planner_loop(VulkanSubmitContext submit_context) {
             m_replan_requested = false;
         }
 
+        m_replan_start_count++;
+        m_is_planning = true;
         plan_path(submit_context, start_pos, goal_pos);
+        m_is_planning = false;
     }
 }
 

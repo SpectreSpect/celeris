@@ -31,7 +31,7 @@ public:
     _XCLASS_NAME(NonholonomicAStar);
     
     struct NonholonomicAStarParams {
-        float wheel_base = 2.5f;
+        float wheel_base = 4.29f;
         float max_steer = 0.6;
         float min_radius = 0.0f;
         float integration_steps = 8;
@@ -42,7 +42,7 @@ public:
         bool use_reed_shepps_fallback = false;
         bool force_reeds_shepp_shot = false;
         bool allow_flying_over_precipices = true;
-        bool allow_diagonal_moves = false;
+        bool allow_diagonal_moves = true;
         // int iteration_limit = 20000;
         int iteration_limit = 5000;
         bool track_explored_paths = true;

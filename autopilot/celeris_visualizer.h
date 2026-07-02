@@ -81,7 +81,8 @@ private:
     bool show_guide_path = true;
     bool show_explored_paths = false;
     bool show_unimpeded_path = true;
-    bool show_start_marker = false;
+    bool show_start_marker = true;
+    bool show_goal_marker = true;
     bool show_vehicle_marker = false;
     bool show_gazelle_next = true;
     bool show_local_candidates = true;

@@ -398,8 +398,8 @@ int main() {
         skybox_exposure
     );
 
-    bool has_start_pos = true;
-    bool has_end_pos = true;
+    bool has_start_pos = false;
+    bool has_end_pos = false;
     bool has_planned_path = false;
 
     VulkanSubmitContext planner_submit_context(
@@ -425,9 +425,6 @@ int main() {
             .footprint_vertical_inflation_size = vertical_inflation_size
         }
     );
-    celeris.set_start(NonholonomicPos{.pos = glm::vec3(0.0f, 1.5f, 0.0f), .theta = glm::pi<float>()});
-    celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.92f, -51.30f)});
-    // celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.5f, -0.0f)});
     celeris.start(std::move(planner_submit_context));
 
     CelerisVisualizer celeris_visualizer(mesh_manager, 
@@ -455,10 +452,7 @@ int main() {
     float car_speed = celeris.car_speed();
 
     auto start_path_planning = [&]() {
-        if (!has_start_pos || !has_end_pos)
-            return;
-
-        celeris.request_path_replan();
+        has_planned_path = celeris.request_path_replan();
     };
 
     auto make_pose_from_camera = [&](NonholonomicPos& out_pose) {
@@ -478,7 +472,6 @@ int main() {
             celeris.set_start(pose);
             has_start_pos = true;
             has_planned_path = false;
-            start_path_planning();
         }
     };
 
@@ -488,8 +481,13 @@ int main() {
             celeris.set_goal(pose);
             has_end_pos = true;
             has_planned_path = false;
-            start_path_planning();
         }
+    };
+
+    auto move_start_to_vehicle = [&]() {
+        celeris.set_start(celeris.vehicle_position());
+        has_start_pos = true;
+        has_planned_path = false;
     };
 
     // LidarVideo lidar_video(
@@ -612,6 +610,7 @@ int main() {
     bool place_start_pressed = false;
     bool place_end_pressed = false;
     bool start_path_planning_pressed = false;
+    bool move_start_to_vehicle_pressed = false;
     bool place_footprint_pressed = false;
     bool fps_camera_pressed = false;
     bool third_person_camera_pressed = false;
@@ -781,7 +780,7 @@ int main() {
         if (third_person_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_R) == GLFW_RELEASE)
             third_person_camera_pressed = false;
 
-        third_person_camera_controller.set_target(celeris_visualizer.get_start_marker_pos());
+        third_person_camera_controller.set_target(celeris.vehicle_position().pos);
         if (camera_controller_mode == CameraControllerMode::FPS)
             fps_camera_controller.update(window, delta_time);
         else
@@ -820,12 +819,21 @@ int main() {
             start_path_planning_pressed = false;
         }
 
-        if (!place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_PRESS) {
+        if (!move_start_to_vehicle_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_PRESS) {
+            move_start_to_vehicle_pressed = true;
+            move_start_to_vehicle();
+        }
+
+        if (move_start_to_vehicle_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_RELEASE) {
+            move_start_to_vehicle_pressed = false;
+        }
+
+        if (!place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_5) == GLFW_PRESS) {
             place_footprint_pressed = true;
             place_footprint();
         }
 
-        if (place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_RELEASE) {
+        if (place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_5) == GLFW_RELEASE) {
             place_footprint_pressed = false;
         }
 
@@ -998,11 +1006,17 @@ int main() {
                     ImGui::SameLine();
                     ImGui::TextUnformatted("Key: 3");
 
+                    if (ImGui::Button("Move start to vehicle")) {
+                        move_start_to_vehicle();
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("Key: 4");
+
                     if (ImGui::Button("Place footprint")) {
                         place_footprint();
                     }
                     ImGui::SameLine();
-                    ImGui::TextUnformatted("Key: 4");
+                    ImGui::TextUnformatted("Key: 5");
 
                     if (ImGui::Button("Play car path")) {
                         start_car_playback();

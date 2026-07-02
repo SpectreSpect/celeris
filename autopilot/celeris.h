@@ -91,6 +91,8 @@ public:
 
     LidarScan* network_scan();
     const Transform& lidar_transform() const noexcept;
+    bool has_start_position() const noexcept;
+    bool has_goal_position() const noexcept;
     NonholonomicPos start_position() const noexcept;
     NonholonomicPos vehicle_position() const noexcept;
     NonholonomicPos goal_position() const noexcept;
@@ -106,7 +108,7 @@ public:
     VoxelMapPointReseter& voxel_map_reseter();
     Footprint& footprint() noexcept;
 
-    void request_path_replan();
+    bool request_path_replan();
     bool adjust_to_ground(
         glm::vec3& output,
         int max_step_up = 500,
@@ -169,6 +171,8 @@ private:
     NonholonomicPos m_start_position;
     NonholonomicPos m_vehicle_position;
     NonholonomicPos m_goal_position;
+    bool m_has_start_position = false;
+    bool m_has_goal_position = false;
     Transform m_lidar_transform;
     float m_car_speed = 10.0f;
 

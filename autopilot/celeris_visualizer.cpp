@@ -103,9 +103,14 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
     add_child(m_unimpended_path_line_cloud);
     add_child(m_local_candidate_line_cloud);
 
-    set_start(m_celeris->start_position());
+    if (m_celeris->has_start_position())
+        set_start(m_celeris->start_position());
     set_vehicle(m_celeris->vehicle_position());
-    set_goal(m_celeris->goal_position());
+    if (m_celeris->has_goal_position())
+        set_goal(m_celeris->goal_position());
+
+    m_start_marker.visible = show_start_marker && m_celeris->has_start_position();
+    m_goal_marker.visible = show_goal_marker && m_celeris->has_goal_position();
 }
 
 void CelerisVisualizer::set_start(const NonholonomicPos& nonholonomic_position) {
@@ -166,14 +171,17 @@ void CelerisVisualizer::update() {
     const bool received_new_scan = received_scan_count != scan_generation;
     scan_generation = received_scan_count;
 
-    set_start(m_celeris->start_position());
-    set_goal(m_celeris->goal_position());
+    if (m_celeris->has_start_position())
+        set_start(m_celeris->start_position());
+    if (m_celeris->has_goal_position())
+        set_goal(m_celeris->goal_position());
     if (m_has_car_pose_override)
         set_gazelle_pose(m_car_pose_override);
     else
         set_gazelle_pose_from_lidar_transform();
 
-    m_start_marker.visible = show_start_marker;
+    m_start_marker.visible = show_start_marker && m_celeris->has_start_position();
+    m_goal_marker.visible = show_goal_marker && m_celeris->has_goal_position();
     m_gazelle_next.visible = show_gazelle_next;
 
     // interpolate_marker_pose(
@@ -240,6 +248,7 @@ void CelerisVisualizer::display_debug_controls() {
         ImGui::Checkbox("Explored paths", &show_explored_paths);
         ImGui::Checkbox("Unimpeded path", &show_unimpeded_path);
         ImGui::Checkbox("Start pose marker", &show_start_marker);
+        ImGui::Checkbox("Goal pose marker", &show_goal_marker);
         ImGui::Checkbox("Vehicle pose marker", &show_vehicle_marker);
         ImGui::Checkbox("Gazelle Next", &show_gazelle_next);
         ImGui::Checkbox("Local candidates", &show_local_candidates);

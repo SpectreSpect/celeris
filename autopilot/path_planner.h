@@ -30,7 +30,7 @@ public:
         uint32_t unimpended_path_window_size = 64;
         uint32_t unimpended_path_max_astar_points = 4096;
         VehicleGeometry vehicle_geometry;
-        uint32_t footprint_sample_count = 5;
+        uint32_t footprint_sample_count = 0; //5
         uint32_t footprint_horizontal_inflation_size = 1;
         uint32_t footprint_vertical_inflation_size = 1;
         NonholonomicAStar::NonholonomicAStarDesc nonholonomic_astar_desc;
@@ -107,6 +107,10 @@ public:
     PathPlannerResult request_result_snapshot() const;
     uint64_t request_result_generation() const noexcept;
     bool request_has_path() const;
+    bool request_has_pending_replan() const;
+    bool request_is_planning() const noexcept;
+    uint64_t request_replan_request_count() const noexcept;
+    uint64_t request_replan_start_count() const noexcept;
 
 private:
     UnimpendedPathFinder m_unimpended_path_finder;
@@ -120,11 +124,14 @@ private:
 
     std::mutex m_planning_mutex;
     std::mutex m_occupancy_grid_mutex;
-    std::mutex m_request_mutex;
+    mutable std::mutex m_request_mutex;
     std::condition_variable m_request_cv;
     std::thread m_thread;
     bool m_running = false;
     bool m_replan_requested = false;
+    std::atomic_bool m_is_planning = false;
+    std::atomic<uint64_t> m_replan_request_count = 0;
+    std::atomic<uint64_t> m_replan_start_count = 0;
     NonholonomicPos m_requested_start;
     NonholonomicPos m_requested_goal;
 
