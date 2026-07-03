@@ -13,6 +13,47 @@ namespace {
     constexpr float kSteeringVelocityLossFactor = 0.08f;
     constexpr float kProjectionBacktrackWindow = 0.75f;
     constexpr float kProjectionLookaheadBase = 6.0f;
+
+    float previous_direction_change_s(
+        const Vehicle::PathArcLengthTable& path_arc_lengths,
+        float s)
+    {
+        const std::vector<float>& changes = path_arc_lengths.direction_change_s;
+        if (changes.empty()) {
+            return 0.0f;
+        }
+
+        const auto change_it = std::lower_bound(
+            changes.begin(),
+            changes.end(),
+            s - Utils::eps
+        );
+        if (change_it == changes.begin()) {
+            return 0.0f;
+        }
+
+        return *(change_it - 1);
+    }
+
+    float compute_virtual_remaining_s(
+        const Vehicle::PathArcLengthTable& path_arc_lengths,
+        float current_s,
+        float stop_s,
+        float min_virtual_segment_length)
+    {
+        const float real_remaining_s = std::max(0.0f, stop_s - current_s);
+        if (real_remaining_s <= Utils::eps || min_virtual_segment_length <= Utils::eps) {
+            return real_remaining_s;
+        }
+
+        const float segment_start_s = previous_direction_change_s(path_arc_lengths, current_s);
+        const float segment_length = std::max(stop_s - segment_start_s, Utils::eps);
+        if (segment_length >= min_virtual_segment_length) {
+            return real_remaining_s;
+        }
+
+        return real_remaining_s * min_virtual_segment_length / segment_length;
+    }
 }
 
 Vehicle::Vehicle(
@@ -553,7 +594,7 @@ Vehicle::PointProjection Vehicle::find_polyline_projection(
         if (dist2 < best_dist2) {
             const glm::vec2 tangent = segment / segment_length;
             const float heading = Utils::lerp_angle(path[i - 1].heading, path[i].heading, t);
-            const float dir = Utils::normalized_dir(t < 0.5f ? path[i - 1].dir : path[i].dir);
+            const float dir = Utils::normalized_dir(path[i].dir);
 
             best_dist2 = dist2;
             best_projection = PointProjection{
@@ -656,7 +697,7 @@ Vehicle::PointProjection Vehicle::sample_polyline_at_s(
                 .point = segment_start + segment * t,
                 .tangent = tangent,
                 .heading = Utils::lerp_angle(path[i - 1].heading, path[i].heading, t),
-                .dir = Utils::normalized_dir(t < 0.5f ? path[i - 1].dir : path[i].dir)
+                .dir = Utils::normalized_dir(path[i].dir)
             };
         }
     }
@@ -806,15 +847,17 @@ float Vehicle::compute_heading_loss_coefficient(
 float Vehicle::compute_speed_loss_coefficient(
     const VehicleTransformState& state,
     const PointProjection& projection,
-    const PointProjection& target_projection,
+    const PathArcLengthTable& path_arc_lengths,
     float total_polyline_length,
-    float next_direction_change_s) const
+    float current_next_direction_change_s) const
 {
-    float remaining_s = std::max(0.0f, total_polyline_length - target_projection.s);
-    if (std::isfinite(next_direction_change_s)) {
-        remaining_s = std::min(
-            remaining_s,
-            std::max(0.0f, next_direction_change_s - target_projection.s)
+    float remaining_s = std::max(0.0f, total_polyline_length - projection.s);
+    if (std::isfinite(current_next_direction_change_s)) {
+        remaining_s = compute_virtual_remaining_s(
+            path_arc_lengths,
+            projection.s,
+            current_next_direction_change_s,
+            m_follow_params.min_direction_segment_virtual_length
         );
     }
 
@@ -832,7 +875,7 @@ float Vehicle::compute_speed_loss_coefficient(
     }
     target_speed_abs *= off_path_speed_factor;
 
-    const float target_speed = target_speed_abs * target_projection.dir;
+    const float target_speed = target_speed_abs * projection.dir;
     const float speed_error = state.m_speed - target_speed;
 
     return m_loss_weights.speed * speed_error * speed_error;
@@ -911,9 +954,10 @@ Vehicle::SimulationLossCoefficients Vehicle::compute_simulation_loss_coefficient
     const VehicleTransformState& state,
     const PointProjection& projection,
     const PointProjection& target_projection,
+    const PathArcLengthTable& path_arc_lengths,
     float total_polyline_length,
     float progress_reference_s,
-    float next_direction_change_s,
+    float current_next_direction_change_s,
     float speed_acceleration,
     float steer_acceleration) const
 {
@@ -923,9 +967,9 @@ Vehicle::SimulationLossCoefficients Vehicle::compute_simulation_loss_coefficient
         .speed = compute_speed_loss_coefficient(
             state,
             projection,
-            target_projection,
+            path_arc_lengths,
             total_polyline_length,
-            next_direction_change_s
+            current_next_direction_change_s
         ),
         .progress = compute_progress_loss_coefficient(state, projection, target_projection, progress_reference_s),
         .steering = compute_steering_loss_coefficient(state, target_projection),
@@ -973,22 +1017,25 @@ float Vehicle::compute_simulation_loss(
         initial_projection_min_s,
         initial_projection_max_s
     );
-    const float progress_reference_s = previous_projection.s;
     const float progress_reference_dist = previous_projection.dist;
     const float reference_initial_path_speed = std::max(
         0.0f,
         glm::dot(forward_vector(state) * state.m_speed, previous_projection.tangent)
     );
+    const float progress_reference_s = previous_projection.s;
     const float next_switch_s = next_direction_change_s(path, path_arc_lengths, progress_reference_s);
+    const float previous_next_switch_s =
+        next_direction_change_s(path, path_arc_lengths, previous_projection.s);
     PointProjection previous_target_projection =
         sample_polyline_at_s(path, path_arc_lengths, progress_reference_s);
     SimulationLossCoefficients previous_loss_coefficients = compute_simulation_loss_coefficients(
         state,
         previous_projection,
         previous_target_projection,
+        path_arc_lengths,
         total_polyline_length,
         progress_reference_s,
-        next_switch_s,
+        previous_next_switch_s,
         speed_acceleration,
         steer_acceleration
     );
@@ -1030,13 +1077,16 @@ float Vehicle::compute_simulation_loss(
         }
         PointProjection current_target_projection =
             sample_polyline_at_s(path, path_arc_lengths, current_target_s);
+        const float current_next_switch_s =
+            next_direction_change_s(path, path_arc_lengths, current_projection.s);
         SimulationLossCoefficients current_loss_coefficients = compute_simulation_loss_coefficients(
             state,
             current_projection,
             current_target_projection,
+            path_arc_lengths,
             total_polyline_length,
             progress_reference_s,
-            next_switch_s,
+            current_next_switch_s,
             speed_acceleration,
             steer_acceleration
         );

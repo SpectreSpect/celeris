@@ -59,6 +59,7 @@ public:
         float vehicle_min_off_path_speed_factor = 0.25f;
         float vehicle_projection_backtrack_window = 0.75f;
         float vehicle_projection_lookahead_base = 3.0f;
+        float vehicle_min_direction_segment_virtual_length = 3.0f;
         float local_planner_update_period = 0.05f;
         VehicleGeometry vehicle_geometry;
         uint32_t footprint_sample_count = 5;

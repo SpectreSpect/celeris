@@ -121,6 +121,8 @@ Celeris::Celeris(VulkanEngine& engine,
     );
     follow_params.projection_backtrack_window = std::max(0.0f, desc.vehicle_projection_backtrack_window);
     follow_params.projection_lookahead_base = std::max(0.0f, desc.vehicle_projection_lookahead_base);
+    follow_params.min_direction_segment_virtual_length =
+        std::max(0.0f, desc.vehicle_min_direction_segment_virtual_length);
     m_car_speed = follow_params.cruise_speed;
 
     m_voxel_map_reseter.reset(m_voxel_point_map);
@@ -890,6 +892,9 @@ void Celeris::display_path_planner_debug_controls() {
         if (ImGui::DragFloat("Projection lookahead base", &params.projection_lookahead_base, 0.05f, 0.0f, 50.0f, "%.3f")) {
             params.projection_lookahead_base = std::max(0.0f, params.projection_lookahead_base);
         }
+        if (ImGui::DragFloat("Min virtual direction segment length", &params.min_direction_segment_virtual_length, 0.05f, 0.0f, 20.0f, "%.3f")) {
+            params.min_direction_segment_virtual_length = std::max(0.0f, params.min_direction_segment_virtual_length);
+        }
 
         if (ImGui::Button("Reset follow params")) {
             params.cruise_speed = std::max(0.0f, m_desc.vehicle_cruise_speed);
@@ -901,6 +906,8 @@ void Celeris::display_path_planner_debug_controls() {
             );
             params.projection_backtrack_window = std::max(0.0f, m_desc.vehicle_projection_backtrack_window);
             params.projection_lookahead_base = std::max(0.0f, m_desc.vehicle_projection_lookahead_base);
+            params.min_direction_segment_virtual_length =
+                std::max(0.0f, m_desc.vehicle_min_direction_segment_virtual_length);
             m_car_speed = params.cruise_speed;
         }
 

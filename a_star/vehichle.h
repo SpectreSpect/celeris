@@ -69,6 +69,7 @@ public:
         float min_off_path_speed_factor = 0.25f;
         float projection_backtrack_window = 0.75f;
         float projection_lookahead_base = 3.0f;
+        float min_direction_segment_virtual_length = 3.0f;
     };
 
     struct VehicleControlCommand {
@@ -366,9 +367,9 @@ private:
     float compute_speed_loss_coefficient(
         const VehicleTransformState& state,
         const PointProjection& projection,
-        const PointProjection& target_projection,
+        const PathArcLengthTable& path_arc_lengths,
         float total_polyline_length,
-        float next_direction_change_s
+        float current_next_direction_change_s
     ) const;
 
     float compute_progress_loss_coefficient(
@@ -393,9 +394,10 @@ private:
         const VehicleTransformState& state,
         const PointProjection& projection,
         const PointProjection& target_projection,
+        const PathArcLengthTable& path_arc_lengths,
         float total_polyline_length,
         float progress_reference_s,
-        float next_direction_change_s,
+        float current_next_direction_change_s,
         float speed_acceleration,
         float steer_acceleration
     ) const;
