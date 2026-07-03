@@ -1898,14 +1898,16 @@ glm::vec3 VoxelGrid::voxel_size() noexcept {
 }
 
 void VoxelGrid::voxelize_point_cloud(VulkanCommandBuffer& command_buffer, VulkanEngine& engine, 
-                                     PointCloud& point_cloud, VulkanBuffer& voxel_writes, uint32_t max_write_count) {
+                                     PointCloud& point_cloud, VulkanBuffer& normal_buffer, VulkanBuffer& voxel_writes, uint32_t max_write_count) {
     LOG_METHOD();
 
     logger().check(point_cloud.point_count() < max_write_count, "Point count was greater than max write count");
     logger().check(point_cloud.point_count() < m_params.max_write_count, "Point count was greater than max write count");
 
     m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(0, point_cloud.instance_buffer());
-    m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(1, voxel_writes);
+    m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(1, normal_buffer);
+
+    m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(2, voxel_writes);
 
     m_pass_instances.voxel_writes_from_point_cloud_pi.push_constants(command_buffer, 
     VoxelListFromPointCloudPushConstants{
@@ -1926,13 +1928,21 @@ void VoxelGrid::voxelize_point_cloud(VulkanCommandBuffer& command_buffer, Vulkan
     set_voxels(command_buffer, voxel_writes);
 }
 
-void VoxelGrid::voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud, 
+void VoxelGrid::voxelize_point_cloud(VulkanEngine& engine, 
+                                     PointCloud& point_cloud, VulkanBuffer& normal_buffer,
                                      VulkanBuffer& voxel_writes, uint32_t max_write_count) {
     LOG_METHOD();
     std::lock_guard lock(m_compute_mutex);
     {
         auto scope = m_command_buffer.begin_scope();
-        voxelize_point_cloud(m_command_buffer, engine, point_cloud, voxel_writes, max_write_count);
+        voxelize_point_cloud(
+            m_command_buffer, 
+            engine, 
+            point_cloud, 
+            normal_buffer, 
+            voxel_writes, 
+            max_write_count
+        );
     }
     submit_compute_commands();
 }

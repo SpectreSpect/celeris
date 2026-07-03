@@ -182,6 +182,7 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         m_voxel_grid->voxelize_point_cloud(
             *m_engine, 
             m_network_scan->point_cloud(), 
+            m_network_scan->normal_buffer(),
             voxel_write_list, 
             m_desc.max_write_count
         );

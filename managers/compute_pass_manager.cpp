@@ -823,7 +823,8 @@ ComputePass ComputePassManager::create_voxel_writes_from_point_cloud_compute_pas
     ComputePassBuilder builder;
 
     builder.add_storage_buffer(0, ShaderStages::compute); // SourcePointBuffer
-    builder.add_storage_buffer(1, ShaderStages::compute); // TargetVoxelWrites
+    builder.add_storage_buffer(1, ShaderStages::compute); // SourceNormalBuffer
+    builder.add_storage_buffer(2, ShaderStages::compute); // TargetVoxelWrites
     // builder.add_storage_buffer(2, ShaderStages::compute); // EnqueuedBuf
 
     builder.add_push_constantsf(sizeof(VoxelListFromPointCloudPushConstants), ShaderStages::compute);
