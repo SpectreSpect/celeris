@@ -60,6 +60,10 @@ public:
         float vehicle_projection_backtrack_window = 0.75f;
         float vehicle_projection_lookahead_base = 3.0f;
         float vehicle_min_direction_segment_virtual_length = 3.0f;
+        float vehicle_direction_switch_arrival_distance = 0.25f;
+        float vehicle_direction_switch_arrival_speed = 0.9f;
+        float vehicle_direction_switch_approach_speed = 0.75f;
+        float global_path_direction_cleanup_min_segment_length = 1.0f;
         float local_planner_update_period = 0.05f;
         VehicleGeometry vehicle_geometry;
         uint32_t footprint_sample_count = 5;
@@ -191,6 +195,8 @@ private:
     uint32_t path_replanning_interval = 5;
 
     uint64_t m_synced_path_generation = 0;
+    uint64_t m_path_direction_cleanup_revision = 0;
+    uint64_t m_synced_path_direction_cleanup_revision = 0;
     uint32_t current_target_path_point_id = 0;
     mutable std::mutex m_path_mutex;
     PlainAstarData plain_astar_path;

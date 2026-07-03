@@ -852,7 +852,8 @@ float Vehicle::compute_speed_loss_coefficient(
     float current_next_direction_change_s) const
 {
     float remaining_s = std::max(0.0f, total_polyline_length - projection.s);
-    if (std::isfinite(current_next_direction_change_s)) {
+    const bool has_direction_switch = std::isfinite(current_next_direction_change_s);
+    if (has_direction_switch) {
         remaining_s = compute_virtual_remaining_s(
             path_arc_lengths,
             projection.s,
@@ -864,6 +865,12 @@ float Vehicle::compute_speed_loss_coefficient(
     const float braking_speed = std::sqrt(std::max(0.0f, 2.0f * m_max_acceleration * remaining_s));
     const float cruise_speed = std::max(0.0f, m_follow_params.cruise_speed);
     float target_speed_abs = std::min(cruise_speed, braking_speed);
+    if (has_direction_switch) {
+        target_speed_abs = std::max(
+            target_speed_abs,
+            std::min(cruise_speed, std::max(0.0f, m_follow_params.direction_switch_approach_speed))
+        );
+    }
 
     float off_path_speed_factor = 1.0f;
     if (m_follow_params.slowdown_distance_from_path > Utils::eps) {

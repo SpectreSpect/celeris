@@ -13,6 +13,7 @@ namespace {
     constexpr float kMaxSteeringAngle = 0.7f;
     constexpr float kPathChangePositionEps2 = 0.05f * 0.05f;
     constexpr float kPathChangeAngleEps = 0.05f;
+    constexpr float kDirectionSwitchProgressEps = 1e-3f;
 
     float angle_diff(float from, float to)
     {
@@ -132,6 +133,7 @@ void LocalPlanner::reset_tracking_state()
     m_path_progress_s = 0.0f;
     m_path_window_min_s = 0.0f;
     m_path_window_max_s = 0.0f;
+    m_path_progress_floor_s = 0.0f;
     m_has_path_progress = false;
     m_last_simulation_candidates.clear();
     last_control_command.reset();
@@ -186,6 +188,7 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
         m_path_length = 0.0f;
         m_path_window_min_s = 0.0f;
         m_path_window_max_s = 0.0f;
+        m_path_progress_floor_s = 0.0f;
         return VehicleCommand{};
     }
 
@@ -195,16 +198,17 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
         m_last_applied_command = AppliedVehicleCommand{};
         m_path_window_min_s = 0.0f;
         m_path_window_max_s = 0.0f;
+        m_path_progress_floor_s = 0.0f;
         return VehicleCommand{};
     }
 
     const float command_delta_time = calculate_command_delta_time();
     const Vehicle::SimulationFollowParams& follow_params = vehicle.follow_params();
-    float projection_min_s = 0.0f;
+    float projection_min_s = m_path_progress_floor_s;
     float projection_max_s = std::numeric_limits<float>::infinity();
     if (m_has_path_progress) {
         projection_min_s = std::max(
-            0.0f,
+            m_path_progress_floor_s,
             m_path_progress_s - follow_params.projection_backtrack_window
         );
         projection_max_s = std::min(
@@ -215,7 +219,7 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
         );
     }
 
-    const Vehicle::PointProjection current_projection = Vehicle::find_polyline_projection(
+    Vehicle::PointProjection current_projection = Vehicle::find_polyline_projection(
         m_global_astar_path,
         m_global_astar_path_arc_lengths,
         vehicle.state().m_position,
@@ -223,11 +227,51 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
         projection_max_s
     );
 
+    const float next_switch_s = Vehicle::next_direction_change_s(
+        m_global_astar_path,
+        m_global_astar_path_arc_lengths,
+        current_projection.s
+    );
+    if (std::isfinite(next_switch_s)) {
+        const float switch_distance_s = next_switch_s - current_projection.s;
+        const float arrival_distance =
+            std::max(0.0f, follow_params.direction_switch_arrival_distance);
+        const float arrival_speed =
+            std::max(
+                std::max(0.0f, follow_params.direction_switch_arrival_speed),
+                std::max(0.0f, follow_params.direction_switch_approach_speed)
+            );
+        const bool close_to_switch =
+            switch_distance_s >= -Utils::eps &&
+            switch_distance_s <= arrival_distance;
+        const bool almost_stopped = std::abs(vehicle.state().m_speed) <= arrival_speed;
+        const bool close_to_path =
+            current_projection.dist <=
+            std::max(0.5f, follow_params.slowdown_distance_from_path);
+
+        if (close_to_switch && almost_stopped && close_to_path) {
+            m_path_progress_floor_s = std::min(
+                m_path_length,
+                next_switch_s + kDirectionSwitchProgressEps
+            );
+            current_projection = Vehicle::find_polyline_projection(
+                m_global_astar_path,
+                m_global_astar_path_arc_lengths,
+                vehicle.state().m_position,
+                m_path_progress_floor_s,
+                std::min(
+                    m_path_length,
+                    m_path_progress_floor_s + follow_params.projection_lookahead_base
+                )
+            );
+        }
+    }
+
     m_path_progress_s = current_projection.s;
     m_has_path_progress = true;
 
     const float candidate_projection_min_s = std::max(
-        0.0f,
+        m_path_progress_floor_s,
         current_projection.s - follow_params.projection_backtrack_window
     );
     const float candidate_projection_max_s = std::min(

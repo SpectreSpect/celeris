@@ -17,6 +17,14 @@
 
 namespace {
     constexpr int COLLISION_BINARY_SEARCH_ITERATIONS = 16;
+    constexpr float PATH_DIRECTION_CLEANUP_EPS = 1e-5f;
+
+    struct DirectionRun {
+        size_t first_segment = 1;
+        size_t past_last_segment = 1;
+        float dir = 1.0f;
+        float length = 0.0f;
+    };
 
     float min_component(glm::vec3 value) noexcept {
         return std::min({value.x, value.y, value.z});
@@ -35,6 +43,95 @@ namespace {
             is_finite(value.x) &&
             is_finite(value.y) &&
             is_finite(value.z);
+    }
+
+    float normalized_path_dir(float dir) noexcept {
+        return dir < 0.0f ? -1.0f : 1.0f;
+    }
+
+    float path_segment_length_xz(const NonholonomicPos& from, const NonholonomicPos& to) noexcept {
+        const glm::vec2 delta{
+            to.pos.x - from.pos.x,
+            to.pos.z - from.pos.z
+        };
+        return glm::length(delta);
+    }
+
+    std::vector<DirectionRun> build_direction_runs(const std::vector<NonholonomicPos>& path) {
+        std::vector<DirectionRun> runs;
+        if (path.size() < 2)
+            return runs;
+
+        for (size_t segment = 1; segment < path.size(); segment++) {
+            const float segment_dir = normalized_path_dir(path[segment].dir);
+            const float segment_length = path_segment_length_xz(path[segment - 1], path[segment]);
+
+            if (runs.empty() || runs.back().dir != segment_dir) {
+                runs.push_back(DirectionRun{
+                    .first_segment = segment,
+                    .past_last_segment = segment + 1,
+                    .dir = segment_dir,
+                    .length = segment_length
+                });
+            } else {
+                runs.back().past_last_segment = segment + 1;
+                runs.back().length += segment_length;
+            }
+        }
+
+        return runs;
+    }
+
+    uint32_t cleanup_short_direction_runs(
+        std::vector<NonholonomicPos>& path,
+        float min_segment_length)
+    {
+        if (path.size() < 4 || min_segment_length <= PATH_DIRECTION_CLEANUP_EPS)
+            return 0;
+
+        uint32_t rewritten_segments = 0;
+        for (size_t pass = 0; pass < path.size(); pass++) {
+            const std::vector<DirectionRun> runs = build_direction_runs(path);
+            if (runs.size() < 3)
+                break;
+
+            bool changed = false;
+            for (size_t run_id = 1; run_id + 1 < runs.size(); run_id++) {
+                const DirectionRun& run = runs[run_id];
+                if (run.length >= min_segment_length)
+                    continue;
+
+                const DirectionRun& left = runs[run_id - 1];
+                const DirectionRun& right = runs[run_id + 1];
+                const float replacement_dir =
+                    left.dir == right.dir
+                        ? left.dir
+                        : (left.length >= right.length ? left.dir : right.dir);
+
+                if (replacement_dir == run.dir)
+                    continue;
+
+                for (size_t segment = run.first_segment;
+                     segment < run.past_last_segment && segment < path.size();
+                     segment++)
+                {
+                    if (normalized_path_dir(path[segment].dir) != replacement_dir) {
+                        path[segment].dir = replacement_dir;
+                        rewritten_segments++;
+                    }
+                }
+
+                changed = true;
+            }
+
+            if (!changed)
+                break;
+        }
+
+        if (path.size() > 1)
+            path.front().dir = path[1].dir;
+
+        return rewritten_segments;
     }
 
     glm::vec3 vehicle_geometry_position_to_model_offset(
@@ -133,6 +230,12 @@ Celeris::Celeris(VulkanEngine& engine,
     follow_params.projection_lookahead_base = std::max(0.0f, desc.vehicle_projection_lookahead_base);
     follow_params.min_direction_segment_virtual_length =
         std::max(0.0f, desc.vehicle_min_direction_segment_virtual_length);
+    follow_params.direction_switch_arrival_distance =
+        std::max(0.0f, desc.vehicle_direction_switch_arrival_distance);
+    follow_params.direction_switch_arrival_speed =
+        std::max(0.0f, desc.vehicle_direction_switch_arrival_speed);
+    follow_params.direction_switch_approach_speed =
+        std::max(0.0f, desc.vehicle_direction_switch_approach_speed);
     m_car_speed = follow_params.cruise_speed;
 
     m_voxel_map_reseter.reset(m_voxel_point_map);
@@ -745,7 +848,20 @@ bool Celeris::has_planned_path() const {
 }
 
 PathPlanner::PathPlannerResult Celeris::path_result_snapshot() const {
-    return m_path_planner.request_result_snapshot();
+    PathPlanner::PathPlannerResult result = m_path_planner.request_result_snapshot();
+
+    std::lock_guard<std::mutex> lock(m_path_mutex);
+    if (result.generation == m_synced_path_generation &&
+        m_path_direction_cleanup_revision == m_synced_path_direction_cleanup_revision)
+    {
+        result.plain_astar_path = plain_astar_path;
+        result.nonholonomic_astar_path = nonholonomic_astar_path;
+        result.explored_paths = explored_paths;
+        result.unimpended_path = unimpended_path;
+        result.total_path_finding_time = total_path_finding_time;
+    }
+
+    return result;
 }
 
 std::vector<NonholonomicPos> Celeris::get_nonholonomic_astar_path() const {
@@ -784,6 +900,18 @@ void Celeris::display_path_planner_debug_controls() {
     ImGui::Text("Unimpeded points: %zu", result.unimpended_path.size());
     ImGui::Text("Nonholonomic points: %zu", result.nonholonomic_astar_path.size());
     ImGui::Text("Explored segments: %zu", result.explored_paths.size());
+    if (ImGui::DragFloat(
+            "Direction cleanup min segment",
+            &m_desc.global_path_direction_cleanup_min_segment_length,
+            0.05f,
+            0.0f,
+            20.0f,
+            "%.3f"))
+    {
+        m_desc.global_path_direction_cleanup_min_segment_length =
+            std::max(0.0f, m_desc.global_path_direction_cleanup_min_segment_length);
+        m_path_direction_cleanup_revision++;
+    }
 
     ImGui::Separator();
     ImGui::Text("Command sender: %s, %s",
@@ -908,6 +1036,15 @@ void Celeris::display_path_planner_debug_controls() {
         if (ImGui::DragFloat("Min virtual direction segment length", &params.min_direction_segment_virtual_length, 0.05f, 0.0f, 20.0f, "%.3f")) {
             params.min_direction_segment_virtual_length = std::max(0.0f, params.min_direction_segment_virtual_length);
         }
+        if (ImGui::DragFloat("Direction switch arrival distance", &params.direction_switch_arrival_distance, 0.01f, 0.0f, 5.0f, "%.3f")) {
+            params.direction_switch_arrival_distance = std::max(0.0f, params.direction_switch_arrival_distance);
+        }
+        if (ImGui::DragFloat("Direction switch arrival speed", &params.direction_switch_arrival_speed, 0.01f, 0.0f, 5.0f, "%.3f")) {
+            params.direction_switch_arrival_speed = std::max(0.0f, params.direction_switch_arrival_speed);
+        }
+        if (ImGui::DragFloat("Direction switch approach speed", &params.direction_switch_approach_speed, 0.01f, 0.0f, 5.0f, "%.3f")) {
+            params.direction_switch_approach_speed = std::max(0.0f, params.direction_switch_approach_speed);
+        }
 
         if (ImGui::Button("Reset follow params")) {
             params.cruise_speed = std::max(0.0f, m_desc.vehicle_cruise_speed);
@@ -921,6 +1058,12 @@ void Celeris::display_path_planner_debug_controls() {
             params.projection_lookahead_base = std::max(0.0f, m_desc.vehicle_projection_lookahead_base);
             params.min_direction_segment_virtual_length =
                 std::max(0.0f, m_desc.vehicle_min_direction_segment_virtual_length);
+            params.direction_switch_arrival_distance =
+                std::max(0.0f, m_desc.vehicle_direction_switch_arrival_distance);
+            params.direction_switch_arrival_speed =
+                std::max(0.0f, m_desc.vehicle_direction_switch_arrival_speed);
+            params.direction_switch_approach_speed =
+                std::max(0.0f, m_desc.vehicle_direction_switch_approach_speed);
             m_car_speed = params.cruise_speed;
         }
 
@@ -968,10 +1111,19 @@ bool Celeris::is_path_impended(VulkanSubmitContext& submit_context) {
 
 void Celeris::sync_path_planner_result() {
     PathPlanner::PathPlannerResult result = m_path_planner.request_result_snapshot();
-    if (result.generation == m_synced_path_generation)
+    const bool cleanup_revision_changed =
+        m_path_direction_cleanup_revision != m_synced_path_direction_cleanup_revision;
+    if (result.generation == m_synced_path_generation && !cleanup_revision_changed)
         return;
 
-    m_local_planner.set_astar_path(result.nonholonomic_astar_path, result.generation);
+    cleanup_short_direction_runs(
+        result.nonholonomic_astar_path,
+        m_desc.global_path_direction_cleanup_min_segment_length
+    );
+    if (cleanup_revision_changed)
+        m_local_planner.set_astar_path(result.nonholonomic_astar_path);
+    else
+        m_local_planner.set_astar_path(result.nonholonomic_astar_path, result.generation);
 
     std::lock_guard<std::mutex> lock(m_path_mutex);
     plain_astar_path = std::move(result.plain_astar_path);
@@ -980,6 +1132,7 @@ void Celeris::sync_path_planner_result() {
     unimpended_path = std::move(result.unimpended_path);
     total_path_finding_time = result.total_path_finding_time;
     m_synced_path_generation = result.generation;
+    m_synced_path_direction_cleanup_revision = m_path_direction_cleanup_revision;
     current_target_path_point_id = 0;
 }
 
