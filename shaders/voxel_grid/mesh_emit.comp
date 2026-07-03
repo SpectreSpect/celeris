@@ -230,6 +230,18 @@ void emit_face_if_needed(
     emit_quad(chunkId, chunkCoord, p, face, color);
 }
 
+uint voxel_debug_color(uint flags, uint ordinary_color)
+{
+    if (display_inflated_voxels == 0u ||
+        (flags & VOXEL_INFLATED_BIT) == 0u) {
+        return ordinary_color;
+    }
+
+    return (flags & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) != 0u
+        ? inflated_curvature_limit_exceeded_voxel_color
+        : inflated_voxel_color;
+}
+
 void main() {
     if (is_vb_full == 1u || is_ib_full == 1u)
         return;
@@ -256,7 +268,7 @@ void main() {
     uint current_flags = read_voxel_flags(voxel_data.type_flags);
     if (!voxel_can_emit_faces(current_flags)) return;
 
-    uint color = voxel_data.color;
+    uint color = voxel_debug_color(current_flags, voxel_data.color);
 
     emit_face_if_needed(chunkId, chunkCoord, p, ivec3( 1, 0, 0), 0u, current_flags, color);
     emit_face_if_needed(chunkId, chunkCoord, p, ivec3(-1, 0, 0), 1u, current_flags, color);

@@ -131,6 +131,12 @@ bool cached_mark_inflated_if_loaded(
     uint global_voxel_id;
     if (!cached_loaded_voxel_id(world_voxel, base_chunk_pos, cached_chunk_ids, global_voxel_id)) return false;
 
+    uint old_type_flags = atomicOr(voxels[global_voxel_id].type_flags, 0u);
+    uint old_flags = read_voxel_flags(old_type_flags);
+    if ((old_flags & VOXEL_RECENTLY_INSERTED_BIT) != 0u) {
+        return is_inflation_barrier(old_flags, source_curvature_limit_exceeded);
+    }
+
     uint flags_to_set = VOXEL_INFLATED_BIT;
     if (source_curvature_limit_exceeded) {
         flags_to_set |= VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT;
@@ -242,25 +248,8 @@ void main()
     if (cached_inflation_barrier_loaded(write_voxel + ivec3(0, 0,  1), base_chunk_pos, cached_chunk_ids, source_curvature_limit_exceeded)) max_z = 0;
 
     int max_shell = max_abs_bound(min_x, max_x, min_y, max_y, min_z, max_z);
-    for (int shell = 0; shell <= max_shell; ++shell) {
+    for (int shell = 1; shell <= max_shell; ++shell) {
         if (shell > max_abs_bound(min_x, max_x, min_y, max_y, min_z, max_z)) break;
-
-        if (shell == 0) {
-            process_inflation_offset(
-                write_voxel,
-                base_chunk_pos,
-                cached_chunk_ids,
-                ivec3(0),
-                source_curvature_limit_exceeded,
-                min_x,
-                max_x,
-                min_y,
-                max_y,
-                min_z,
-                max_z
-            );
-            continue;
-        }
 
         int y0 = max(min_y, -shell);
         int y1 = min(max_y,  shell);
