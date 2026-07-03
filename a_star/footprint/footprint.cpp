@@ -19,17 +19,48 @@ Footprint::Footprint(
         m_vertical_inflation_size(vertical_inflation_size),
         m_grid(&occupancy_grid) {}
 
-bool Footprint::is_passible(const NonholonomicPos& rear_axle_pos) {
-    return sample(rear_axle_pos).is_passible;
+bool Footprint::is_passible(
+    const NonholonomicPos& rear_axle_pos,
+    int max_step_up,
+    int max_drop,
+    int max_y_diff,
+    bool allow_flying_over_precepices)
+{
+    return sample(
+        rear_axle_pos,
+        max_step_up,
+        max_drop,
+        max_y_diff,
+        allow_flying_over_precepices
+    ).is_passible;
 }
 
-Footprint::SampleResult Footprint::sample(const NonholonomicPos& rear_axle_pos) {
+Footprint::SampleResult Footprint::sample(
+    const NonholonomicPos& rear_axle_pos,
+    int max_step_up,
+    int max_drop,
+    int max_y_diff,
+    bool allow_flying_over_precepices)
+{
     std::vector<glm::vec3> positions = sample_raw_positions(rear_axle_pos);
 
     std::vector<glm::ivec3> ground_positions;
     const bool is_passible =
-        m_grid->adjust_to_ground(positions, 1, 1, 2) &&
-        m_grid->get_ground_positions(positions, ground_positions, 1, 1, 2);
+        m_grid->adjust_to_ground(
+            positions,
+            max_step_up,
+            max_drop,
+            max_y_diff,
+            allow_flying_over_precepices
+        ) &&
+        m_grid->get_ground_positions(
+            positions,
+            ground_positions,
+            max_step_up,
+            max_drop,
+            max_y_diff,
+            allow_flying_over_precepices
+        );
 
     return SampleResult{
         .positions = std::move(positions),
@@ -67,7 +98,13 @@ Footprint::PathResult Footprint::evaluate_path(
     }
 
     for (const NonholonomicPos& pose : result.path) {
-        if (!is_passible(pose)) {
+        if (!is_passible(
+                pose,
+                max_step_up,
+                max_drop,
+                max_y_diff,
+                allow_flying_over_precepices))
+        {
             result.is_passible = false;
             return result;
         }

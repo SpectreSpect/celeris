@@ -31,8 +31,20 @@ public:
         uint32_t vertical_inflation_size = 1
     );
 
-    bool is_passible(const NonholonomicPos& rear_axle_pos);
-    SampleResult sample(const NonholonomicPos& rear_axle_pos);
+    bool is_passible(
+        const NonholonomicPos& rear_axle_pos,
+        int max_step_up = 1,
+        int max_drop = 1,
+        int max_y_diff = 2,
+        bool allow_flying_over_precepices = true
+    );
+    SampleResult sample(
+        const NonholonomicPos& rear_axle_pos,
+        int max_step_up = 1,
+        int max_drop = 1,
+        int max_y_diff = 2,
+        bool allow_flying_over_precepices = true
+    );
     PathResult evaluate_path(
         const std::vector<NonholonomicPos>& path,
         int max_step_up = 1,
