@@ -60,6 +60,12 @@ namespace math_utils {
         return q;
     }
 
+    static float horizontal_distance(glm::vec3 a, glm::vec3 b) {
+        a.y = 0;
+        b.y = 0;
+        return glm::distance(a, b);
+    }
+
     static int floor_mod(int a, int b) {
         int r = a % b;
         if (r < 0) r += b;
