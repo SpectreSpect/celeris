@@ -63,20 +63,34 @@ uint voxel_flags(ivec3 pos, inout VoxelLookupCache cache) {
 
 bool is_blocking_voxel(ivec3 pos, inout VoxelLookupCache cache) {
     uint flags = voxel_flags(pos, cache);
-    return (flags & (VOXEL_VISABILITY_FLAG_BIT | VOXEL_INFLATED_BIT)) != 0u;
+    return (flags & (
+        VOXEL_VISABILITY_FLAG_BIT |
+        VOXEL_INFLATED_BIT |
+        VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT
+    )) != 0u;
 }
 
 bool is_ground_voxel(ivec3 pos, inout VoxelLookupCache cache) {
-    // return (voxel_flags(pos, cache) & VOXEL_VISABILITY_FLAG_BIT) != 0u;
     uint flags = voxel_flags(pos, cache);
-    return (flags & (VOXEL_VISABILITY_FLAG_BIT | VOXEL_INFLATED_BIT)) != 0u;
+    bool ground = (flags & (VOXEL_VISABILITY_FLAG_BIT | VOXEL_INFLATED_BIT)) != 0u;
+    bool curvature_limit_exceeded = (flags & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) != 0u;
+    return ground && !curvature_limit_exceeded;
 }
 
 int voxel_y_offset(ivec3 pos, uint max_step_up_u, uint max_drop_u, inout VoxelLookupCache cache) {
     int max_step_up = int(max_step_up_u);
     int max_drop = int(max_drop_u);
 
-    if (is_blocking_voxel(pos, cache)) {
+    uint flags = voxel_flags(pos, cache);
+    if ((flags & (
+        VOXEL_VISABILITY_FLAG_BIT |
+        VOXEL_INFLATED_BIT |
+        VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT
+    )) != 0u) {
+        if ((flags & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) != 0u) {
+            return max_step_up + 1;
+        }
+
         for (int dy = 1; dy <= max_step_up; dy++) {
             ivec3 stand_pos = pos + ivec3(0, dy, 0);
 

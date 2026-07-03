@@ -77,6 +77,10 @@ struct alignas(8) VoxelDataGPU {
     inline bool is_inflated() const {
         return ((type_flags >> VOXEL_TYPE_BITS) & VOXEL_INFLATED_BIT) > 0;
     }
+
+    inline bool exceeds_curvature_limit() const {
+        return ((type_flags >> VOXEL_TYPE_BITS) & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) > 0;
+    }
 };
 
 static_assert(sizeof(VoxelDataGPU) == 8);
