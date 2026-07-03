@@ -198,7 +198,8 @@ private:
 
     void sync_path_planner_result();
     Transform rear_axle_transform_from_lidar_transform(const Transform& lidar_transform) const;
-    glm::vec3 rear_axle_bottom_offset() const;
+    glm::vec3 rear_axle_midpoint_offset() const;
+    glm::vec3 lidar_offset() const;
 
     bool find_closest_next_path_point(uint32_t current_id, uint32_t& output_id, uint32_t& output_dist);
     VehicleCommand get_path_following_command();

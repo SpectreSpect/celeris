@@ -605,7 +605,7 @@ int main() {
     scene.add(skybox);
 
     scene.add(celeris_visualizer);
-    scene.add(footprint_visualizer);
+    // scene.add(footprint_visualizer);
     // scene.add(gazelle);
     // scene.add(target_scan);
     // scene.add(voxel_point_map);

@@ -51,17 +51,23 @@ float random01(uint value) {
     return float(value) / 4294967295.0;
 }
 
+bool valid_normal(vec3 normal) {
+    if (any(isnan(normal)) || any(isinf(normal))) {
+        return false;
+    }
+
+    return dot(normal, normal) > 1e-12;
+}
+
 void main() {
     uint point_id = gl_GlobalInvocationID.x;
 
     if (point_id >= point_count) return;
     if (point_id >= max_write_count) return;
 
-    if (point_id == 0u) {
-        voxel_write_list.count_voxel_writes = min(point_count, max_write_count);
-    }
-
     vec4 normal = source_normal_buffer.normals[point_id];
+    if (!valid_normal(normal.xyz)) return;
+
     float curvature = 1.0 - max(dot(normal.xyz, vec3(0.0, 1.0, 0.0)), 0);
     float curvature_limit = 0.05;
 
@@ -87,8 +93,9 @@ void main() {
 
     voxel_data.color = (packed_color.r << 24u) | (packed_color.g << 16u) | (packed_color.b << 8u) | 255u;
 
-    voxel_write_list.voxel_writes[point_id].world_voxel = voxel_pos;
-    voxel_write_list.voxel_writes[point_id].voxel_data = voxel_data;
-    voxel_write_list.voxel_writes[point_id].set_flags = OVERWRITE_BIT;
-    voxel_write_list.voxel_writes[point_id]._pad1 = 0u;
+    uint voxel_write_id = atomicAdd(voxel_write_list.count_voxel_writes, 1u);
+    voxel_write_list.voxel_writes[voxel_write_id].world_voxel = voxel_pos;
+    voxel_write_list.voxel_writes[voxel_write_id].voxel_data = voxel_data;
+    voxel_write_list.voxel_writes[voxel_write_id].set_flags = OVERWRITE_BIT;
+    voxel_write_list.voxel_writes[voxel_write_id]._pad1 = 0u;
 }

@@ -1913,6 +1913,8 @@ void VoxelGrid::voxelize_point_cloud(VulkanCommandBuffer& command_buffer, Vulkan
     logger().check(point_cloud.point_count() < max_write_count, "Point count was greater than max write count");
     logger().check(point_cloud.point_count() < m_params.max_write_count, "Point count was greater than max write count");
 
+    reset_voxel_write_list_counter(command_buffer, voxel_writes);
+
     m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(0, point_cloud.instance_buffer());
     m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(1, normal_buffer);
 
@@ -2205,8 +2207,9 @@ void VoxelGrid::inflate_voxel_writes(VulkanCommandBuffer& command_buffer, const 
 
 void VoxelGrid::reset_voxel_write_list_counter(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_write_list) {
     LOG_METHOD();
-    
-    voxel_write_list.fill(command_buffer, 0u, sizeof(uint32_t));
+
+    uint32_t zero = 0u;
+    voxel_write_list.fill(command_buffer, m_pass_instances.fill_buffer_pw, zero, sizeof(uint32_t));
     voxel_write_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 
