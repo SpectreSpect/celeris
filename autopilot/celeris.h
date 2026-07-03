@@ -99,6 +99,8 @@ public:
     NonholonomicPos goal_position() const noexcept;
     float car_speed() const noexcept;
     const std::vector<Vehicle::SimulationControlCandidate>& local_planner_candidates() const noexcept;
+    float local_planner_path_window_min_s() const noexcept;
+    float local_planner_path_window_max_s() const noexcept;
     uint32_t received_scan_count() const noexcept;
 
     VulkanEngine* engine();
@@ -183,8 +185,6 @@ private:
     std::chrono::steady_clock::time_point m_last_local_planner_update_timestamp{};
     bool m_has_last_local_planner_update_timestamp = false;
     bool m_has_previous_lidar_pose = false;
-    glm::vec3 m_previous_lidar_position{0.0f};
-    glm::quat m_previous_lidar_rotation{1.0f, 0.0f, 0.0f, 0.0f};
     std::vector<glm::vec3> m_collision_raw_position_history;
     glm::vec3 m_collision_surface_point{0.0f};
     bool m_has_collision_surface_point = false;
@@ -227,6 +227,7 @@ private:
 
     void sync_path_planner_result();
     Transform rear_axle_transform_from_lidar_transform(const Transform& lidar_transform) const;
+    Transform lidar_transform_from_rear_axle_transform(const Transform& rear_axle_transform) const;
     glm::vec3 rear_axle_midpoint_offset() const;
     glm::vec3 lidar_offset() const;
 

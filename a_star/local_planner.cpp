@@ -115,6 +115,14 @@ float LocalPlanner::path_length() const noexcept {
     return m_path_length;
 }
 
+float LocalPlanner::path_window_min_s() const noexcept {
+    return m_path_window_min_s;
+}
+
+float LocalPlanner::path_window_max_s() const noexcept {
+    return m_path_window_max_s;
+}
+
 uint64_t LocalPlanner::path_generation() const noexcept {
     return m_path_generation;
 }
@@ -122,6 +130,8 @@ uint64_t LocalPlanner::path_generation() const noexcept {
 void LocalPlanner::reset_tracking_state()
 {
     m_path_progress_s = 0.0f;
+    m_path_window_min_s = 0.0f;
+    m_path_window_max_s = 0.0f;
     m_has_path_progress = false;
     m_last_simulation_candidates.clear();
     last_control_command.reset();
@@ -174,6 +184,8 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
         m_last_applied_command = AppliedVehicleCommand{};
         m_path_progress_s = 0.0f;
         m_path_length = 0.0f;
+        m_path_window_min_s = 0.0f;
+        m_path_window_max_s = 0.0f;
         return VehicleCommand{};
     }
 
@@ -181,6 +193,8 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
         m_last_simulation_candidates.clear();
         last_control_command = Vehicle::VehicleControlCommand{};
         m_last_applied_command = AppliedVehicleCommand{};
+        m_path_window_min_s = 0.0f;
+        m_path_window_max_s = 0.0f;
         return VehicleCommand{};
     }
 
@@ -222,6 +236,8 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
             follow_params.projection_lookahead_base +
             std::abs(vehicle.state().m_speed) * command_delta_time
     );
+    m_path_window_min_s = candidate_projection_min_s;
+    m_path_window_max_s = candidate_projection_max_s;
 
     Vehicle::SimulationControlSearchDesc search_desc;
     search_desc.max_results =

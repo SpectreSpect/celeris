@@ -59,6 +59,8 @@ public:
     const std::vector<Vehicle::SimulationControlCandidate>& last_simulation_candidates() const noexcept;
     float path_progress_s() const noexcept;
     float path_length() const noexcept;
+    float path_window_min_s() const noexcept;
+    float path_window_max_s() const noexcept;
     uint64_t path_generation() const noexcept;
 
 private:
@@ -79,6 +81,8 @@ private:
     std::vector<Vehicle::SimulationControlCandidate> m_last_simulation_candidates;
     float m_path_progress_s = 0.0f;
     float m_path_length = 0.0f;
+    float m_path_window_min_s = 0.0f;
+    float m_path_window_max_s = 0.0f;
     uint64_t m_path_generation = 0;
     bool m_has_path_progress = false;
     float m_step_dt_min = std::numeric_limits<float>::min();

@@ -163,19 +163,19 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
     sync_path_planner_result();
 
     m_local_planner.update_timestamp();
-    m_local_planner.predict_vehicle_state(m_vehicle);
 
     VehicleFeedback vehicle_feedback;
     const bool has_vehicle_feedback =
         m_vehicle_state_receiver.latest_feedback(vehicle_feedback) &&
         is_vehicle_feedback_fresh(vehicle_feedback);
+    if (has_vehicle_feedback) {
+        apply_vehicle_feedback(vehicle_feedback);
+    }
+    m_local_planner.predict_vehicle_state(m_vehicle);
 
     float vehicle_height = m_vehicle_position.pos.y;
 
     if (auto scan = m_scan_receiver.try_pop_scan(*m_manager_bundle)) {
-        glm::vec3 raw_position = scan->point_cloud().transform.position;
-        glm::quat raw_rotation = glm::normalize(scan->point_cloud().transform.rotation);
-
         if (m_network_scan)
             m_retired_network_scans.push_back(std::move(m_network_scan));
 
@@ -202,24 +202,19 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
             m_network_scan->point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
             m_has_previous_lidar_pose = true;
         } else {
-            if (glm::dot(m_previous_lidar_rotation, raw_rotation) < 0.0f) {
-                raw_rotation = -raw_rotation;
-            }
-
-            glm::vec3 delta_position = raw_position - m_previous_lidar_position;
-            glm::quat delta_rotation = glm::normalize(raw_rotation * glm::inverse(m_previous_lidar_rotation));
-
-            glm::vec3 previous_map_position = glm::vec3(0.0f);
-            glm::quat previous_map_rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-
-            if (!m_retired_network_scans.empty()) {
-                PointCloud& previous_point_cloud = m_retired_network_scans.back()->point_cloud();
-                previous_map_position = previous_point_cloud.transform.position;
-                previous_map_rotation = glm::normalize(previous_point_cloud.transform.rotation);
-            }
-
-            m_network_scan->point_cloud().transform.position = previous_map_position + delta_position;
-            m_network_scan->point_cloud().transform.rotation = glm::normalize(delta_rotation * previous_map_rotation);
+            const Vehicle::VehicleTransformState& state = m_vehicle.state();
+            Transform predicted_rear_axle_transform;
+            predicted_rear_axle_transform.position = glm::vec3{
+                state.m_position.x,
+                vehicle_height,
+                state.m_position.y
+            };
+            predicted_rear_axle_transform.rotation = glm::angleAxis(
+                glm::pi<float>() - state.m_heading,
+                glm::vec3(0.0f, 1.0f, 0.0f)
+            );
+            m_network_scan->point_cloud().transform =
+                lidar_transform_from_rear_axle_transform(predicted_rear_axle_transform);
 
             m_gicp_pass.fit(m_voxel_point_map,
                             m_network_scan->point_cloud(),
@@ -271,13 +266,7 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         if (has_planned_path() && is_path_impended(submit_context))
             request_path_replan();
 
-        m_previous_lidar_position = raw_position;
-        m_previous_lidar_rotation = raw_rotation;
         m_received_scan_count++;
-    }
-
-    if (has_vehicle_feedback) {
-        apply_vehicle_feedback(vehicle_feedback);
     }
 
     sync_vehicle_position_from_state(vehicle_height);
@@ -430,6 +419,14 @@ const std::vector<Vehicle::SimulationControlCandidate>&
 Celeris::local_planner_candidates() const noexcept
 {
     return m_local_planner.last_simulation_candidates();
+}
+
+float Celeris::local_planner_path_window_min_s() const noexcept {
+    return m_local_planner.path_window_min_s();
+}
+
+float Celeris::local_planner_path_window_max_s() const noexcept {
+    return m_local_planner.path_window_max_s();
 }
 
 Footprint& Celeris::footprint() noexcept {
@@ -834,6 +831,11 @@ void Celeris::display_path_planner_debug_controls() {
         m_local_planner.path_length()
     );
     ImGui::Text(
+        "Local s window: %.2f .. %.2f",
+        m_local_planner.path_window_min_s(),
+        m_local_planner.path_window_max_s()
+    );
+    ImGui::Text(
         "Local path generation: %llu",
         static_cast<unsigned long long>(m_local_planner.path_generation())
     );
@@ -996,6 +998,23 @@ Transform Celeris::rear_axle_transform_from_lidar_transform(const Transform& lid
         model_rotation * ((rear_axle_offset - lidar_model_offset) * lidar_transform.scale);
 
     return rear_axle_transform;
+}
+
+Transform Celeris::lidar_transform_from_rear_axle_transform(const Transform& rear_axle_transform) const {
+    Transform lidar_transform = rear_axle_transform;
+    const glm::quat scan_rotation = glm::normalize(rear_axle_transform.rotation);
+    const glm::quat lidar_mount_rotation = glm::angleAxis(glm::pi<float>(), glm::vec3(0.0f, 1.0f, 0.0f));
+    const glm::quat model_rotation = glm::normalize(scan_rotation * glm::inverse(lidar_mount_rotation));
+
+    const glm::vec3 rear_axle_offset = rear_axle_midpoint_offset();
+    const glm::vec3 lidar_model_offset = lidar_offset();
+
+    lidar_transform.rotation = scan_rotation;
+    lidar_transform.position =
+        rear_axle_transform.position -
+        model_rotation * ((rear_axle_offset - lidar_model_offset) * rear_axle_transform.scale);
+
+    return lidar_transform;
 }
 
 glm::vec3 Celeris::rear_axle_midpoint_offset() const {

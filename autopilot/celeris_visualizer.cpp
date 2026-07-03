@@ -3,10 +3,13 @@
 #include "../a_star/a_star_structures.h"
 #include "../managers/mesh_manager.h"
 #include "../managers/material_instance_manager.h"
+#include "../vulkan_self/utils.h"
 #include "celeris.h"
 
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/geometric.hpp>
+#include <glm/vec2.hpp>
 #include <imgui.h>
 
 #include <algorithm>
@@ -211,7 +214,15 @@ void CelerisVisualizer::update() {
         show_guide_path ? make_path_lines(path_result.plain_astar_path.path) : hidden_lines
     );
     m_path_line_cloud.set_lines(
-        show_path ? make_path_lines(path_result.nonholonomic_astar_path, true) : hidden_lines
+        show_path
+            ? make_path_lines(
+                path_result.nonholonomic_astar_path,
+                true,
+                show_local_s_window,
+                m_celeris->local_planner_path_window_min_s(),
+                m_celeris->local_planner_path_window_max_s()
+            )
+            : hidden_lines
     );
     m_explored_paths_line_cloud.set_lines(
         show_explored_paths && !path_result.explored_paths.empty()
@@ -252,6 +263,7 @@ void CelerisVisualizer::display_debug_controls() {
         ImGui::Checkbox("Vehicle pose marker", &show_vehicle_marker);
         ImGui::Checkbox("Gazelle Next", &show_gazelle_next);
         ImGui::Checkbox("Local candidates", &show_local_candidates);
+        ImGui::Checkbox("Local s window", &show_local_s_window);
     }
 }
 
@@ -362,23 +374,87 @@ void CelerisVisualizer::interpolate_marker_pose(
     ));
 }
 
-std::vector<LineInstance> CelerisVisualizer::make_path_lines(const std::vector<NonholonomicPos>& path, bool override_color) {
+std::vector<LineInstance> CelerisVisualizer::make_path_lines(
+    const std::vector<NonholonomicPos>& path,
+    bool override_color,
+    bool highlight_s_window,
+    float window_min_s,
+    float window_max_s)
+{
     std::vector<LineInstance> path_lines;
-    path_lines.reserve(std::min<size_t>(path.size(), max_path_line_count));
+    path_lines.reserve(std::min<size_t>(path.size() * 3, max_path_line_count));
 
+    auto append_line = [&](glm::vec3 p0, glm::vec3 p1, glm::vec4 color) {
+        if (path_lines.size() >= max_path_line_count)
+            return;
+        path_lines.push_back(LineInstance{
+            .p0 = p0 + glm::vec3(0, 0.2f, 0),
+            .p1 = p1 + glm::vec3(0, 0.2f, 0),
+            .color = color
+        });
+    };
+
+    const bool has_valid_s_window =
+        highlight_s_window &&
+        std::isfinite(window_min_s) &&
+        std::isfinite(window_max_s) &&
+        window_max_s > window_min_s + Utils::eps;
+
+    float current_s = 0.0f;
     for (uint32_t i = 1; i < path.size() && path_lines.size() < max_path_line_count; i++) {
         glm::vec4 line_color = glm::vec4(1, 0, 0, 1);
-        if (path[i].dir == -1)
+        glm::vec4 active_line_color = glm::vec4(1.0f, 0.0f, 0.9f, 1.0f);
+        if (path[i].dir == -1) {
             line_color = glm::vec4(0, 0, 1, 1);
-        
-        if (!override_color)
-            line_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+            active_line_color = glm::vec4(0.0f, 0.95f, 1.0f, 1.0f);
+        }
 
-        path_lines.push_back(LineInstance{
-            .p0 = path[i - 1].pos + glm::vec3(0, 0.2f, 0),
-            .p1 = path[i].pos + glm::vec3(0, 0.2f, 0),
-            .color = line_color
-        });
+        if (!override_color) {
+            append_line(path[i - 1].pos, path[i].pos, glm::vec4(1.0f));
+            continue;
+        }
+
+        const glm::vec3 p0 = path[i - 1].pos;
+        const glm::vec3 p1 = path[i].pos;
+        const float segment_length = glm::distance(
+            glm::vec2(p0.x, p0.z),
+            glm::vec2(p1.x, p1.z)
+        );
+        const float next_s = current_s + segment_length;
+
+        if (!has_valid_s_window || segment_length <= Utils::eps) {
+            append_line(p0, p1, line_color);
+            current_s = next_s;
+            continue;
+        }
+
+        const bool segment_intersects_window =
+            next_s >= window_min_s &&
+            current_s <= window_max_s;
+        if (!segment_intersects_window) {
+            append_line(p0, p1, line_color * glm::vec4(0.45f, 0.45f, 0.45f, 1.0f));
+            current_s = next_s;
+            continue;
+        }
+
+        const float active_start_s = std::clamp(window_min_s, current_s, next_s);
+        const float active_end_s = std::clamp(window_max_s, current_s, next_s);
+        const float active_start_t = (active_start_s - current_s) / segment_length;
+        const float active_end_t = (active_end_s - current_s) / segment_length;
+        const glm::vec3 active_start = glm::mix(p0, p1, active_start_t);
+        const glm::vec3 active_end = glm::mix(p0, p1, active_end_t);
+        const glm::vec4 inactive_color = line_color * glm::vec4(0.45f, 0.45f, 0.45f, 1.0f);
+
+        if (active_start_t > Utils::eps)
+            append_line(p0, active_start, inactive_color);
+
+        if (active_end_t > active_start_t + Utils::eps)
+            append_line(active_start, active_end, active_line_color);
+
+        if (active_end_t < 1.0f - Utils::eps)
+            append_line(active_end, p1, inactive_color);
+
+        current_s = next_s;
     }
 
     if (path_lines.empty())

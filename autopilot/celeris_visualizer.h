@@ -86,6 +86,7 @@ private:
     bool show_vehicle_marker = false;
     bool show_gazelle_next = true;
     bool show_local_candidates = true;
+    bool show_local_s_window = true;
     bool m_has_car_pose_override = false;
     NonholonomicPos m_car_pose_override;
 
@@ -107,7 +108,13 @@ private:
         std::chrono::steady_clock::time_point now,
         bool force_new_sample = false
     );
-    std::vector<LineInstance> make_path_lines(const std::vector<NonholonomicPos>& path, bool override_color = false);
+    std::vector<LineInstance> make_path_lines(
+        const std::vector<NonholonomicPos>& path,
+        bool override_color = false,
+        bool highlight_s_window = false,
+        float window_min_s = 0.0f,
+        float window_max_s = 0.0f
+    );
     std::vector<LineInstance> make_path_lines(const std::vector<glm::vec3>& path);
     std::vector<LineInstance> make_path_lines(const std::vector<glm::ivec3>& path);
     std::vector<LineInstance> make_local_candidate_lines(
