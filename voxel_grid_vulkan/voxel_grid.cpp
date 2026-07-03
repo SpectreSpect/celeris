@@ -664,7 +664,9 @@ void VoxelGrid::mesh_emit(VulkanCommandBuffer& command_buffer, VulkanBuffer& dis
         .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
         .u_voxels_per_chunk = static_cast<uint32_t>(vox_per_chunk()),
         .display_inflated_voxels = m_params.display_inflated_voxels,
-        .inflated_voxel_color = m_params.inflated_voxel_color
+        .inflated_voxel_color = m_params.inflated_voxel_color,
+        .inflated_curvature_limit_exceeded_voxel_color =
+            m_params.inflated_curvature_limit_exceeded_voxel_color
     });
 
     m_pass_instances.mesh_emit_pi.bind(command_buffer);
@@ -881,6 +883,12 @@ VoxelGrid::VoxelGridParams VoxelGrid::create_params(const VoxelGridDesc& desc) c
     params.count_active_chunks = desc.count_active_chunks;
     params.count_evict_buckets = desc.count_evict_buckets;
     params.max_write_count = desc.max_write_count;
+
+    logger().check(desc.max_write_count <= (1u << 30u), "Voxel write unique table size would overflow");
+    params.voxel_write_unique_table_size = math_utils::next_pow2_u32(
+        std::max(1u, desc.max_write_count * 2u)
+    );
+
     params.min_free_chunks = desc.min_free_chunks;
     params.tomb_fraction_to_rebuild = desc.tomb_fraction_to_rebuild;
     params.eviction_bucket_shell_thickness = desc.eviction_bucket_shell_thickness;
@@ -897,6 +905,8 @@ VoxelGrid::VoxelGridParams VoxelGrid::create_params(const VoxelGridDesc& desc) c
     params.positive_z_inflation_size = desc.positive_z_inflation_size;
     params.display_inflated_voxels = desc.display_inflated_voxels;
     params.inflated_voxel_color = desc.inflated_voxel_color;
+    params.inflated_curvature_limit_exceeded_voxel_color =
+        desc.inflated_curvature_limit_exceeded_voxel_color;
 
     uint64_t raw = (uint64_t)std::ceil((double)desc.chunk_hash_table_size_factor * (double)desc.count_active_chunks);
     uint32_t base = (raw > UINT32_MAX) ? UINT32_MAX : (uint32_t)raw;
@@ -947,6 +957,8 @@ VoxelGrid::VoxelGridPassInstances VoxelGrid::create_pass_instances(VulkanDevice&
         .stream_select_chunks_pi = PassInstance(compute_pass_manager.stream_select_chunks_cp, dp),
         .insert_elements_to_voxel_write_list_pw = PassWriter(device, compute_pass_manager.insert_elements_to_voxel_write_list_cp),
         .add_voxel_write_list_counters_together_pw = PassWriter(device, compute_pass_manager.add_voxel_write_list_counters_together_cp),
+        .build_unique_voxel_write_table_pw = PassWriter(device, compute_pass_manager.build_unique_voxel_write_table_cp),
+        .compact_unique_voxel_write_table_pw = PassWriter(device, compute_pass_manager.compact_unique_voxel_write_table_cp),
         .mark_write_chunks_to_generate_pi = PassInstance(compute_pass_manager.mark_write_chunks_to_generate_cp, dp),
         .stream_generate_terrain_pi = PassInstance(compute_pass_manager.stream_generate_terrain_cp, dp),
         .write_voxels_to_grid_pi = PassInstance(compute_pass_manager.write_voxels_to_grid_cp, dp),
@@ -987,6 +999,8 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize to_inflate_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
     VkDeviceSize local_voxel_write_list_size = sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * m_params.max_write_count;
     VkDeviceSize voxel_write_list_size = sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * m_params.max_write_count;
+    VkDeviceSize voxel_write_unique_table_size =
+        sizeof(VoxelWriteUniqueSlotGPU) * m_params.voxel_write_unique_table_size;
     VkDeviceSize voxels_size = sizeof(VoxelDataGPU) * vox_per_chunk() * (size_t)m_params.count_active_chunks;
     VkDeviceSize indirect_cmds_size = sizeof(uint32_t) + sizeof(DrawElementsIndirectCommand) * m_params.count_active_chunks;
     VkDeviceSize failed_dirty_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
@@ -1030,6 +1044,30 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         physical_device,
         device,
         local_voxel_write_list_size,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        ssbo_memory_properties
+    );
+
+    VulkanBuffer voxel_write_list = VulkanBuffer(
+        physical_device,
+        device,
+        voxel_write_list_size,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        ssbo_memory_properties
+    );
+
+    VulkanBuffer unique_voxel_write_list = VulkanBuffer(
+        physical_device,
+        device,
+        voxel_write_list_size,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        ssbo_memory_properties
+    );
+
+    VulkanBuffer voxel_write_unique_table = VulkanBuffer(
+        physical_device,
+        device,
+        voxel_write_unique_table_size,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         ssbo_memory_properties
     );
@@ -1103,6 +1141,9 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         auto scope = m_command_buffer.begin_scope();
 
         local_voxel_write_list.fill(m_command_buffer, 0u);
+        voxel_write_list.fill(m_command_buffer, 0u);
+        unique_voxel_write_list.fill(m_command_buffer, 0u);
+        voxel_write_unique_table.fill(m_command_buffer, 0u);
         vb_returned_nodes_list.fill(m_command_buffer, 0u);
         ib_returned_nodes_list.fill(m_command_buffer, 0u);
 
@@ -1200,13 +1241,9 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
             ssbo_memory_properties
         ),
         .local_voxel_write_list = std::move(local_voxel_write_list),
-        .voxel_write_list = VulkanBuffer(
-            physical_device,
-            device,
-            voxel_write_list_size,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            ssbo_memory_properties
-        ),
+        .voxel_write_list = std::move(voxel_write_list),
+        .unique_voxel_write_list = std::move(unique_voxel_write_list),
+        .voxel_write_unique_table = std::move(voxel_write_unique_table),
         .voxels = VulkanBuffer(
             physical_device,
             device,
@@ -1451,6 +1488,7 @@ void VoxelGrid::set_render_distance(float value) {
 void VoxelGrid::set_inflated_voxel_debug_display(
     uint32_t display_inflated_voxels, 
     uint32_t inflated_voxel_color,
+    uint32_t inflated_curvature_limit_exceeded_voxel_color,
     uint32_t negative_x_inflation_size,
     uint32_t positive_x_inflation_size,
     uint32_t negative_y_inflation_size,
@@ -1478,6 +1516,8 @@ void VoxelGrid::set_inflated_voxel_debug_display(
 
     if (m_params.display_inflated_voxels == display_inflated_voxels &&
         m_params.inflated_voxel_color == inflated_voxel_color &&
+        m_params.inflated_curvature_limit_exceeded_voxel_color ==
+            inflated_curvature_limit_exceeded_voxel_color &&
         m_params.negative_x_inflation_size == negative_x_inflation_size &&
         m_params.positive_x_inflation_size == positive_x_inflation_size &&
         m_params.negative_y_inflation_size == negative_y_inflation_size &&
@@ -1489,6 +1529,8 @@ void VoxelGrid::set_inflated_voxel_debug_display(
 
     m_params.display_inflated_voxels = display_inflated_voxels;
     m_params.inflated_voxel_color = inflated_voxel_color;
+    m_params.inflated_curvature_limit_exceeded_voxel_color =
+        inflated_curvature_limit_exceeded_voxel_color;
     m_params.negative_x_inflation_size = negative_x_inflation_size;
     m_params.positive_x_inflation_size = positive_x_inflation_size;
     m_params.negative_y_inflation_size = negative_y_inflation_size;
@@ -1898,14 +1940,18 @@ glm::vec3 VoxelGrid::voxel_size() noexcept {
 }
 
 void VoxelGrid::voxelize_point_cloud(VulkanCommandBuffer& command_buffer, VulkanEngine& engine, 
-                                     PointCloud& point_cloud, VulkanBuffer& voxel_writes, uint32_t max_write_count) {
+                                     PointCloud& point_cloud, VulkanBuffer& normal_buffer, VulkanBuffer& voxel_writes, uint32_t max_write_count) {
     LOG_METHOD();
 
     logger().check(point_cloud.point_count() < max_write_count, "Point count was greater than max write count");
     logger().check(point_cloud.point_count() < m_params.max_write_count, "Point count was greater than max write count");
 
+    reset_voxel_write_list_counter(command_buffer, voxel_writes);
+
     m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(0, point_cloud.instance_buffer());
-    m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(1, voxel_writes);
+    m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(1, normal_buffer);
+
+    m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(2, voxel_writes);
 
     m_pass_instances.voxel_writes_from_point_cloud_pi.push_constants(command_buffer, 
     VoxelListFromPointCloudPushConstants{
@@ -1926,13 +1972,21 @@ void VoxelGrid::voxelize_point_cloud(VulkanCommandBuffer& command_buffer, Vulkan
     set_voxels(command_buffer, voxel_writes);
 }
 
-void VoxelGrid::voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud, 
+void VoxelGrid::voxelize_point_cloud(VulkanEngine& engine, 
+                                     PointCloud& point_cloud, VulkanBuffer& normal_buffer,
                                      VulkanBuffer& voxel_writes, uint32_t max_write_count) {
     LOG_METHOD();
     std::lock_guard lock(m_compute_mutex);
     {
         auto scope = m_command_buffer.begin_scope();
-        voxelize_point_cloud(m_command_buffer, engine, point_cloud, voxel_writes, max_write_count);
+        voxelize_point_cloud(
+            m_command_buffer, 
+            engine, 
+            point_cloud, 
+            normal_buffer, 
+            voxel_writes, 
+            max_write_count
+        );
     }
     submit_compute_commands();
 }
@@ -2115,13 +2169,22 @@ void VoxelGrid::write_voxels_to_grid(VulkanCommandBuffer& command_buffer, const 
     
     m_pass_instances.write_voxels_to_grid_pi.bind(command_buffer);
 
+    const bool has_inflation =
+        m_params.negative_x_inflation_size != 0u ||
+        m_params.positive_x_inflation_size != 0u ||
+        m_params.negative_y_inflation_size != 0u ||
+        m_params.positive_y_inflation_size != 0u ||
+        m_params.negative_z_inflation_size != 0u ||
+        m_params.positive_z_inflation_size != 0u;
+
     m_pass_instances.write_voxels_to_grid_pi.push_constants(command_buffer, WriteVoxelsToGridPushConstants{
         .u_chunk_dim = glm::ivec4(m_params.chunk_size.x, m_params.chunk_size.y, m_params.chunk_size.z, 0),
         .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
         .u_voxels_per_chunk = static_cast<uint32_t>(vox_per_chunk()),
 
         .u_pack_offset = math_utils::OFFSET,
-        .u_pack_bits = math_utils::BITS
+        .u_pack_bits = math_utils::BITS,
+        .u_mark_recently_inserted = has_inflation ? 1u : 0u
     });
 
     command_buffer.dispatch_indirect(dispatch_args);
@@ -2177,8 +2240,9 @@ void VoxelGrid::inflate_voxel_writes(VulkanCommandBuffer& command_buffer, const 
 
 void VoxelGrid::reset_voxel_write_list_counter(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_write_list) {
     LOG_METHOD();
-    
-    voxel_write_list.fill(command_buffer, 0u, sizeof(uint32_t));
+
+    uint32_t zero = 0u;
+    voxel_write_list.fill(command_buffer, m_pass_instances.fill_buffer_pw, zero, sizeof(uint32_t));
     voxel_write_list.memory_barrier_compute_write_to_compute_write_read(command_buffer);
 }
 

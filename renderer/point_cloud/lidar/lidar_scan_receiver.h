@@ -19,7 +19,7 @@ public:
         PointCloudPreprocessor& point_cloud_preprocessor,
         uint16_t port = 5000,
         size_t max_queued_frames = 3,
-        uint32_t points_freq = 5
+        uint32_t points_freq = 1
     );
     ~LidarScanReceiver();
 
@@ -37,7 +37,7 @@ public:
 private:
     uint16_t m_port = 0;
     size_t m_max_queued_frames = 0;
-    uint32_t m_points_freq = 5;
+    uint32_t m_points_freq = 1;
     PointCloudPreprocessor* m_point_cloud_preprocessor = nullptr;
     std::atomic<bool> m_running{false};
     int m_listen_socket = -1;

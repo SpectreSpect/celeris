@@ -92,6 +92,7 @@ public:
         uint32_t positive_z_inflation_size = 0u;
         uint32_t display_inflated_voxels = 0u;
         uint32_t inflated_voxel_color = 0xFF3355FFu;
+        uint32_t inflated_curvature_limit_exceeded_voxel_color = 0xFF0707FFu;
     };
 
     struct BuddyAllocatorParams {
@@ -107,6 +108,7 @@ public:
         uint32_t count_active_chunks = 0u;
         uint32_t count_evict_buckets = 0u;
         uint32_t max_write_count = 0u;
+        uint32_t voxel_write_unique_table_size = 0u;
         uint32_t min_free_chunks = 0u;
         uint32_t chunk_hash_table_size = 0u;
         float tomb_fraction_to_rebuild = 0.0f;
@@ -123,6 +125,7 @@ public:
         uint32_t positive_z_inflation_size = 0u;
         uint32_t display_inflated_voxels = 0u;
         uint32_t inflated_voxel_color = 0xFF3355FFu;
+        uint32_t inflated_curvature_limit_exceeded_voxel_color = 0xFF0707FFu;
 
         BuddyAllocatorParams vb_allocator_params;
         BuddyAllocatorParams ib_allocator_params;
@@ -152,6 +155,8 @@ public:
         VulkanBuffer to_inflate_list;
         VulkanBuffer local_voxel_write_list;
         VulkanBuffer voxel_write_list;
+        VulkanBuffer unique_voxel_write_list;
+        VulkanBuffer voxel_write_unique_table;
         VulkanBuffer voxels;
 
         VulkanBuffer bucket_heads;
@@ -217,9 +222,9 @@ public:
 
     glm::vec3 voxel_size() noexcept;
     void voxelize_point_cloud(VulkanCommandBuffer& command_buffer, VulkanEngine& engine, 
-                              PointCloud& point_cloud, VulkanBuffer& voxel_writes, uint32_t max_write_count);
+                              PointCloud& point_cloud, VulkanBuffer& normal_buffer, VulkanBuffer& voxel_writes, uint32_t max_write_count);
     void voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud, 
-                              VulkanBuffer& voxel_writes, uint32_t max_write_count);
+                              VulkanBuffer& voxel_writes, VulkanBuffer& normal_buffer, uint32_t max_write_count);
     
     void update(Window& window, Camera& camera);
     void set_voxels(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src);
@@ -227,6 +232,7 @@ public:
     void set_inflated_voxel_debug_display(
         uint32_t display_inflated_voxels,
         uint32_t inflated_voxel_color,
+        uint32_t inflated_curvature_limit_exceeded_voxel_color,
         uint32_t negative_x_inflation_size,
         uint32_t positive_x_inflation_size,
         uint32_t negative_y_inflation_size,
@@ -262,6 +268,8 @@ public:
         PassInstance stream_select_chunks_pi;
         PassWriter insert_elements_to_voxel_write_list_pw;
         PassWriter add_voxel_write_list_counters_together_pw;
+        PassWriter build_unique_voxel_write_table_pw;
+        PassWriter compact_unique_voxel_write_table_pw;
         PassInstance mark_write_chunks_to_generate_pi;
         PassInstance stream_generate_terrain_pi;
         PassInstance write_voxels_to_grid_pi;
@@ -337,10 +345,19 @@ private:
     void reset_load_list_counter(VulkanCommandBuffer& command_buffer);
     void reset_to_inflate_list_counter(VulkanCommandBuffer& command_buffer);
     void mark_chunk_to_generate(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks);
-    void mark_write_chunks_to_generate(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void mark_write_chunks_to_generate(
+        VulkanCommandBuffer& command_buffer,
+        const VulkanBuffer& dispatch_args
+    );
     void generate_terrain(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t seed);
-    void write_voxels_to_grid(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
-    void inflate_voxel_writes(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void write_voxels_to_grid(
+        VulkanCommandBuffer& command_buffer,
+        const VulkanBuffer& dispatch_args
+    );
+    void inflate_voxel_writes(
+        VulkanCommandBuffer& command_buffer,
+        const VulkanBuffer& dispatch_args
+    );
     void reset_voxel_write_list_counter(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_write_list);
     void stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks, uint32_t seed);
     

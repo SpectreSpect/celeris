@@ -33,6 +33,7 @@ public:
     glm::vec3 voxel_to_world_pos(const glm::ivec3& p) const;
     glm::vec3 voxel_center_world_pos(const glm::ivec3& p) const;
     bool is_solid(glm::ivec3 pos);
+    bool exceeds_curvature_limit(glm::ivec3 pos);
     bool check_footprint(glm::vec3 origin, glm::vec3 offsets, uint32_t max_step_up);
     bool adjust_to_ground(
         glm::ivec3& output,
@@ -100,6 +101,12 @@ public:
     );
     std::vector<glm::ivec3> line_intersects_xz(glm::vec3 pos1, glm::vec3 pos2);
 
+private:
+    VoxelDataGPU voxel_data(glm::ivec3 pos);
+    static bool is_blocking_voxel(const VoxelDataGPU& voxel);
+    static bool is_standable_ground_voxel(const VoxelDataGPU& voxel);
+
+public:
     template <class T, class GetPos, class SetPos>
     bool adjust_to_ground_range(
         T* begin, 

@@ -37,6 +37,16 @@ namespace {
             is_finite(value.z);
     }
 
+    glm::vec3 vehicle_geometry_position_to_model_offset(
+        const VehicleGeometry& vehicle_geometry,
+        glm::vec3 position_from_left_rear_bottom
+    ) {
+        return glm::vec3(
+            position_from_left_rear_bottom.z - vehicle_geometry.size.z / 2.0f,
+            position_from_left_rear_bottom.y - vehicle_geometry.size.y / 2.0f,
+            position_from_left_rear_bottom.x - vehicle_geometry.size.x / 2.0f
+        );
+    }
 }
 
 Celeris::Celeris(VulkanEngine& engine,
@@ -237,6 +247,7 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         m_voxel_grid->voxelize_point_cloud(
             *m_engine, 
             m_network_scan->point_cloud(), 
+            m_network_scan->normal_buffer(),
             voxel_write_list, 
             m_desc.max_write_count
         );
@@ -973,32 +984,32 @@ void Celeris::sync_path_planner_result() {
 Transform Celeris::rear_axle_transform_from_lidar_transform(const Transform& lidar_transform) const {
     Transform rear_axle_transform = lidar_transform;
     const glm::quat scan_rotation = glm::normalize(lidar_transform.rotation);
-    const glm::quat model_rotation = glm::normalize(
-        scan_rotation * glm::angleAxis(glm::pi<float>(), glm::vec3(0.0f, 1.0f, 0.0f))
-    );
+    const glm::quat lidar_mount_rotation = glm::angleAxis(glm::pi<float>(), glm::vec3(0.0f, 1.0f, 0.0f));
+    const glm::quat model_rotation = glm::normalize(scan_rotation * glm::inverse(lidar_mount_rotation));
+
+    const glm::vec3 rear_axle_offset = rear_axle_midpoint_offset();
+    const glm::vec3 lidar_model_offset = lidar_offset();
 
     rear_axle_transform.rotation = scan_rotation;
     rear_axle_transform.position =
         lidar_transform.position +
-        model_rotation * (rear_axle_bottom_offset() * lidar_transform.scale);
+        model_rotation * ((rear_axle_offset - lidar_model_offset) * lidar_transform.scale);
 
     return rear_axle_transform;
 }
 
-glm::vec3 Celeris::rear_axle_bottom_offset() const {
-    const float car_length = 6.6f;
-    const float rear_axle_x_portion = 0.2f;
-    const float car_body_height = 2.75f;
+glm::vec3 Celeris::rear_axle_midpoint_offset() const {
+    return vehicle_geometry_position_to_model_offset(
+        m_desc.vehicle_geometry,
+        m_desc.vehicle_geometry.rear_axle_midpoint()
+    );
+}
 
-    const float car_rear_x = -car_length / 2.0f;
-    const float car_model_bottom_y = 0.0f;
-    const float car_model_top_y = car_model_bottom_y + car_body_height;
-    const float car_model_center_y = (car_model_bottom_y + car_model_top_y) / 2.0f;
-
-    const float rear_axle_x = car_rear_x + car_length * rear_axle_x_portion;
-    const float wheel_bottom_y = car_model_bottom_y - car_model_center_y;
-
-    return glm::vec3(rear_axle_x, wheel_bottom_y, 0.0f);
+glm::vec3 Celeris::lidar_offset() const {
+    return vehicle_geometry_position_to_model_offset(
+        m_desc.vehicle_geometry,
+        m_desc.vehicle_geometry.lidar_position()
+    );
 }
 
 bool Celeris::find_closest_next_path_point(uint32_t current_id, uint32_t& output_id, uint32_t& output_dist) {

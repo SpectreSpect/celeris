@@ -34,6 +34,8 @@ static constexpr uint32_t VOXEL_TYPE_MASK = (1u << VOXEL_TYPE_BITS) - 1u;
 static constexpr uint32_t VOXEL_VISABILITY_FLAG_BIT = 1u; // Определяет, видим ли воксель
 static constexpr uint32_t VOXEL_EASY_OVERWRITE_FLAG_BIT = 2u; // Определяет, можно ли заменять воксель как будто бы он "воздух" или "вода" в майне
 static constexpr uint32_t VOXEL_INFLATED_BIT = 4u; // Определяет, пересекает ли воксель раздутые видимые воксели
+static constexpr uint32_t VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT = 8u; // Определяет, превышает ли воксель лимит кривизны
+static constexpr uint32_t VOXEL_RECENTLY_INSERTED_BIT = 16u; // Определяет, был ли воксель вставлен в текущем батче записи
 
 struct alignas(8) VoxelDataGPU {
     uint32_t type_flags;
@@ -75,6 +77,14 @@ struct alignas(8) VoxelDataGPU {
 
     inline bool is_inflated() const {
         return ((type_flags >> VOXEL_TYPE_BITS) & VOXEL_INFLATED_BIT) > 0;
+    }
+
+    inline bool exceeds_curvature_limit() const {
+        return ((type_flags >> VOXEL_TYPE_BITS) & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) > 0;
+    }
+
+    inline bool was_recently_inserted() const {
+        return ((type_flags >> VOXEL_TYPE_BITS) & VOXEL_RECENTLY_INSERTED_BIT) > 0;
     }
 };
 
@@ -135,6 +145,17 @@ struct alignas(16) VoxelWriteGPU {
 
 static_assert(sizeof(VoxelWriteGPU) == 32);
 static_assert(alignof(VoxelWriteGPU) == 16);
+
+struct alignas(16) VoxelWriteUniqueSlotGPU {
+    glm::ivec4 world_voxel;
+    uint32_t selected_rank;
+    uint32_t state;
+    uint32_t pad0;
+    uint32_t pad1;
+};
+
+static_assert(sizeof(VoxelWriteUniqueSlotGPU) == 32);
+static_assert(alignof(VoxelWriteUniqueSlotGPU) == 16);
 
 struct BucketHead {
     uint32_t id;

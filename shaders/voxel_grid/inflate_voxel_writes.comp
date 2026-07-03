@@ -95,30 +95,69 @@ bool cached_loaded_voxel_id(
     return true;
 }
 
-bool cached_visible_voxel_loaded(
+bool is_inflation_barrier(uint flags, bool source_curvature_limit_exceeded)
+{
+    if ((flags & VOXEL_VISABILITY_FLAG_BIT) == 0u) {
+        return false;
+    }
+
+    if (source_curvature_limit_exceeded) {
+        return (flags & VOXEL_RECENTLY_INSERTED_BIT) != 0u;
+    }
+
+    return true;
+}
+
+bool cached_inflation_barrier_loaded(
     ivec3 world_voxel,
     ivec3 base_chunk_pos,
-    inout uint cached_chunk_ids[CACHED_CHUNK_COUNT])
+    inout uint cached_chunk_ids[CACHED_CHUNK_COUNT],
+    bool source_curvature_limit_exceeded)
 {
     uint global_voxel_id;
     if (!cached_loaded_voxel_id(world_voxel, base_chunk_pos, cached_chunk_ids, global_voxel_id)) return false;
 
     uint type_flags = atomicOr(voxels[global_voxel_id].type_flags, 0u);
-    return (read_voxel_flags(type_flags) & VOXEL_VISABILITY_FLAG_BIT) != 0u;
+    uint flags = read_voxel_flags(type_flags);
+    return is_inflation_barrier(flags, source_curvature_limit_exceeded);
 }
 
 bool cached_mark_inflated_if_loaded(
     ivec3 world_voxel,
     ivec3 base_chunk_pos,
-    inout uint cached_chunk_ids[CACHED_CHUNK_COUNT])
+    inout uint cached_chunk_ids[CACHED_CHUNK_COUNT],
+    bool source_curvature_limit_exceeded)
 {
     uint global_voxel_id;
     if (!cached_loaded_voxel_id(world_voxel, base_chunk_pos, cached_chunk_ids, global_voxel_id)) return false;
 
-    uint inflated_type_flag = VOXEL_INFLATED_BIT << VOXEL_TYPE_BITS;
-    uint type_flags = atomicOr(voxels[global_voxel_id].type_flags, inflated_type_flag);
+    uint old_type_flags = atomicOr(voxels[global_voxel_id].type_flags, 0u);
+    uint old_flags = read_voxel_flags(old_type_flags);
+    if ((old_flags & VOXEL_RECENTLY_INSERTED_BIT) != 0u) {
+        return is_inflation_barrier(old_flags, source_curvature_limit_exceeded);
+    }
 
-    return (read_voxel_flags(type_flags) & VOXEL_VISABILITY_FLAG_BIT) != 0u;
+    uint flags_to_set = VOXEL_INFLATED_BIT;
+    if (source_curvature_limit_exceeded) {
+        flags_to_set |= VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT;
+    }
+
+    uint type_flags = atomicOr(voxels[global_voxel_id].type_flags, flags_to_set << VOXEL_TYPE_BITS);
+    uint flags = read_voxel_flags(type_flags);
+
+    return is_inflation_barrier(flags, source_curvature_limit_exceeded);
+}
+
+void clear_recently_inserted_if_loaded(
+    ivec3 world_voxel,
+    ivec3 base_chunk_pos,
+    inout uint cached_chunk_ids[CACHED_CHUNK_COUNT])
+{
+    uint global_voxel_id;
+    if (!cached_loaded_voxel_id(world_voxel, base_chunk_pos, cached_chunk_ids, global_voxel_id)) return;
+
+    uint recently_inserted_type_flag = VOXEL_RECENTLY_INSERTED_BIT << VOXEL_TYPE_BITS;
+    atomicAnd(voxels[global_voxel_id].type_flags, ~recently_inserted_type_flag);
 }
 
 int max_abs_bound(int min_x, int max_x, int min_y, int max_y, int min_z, int max_z)
@@ -159,6 +198,7 @@ void process_inflation_offset(
     ivec3 base_chunk_pos,
     inout uint cached_chunk_ids[CACHED_CHUNK_COUNT],
     ivec3 offset,
+    bool source_curvature_limit_exceeded,
     inout int min_x,
     inout int max_x,
     inout int min_y,
@@ -168,7 +208,12 @@ void process_inflation_offset(
 {
     if (!offset_inside_bounds(offset, min_x, max_x, min_y, max_y, min_z, max_z)) return;
 
-    bool is_visible = cached_mark_inflated_if_loaded(write_voxel + offset, base_chunk_pos, cached_chunk_ids);
+    bool is_visible = cached_mark_inflated_if_loaded(
+        write_voxel + offset,
+        base_chunk_pos,
+        cached_chunk_ids,
+        source_curvature_limit_exceeded
+    );
     if (is_visible) {
         clamp_bounds_to_offset(offset, min_x, max_x, min_y, max_y, min_z, max_z);
     }
@@ -181,6 +226,9 @@ void main()
 
     VoxelWrite voxel_write = voxel_writes[voxel_write_id];
     ivec3 write_voxel = voxel_write.world_voxel.xyz;
+    uint write_flags = read_voxel_flags(voxel_write.voxel_data.type_flags);
+    bool source_curvature_limit_exceeded =
+        (write_flags & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) != 0u;
     ivec3 base_chunk_pos = floor_div(write_voxel, u_chunk_dim.xyz);
     uint cached_chunk_ids[CACHED_CHUNK_COUNT];
     init_cached_chunk_ids(cached_chunk_ids);
@@ -192,32 +240,16 @@ void main()
     int min_z = -int(u_negative_z_inflation_size);
     int max_z =  int(u_positive_z_inflation_size);
 
-    if (cached_visible_voxel_loaded(write_voxel + ivec3(-1, 0, 0), base_chunk_pos, cached_chunk_ids)) min_x = 0;
-    if (cached_visible_voxel_loaded(write_voxel + ivec3( 1, 0, 0), base_chunk_pos, cached_chunk_ids)) max_x = 0;
-    if (cached_visible_voxel_loaded(write_voxel + ivec3(0, -1, 0), base_chunk_pos, cached_chunk_ids)) min_y = 0;
-    if (cached_visible_voxel_loaded(write_voxel + ivec3(0,  1, 0), base_chunk_pos, cached_chunk_ids)) max_y = 0;
-    if (cached_visible_voxel_loaded(write_voxel + ivec3(0, 0, -1), base_chunk_pos, cached_chunk_ids)) min_z = 0;
-    if (cached_visible_voxel_loaded(write_voxel + ivec3(0, 0,  1), base_chunk_pos, cached_chunk_ids)) max_z = 0;
+    if (cached_inflation_barrier_loaded(write_voxel + ivec3(-1, 0, 0), base_chunk_pos, cached_chunk_ids, source_curvature_limit_exceeded)) min_x = 0;
+    if (cached_inflation_barrier_loaded(write_voxel + ivec3( 1, 0, 0), base_chunk_pos, cached_chunk_ids, source_curvature_limit_exceeded)) max_x = 0;
+    if (cached_inflation_barrier_loaded(write_voxel + ivec3(0, -1, 0), base_chunk_pos, cached_chunk_ids, source_curvature_limit_exceeded)) min_y = 0;
+    if (cached_inflation_barrier_loaded(write_voxel + ivec3(0,  1, 0), base_chunk_pos, cached_chunk_ids, source_curvature_limit_exceeded)) max_y = 0;
+    if (cached_inflation_barrier_loaded(write_voxel + ivec3(0, 0, -1), base_chunk_pos, cached_chunk_ids, source_curvature_limit_exceeded)) min_z = 0;
+    if (cached_inflation_barrier_loaded(write_voxel + ivec3(0, 0,  1), base_chunk_pos, cached_chunk_ids, source_curvature_limit_exceeded)) max_z = 0;
 
     int max_shell = max_abs_bound(min_x, max_x, min_y, max_y, min_z, max_z);
-    for (int shell = 0; shell <= max_shell; ++shell) {
+    for (int shell = 1; shell <= max_shell; ++shell) {
         if (shell > max_abs_bound(min_x, max_x, min_y, max_y, min_z, max_z)) break;
-
-        if (shell == 0) {
-            process_inflation_offset(
-                write_voxel,
-                base_chunk_pos,
-                cached_chunk_ids,
-                ivec3(0),
-                min_x,
-                max_x,
-                min_y,
-                max_y,
-                min_z,
-                max_z
-            );
-            continue;
-        }
 
         int y0 = max(min_y, -shell);
         int y1 = min(max_y,  shell);
@@ -231,6 +263,7 @@ void main()
                     base_chunk_pos,
                     cached_chunk_ids,
                     ivec3(-shell, y, z),
+                    source_curvature_limit_exceeded,
                     min_x,
                     max_x,
                     min_y,
@@ -243,6 +276,7 @@ void main()
                     base_chunk_pos,
                     cached_chunk_ids,
                     ivec3(shell, y, z),
+                    source_curvature_limit_exceeded,
                     min_x,
                     max_x,
                     min_y,
@@ -265,6 +299,7 @@ void main()
                     base_chunk_pos,
                     cached_chunk_ids,
                     ivec3(x, -shell, z),
+                    source_curvature_limit_exceeded,
                     min_x,
                     max_x,
                     min_y,
@@ -277,6 +312,7 @@ void main()
                     base_chunk_pos,
                     cached_chunk_ids,
                     ivec3(x, shell, z),
+                    source_curvature_limit_exceeded,
                     min_x,
                     max_x,
                     min_y,
@@ -299,6 +335,7 @@ void main()
                     base_chunk_pos,
                     cached_chunk_ids,
                     ivec3(x, y, -shell),
+                    source_curvature_limit_exceeded,
                     min_x,
                     max_x,
                     min_y,
@@ -311,6 +348,7 @@ void main()
                     base_chunk_pos,
                     cached_chunk_ids,
                     ivec3(x, y, shell),
+                    source_curvature_limit_exceeded,
                     min_x,
                     max_x,
                     min_y,
@@ -321,4 +359,6 @@ void main()
             }
         }
     }
+
+    clear_recently_inserted_if_loaded(write_voxel, base_chunk_pos, cached_chunk_ids);
 }

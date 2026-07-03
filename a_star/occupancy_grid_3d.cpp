@@ -295,20 +295,7 @@ glm::vec3 OccupancyGrid3D::voxel_center_world_pos(const glm::ivec3& p) const {
     return (glm::vec3(p) + glm::vec3(0.5f)) * m_voxel_grid->voxel_size();
 }
 
-bool OccupancyGrid3D::is_solid(glm::ivec3 pos) {
-    // // LOG_METHOD();
-    // return pos.y <= 0;
-    
-    // logger().check(m_voxel_grid, "Voxel grid was null");
-
-    const auto is_solid_start = std::chrono::steady_clock::now();
-    auto record_is_solid_time = [&] {
-        const auto is_solid_end = std::chrono::steady_clock::now();
-        std::lock_guard lock(m_metrics_mutex);
-        is_solid_count++;
-        is_solid_time.add(is_solid_end - is_solid_start);
-    };
-
+VoxelDataGPU OccupancyGrid3D::voxel_data(glm::ivec3 pos) {
     glm::ivec3 chunk_pos = m_voxel_grid->chunk_pos_from_voxel_pos(pos);
 
     uint64_t chunk_key = math_utils::pack_key(chunk_pos.x, chunk_pos.y, chunk_pos.z);
@@ -319,9 +306,7 @@ bool OccupancyGrid3D::is_solid(glm::ivec3 pos) {
         std::lock_guard lock(m_chunk_cache_mutex);
         auto cached_chunk_it = m_chunk_cache.find(chunk_key);
         if (cached_chunk_it != m_chunk_cache.end()) {
-            VoxelDataGPU voxel = cached_chunk_it->second.voxel(glm::uvec3(local_pos));
-            record_is_solid_time();
-            return voxel.is_solid() || voxel.is_inflated();
+            return cached_chunk_it->second.voxel(glm::uvec3(local_pos));
         }
     }
 
@@ -336,17 +321,39 @@ bool OccupancyGrid3D::is_solid(glm::ivec3 pos) {
         read_and_inflate_chunk_time.add(read_and_inflate_end - read_and_inflate_start);
     }
 
-    VoxelDataGPU voxel;
     {
         std::lock_guard lock(m_chunk_cache_mutex);
         auto [cached_chunk_it, inserted] = m_chunk_cache.emplace(chunk_key, std::move(loaded_chunk));
-        voxel = cached_chunk_it->second.voxel(glm::uvec3(local_pos));
+        return cached_chunk_it->second.voxel(glm::uvec3(local_pos));
     }
+}
+
+bool OccupancyGrid3D::is_blocking_voxel(const VoxelDataGPU& voxel) {
+    return voxel.is_solid() || voxel.is_inflated() || voxel.exceeds_curvature_limit();
+}
+
+bool OccupancyGrid3D::is_standable_ground_voxel(const VoxelDataGPU& voxel) {
+    return (voxel.is_solid() || voxel.is_inflated()) && !voxel.exceeds_curvature_limit();
+}
+
+bool OccupancyGrid3D::is_solid(glm::ivec3 pos) {
+    const auto is_solid_start = std::chrono::steady_clock::now();
+    auto record_is_solid_time = [&] {
+        const auto is_solid_end = std::chrono::steady_clock::now();
+        std::lock_guard lock(m_metrics_mutex);
+        is_solid_count++;
+        is_solid_time.add(is_solid_end - is_solid_start);
+    };
+
+    VoxelDataGPU voxel = voxel_data(pos);
 
     record_is_solid_time();
 
-    return voxel.is_solid() || voxel.is_inflated();
-    // return pos.y <= 0;
+    return is_blocking_voxel(voxel);
+}
+
+bool OccupancyGrid3D::exceeds_curvature_limit(glm::ivec3 pos) {
+    return voxel_data(pos).exceeds_curvature_limit();
 }
 
 bool OccupancyGrid3D::check_footprint(glm::vec3 origin, glm::vec3 offsets, uint32_t max_step_up) {
@@ -472,6 +479,12 @@ bool OccupancyGrid3D::adjust_to_ground(
         if (status)
             *status = 1;
         return allow_flying_over_precepices;
+    }
+
+    if (!is_standable_ground_voxel(voxel_data(result_pos))) {
+        if (status)
+            *status = 5;
+        return false;
     }
 
     if ((int)norm_pos.y == (int)result_pos.y) {

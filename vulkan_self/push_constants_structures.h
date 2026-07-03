@@ -127,6 +127,7 @@ struct MeshEmitPushConstants {
     uint32_t u_voxels_per_chunk;
     uint32_t display_inflated_voxels;
     uint32_t inflated_voxel_color;
+    uint32_t inflated_curvature_limit_exceeded_voxel_color;
 };
 
 struct StreamGenerateTerrainPushConstants {
@@ -149,6 +150,12 @@ struct WriteVoxelsToGridPushConstants {
 
     uint32_t u_pack_offset;
     uint32_t u_pack_bits;
+    uint32_t u_mark_recently_inserted;
+};
+
+struct UniquifyVoxelWriteListPushConstants {
+    uint32_t u_hash_table_size;
+    uint32_t u_max_write_count;
 };
 
 struct ReadVoxelGridChunkPushConstants {

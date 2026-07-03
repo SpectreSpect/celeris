@@ -38,6 +38,8 @@ const uint VOXEL_TYPE_MASK = (1u << VOXEL_TYPE_BITS) - 1u;
 #define VOXEL_VISABILITY_FLAG_BIT 1u // Определяет, видим ли воксель
 #define VOXEL_EASY_OVERWRITE_FLAG_BIT 2u // Определяет, можно ли заменять воксель как будто бы он "воздух" или "вода" в майне
 #define VOXEL_INFLATED_BIT 4u // Определяет, пересикает ли воксель раздутые видимые воксели
+#define VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT 8u // Определяет, превышает ли воксель лимит кривизны
+#define VOXEL_RECENTLY_INSERTED_BIT 16u // Определяет, был ли воксель вставлен в текущем батче записи
 
 uint read_voxel_type(uint type_flags) {
     return type_flags & VOXEL_TYPE_MASK;
@@ -63,6 +65,14 @@ struct VoxelWrite {
     VoxelData voxel_data;
     uint set_flags;
     uint _pad1;
+};
+
+struct VoxelWriteUniqueSlot {
+    ivec4 world_voxel;
+    uint selected_rank;
+    uint state;
+    uint pad0;
+    uint pad1;
 };
 
 struct Vertex {

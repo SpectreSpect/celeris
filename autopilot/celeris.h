@@ -199,12 +199,6 @@ private:
     std::vector<NonholonomicPos> unimpended_path;
     AvgTimer total_path_finding_time;
 
-    // glm::vec3 car_size = glm::vec3(2.0f, 2.0f, 6.6f); // width, height, length
-    // glm::vec3 front_axle_midpoint = glm::vec3(car_size.x / 2.0f, 0.39f, 5.61f); // relative to left back bottom
-    // glm::vec3 rear_axle_midpoint = glm::vec3(car_size.x / 2.0f, 0.39f, 1.32f); // relative to left back bottom
-    // glm::vec3 lidar_position = glm::vec3(car_size.x / 2.0f, 1.51f, 6.0f); // relative to left back bottom
-
-
     bool is_stop_waiting = false;
     double stop_waiting_time = 2;
     std::chrono::steady_clock::time_point stop_waiting_start_timestamp{};
@@ -233,7 +227,8 @@ private:
 
     void sync_path_planner_result();
     Transform rear_axle_transform_from_lidar_transform(const Transform& lidar_transform) const;
-    glm::vec3 rear_axle_bottom_offset() const;
+    glm::vec3 rear_axle_midpoint_offset() const;
+    glm::vec3 lidar_offset() const;
 
     bool find_closest_next_path_point(uint32_t current_id, uint32_t& output_id, uint32_t& output_dist);
 };

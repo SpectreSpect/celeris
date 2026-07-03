@@ -189,6 +189,7 @@ int main() {
         .display_inflated_voxels = 0u,
         // .inflated_voxel_color = 0xFF0707FFu, // 0xFF3355FFu
         .inflated_voxel_color = 0xFFFFFFFFu,
+        .inflated_curvature_limit_exceeded_voxel_color = 0xFF0707FFu,
     };
 
     VoxelGrid voxel_grid(
@@ -207,6 +208,12 @@ int main() {
         float((voxel_grid.params().inflated_voxel_color >> 16u) & 0xFFu) / 255.0f,
         float((voxel_grid.params().inflated_voxel_color >> 8u) & 0xFFu) / 255.0f,
         float(voxel_grid.params().inflated_voxel_color & 0xFFu) / 255.0f
+    };
+    float inflated_curvature_limit_exceeded_voxel_color[4] = {
+        float((voxel_grid.params().inflated_curvature_limit_exceeded_voxel_color >> 24u) & 0xFFu) / 255.0f,
+        float((voxel_grid.params().inflated_curvature_limit_exceeded_voxel_color >> 16u) & 0xFFu) / 255.0f,
+        float((voxel_grid.params().inflated_curvature_limit_exceeded_voxel_color >> 8u) & 0xFFu) / 255.0f,
+        float(voxel_grid.params().inflated_curvature_limit_exceeded_voxel_color & 0xFFu) / 255.0f
     };
     int negative_x_inflation_size = static_cast<int>(voxel_grid.params().negative_x_inflation_size);
     int positive_x_inflation_size = static_cast<int>(voxel_grid.params().positive_x_inflation_size);
@@ -595,7 +602,7 @@ int main() {
     scene.add(skybox);
 
     scene.add(celeris_visualizer);
-    scene.add(footprint_visualizer);
+    // scene.add(footprint_visualizer);
     // scene.add(gazelle);
     // scene.add(target_scan);
     // scene.add(voxel_point_map);
@@ -917,6 +924,11 @@ int main() {
                         inflated_voxel_color,
                         ImGuiColorEditFlags_AlphaBar
                     );
+                    inflated_settings_changed |= ImGui::ColorEdit4(
+                        "Inflated curvature-limit voxel color",
+                        inflated_curvature_limit_exceeded_voxel_color,
+                        ImGuiColorEditFlags_AlphaBar
+                    );
 
                     inflated_settings_changed |= ImGui::SliderInt(
                         "Negative X inflation size",
@@ -959,6 +971,7 @@ int main() {
                         voxel_grid.set_inflated_voxel_debug_display(
                             display_inflated_voxels ? 1u : 0u,
                             pack_inflated_voxel_color(inflated_voxel_color),
+                            pack_inflated_voxel_color(inflated_curvature_limit_exceeded_voxel_color),
                             static_cast<uint32_t>(negative_x_inflation_size),
                             static_cast<uint32_t>(positive_x_inflation_size),
                             static_cast<uint32_t>(negative_y_inflation_size),

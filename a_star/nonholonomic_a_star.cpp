@@ -449,7 +449,7 @@ float NonholonomicAStar::get_nonholonomic_f(NonholonomicPos& new_pos, Nonholonom
     LOG_METHOD();
 
     if (m_state.unimpended_astar_positions.empty())
-        return glm::distance(new_pos.pos, end_pos.pos);
+        return math_utils::horizontal_distance(new_pos.pos, end_pos.pos);
 
     const int last_target_id = static_cast<int>(m_state.unimpended_astar_positions.size()) - 1;
 
@@ -459,12 +459,10 @@ float NonholonomicAStar::get_nonholonomic_f(NonholonomicPos& new_pos, Nonholonom
         glm::vec3 pos1 = new_pos.pos;
         glm::vec3 pos2 = m_state.unimpended_astar_positions[new_pos.dubins_segment_id].pos;
 
-        pos1.y = 0;
-        pos2.y = 0;
-        dist_to_unimpended_pos = glm::distance(pos1, pos2);
+        dist_to_unimpended_pos = math_utils::horizontal_distance(pos1, pos2);
     }
     else
-        dist_to_unimpended_pos = glm::distance(new_pos.pos, m_state.unimpended_astar_positions[new_pos.dubins_segment_id].pos);
+        dist_to_unimpended_pos = math_utils::horizontal_distance(new_pos.pos, m_state.unimpended_astar_positions[new_pos.dubins_segment_id].pos);
     
     if (new_pos.dubins_segment_id < last_target_id && dist_to_unimpended_pos <= 1.0f) {
         new_pos.dubins_segment_id += 1;
@@ -858,7 +856,7 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
 
             float motion_dist = 0;
             for (int i = 0; i < motion.size() -1; i++) {
-                motion_dist += glm::distance(motion[i].pos, motion[i+1].pos);
+                motion_dist += math_utils::horizontal_distance(motion[i].pos, motion[i+1].pos);
             }
             
             // NonholonomicPos new_pos = simplified_motion[simplified_motion.size() - 1];
