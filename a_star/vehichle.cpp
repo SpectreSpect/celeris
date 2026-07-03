@@ -1000,6 +1000,14 @@ float Vehicle::compute_simulation_loss(
 
     logger().check(total_polyline_length > Utils::eps, "path length must be greater than zero");
 
+    const auto clear_target_tracking_loss =
+        [](SimulationLossCoefficients& coefficients) {
+            coefficients.position = 0.0f;
+            coefficients.heading = 0.0f;
+            coefficients.progress = 0.0f;
+            coefficients.steering = 0.0f;
+        };
+
     const glm::vec2 start_position = state.m_position;
     float trajectory_length = 0.0f;
     glm::vec2 previous_trajectory_position = state.m_position;
@@ -1041,6 +1049,7 @@ float Vehicle::compute_simulation_loss(
     );
 
     float loss = 0.0f;
+    bool tracking_finished_after_switch = false;
     PointProjection last_projection = previous_projection;
     PointProjection last_target_projection = previous_target_projection;
     for (float time = 0.0f; time < simulation_time;) {
@@ -1067,11 +1076,16 @@ float Vehicle::compute_simulation_loss(
             projection_min_s,
             projection_max_s
         );
-        float current_target_s = std::min(
+        const float unclamped_current_target_s = std::min(
             total_polyline_length,
             progress_reference_s +
                 compute_reference_progress(reference_initial_path_speed, time + step_dt)
         );
+        const bool reaches_next_switch =
+            std::isfinite(next_switch_s) &&
+            unclamped_current_target_s >= next_switch_s - Utils::eps;
+
+        float current_target_s = unclamped_current_target_s;
         if (std::isfinite(next_switch_s)) {
             current_target_s = std::min(current_target_s, next_switch_s);
         }
@@ -1090,6 +1104,9 @@ float Vehicle::compute_simulation_loss(
             speed_acceleration,
             steer_acceleration
         );
+        if (tracking_finished_after_switch) {
+            clear_target_tracking_loss(current_loss_coefficients);
+        }
 
         loss += 0.5f * (
             previous_loss_coefficients.total() +
@@ -1098,6 +1115,10 @@ float Vehicle::compute_simulation_loss(
 
         previous_projection = current_projection;
         previous_loss_coefficients = current_loss_coefficients;
+        if (reaches_next_switch) {
+            tracking_finished_after_switch = true;
+            clear_target_tracking_loss(previous_loss_coefficients);
+        }
         last_projection = current_projection;
         last_target_projection = current_target_projection;
         time += step_dt;
