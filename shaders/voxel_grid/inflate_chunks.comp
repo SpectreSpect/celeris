@@ -34,49 +34,63 @@ layout(push_constant) uniform InflateChunksPushConstants {
 shared uint shared_target_chunk_id;
 shared ivec3 shared_target_chunk_pos;
 
-bool intersects_inflated_solid(uint target_chunk_id, ivec3 target_chunk_pos, ivec3 target_local_pos)
+uint inflation_flags_from_neighbor(uint target_chunk_id, ivec3 target_chunk_pos, ivec3 target_local_pos, ivec3 offset)
 {
-    if (voxel_vis(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(0)) != 0u) {
-        return true;
+    bool success;
+    VoxelData source_voxel = neighbor_voxel_data(
+        target_chunk_id,
+        target_chunk_pos,
+        target_local_pos,
+        offset,
+        success
+    );
+    if (!success) return 0u;
+
+    uint source_flags = read_voxel_flags(source_voxel.type_flags);
+    if ((source_flags & VOXEL_VISABILITY_FLAG_BIT) == 0u) {
+        return 0u;
     }
 
+    return VOXEL_INFLATED_BIT |
+        (source_flags & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT);
+}
+
+uint intersecting_inflation_flags(uint target_chunk_id, ivec3 target_chunk_pos, ivec3 target_local_pos)
+{
+    uint flags = inflation_flags_from_neighbor(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(0));
+    if ((flags & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) != 0u) return flags;
+
     for (int x = 1; x <= int(u_negative_x_inflation_size); ++x) {
-        if (voxel_vis(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(-x, 0, 0)) != 0u) {
-            return true;
-        }
+        flags |= inflation_flags_from_neighbor(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(-x, 0, 0));
+        if ((flags & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) != 0u) return flags;
     }
 
     for (int x = 1; x <= int(u_positive_x_inflation_size); ++x) {
-        if (voxel_vis(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(x, 0, 0)) != 0u) {
-            return true;
-        }
+        flags |= inflation_flags_from_neighbor(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(x, 0, 0));
+        if ((flags & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) != 0u) return flags;
     }
 
     for (int y = 1; y <= int(u_negative_y_inflation_size); ++y) {
-        if (voxel_vis(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(0, -y, 0)) != 0u) {
-            return true;
-        }
+        flags |= inflation_flags_from_neighbor(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(0, -y, 0));
+        if ((flags & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) != 0u) return flags;
     }
 
     for (int y = 1; y <= int(u_positive_y_inflation_size); ++y) {
-        if (voxel_vis(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(0, y, 0)) != 0u) {
-            return true;
-        }
+        flags |= inflation_flags_from_neighbor(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(0, y, 0));
+        if ((flags & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) != 0u) return flags;
     }
 
     for (int z = 1; z <= int(u_negative_z_inflation_size); ++z) {
-        if (voxel_vis(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(0, 0, -z)) != 0u) {
-            return true;
-        }
+        flags |= inflation_flags_from_neighbor(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(0, 0, -z));
+        if ((flags & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) != 0u) return flags;
     }
 
     for (int z = 1; z <= int(u_positive_z_inflation_size); ++z) {
-        if (voxel_vis(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(0, 0, z)) != 0u) {
-            return true;
-        }
+        flags |= inflation_flags_from_neighbor(target_chunk_id, target_chunk_pos, target_local_pos, ivec3(0, 0, z));
+        if ((flags & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) != 0u) return flags;
     }
 
-    return false;
+    return flags;
 }
 
 void main()
@@ -100,18 +114,23 @@ void main()
 
     uint target_chunk_id = shared_target_chunk_id;
     uint target_global_voxel_id = target_chunk_id * u_voxels_per_chunk + voxel_id;
-    uint inflated_type_flag = VOXEL_INFLATED_BIT << VOXEL_TYPE_BITS;
 
-    uint target_type_flags = voxels[target_global_voxel_id].type_flags & ~inflated_type_flag;
+    uint target_type_flags = voxels[target_global_voxel_id].type_flags;
+    uint target_type = read_voxel_type(target_type_flags);
+    uint target_flags = read_voxel_flags(target_type_flags);
 
     ivec3 target_chunk_pos = shared_target_chunk_pos;
     ivec3 target_local_pos = local_voxel_pos_from_index(voxel_id);
 
-    if (intersects_inflated_solid(target_chunk_id, target_chunk_pos, target_local_pos)) {
-        target_type_flags |= inflated_type_flag;
+    target_flags &= ~VOXEL_INFLATED_BIT;
+    if ((target_flags & VOXEL_VISABILITY_FLAG_BIT) == 0u) {
+        target_flags &= ~VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT;
     }
 
-    voxels[target_global_voxel_id].type_flags = target_type_flags;
+    uint inflation_flags = intersecting_inflation_flags(target_chunk_id, target_chunk_pos, target_local_pos);
+    target_flags |= inflation_flags;
+
+    voxels[target_global_voxel_id].type_flags = pack_voxel_type_flags(target_type, target_flags);
 
     if (voxel_id == 0u) {
         atomicAnd(meta[target_chunk_id].dirty_flags, ~DIRTY_INFLATE_FLAG_BIT);

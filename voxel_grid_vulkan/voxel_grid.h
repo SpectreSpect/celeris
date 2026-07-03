@@ -92,6 +92,7 @@ public:
         uint32_t positive_z_inflation_size = 0u;
         uint32_t display_inflated_voxels = 0u;
         uint32_t inflated_voxel_color = 0xFF3355FFu;
+        uint32_t inflated_curvature_limit_exceeded_voxel_color = 0xFF0707FFu;
     };
 
     struct BuddyAllocatorParams {
@@ -123,6 +124,7 @@ public:
         uint32_t positive_z_inflation_size = 0u;
         uint32_t display_inflated_voxels = 0u;
         uint32_t inflated_voxel_color = 0xFF3355FFu;
+        uint32_t inflated_curvature_limit_exceeded_voxel_color = 0xFF0707FFu;
 
         BuddyAllocatorParams vb_allocator_params;
         BuddyAllocatorParams ib_allocator_params;
@@ -227,6 +229,7 @@ public:
     void set_inflated_voxel_debug_display(
         uint32_t display_inflated_voxels,
         uint32_t inflated_voxel_color,
+        uint32_t inflated_curvature_limit_exceeded_voxel_color,
         uint32_t negative_x_inflation_size,
         uint32_t positive_x_inflation_size,
         uint32_t negative_y_inflation_size,

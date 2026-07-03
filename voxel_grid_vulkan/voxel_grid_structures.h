@@ -34,6 +34,7 @@ static constexpr uint32_t VOXEL_TYPE_MASK = (1u << VOXEL_TYPE_BITS) - 1u;
 static constexpr uint32_t VOXEL_VISABILITY_FLAG_BIT = 1u; // Определяет, видим ли воксель
 static constexpr uint32_t VOXEL_EASY_OVERWRITE_FLAG_BIT = 2u; // Определяет, можно ли заменять воксель как будто бы он "воздух" или "вода" в майне
 static constexpr uint32_t VOXEL_INFLATED_BIT = 4u; // Определяет, пересекает ли воксель раздутые видимые воксели
+static constexpr uint32_t VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT = 8u; // Определяет, превышает ли воксель лимит кривизны
 
 struct alignas(8) VoxelDataGPU {
     uint32_t type_flags;

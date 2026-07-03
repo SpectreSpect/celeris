@@ -110,13 +110,18 @@ bool cached_visible_voxel_loaded(
 bool cached_mark_inflated_if_loaded(
     ivec3 world_voxel,
     ivec3 base_chunk_pos,
-    inout uint cached_chunk_ids[CACHED_CHUNK_COUNT])
+    inout uint cached_chunk_ids[CACHED_CHUNK_COUNT],
+    bool source_curvature_limit_exceeded)
 {
     uint global_voxel_id;
     if (!cached_loaded_voxel_id(world_voxel, base_chunk_pos, cached_chunk_ids, global_voxel_id)) return false;
 
-    uint inflated_type_flag = VOXEL_INFLATED_BIT << VOXEL_TYPE_BITS;
-    uint type_flags = atomicOr(voxels[global_voxel_id].type_flags, inflated_type_flag);
+    uint flags_to_set = VOXEL_INFLATED_BIT;
+    if (source_curvature_limit_exceeded) {
+        flags_to_set |= VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT;
+    }
+
+    uint type_flags = atomicOr(voxels[global_voxel_id].type_flags, flags_to_set << VOXEL_TYPE_BITS);
 
     return (read_voxel_flags(type_flags) & VOXEL_VISABILITY_FLAG_BIT) != 0u;
 }
@@ -159,6 +164,7 @@ void process_inflation_offset(
     ivec3 base_chunk_pos,
     inout uint cached_chunk_ids[CACHED_CHUNK_COUNT],
     ivec3 offset,
+    bool source_curvature_limit_exceeded,
     inout int min_x,
     inout int max_x,
     inout int min_y,
@@ -168,7 +174,12 @@ void process_inflation_offset(
 {
     if (!offset_inside_bounds(offset, min_x, max_x, min_y, max_y, min_z, max_z)) return;
 
-    bool is_visible = cached_mark_inflated_if_loaded(write_voxel + offset, base_chunk_pos, cached_chunk_ids);
+    bool is_visible = cached_mark_inflated_if_loaded(
+        write_voxel + offset,
+        base_chunk_pos,
+        cached_chunk_ids,
+        source_curvature_limit_exceeded
+    );
     if (is_visible) {
         clamp_bounds_to_offset(offset, min_x, max_x, min_y, max_y, min_z, max_z);
     }
@@ -181,6 +192,9 @@ void main()
 
     VoxelWrite voxel_write = voxel_writes[voxel_write_id];
     ivec3 write_voxel = voxel_write.world_voxel.xyz;
+    uint write_flags = read_voxel_flags(voxel_write.voxel_data.type_flags);
+    bool source_curvature_limit_exceeded =
+        (write_flags & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) != 0u;
     ivec3 base_chunk_pos = floor_div(write_voxel, u_chunk_dim.xyz);
     uint cached_chunk_ids[CACHED_CHUNK_COUNT];
     init_cached_chunk_ids(cached_chunk_ids);
@@ -209,6 +223,7 @@ void main()
                 base_chunk_pos,
                 cached_chunk_ids,
                 ivec3(0),
+                source_curvature_limit_exceeded,
                 min_x,
                 max_x,
                 min_y,
@@ -231,6 +246,7 @@ void main()
                     base_chunk_pos,
                     cached_chunk_ids,
                     ivec3(-shell, y, z),
+                    source_curvature_limit_exceeded,
                     min_x,
                     max_x,
                     min_y,
@@ -243,6 +259,7 @@ void main()
                     base_chunk_pos,
                     cached_chunk_ids,
                     ivec3(shell, y, z),
+                    source_curvature_limit_exceeded,
                     min_x,
                     max_x,
                     min_y,
@@ -265,6 +282,7 @@ void main()
                     base_chunk_pos,
                     cached_chunk_ids,
                     ivec3(x, -shell, z),
+                    source_curvature_limit_exceeded,
                     min_x,
                     max_x,
                     min_y,
@@ -277,6 +295,7 @@ void main()
                     base_chunk_pos,
                     cached_chunk_ids,
                     ivec3(x, shell, z),
+                    source_curvature_limit_exceeded,
                     min_x,
                     max_x,
                     min_y,
@@ -299,6 +318,7 @@ void main()
                     base_chunk_pos,
                     cached_chunk_ids,
                     ivec3(x, y, -shell),
+                    source_curvature_limit_exceeded,
                     min_x,
                     max_x,
                     min_y,
@@ -311,6 +331,7 @@ void main()
                     base_chunk_pos,
                     cached_chunk_ids,
                     ivec3(x, y, shell),
+                    source_curvature_limit_exceeded,
                     min_x,
                     max_x,
                     min_y,

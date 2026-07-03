@@ -664,7 +664,9 @@ void VoxelGrid::mesh_emit(VulkanCommandBuffer& command_buffer, VulkanBuffer& dis
         .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
         .u_voxels_per_chunk = static_cast<uint32_t>(vox_per_chunk()),
         .display_inflated_voxels = m_params.display_inflated_voxels,
-        .inflated_voxel_color = m_params.inflated_voxel_color
+        .inflated_voxel_color = m_params.inflated_voxel_color,
+        .inflated_curvature_limit_exceeded_voxel_color =
+            m_params.inflated_curvature_limit_exceeded_voxel_color
     });
 
     m_pass_instances.mesh_emit_pi.bind(command_buffer);
@@ -897,6 +899,8 @@ VoxelGrid::VoxelGridParams VoxelGrid::create_params(const VoxelGridDesc& desc) c
     params.positive_z_inflation_size = desc.positive_z_inflation_size;
     params.display_inflated_voxels = desc.display_inflated_voxels;
     params.inflated_voxel_color = desc.inflated_voxel_color;
+    params.inflated_curvature_limit_exceeded_voxel_color =
+        desc.inflated_curvature_limit_exceeded_voxel_color;
 
     uint64_t raw = (uint64_t)std::ceil((double)desc.chunk_hash_table_size_factor * (double)desc.count_active_chunks);
     uint32_t base = (raw > UINT32_MAX) ? UINT32_MAX : (uint32_t)raw;
@@ -1451,6 +1455,7 @@ void VoxelGrid::set_render_distance(float value) {
 void VoxelGrid::set_inflated_voxel_debug_display(
     uint32_t display_inflated_voxels, 
     uint32_t inflated_voxel_color,
+    uint32_t inflated_curvature_limit_exceeded_voxel_color,
     uint32_t negative_x_inflation_size,
     uint32_t positive_x_inflation_size,
     uint32_t negative_y_inflation_size,
@@ -1478,6 +1483,8 @@ void VoxelGrid::set_inflated_voxel_debug_display(
 
     if (m_params.display_inflated_voxels == display_inflated_voxels &&
         m_params.inflated_voxel_color == inflated_voxel_color &&
+        m_params.inflated_curvature_limit_exceeded_voxel_color ==
+            inflated_curvature_limit_exceeded_voxel_color &&
         m_params.negative_x_inflation_size == negative_x_inflation_size &&
         m_params.positive_x_inflation_size == positive_x_inflation_size &&
         m_params.negative_y_inflation_size == negative_y_inflation_size &&
@@ -1489,6 +1496,8 @@ void VoxelGrid::set_inflated_voxel_debug_display(
 
     m_params.display_inflated_voxels = display_inflated_voxels;
     m_params.inflated_voxel_color = inflated_voxel_color;
+    m_params.inflated_curvature_limit_exceeded_voxel_color =
+        inflated_curvature_limit_exceeded_voxel_color;
     m_params.negative_x_inflation_size = negative_x_inflation_size;
     m_params.positive_x_inflation_size = positive_x_inflation_size;
     m_params.negative_y_inflation_size = negative_y_inflation_size;

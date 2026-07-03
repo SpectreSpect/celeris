@@ -31,6 +31,7 @@ layout(push_constant) uniform MeshEmitPushConstants {
     uint u_voxels_per_chunk;
     uint display_inflated_voxels;
     uint inflated_voxel_color;
+    uint inflated_curvature_limit_exceeded_voxel_color;
 };
 
 // ===== uniforms =====
@@ -218,9 +219,14 @@ void emit_face_if_needed(
     uint face_kind = mesh_face_kind(current_flags, neighbor_flags);
     if (face_kind == MESH_FACE_NONE) return;
 
-    uint color = face_kind == MESH_FACE_INFLATED
-        ? inflated_voxel_color
-        : ordinary_color;
+    bool curvature_limit_exceeded =
+        (current_flags & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) != 0u;
+    uint color = ordinary_color;
+    if (face_kind == MESH_FACE_INFLATED) {
+        color = curvature_limit_exceeded
+            ? inflated_curvature_limit_exceeded_voxel_color
+            : inflated_voxel_color;
+    }
     emit_quad(chunkId, chunkCoord, p, face, color);
 }
 
