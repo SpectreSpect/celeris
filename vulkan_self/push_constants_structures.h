@@ -150,6 +150,7 @@ struct WriteVoxelsToGridPushConstants {
 
     uint32_t u_pack_offset;
     uint32_t u_pack_bits;
+    uint32_t u_mark_recently_inserted;
 };
 
 struct ReadVoxelGridChunkPushConstants {

@@ -35,6 +35,7 @@ static constexpr uint32_t VOXEL_VISABILITY_FLAG_BIT = 1u; // Определяе�
 static constexpr uint32_t VOXEL_EASY_OVERWRITE_FLAG_BIT = 2u; // Определяет, можно ли заменять воксель как будто бы он "воздух" или "вода" в майне
 static constexpr uint32_t VOXEL_INFLATED_BIT = 4u; // Определяет, пересекает ли воксель раздутые видимые воксели
 static constexpr uint32_t VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT = 8u; // Определяет, превышает ли воксель лимит кривизны
+static constexpr uint32_t VOXEL_RECENTLY_INSERTED_BIT = 16u; // Определяет, был ли воксель вставлен в текущем батче записи
 
 struct alignas(8) VoxelDataGPU {
     uint32_t type_flags;
@@ -80,6 +81,10 @@ struct alignas(8) VoxelDataGPU {
 
     inline bool exceeds_curvature_limit() const {
         return ((type_flags >> VOXEL_TYPE_BITS) & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) > 0;
+    }
+
+    inline bool was_recently_inserted() const {
+        return ((type_flags >> VOXEL_TYPE_BITS) & VOXEL_RECENTLY_INSERTED_BIT) > 0;
     }
 };
 

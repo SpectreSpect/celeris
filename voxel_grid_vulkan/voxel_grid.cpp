@@ -2134,13 +2134,22 @@ void VoxelGrid::write_voxels_to_grid(VulkanCommandBuffer& command_buffer, const 
     
     m_pass_instances.write_voxels_to_grid_pi.bind(command_buffer);
 
+    const bool has_inflation =
+        m_params.negative_x_inflation_size != 0u ||
+        m_params.positive_x_inflation_size != 0u ||
+        m_params.negative_y_inflation_size != 0u ||
+        m_params.positive_y_inflation_size != 0u ||
+        m_params.negative_z_inflation_size != 0u ||
+        m_params.positive_z_inflation_size != 0u;
+
     m_pass_instances.write_voxels_to_grid_pi.push_constants(command_buffer, WriteVoxelsToGridPushConstants{
         .u_chunk_dim = glm::ivec4(m_params.chunk_size.x, m_params.chunk_size.y, m_params.chunk_size.z, 0),
         .u_chunk_hash_table_size = m_params.chunk_hash_table_size,
         .u_voxels_per_chunk = static_cast<uint32_t>(vox_per_chunk()),
 
         .u_pack_offset = math_utils::OFFSET,
-        .u_pack_bits = math_utils::BITS
+        .u_pack_bits = math_utils::BITS,
+        .u_mark_recently_inserted = has_inflation ? 1u : 0u
     });
 
     command_buffer.dispatch_indirect(dispatch_args);
