@@ -11,6 +11,7 @@
 #include <functional>
 #include <vector>
 #include <cstdint>
+#include <optional>
 
 #include "../renderer/lines/line_instance.h"
 #include "footprint/footprint.h"
@@ -51,6 +52,9 @@ public:
         int max_y_diff = 2;
         float max_goal_position_error = 0.7f;
         float max_goal_heading_error_radians = 0.3f;
+        float reeds_shepp_reverse_cost_multiplier = 3.0f;
+        float reeds_shepp_gear_switch_penalty = 5.0f;
+        float reeds_shepp_backtrack_penalty = 10.0f;
     };
 
     struct NonholonomicAStarState {
@@ -94,8 +98,15 @@ public:
         bool allow_flying_over_precipices);
     std::vector<NonholonomicPos> reconstruct_path(std::unordered_map<uint64_t, NonholonomicAStarCell> closed_heap, NonholonomicPos pos);
     std::vector<NonholonomicPos> simulate_motion(NonholonomicPos start_pos, int steer, int direction);
-    bool try_reeds_shepp_shot(NonholonomicPos& start, NonholonomicPos& end, std::vector<NonholonomicPos>& out_path);
-    bool try_finish_with_reeds_shepp(NonholonomicPos& from, NonholonomicPos& to);
+    bool try_reeds_shepp_shot(
+        NonholonomicPos& start,
+        NonholonomicPos& end,
+        std::vector<NonholonomicPos>& out_path,
+        std::optional<NonholonomicPos> previous_pos = std::nullopt);
+    bool try_finish_with_reeds_shepp(
+        NonholonomicPos& from,
+        NonholonomicPos& to,
+        std::optional<NonholonomicPos> previous_pos = std::nullopt);
 
     std::vector<glm::ivec3> find_unimpended_points(VulkanSubmitContext& submit_context, const PlainAstarData& astar_path_data);
     std::vector<NonholonomicPos> prepare_unimpended_points(

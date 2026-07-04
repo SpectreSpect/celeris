@@ -701,7 +701,12 @@ void NonholonomicAStar::initialize(
     m_initialize_time.end();
 }
 
-bool NonholonomicAStar::try_reeds_shepp_shot(NonholonomicPos& start, NonholonomicPos& end, std::vector<NonholonomicPos>& out_path) {
+bool NonholonomicAStar::try_reeds_shepp_shot(
+    NonholonomicPos& start,
+    NonholonomicPos& end,
+    std::vector<NonholonomicPos>& out_path,
+    std::optional<NonholonomicPos> previous_pos)
+{
     LOG_METHOD();
 
     const glm::vec3 voxel_size = m_grid->voxel_size();
@@ -710,51 +715,111 @@ bool NonholonomicAStar::try_reeds_shepp_shot(NonholonomicPos& start, Nonholonomi
         line_step_world = m_params.reeds_shepp_step_world;
     }
 
-    std::vector<NonholonomicPathElement> reeds_shepp_path = ReedsShepp::get_optimal_path(
+    std::vector<std::vector<NonholonomicPathElement>> reeds_shepp_paths = ReedsShepp::get_all_paths(
         start,
         end,
         m_params.min_radius
     );
 
-    if (reeds_shepp_path.empty()) {
+    if (reeds_shepp_paths.empty()) {
         return false;
     }
 
-    out_path = ReedsShepp::discretize_path(
-        start,
-        reeds_shepp_path,
-        8,
-        m_params.min_radius,
-        std::nullopt,
-        line_step_world
-    );
+    auto gear_to_dir = [](Gear gear) {
+        return gear == Gear::FORWARD ? 1.0f : -1.0f;
+    };
 
-    if (out_path.empty())
-        return false;
+    auto score_path = [&](const std::vector<NonholonomicPathElement>& path) {
+        float cost = 0.0f;
+        Gear previous_gear = start.dir < 0.0f ? Gear::BACKWARD : Gear::FORWARD;
 
-    Footprint::PathResult footprint_path = m_footprint->evaluate_path(
-        out_path,
-        m_params.max_step_up,
-        m_params.max_drop,
-        m_params.max_y_diff,
-        m_params.allow_flying_over_precipices
-    );
+        for (const NonholonomicPathElement& element : path) {
+            const float segment_length = element.dist * m_params.min_radius;
+            cost += segment_length;
 
-    if (!footprint_path.is_passible)
-        return false;
+            if (element.gear == Gear::BACKWARD) {
+                cost += segment_length * (m_params.reeds_shepp_reverse_cost_multiplier - 1.0f);
+            }
 
-    out_path = std::move(footprint_path.path);
+            if (element.gear != previous_gear) {
+                cost += m_params.reeds_shepp_gear_switch_penalty;
+            }
+            previous_gear = element.gear;
+        }
 
-    insert_y_transition_points(out_path);
-    
-    return true;
+        if (previous_pos.has_value() && !path.empty()) {
+            const glm::vec3 incoming = start.pos - previous_pos->pos;
+            const glm::vec3 first_motion =
+                glm::vec3(std::cos(start.theta), 0.0f, std::sin(start.theta)) *
+                gear_to_dir(path.front().gear);
+
+            const float incoming_len = glm::length(glm::vec2(incoming.x, incoming.z));
+            const float first_motion_len = glm::length(glm::vec2(first_motion.x, first_motion.z));
+            if (incoming_len > 1e-5f && first_motion_len > 1e-5f) {
+                const glm::vec2 incoming_xz(incoming.x, incoming.z);
+                const glm::vec2 first_motion_xz(first_motion.x, first_motion.z);
+                const float alignment =
+                    glm::dot(incoming_xz / incoming_len, first_motion_xz / first_motion_len);
+
+                if (alignment < -0.5f) {
+                    cost += m_params.reeds_shepp_backtrack_penalty;
+                }
+            }
+        }
+
+        return cost;
+    };
+
+    std::sort(
+        reeds_shepp_paths.begin(),
+        reeds_shepp_paths.end(),
+        [&](const auto& lhs, const auto& rhs) {
+            return score_path(lhs) < score_path(rhs);
+        });
+
+    for (const std::vector<NonholonomicPathElement>& reeds_shepp_path : reeds_shepp_paths) {
+        std::vector<NonholonomicPos> candidate_path = ReedsShepp::discretize_path(
+            start,
+            reeds_shepp_path,
+            8,
+            m_params.min_radius,
+            std::nullopt,
+            line_step_world
+        );
+
+        if (candidate_path.empty()) {
+            continue;
+        }
+
+        Footprint::PathResult footprint_path = m_footprint->evaluate_path(
+            candidate_path,
+            m_params.max_step_up,
+            m_params.max_drop,
+            m_params.max_y_diff,
+            m_params.allow_flying_over_precipices
+        );
+
+        if (!footprint_path.is_passible) {
+            continue;
+        }
+
+        out_path = std::move(footprint_path.path);
+        insert_y_transition_points(out_path);
+        return true;
+    }
+
+    return false;
 }
 
-bool NonholonomicAStar::try_finish_with_reeds_shepp(NonholonomicPos& from, NonholonomicPos& to) {
+bool NonholonomicAStar::try_finish_with_reeds_shepp(
+    NonholonomicPos& from,
+    NonholonomicPos& to,
+    std::optional<NonholonomicPos> previous_pos)
+{
     LOG_METHOD();
 
     std::vector<NonholonomicPos> reeds_shepp_path;
-    if (try_reeds_shepp_shot(from, to, reeds_shepp_path)) {
+    if (try_reeds_shepp_shot(from, to, reeds_shepp_path, previous_pos)) {
         m_state.path = reconstruct_path(m_state.closed_heap, from);
         auto insert_begin = reeds_shepp_path.begin();
         if (!m_state.path.empty() && insert_begin != reeds_shepp_path.end()) {
@@ -816,7 +881,12 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
             return true;
         }
 
-        bool status = try_finish_with_reeds_shepp(cur_cell.pos, m_state.end_pos);
+        std::optional<NonholonomicPos> previous_pos = std::nullopt;
+        if (!cur_cell.no_parent) {
+            previous_pos = cur_cell.came_from;
+        }
+
+        bool status = try_finish_with_reeds_shepp(cur_cell.pos, m_state.end_pos, previous_pos);
         
         // if (status)
         //     logger().log("3. Almost equal = true (with reeds-shepp fallback)");
@@ -827,7 +897,12 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
     if (m_params.use_reed_shepps_fallback || m_params.force_reeds_shepp_shot)
         if (m_state.counter % m_params.try_reeds_shepp_interval == 0 || m_params.force_reeds_shepp_shot) {
             m_params.force_reeds_shepp_shot = false;
-            bool status = try_finish_with_reeds_shepp(cur_cell.pos, m_state.end_pos);
+            std::optional<NonholonomicPos> previous_pos = std::nullopt;
+            if (!cur_cell.no_parent) {
+                previous_pos = cur_cell.came_from;
+            }
+
+            bool status = try_finish_with_reeds_shepp(cur_cell.pos, m_state.end_pos, previous_pos);
             if (status) {
                 // logger().log("4. Reeds-shepp shot succeeded");
                 return true;
