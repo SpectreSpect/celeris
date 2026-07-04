@@ -27,6 +27,7 @@ public:
 
     VkDevice handle() const noexcept;
     void wait_idle();
+    bool supports_shader_float64() const noexcept;
 
     const VulkanQueue& graphics_queue(uint32_t index = 0) const;
     VulkanQueue& graphics_queue(uint32_t index = 0);
@@ -44,6 +45,7 @@ public:
 
 private:
     VkDevice m_device = VK_NULL_HANDLE;
+    bool m_supports_shader_float64 = false;
 
     std::vector<std::unique_ptr<VulkanQueue>> m_graphics_queues;
     std::vector<std::unique_ptr<VulkanQueue>> m_present_queues; 
