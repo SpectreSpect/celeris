@@ -285,6 +285,8 @@ std::vector<NonholonomicPos> NonholonomicAStar::simulate_motion(NonholonomicPos 
         NonholonomicPos s = start;
         s.pos = p;
         s.theta = yaw;
+        s.steer = steer;
+        s.dir = direction;
         out.push_back(s);
     }
 
@@ -885,13 +887,15 @@ bool NonholonomicAStar::find_nonholomic_path_step() {
             new_cell.pos.dir = dir;
             new_cell.came_from = cur_cell.pos;
             new_cell.simulated_motion = motion;
-            for (NonholonomicPos& motion_pos : new_cell.simulated_motion) {
-                motion_pos.steer = steer;
-                motion_pos.dir = dir;
-            }
-            if (!new_cell.simulated_motion.empty()) {
-                new_cell.simulated_motion.back() = new_pos;
-            }
+            
+            // for (NonholonomicPos& motion_pos : new_cell.simulated_motion) {
+            //     motion_pos.steer = steer;
+            //     motion_pos.dir = dir;
+            // }
+
+            // if (!new_cell.simulated_motion.empty()) {
+            //     new_cell.simulated_motion.back() = new_pos;
+            // }
 
             new_cell.no_parent = false;
             new_cell.g = new_g;
