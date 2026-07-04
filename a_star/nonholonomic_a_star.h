@@ -55,6 +55,7 @@ public:
         float reeds_shepp_reverse_cost_multiplier = 3.0f;
         float reeds_shepp_gear_switch_penalty = 5.0f;
         float reeds_shepp_backtrack_penalty = 10.0f;
+        float unimpended_waypoint_reached_radius = 2.0f;
     };
 
     struct NonholonomicAStarState {

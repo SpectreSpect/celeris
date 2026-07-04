@@ -466,7 +466,8 @@ float NonholonomicAStar::get_nonholonomic_f(NonholonomicPos& new_pos, Nonholonom
     else
         dist_to_unimpended_pos = math_utils::horizontal_distance(new_pos.pos, m_state.unimpended_astar_positions[new_pos.dubins_segment_id].pos);
     
-    if (new_pos.dubins_segment_id < last_target_id && dist_to_unimpended_pos <= 1.0f) {
+    if (new_pos.dubins_segment_id < last_target_id &&
+        dist_to_unimpended_pos <= m_params.unimpended_waypoint_reached_radius) {
         new_pos.dubins_segment_id += 1;
     }
 
