@@ -117,14 +117,14 @@ bool VulkanPhysicalDevice::find_queue_families(
 
         const uint32_t available_count = queue_families[family_index].queueCount;
 
-        if (requested_count > available_count) {
+        if (available_count == 0) {
             return false;
         }
 
         for (uint32_t queue_index = 0;
              queue_index < requested_count;
              ++queue_index) {
-            output.emplace_back(family_index, queue_index);
+            output.emplace_back(family_index, queue_index % available_count);
         }
 
         return true;

@@ -11,12 +11,17 @@
 
 #include "collect_handles_helper.h"
 
-VulkanQueue::VulkanQueue(const VulkanDevice& device, QueueLocation location, VulkanQueueType type)
-    : m_location(location), m_type(type)
+VulkanQueue::VulkanQueue(
+    const VulkanDevice& device,
+    QueueLocation location,
+    VulkanQueueType type,
+    std::shared_ptr<std::mutex> mutex)
+    : m_location(location), m_type(type), m_mutex(std::move(mutex))
 {
     LOG_METHOD();
 
     logger().check(device.handle() != VK_NULL_HANDLE, "Device has not been initialized");
+    logger().check(m_mutex != nullptr, "Queue mutex is not initialized");
 
     vkGetDeviceQueue(device.handle(), location.family_index, location.queue_index, &m_queue);
 }
@@ -24,13 +29,15 @@ VulkanQueue::VulkanQueue(const VulkanDevice& device, QueueLocation location, Vul
 VulkanQueue::VulkanQueue(VulkanQueue&& other) noexcept
     :   m_queue(std::exchange(other.m_queue, VK_NULL_HANDLE)) ,
         m_location(std::exchange(other.m_location, QueueLocation{})),
-        m_type(std::exchange(other.m_type, VulkanQueueType::Graphics)) {}
+        m_type(std::exchange(other.m_type, VulkanQueueType::Graphics)),
+        m_mutex(std::move(other.m_mutex)) {}
 
 VulkanQueue& VulkanQueue::operator=(VulkanQueue&& other) noexcept {
     if (this != &other) {
         m_queue = std::exchange(other.m_queue, VK_NULL_HANDLE);
         m_location = std::exchange(other.m_location, QueueLocation{});
         m_type = std::exchange(other.m_type, VulkanQueueType::Graphics);
+        m_mutex = std::move(other.m_mutex);
     }
 
     return *this;
@@ -105,7 +112,7 @@ void VulkanQueue::submit(
 
     VkResult submit_result = VK_SUCCESS;
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
+        std::lock_guard<std::mutex> lock(*m_mutex);
         submit_result = vkQueueSubmit(
             m_queue,
             1,
@@ -181,7 +188,7 @@ VkResult VulkanQueue::present(
 
     VkResult present_result = VK_SUCCESS;
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
+        std::lock_guard<std::mutex> lock(*m_mutex);
         present_result = vkQueuePresentKHR(m_queue, &present_info);
     }
 

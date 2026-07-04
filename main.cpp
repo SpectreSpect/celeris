@@ -90,9 +90,9 @@ int main() {
     window.set_icon(path_utils::executable_dir() / "assets" / "icon" / "celeris_icon.png");
 
     QueueRequest queue_request;
-    queue_request.graphics_count = 1;
+    queue_request.graphics_count = 2;
     queue_request.present_count = 1;
-    queue_request.compute_count = 1;
+    queue_request.compute_count = 2;
 
     auto vehicle_config_path = []() {
         const std::filesystem::path relative_path =

@@ -318,8 +318,6 @@ struct VoxelizeTrianglesPushConstants {
     glm::mat4 u_transform;
 
     uint32_t u_counter_hash_table_size;
-    uint32_t u_count_voxels_in_chunk;
-
     uint32_t u_vertex_stride_bytes;
     uint32_t u_vertex_position_offset_bytes;
 
@@ -330,6 +328,8 @@ struct VoxelizeTrianglesPushConstants {
     uint32_t voxel_color;
     uint32_t voxel_set_flags;
 };
+
+static_assert(sizeof(VoxelizeTrianglesPushConstants) <= 128);
 
 struct GenerateMeshPushConstants {
     uint32_t count_triangles_in_lidar_ring;

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <algorithm>
 #include <unordered_map>
+#include <map>
 
 VulkanDevice::VulkanDevice(const VulkanPhysicalDevice& physical_device) {
     LOG_METHOD();
@@ -206,6 +207,19 @@ void VulkanDevice::load_device_functions() {
 void VulkanDevice::retrieve_queues(const QueueAllocation& queue_allocation) {
     LOG_METHOD();
 
+    std::map<std::pair<uint32_t, uint32_t>, std::shared_ptr<std::mutex>> mutexes_by_location;
+
+    auto mutex_for_location = [&mutexes_by_location](QueueLocation location) {
+        auto key = std::make_pair(location.family_index, location.queue_index);
+        auto [it, inserted] = mutexes_by_location.try_emplace(key);
+
+        if (inserted) {
+            it->second = std::make_shared<std::mutex>();
+        }
+
+        return it->second;
+    };
+
     auto retrieve_queue = [&](
         std::vector<std::unique_ptr<VulkanQueue>>& queues,
         const std::vector<QueueLocation>& locations,
@@ -215,7 +229,12 @@ void VulkanDevice::retrieve_queues(const QueueAllocation& queue_allocation) {
         queues.reserve(locations.size());
 
         for (const QueueLocation& location : locations) {
-            queues.push_back(std::make_unique<VulkanQueue>(*this, location, type));
+            queues.push_back(std::make_unique<VulkanQueue>(
+                *this,
+                location,
+                type,
+                mutex_for_location(location)
+            ));
         }
     };
 
