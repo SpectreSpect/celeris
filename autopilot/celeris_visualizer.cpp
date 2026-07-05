@@ -246,7 +246,7 @@ void CelerisVisualizer::update() {
         show_local_candidates
             ? make_local_candidate_lines(
                 m_celeris->local_planner_candidates(),
-                m_celeris->vehicle_position().pos.y
+                m_celeris->lidar_transform().position.y
             )
             : hidden_lines
     );

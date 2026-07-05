@@ -459,7 +459,10 @@ int main() {
     float car_speed = celeris.car_speed();
 
     auto start_path_planning = [&]() {
+        const bool already_has_path = celeris.has_planned_path();
         has_planned_path = celeris.request_path_replan();
+        if (has_planned_path || already_has_path)
+            celeris.reset_local_planner_tracking();
     };
 
     auto make_pose_from_camera = [&](NonholonomicPos& out_pose) {

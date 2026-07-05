@@ -116,6 +116,7 @@ public:
     Footprint& footprint() noexcept;
 
     bool request_path_replan();
+    void reset_local_planner_tracking();
     bool adjust_to_ground(
         glm::vec3& output,
         int max_step_up = 500,

@@ -128,6 +128,11 @@ uint64_t LocalPlanner::path_generation() const noexcept {
     return m_path_generation;
 }
 
+void LocalPlanner::reset_tracking()
+{
+    reset_tracking_state();
+}
+
 void LocalPlanner::reset_tracking_state()
 {
     m_path_progress_s = 0.0f;

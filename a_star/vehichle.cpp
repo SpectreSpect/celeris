@@ -1007,14 +1007,6 @@ float Vehicle::compute_simulation_loss(
 
     logger().check(total_polyline_length > Utils::eps, "path length must be greater than zero");
 
-    const auto clear_target_tracking_loss =
-        [](SimulationLossCoefficients& coefficients) {
-            coefficients.position = 0.0f;
-            coefficients.heading = 0.0f;
-            coefficients.progress = 0.0f;
-            coefficients.steering = 0.0f;
-        };
-
     const glm::vec2 start_position = state.m_position;
     float trajectory_length = 0.0f;
     glm::vec2 previous_trajectory_position = state.m_position;
@@ -1056,7 +1048,7 @@ float Vehicle::compute_simulation_loss(
     );
 
     float loss = 0.0f;
-    bool tracking_finished_after_switch = false;
+    SimulationLossBreakdown loss_breakdown;
     PointProjection last_projection = previous_projection;
     PointProjection last_target_projection = previous_target_projection;
     for (float time = 0.0f; time < simulation_time;) {
@@ -1111,24 +1103,37 @@ float Vehicle::compute_simulation_loss(
             speed_acceleration,
             steer_acceleration
         );
-        if (tracking_finished_after_switch) {
-            clear_target_tracking_loss(current_loss_coefficients);
-        }
 
-        loss += 0.5f * (
-            previous_loss_coefficients.total() +
-            current_loss_coefficients.total()
-        ) * step_dt;
+        const float loss_integration_scale = 0.5f * step_dt;
+        loss_breakdown.position +=
+            (previous_loss_coefficients.position + current_loss_coefficients.position) *
+            loss_integration_scale;
+        loss_breakdown.heading +=
+            (previous_loss_coefficients.heading + current_loss_coefficients.heading) *
+            loss_integration_scale;
+        loss_breakdown.speed +=
+            (previous_loss_coefficients.speed + current_loss_coefficients.speed) *
+            loss_integration_scale;
+        loss_breakdown.progress +=
+            (previous_loss_coefficients.progress + current_loss_coefficients.progress) *
+            loss_integration_scale;
+        loss_breakdown.steering +=
+            (previous_loss_coefficients.steering + current_loss_coefficients.steering) *
+            loss_integration_scale;
+        loss_breakdown.control +=
+            (previous_loss_coefficients.control + current_loss_coefficients.control) *
+            loss_integration_scale;
+        loss = loss_breakdown.total();
 
         previous_projection = current_projection;
         previous_loss_coefficients = current_loss_coefficients;
-        if (reaches_next_switch) {
-            tracking_finished_after_switch = true;
-            clear_target_tracking_loss(previous_loss_coefficients);
-        }
         last_projection = current_projection;
         last_target_projection = current_target_projection;
         time += step_dt;
+
+        if (reaches_next_switch) {
+            break;
+        }
     }
 
     if (candidate_debug) {
@@ -1140,6 +1145,7 @@ float Vehicle::compute_simulation_loss(
         candidate_debug->target_end_dist = glm::length(state.m_position - last_target_projection.point);
         candidate_debug->reference_initial_path_speed = reference_initial_path_speed;
         candidate_debug->trajectory_length = trajectory_length;
+        candidate_debug->loss_breakdown = loss_breakdown;
         candidate_debug->start_position = start_position;
         candidate_debug->end_position = state.m_position;
         candidate_debug->target_end_point = last_target_projection.point;

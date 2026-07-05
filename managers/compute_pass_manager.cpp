@@ -43,8 +43,6 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
         stream_select_chunks_cp(create_stream_select_chunks_compute_pass(device, shader_manager.stream_select_chunks_cs)),
         insert_elements_to_voxel_write_list_cp(create_insert_elements_to_voxel_write_list_compute_pass(device, shader_manager.insert_elements_to_voxel_write_list_cs)),
         add_voxel_write_list_counters_together_cp(create_add_voxel_write_list_counters_together_compute_pass(device, shader_manager.add_voxel_write_list_counters_together_cs)),
-        build_unique_voxel_write_table_cp(create_build_unique_voxel_write_table_compute_pass(device, shader_manager.build_unique_voxel_write_table_cs)),
-        compact_unique_voxel_write_table_cp(create_compact_unique_voxel_write_table_compute_pass(device, shader_manager.compact_unique_voxel_write_table_cs)),
         mark_write_chunks_to_generate_cp(create_mark_write_chunks_to_generate_compute_pass(device, shader_manager.mark_write_chunks_to_generate_cs)),
         stream_generate_terrain_cp(create_stream_generate_terrain_compute_pass(device, shader_manager.stream_generate_terrain_cs)),
         write_voxels_to_grid_cp(create_write_voxels_to_grid_compute_pass(device, shader_manager.write_voxels_to_grid_cs)),
@@ -548,37 +546,6 @@ ComputePass ComputePassManager::create_add_voxel_write_list_counters_together_co
 
     builder.add_storage_buffer(0, ShaderStages::compute); // VoxelsWriteDataSrc
     builder.add_storage_buffer(1, ShaderStages::compute); // VoxelsWriteDataDsc
-
-    return create_pass(device, compute_shader_module, builder);
-}
-
-ComputePass ComputePassManager::create_build_unique_voxel_write_table_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
-    LOG_METHOD();
-
-    ComputePassBuilder builder;
-
-    builder.set_descriptor_set_flags(VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
-
-    builder.add_storage_buffer(0, ShaderStages::compute); // VoxelWriteListSrc
-    builder.add_storage_buffer(1, ShaderStages::compute); // VoxelWriteUniqueTable
-
-    builder.add_push_constantsf(sizeof(UniquifyVoxelWriteListPushConstants), ShaderStages::compute);
-
-    return create_pass(device, compute_shader_module, builder);
-}
-
-ComputePass ComputePassManager::create_compact_unique_voxel_write_table_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module) {
-    LOG_METHOD();
-
-    ComputePassBuilder builder;
-
-    builder.set_descriptor_set_flags(VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
-
-    builder.add_storage_buffer(0, ShaderStages::compute); // VoxelWriteListSrc
-    builder.add_storage_buffer(1, ShaderStages::compute); // VoxelWriteUniqueTable
-    builder.add_storage_buffer(2, ShaderStages::compute); // VoxelWriteListDst
-
-    builder.add_push_constantsf(sizeof(UniquifyVoxelWriteListPushConstants), ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }

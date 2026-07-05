@@ -40,6 +40,7 @@ public:
     void update_timestamp();
     float calculate_delta_time();
     void predict_vehicle_state(Vehicle& vehicle);
+    void reset_tracking();
 
     void set_astar_path(const std::vector<NonholonomicPos>& astar_path);
     void set_astar_path(const std::vector<NonholonomicPos>& astar_path, uint64_t generation);

@@ -80,6 +80,19 @@ public:
         float steer_acceleration = 0.0f;
     };
 
+    struct SimulationLossBreakdown {
+        float position = 0.0f;
+        float heading = 0.0f;
+        float speed = 0.0f;
+        float progress = 0.0f;
+        float steering = 0.0f;
+        float control = 0.0f;
+
+        float total() const noexcept {
+            return position + heading + speed + progress + steering + control;
+        }
+    };
+
     struct SimulationControlCandidateDebug {
         float start_s = 0.0f;
         float end_s = 0.0f;
@@ -89,6 +102,7 @@ public:
         float target_end_dist = 0.0f;
         float reference_initial_path_speed = 0.0f;
         float trajectory_length = 0.0f;
+        SimulationLossBreakdown loss_breakdown;
         glm::vec2 start_position = glm::vec2{0.0f};
         glm::vec2 end_position = glm::vec2{0.0f};
         glm::vec2 target_end_point = glm::vec2{0.0f};

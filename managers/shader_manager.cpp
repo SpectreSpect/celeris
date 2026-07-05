@@ -54,8 +54,6 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         stream_select_chunks_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "stream_select_chunks.comp.spv"),
         insert_elements_to_voxel_write_list_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "insert_elements_to_voxel_write_list.comp.spv"),
         add_voxel_write_list_counters_together_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "add_voxel_write_list_counters_together.comp.spv"),
-        build_unique_voxel_write_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "build_unique_voxel_write_table.comp.spv"),
-        compact_unique_voxel_write_table_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "compact_unique_voxel_write_table.comp.spv"),
         mark_write_chunks_to_generate_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "mark_write_chunks_to_generate.comp.spv"),
         stream_generate_terrain_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "stream_generate_terrain.comp.spv"),
         write_voxels_to_grid_cs(device, path_utils::executable_dir() / "shaders" / "voxel_grid" / "write_voxels_to_grid.comp.spv"),

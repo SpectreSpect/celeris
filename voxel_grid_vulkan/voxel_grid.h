@@ -268,8 +268,6 @@ public:
         PassInstance stream_select_chunks_pi;
         PassWriter insert_elements_to_voxel_write_list_pw;
         PassWriter add_voxel_write_list_counters_together_pw;
-        PassWriter build_unique_voxel_write_table_pw;
-        PassWriter compact_unique_voxel_write_table_pw;
         PassInstance mark_write_chunks_to_generate_pi;
         PassInstance stream_generate_terrain_pi;
         PassInstance write_voxels_to_grid_pi;

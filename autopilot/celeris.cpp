@@ -796,6 +796,19 @@ bool Celeris::request_path_replan() {
     return true;
 }
 
+void Celeris::reset_local_planner_tracking() {
+    std::vector<NonholonomicPos> current_path;
+    {
+        std::lock_guard<std::mutex> lock(m_path_mutex);
+        current_path = nonholonomic_astar_path;
+    }
+
+    if (!current_path.empty())
+        m_local_planner.set_astar_path(current_path);
+
+    m_local_planner.reset_tracking();
+}
+
 bool Celeris::adjust_to_ground(
     glm::vec3& output,
     int max_step_up,
@@ -968,6 +981,39 @@ void Celeris::display_path_planner_debug_controls() {
         static_cast<unsigned long long>(m_local_planner.path_generation())
     );
     if (!candidates.empty()) {
+        auto display_candidate_loss_breakdown =
+            [](const Vehicle::SimulationLossBreakdown& breakdown) {
+                ImGui::Text(
+                    "    loss parts: pos=%+.2f head=%+.2f speed=%+.2f prog=%+.2f steer=%+.2f ctrl=%+.2f sum=%+.2f",
+                    breakdown.position,
+                    breakdown.heading,
+                    breakdown.speed,
+                    breakdown.progress,
+                    breakdown.steering,
+                    breakdown.control,
+                    breakdown.total()
+                );
+            };
+
+        auto display_candidate_summary =
+            [&](size_t i, const Vehicle::SimulationControlCandidate& candidate) {
+                const Vehicle::SimulationControlCandidateDebug& candidate_debug = candidate.debug;
+                ImGui::Text(
+                    "#%zu loss=%.2f acc=%.2f steer_acc=%.2f len=%.2f s=%.2f->%.2f target=%.2f err=%.2f v=%.2f",
+                    i,
+                    candidate.loss,
+                    candidate.control_command.speed_acceleration,
+                    candidate.control_command.steer_acceleration,
+                    candidate_debug.trajectory_length,
+                    candidate_debug.start_s,
+                    candidate_debug.end_s,
+                    candidate_debug.target_end_s,
+                    candidate_debug.target_end_dist,
+                    candidate.predicted_state.m_speed
+                );
+                display_candidate_loss_breakdown(candidate_debug.loss_breakdown);
+            };
+
         const Vehicle::SimulationControlCandidate& best = candidates.front();
         const Vehicle::SimulationControlCandidateDebug& debug = best.debug;
         ImGui::Text("Best loss: %.3f", best.loss);
@@ -990,24 +1036,19 @@ void Celeris::display_path_planner_debug_controls() {
         ImGui::Text("Best predicted speed: %.3f", best.predicted_state.m_speed);
         ImGui::Text("Best predicted steering: %.3f", best.predicted_state.m_steering_angle);
         ImGui::Text("Best predicted steering velocity: %.3f", best.predicted_state.m_steering_angle_velocity);
+        display_candidate_loss_breakdown(debug.loss_breakdown);
 
         if (ImGui::TreeNode("Top local candidates")) {
             const size_t display_count = std::min<size_t>(candidates.size(), 8);
             for (size_t i = 0; i < display_count; i++) {
-                const Vehicle::SimulationControlCandidate& candidate = candidates[i];
-                const Vehicle::SimulationControlCandidateDebug& candidate_debug = candidate.debug;
-                ImGui::Text(
-                    "#%zu loss=%.2f acc=%.2f steer_acc=%.2f len=%.2f s=%.2f->%.2f target=%.2f err=%.2f",
-                    i,
-                    candidate.loss,
-                    candidate.control_command.speed_acceleration,
-                    candidate.control_command.steer_acceleration,
-                    candidate_debug.trajectory_length,
-                    candidate_debug.start_s,
-                    candidate_debug.end_s,
-                    candidate_debug.target_end_s,
-                    candidate_debug.target_end_dist
-                );
+                display_candidate_summary(i, candidates[i]);
+            }
+            ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNode("All local candidates")) {
+            for (size_t i = 0; i < candidates.size(); i++) {
+                display_candidate_summary(i, candidates[i]);
             }
             ImGui::TreePop();
         }
