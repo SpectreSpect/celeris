@@ -2,12 +2,14 @@
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <imgui.h>
 #include <iostream>
 #include <limits>
 #include <utility>
 
 #include <glm/gtc/constants.hpp>
+#include "../path_utils.h"
 #include "../vulkan_self/vulkan_device.h"
 #include "../vulkan_self/vulkan_queue.h"
 #include "../vulkan_self/vulkan_submit_context.h"
@@ -34,6 +36,21 @@ namespace {
             position_from_left_rear_bottom.y - vehicle_geometry.size.y / 2.0f,
             position_from_left_rear_bottom.x - vehicle_geometry.size.x / 2.0f
         );
+    }
+
+    std::filesystem::path resolve_celeris_file_path(const std::filesystem::path& path) {
+        if (path.is_absolute()) {
+            return path;
+        }
+
+#ifdef CELERIS_SOURCE_DIR
+        const std::filesystem::path source_root = CELERIS_SOURCE_DIR;
+        if (std::filesystem::exists(source_root)) {
+            return source_root / path;
+        }
+#endif
+
+        return path_utils::executable_dir() / path;
     }
 }
 
@@ -108,7 +125,7 @@ void Celeris::start_lidar_receiver() {
 }
 
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
-    // start_lidar_receiver();
+    start_lidar_receiver();
     // m_command_sender.start();
     // m_path_planner.start(std::move(planner_submit_context));
 }
@@ -298,6 +315,10 @@ VoxelMapPointReseter& Celeris::voxel_map_reseter() {
 
 Footprint& Celeris::footprint() noexcept {
     return m_path_planner.footprint();
+}
+
+VoxelGrid* Celeris::voxel_grid() noexcept {
+    return m_voxel_grid;
 }
 
 uint32_t Celeris::received_scan_count() const noexcept {
@@ -639,6 +660,41 @@ glm::vec3 Celeris::voxel_size() {
 
 glm::vec3 Celeris::voxel_center_world_pos(const glm::ivec3& voxel_pos) {
     return m_path_planner.request_voxel_center_world_pos(voxel_pos);
+}
+
+void Celeris::sync_point_map_and_voxel_grid() {
+    m_voxel_grid->voxelize_point_cloud(
+            *m_engine,
+            m_voxel_point_map.map_point_buffer,
+            m_voxel_point_map.map_normal_buffer,
+            m_voxel_point_map.map_point_count(),
+            voxel_write_list,
+            m_desc.max_write_count
+        );
+    // m_voxel_grid->voxelize_point_map(
+    //     m_voxel_point_map,
+    //     voxel_write_list,
+    //     m_engine->compute_command_pool(),
+    //     m_engine->compute_queue()
+    // );
+}
+
+void Celeris::save_map(const std::filesystem::path& path) {
+    std::filesystem::path resolved_path = resolve_celeris_file_path(path);
+    resolved_path.replace_extension(".vpm");
+
+    const std::filesystem::path parent_path = resolved_path.parent_path();
+
+    if (!parent_path.empty()) {
+        std::filesystem::create_directories(parent_path);
+    }
+
+    m_voxel_point_map.save(resolved_path);
+}
+
+void Celeris::load_map(const std::filesystem::path& path) {
+    m_voxel_point_map.load(resolve_celeris_file_path(path));
+    sync_point_map_and_voxel_grid();
 }
 
 bool Celeris::is_path_impended(VulkanSubmitContext& submit_context) {

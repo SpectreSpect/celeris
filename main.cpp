@@ -78,10 +78,13 @@
 #include "vulkan_self/vulkan_submit_context.h"
 
 #include <algorithm>
+#include <exception>
+#include <filesystem>
 #include <fstream>
 #include <cmath>
 #include <vector>
 #include <random>
+#include <string>
 
 VkClearValue clear_color = {0.05f, 0.05f, 0.05f, 1.0f};
 
@@ -94,6 +97,8 @@ int main() {
     queue_request.graphics_count = 2;
     queue_request.present_count = 1;
     queue_request.compute_count = 2;
+
+    const std::filesystem::path saved_maps_directory = std::filesystem::path("saved_maps");
 
     auto vehicle_config_path = []() {
         const std::filesystem::path relative_path =
@@ -435,6 +440,7 @@ int main() {
     );
     celeris.set_start(NonholonomicPos{.pos = glm::vec3(0.0f, 1.5f, 0.0f)});
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
+    celeris.load_map(saved_maps_directory / "robocross_map.vpm");
     celeris.start(std::move(planner_submit_context));
 
     CelerisVisualizer celeris_visualizer(
@@ -455,17 +461,17 @@ int main() {
     source_scan.point_cloud().transform.position += glm::vec3(-2, 2, -2);
 
 
-    celeris.voxel_map_point_inserter().insert(
-        celeris.voxel_point_map(),
-        target_scan.point_cloud(),
-        target_scan.normal_buffer()
-    );
+    // celeris.voxel_map_point_inserter().insert(
+    //     celeris.voxel_point_map(),
+    //     target_scan.point_cloud(),
+    //     target_scan.normal_buffer()
+    // );
 
-    celeris.voxel_map_point_inserter().insert(
-        celeris.voxel_point_map(),
-        source_scan.point_cloud(),
-        source_scan.normal_buffer()
-    );
+    // celeris.voxel_map_point_inserter().insert(
+    //     celeris.voxel_point_map(),
+    //     source_scan.point_cloud(),
+    //     source_scan.normal_buffer()
+    // );
 
     // std::vector<PointInstance> point_map_points(
     //     celeris.voxel_point_map().map_point_count()
@@ -488,7 +494,11 @@ int main() {
     // );
 
 
-    celeris.voxel_point_map().load("/home/spectre/Projects/celeris/saved_maps/map.cel");
+    char map_save_file_name[128] = "map";
+    std::string map_save_status;
+    bool map_save_failed = false;
+
+    
 
     // std::ofstream saved_file("/home/spectre/Projects/celeris/saved_maps/map.cel");
 
@@ -1052,6 +1062,39 @@ int main() {
                             static_cast<uint32_t>(negative_z_inflation_size),
                             static_cast<uint32_t>(positive_z_inflation_size)
                         );
+                    }
+                }
+
+                if (ImGui::CollapsingHeader("Voxel point map")) {
+                    ImGui::InputText("Save file", map_save_file_name, sizeof(map_save_file_name));
+
+                    if (ImGui::Button("Save map")) {
+                        std::filesystem::path save_file_name =
+                            std::filesystem::path(map_save_file_name).filename();
+
+                        if (save_file_name.empty()) {
+                            map_save_failed = true;
+                            map_save_status = "File name is empty";
+                        } else {
+                            save_file_name.replace_extension(".vpm");
+                            const std::filesystem::path save_path = saved_maps_directory / save_file_name;
+
+                            try {
+                                celeris.save_map(save_path);
+                                map_save_failed = false;
+                                map_save_status = "Saved " + save_path.string();
+                            } catch (const std::exception& error) {
+                                map_save_failed = true;
+                                map_save_status = error.what();
+                            }
+                        }
+                    }
+
+                    if (!map_save_status.empty()) {
+                        const ImVec4 color = map_save_failed
+                            ? ImVec4(1.0f, 0.25f, 0.25f, 1.0f)
+                            : ImVec4(0.35f, 1.0f, 0.45f, 1.0f);
+                        ImGui::TextColored(color, "%s", map_save_status.c_str());
                     }
                 }
 

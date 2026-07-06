@@ -23,6 +23,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <filesystem>
 #include <span>
 
 
@@ -89,6 +90,7 @@ public:
     VoxelMapPointInserter& voxel_map_point_inserter();
     VoxelMapPointReseter& voxel_map_reseter();
     Footprint& footprint() noexcept;
+    VoxelGrid* voxel_grid() noexcept;
 
     void request_path_replan();
     bool adjust_to_ground(
@@ -118,6 +120,9 @@ public:
     void display_path_planner_debug_controls() const;
     glm::vec3 voxel_size();
     glm::vec3 voxel_center_world_pos(const glm::ivec3& voxel_pos);
+    void sync_point_map_and_voxel_grid();
+    void save_map(const std::filesystem::path& path);
+    void load_map(const std::filesystem::path& path);
 
 private:
     VulkanEngine* m_engine = nullptr;
