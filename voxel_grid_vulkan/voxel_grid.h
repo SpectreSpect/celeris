@@ -220,8 +220,16 @@ public:
     glm::vec3 voxel_size() noexcept;
     void voxelize_point_cloud(VulkanCommandBuffer& command_buffer, VulkanEngine& engine, 
                               PointCloud& point_cloud, VulkanBuffer& normal_buffer, VulkanBuffer& voxel_writes, uint32_t max_write_count);
+    void voxelize_point_cloud(VulkanCommandBuffer& command_buffer, VulkanEngine& engine,
+                              const VulkanBuffer& point_buffer, const VulkanBuffer& normal_buffer,
+                              uint32_t point_count, VulkanBuffer& voxel_writes, uint32_t max_write_count,
+                              const glm::mat4& source_point_cloud_model = glm::mat4(1.0f));
     void voxelize_point_cloud(VulkanEngine& engine, PointCloud& point_cloud, 
-                              VulkanBuffer& voxel_writes, VulkanBuffer& normal_buffer, uint32_t max_write_count);
+                              VulkanBuffer& normal_buffer, VulkanBuffer& voxel_writes, uint32_t max_write_count);
+    void voxelize_point_cloud(VulkanEngine& engine,
+                              const VulkanBuffer& point_buffer, const VulkanBuffer& normal_buffer,
+                              uint32_t point_count, VulkanBuffer& voxel_writes, uint32_t max_write_count,
+                              const glm::mat4& source_point_cloud_model = glm::mat4(1.0f));
     
     void update(Window& window, Camera& camera);
     void set_voxels(VulkanCommandBuffer& command_buffer, const VulkanBuffer& voxel_write_list_src);

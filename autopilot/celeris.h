@@ -16,6 +16,7 @@
 #include "../vulkan_self/vulkan_engine.h"
 #include "../vulkan_self/vulkan_submit_context.h"
 #include "../vulkan_self/logger/logger_header.h"
+#include "../renderer/aabb.h"
 #include "path_planner.h"
 #include "vehicle_command_sender.h"
 #include "vehicle_geometry.h"
@@ -23,6 +24,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <filesystem>
 #include <span>
 
 
@@ -50,6 +52,9 @@ public:
         uint32_t footprint_sample_count = 5;
         uint32_t footprint_horizontal_inflation_size = 1;
         uint32_t footprint_vertical_inflation_size = 1;
+        float localization_probe_step = 4.0f;
+        uint32_t localization_max_candidates = 512;
+        uint32_t localization_gicp_iterations = 2;
         NonholonomicAStar::NonholonomicAStarDesc nonholonomic_astar_desc;
     };
 
@@ -73,6 +78,8 @@ public:
 
     void set_start(const NonholonomicPos& position);
     void set_goal(const NonholonomicPos& position);
+    void set_start_lidar_scan_position(glm::vec3 position) noexcept;
+    void set_start_lidar_scan_position(const NonholonomicPos& position) noexcept;
     void set_car_speed(float speed) noexcept;
 
     LidarScan* network_scan();
@@ -89,6 +96,7 @@ public:
     VoxelMapPointInserter& voxel_map_point_inserter();
     VoxelMapPointReseter& voxel_map_reseter();
     Footprint& footprint() noexcept;
+    VoxelGrid* voxel_grid() noexcept;
 
     void request_path_replan();
     bool adjust_to_ground(
@@ -118,6 +126,13 @@ public:
     void display_path_planner_debug_controls() const;
     glm::vec3 voxel_size();
     glm::vec3 voxel_center_world_pos(const glm::ivec3& voxel_pos);
+    void sync_point_map_and_voxel_grid();
+    void save_map(const std::filesystem::path& path);
+    void load_map(const std::filesystem::path& path);
+    bool localize_on_map();
+    const AABB& get_bounding_box() const noexcept;
+    const AABB& get_bouding_box() const noexcept { return get_bounding_box(); }
+    bool has_map_bounding_box() const noexcept;
 
 private:
     VulkanEngine* m_engine = nullptr;
@@ -142,6 +157,9 @@ private:
     VoxelMapPointReseter m_voxel_map_reseter;
 
     VulkanBuffer voxel_write_list;
+    AABB m_map_bounding_box{glm::vec4(0.0f), glm::vec4(0.0f)};
+    bool m_has_map_bounding_box = false;
+    bool m_needs_map_localization = false;
 
     NonholonomicPos m_start_position;
     NonholonomicPos m_goal_position;
@@ -152,6 +170,10 @@ private:
     std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;
     uint32_t m_received_scan_count = 0;
     bool m_has_previous_lidar_pose = false;
+    bool m_has_start_lidar_scan_position = false;
+    bool m_has_start_lidar_scan_rotation = false;
+    glm::vec3 m_start_lidar_scan_position{0.0f};
+    glm::quat m_start_lidar_scan_rotation{1.0f, 0.0f, 0.0f, 0.0f};
     glm::vec3 m_previous_lidar_position{0.0f};
     glm::quat m_previous_lidar_rotation{1.0f, 0.0f, 0.0f, 0.0f};
     std::vector<glm::vec3> m_collision_raw_position_history;
@@ -197,4 +219,5 @@ private:
 
     bool find_closest_next_path_point(uint32_t current_id, uint32_t& output_id, uint32_t& output_dist);
     VehicleCommand get_path_following_command();
+    void update_map_bounding_box();
 };

@@ -78,9 +78,13 @@
 #include "vulkan_self/vulkan_submit_context.h"
 
 #include <algorithm>
+#include <exception>
+#include <filesystem>
+#include <fstream>
 #include <cmath>
 #include <vector>
 #include <random>
+#include <string>
 
 VkClearValue clear_color = {0.05f, 0.05f, 0.05f, 1.0f};
 
@@ -93,6 +97,8 @@ int main() {
     queue_request.graphics_count = 2;
     queue_request.present_count = 1;
     queue_request.compute_count = 2;
+
+    const std::filesystem::path saved_maps_directory = std::filesystem::path("saved_maps");
 
     auto vehicle_config_path = []() {
         const std::filesystem::path relative_path =
@@ -432,18 +438,112 @@ int main() {
             .footprint_vertical_inflation_size = vertical_inflation_size
         }
     );
-    celeris.set_start(NonholonomicPos{.pos = glm::vec3(0.0f, 1.5f, 0.0f)});
-    // celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.92f, -51.30f)});
+    const NonholonomicPos start_lidar_scan_position{.pos = glm::vec3(0.0f, 0.0f, 0.0f)};
+    // celeris.set_start(start_lidar_scan_position);
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
-    // celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.5f, -0.0f)});
+    // celeris.set_start_lidar_scan_position(start_lidar_scan_position);
+    celeris.load_map(saved_maps_directory / "robocross_map.vpm");
     celeris.start(std::move(planner_submit_context));
 
-    CelerisVisualizer celeris_visualizer(mesh_manager, 
-                                         material_instance_manager, 
-                                         celeris, 
-                                         vehicle_geometry,
-                                         20000, 
-                                         skybox_exposure);
+    CelerisVisualizer celeris_visualizer(
+        mesh_manager, 
+        material_instance_manager, 
+        celeris, 
+        vehicle_geometry,
+        20000, 
+        skybox_exposure
+    );
+
+    LidarScan target_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
+    LidarScan source_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
+
+    target_scan.point_cloud().set_color(glm::vec4(0, 0, 1, 1));
+    source_scan.point_cloud().set_color(glm::vec4(1, 0, 0, 1));
+
+    source_scan.point_cloud().transform.position += glm::vec3(-2, 2, -2);
+
+
+    // celeris.voxel_map_point_inserter().insert(
+    //     celeris.voxel_point_map(),
+    //     target_scan.point_cloud(),
+    //     target_scan.normal_buffer()
+    // );
+
+    // celeris.voxel_map_point_inserter().insert(
+    //     celeris.voxel_point_map(),
+    //     source_scan.point_cloud(),
+    //     source_scan.normal_buffer()
+    // );
+
+    // std::vector<PointInstance> point_map_points(
+    //     celeris.voxel_point_map().map_point_count()
+    // );
+
+    // std::vector<glm::vec4> point_map_normals(
+    //     celeris.voxel_point_map().map_point_count()
+    // );
+
+    // celeris.voxel_point_map().map_point_buffer.read(
+    //     point_map_points.data(), 
+    //     celeris.voxel_point_map().map_point_count() * sizeof(PointInstance),
+    //     0
+    // );
+
+    // celeris.voxel_point_map().map_normal_buffer.read(
+    //     point_map_normals.data(), 
+    //     celeris.voxel_point_map().map_point_count() * sizeof(glm::vec4),
+    //     0
+    // );
+
+
+    char map_save_file_name[128] = "map";
+    std::string map_save_status;
+    bool map_save_failed = false;
+    std::string map_localization_status;
+    bool map_localization_failed = false;
+
+    
+
+    // std::ofstream saved_file("/home/spectre/Projects/celeris/saved_maps/map.cel");
+
+    // saved_file << celeris.voxel_point_map().map_point_count() << "\n";
+
+    // for (int i = 0; i < celeris.voxel_point_map().map_point_count(); i++) {
+    //     saved_file 
+    //         << point_map_points[i].position.x << "\n"
+    //         << point_map_points[i].position.y << "\n"
+    //         << point_map_points[i].position.z << "\n"
+    //         << point_map_points[i].position.w << "\n"
+
+    //         << point_map_points[i].color.r << "\n"
+    //         << point_map_points[i].color.g << "\n"
+    //         << point_map_points[i].color.b << "\n"
+    //         << point_map_points[i].color.a << "\n";
+    // }
+
+    // for (int i = 0; i < celeris.voxel_point_map().map_point_count(); i++) {
+    //     saved_file 
+    //         << point_map_normals[i].x << "\n"
+    //         << point_map_normals[i].y << "\n"
+    //         << point_map_normals[i].z << "\n"
+    //         << point_map_normals[i].w << "\n";
+    // }
+    
+    // saved_file.close();
+
+    
+
+    // celeris.voxel_point_map
+
+    // VoxelPointMap voxel_point_map(
+    //     engine,
+    //     1500000,
+    //     1500000
+    // );
+
+
+
+
 
     auto use_fps_camera_controller = [&]() {
         if (camera_controller_mode == CameraControllerMode::FPS)
@@ -529,13 +629,7 @@ int main() {
     // lidar_video.get_scan(0).point_cloud().transform.position = glm::vec3(0.0f);
     // lidar_video.get_scan(0).point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
-    LidarScan target_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
-    LidarScan source_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
 
-    target_scan.point_cloud().set_color(glm::vec4(0, 0, 1, 1));
-    source_scan.point_cloud().set_color(glm::vec4(1, 0, 0, 1));
-
-    source_scan.point_cloud().transform.position += glm::vec3(-2, 2, -2);
 
     // celeris.voxel_map_reseter().reset(celeris.voxel_point_map());
     // celeris.voxel_map_point_inserter().insert(
@@ -972,6 +1066,59 @@ int main() {
                             static_cast<uint32_t>(negative_z_inflation_size),
                             static_cast<uint32_t>(positive_z_inflation_size)
                         );
+                    }
+                }
+
+                if (ImGui::CollapsingHeader("Voxel point map")) {
+                    ImGui::InputText("Save file", map_save_file_name, sizeof(map_save_file_name));
+
+                    if (ImGui::Button("Save map")) {
+                        std::filesystem::path save_file_name =
+                            std::filesystem::path(map_save_file_name).filename();
+
+                        if (save_file_name.empty()) {
+                            map_save_failed = true;
+                            map_save_status = "File name is empty";
+                        } else {
+                            save_file_name.replace_extension(".vpm");
+                            const std::filesystem::path save_path = saved_maps_directory / save_file_name;
+
+                            try {
+                                celeris.save_map(save_path);
+                                map_save_failed = false;
+                                map_save_status = "Saved " + save_path.string();
+                            } catch (const std::exception& error) {
+                                map_save_failed = true;
+                                map_save_status = error.what();
+                            }
+                        }
+                    }
+
+                    if (!map_save_status.empty()) {
+                        const ImVec4 color = map_save_failed
+                            ? ImVec4(1.0f, 0.25f, 0.25f, 1.0f)
+                            : ImVec4(0.35f, 1.0f, 0.45f, 1.0f);
+                        ImGui::TextColored(color, "%s", map_save_status.c_str());
+                    }
+
+                    if (ImGui::Button("Localize on map")) {
+                        try {
+                            const bool localized = celeris.localize_on_map();
+                            map_localization_failed = !localized;
+                            map_localization_status = localized
+                                ? "Localized on map"
+                                : "Localization failed";
+                        } catch (const std::exception& error) {
+                            map_localization_failed = true;
+                            map_localization_status = error.what();
+                        }
+                    }
+
+                    if (!map_localization_status.empty()) {
+                        const ImVec4 color = map_localization_failed
+                            ? ImVec4(1.0f, 0.25f, 0.25f, 1.0f)
+                            : ImVec4(0.35f, 1.0f, 0.45f, 1.0f);
+                        ImGui::TextColored(color, "%s", map_localization_status.c_str());
                     }
                 }
 

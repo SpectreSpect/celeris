@@ -53,7 +53,15 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
         m_unimpended_path_line_cloud(*m_celeris->engine(),
                    mesh_manager.line_quad,
                    material_instance_manager.line,
-                   max_path_line_count) {
+                   max_path_line_count),
+        // VulkanEngine& engine, MeshManager& mesh_manager, MaterialInstanceManager& material_instance_manager, VulkanBuffer& instance_buffer, uint32_t instance_count
+        m_point_map_point_cloud(
+            *m_celeris->engine(), 
+            mesh_manager, 
+            material_instance_manager, 
+            m_celeris->voxel_point_map().map_point_buffer, 
+            celeris.voxel_point_map().m_map_point_count
+        ) {
     m_path_line_cloud.set_material_data(LineMaterialData{
         .color = glm::vec4(1, 1, 1, 1),
         .line_width_pixels = 5
@@ -63,6 +71,12 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
         .color = glm::vec4(0.3f, 1.0f, 0.3f, 1.0f),
         .line_width_pixels = 5
     });
+
+    // PointCloud voxel_point_map(
+    //     manager_bundle, 
+    //     celeris.voxel_point_map().map_point_buffer, 
+    //     celeris.voxel_point_map().m_map_point_count
+    // );
 
     m_explored_paths_line_cloud.set_material_data(LineMaterialData{
         .color = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
@@ -74,6 +88,10 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
         .line_width_pixels = 5
     });
 
+    // m_point_map_point_cloud.set_material_data(PointCloudMaterialData{
+    //     .color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)
+    // });
+
     add_child(m_start_marker);
     add_child(m_gazelle_next);
     add_child(m_goal_marker);
@@ -81,6 +99,8 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
     add_child(m_guide_path_line_cloud);
     add_child(m_explored_paths_line_cloud);
     add_child(m_unimpended_path_line_cloud);
+    add_child(m_point_map_point_cloud);
+
 
     set_start(m_celeris->start_position());
     set_goal(m_celeris->goal_position());
@@ -132,6 +152,10 @@ void CelerisVisualizer::update() {
     const uint32_t received_scan_count = m_celeris->received_scan_count();
     const bool received_new_scan = received_scan_count != scan_generation;
     scan_generation = received_scan_count;
+
+    m_point_map_point_cloud.set_instance_view(
+        m_celeris->voxel_point_map().get_map_instance_view()
+    );
 
     set_start(m_celeris->start_position());
     set_goal(m_celeris->goal_position());

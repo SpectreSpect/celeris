@@ -27,7 +27,11 @@ GICPPass::GICPPass(VulkanEngine& engine, ComputePassManager& compute_pass_manage
     // reductor = GICPReductor(engine);
 }
 
-double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_cloud, VulkanBuffer& source_normal_buffer) {
+double GICPPass::step(
+    VoxelPointMap& voxel_point_map,
+    PointCloud& source_point_cloud,
+    VulkanBuffer& source_normal_buffer,
+    bool log_failures) {
     LOG_METHOD();
 
     logger().check(source_point_cloud.instance_buffer_view_valid(), "Source point cloud instance view was invalid");
@@ -104,7 +108,9 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
 
 
     if (result.valid_count < 6) {
-        std::cout << "valid_count was less than 6" << std::endl;
+        if (log_failures) {
+            std::cout << "valid_count was less than 6" << std::endl;
+        }
         return 99999;
     }
 
@@ -121,7 +127,9 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
     }
 
     if (!solve_6x6(result.H, result.g, delta)) {
-        std::cout << "solve_6x6 failed" << std::endl;
+        if (log_failures) {
+            std::cout << "solve_6x6 failed" << std::endl;
+        }
         return 9999;
     }
 
@@ -157,10 +165,15 @@ double GICPPass::step(VoxelPointMap& voxel_point_map, PointCloud& source_point_c
     return rmse;
 }
 
-double GICPPass::fit(VoxelPointMap& voxel_point_map, PointCloud& source_point_cloud, VulkanBuffer& source_normal_buffer, uint32_t max_steps) {
+double GICPPass::fit(
+    VoxelPointMap& voxel_point_map,
+    PointCloud& source_point_cloud,
+    VulkanBuffer& source_normal_buffer,
+    uint32_t max_steps,
+    bool log_failures) {
     double rmse = 0;
     for (int i = 0; i < max_steps; i++) {
-        rmse = step(voxel_point_map, source_point_cloud, source_normal_buffer);
+        rmse = step(voxel_point_map, source_point_cloud, source_normal_buffer, log_failures);
         if (rmse < 0.5) {
             break;
         }
