@@ -53,9 +53,11 @@ public:
     void clear();
     void save(const std::filesystem::path& path) const;
     void load(const std::filesystem::path& path);
+    void set_first_visible_waypoint_index(size_t index);
 
     const std::vector<Waypoint>& waypoints() const noexcept;
     size_t directional_waypoint_count() const noexcept;
+    size_t first_visible_waypoint_index() const noexcept;
 
 private:
     uint32_t m_max_line_count = 0;
@@ -68,6 +70,7 @@ private:
 
     LineCloud m_line_cloud;
     std::vector<Waypoint> m_waypoints;
+    size_t m_first_visible_waypoint_index = 0;
     std::vector<std::unique_ptr<RenderObject>> m_spheres;
     std::vector<std::unique_ptr<SphericalPoseMarker>> m_pose_markers;
 

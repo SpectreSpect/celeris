@@ -445,8 +445,8 @@ int main() {
     // celeris.set_start(start_lidar_scan_position);
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
     // celeris.set_start_lidar_scan_position(start_lidar_scan_position);
-    celeris.load_map(saved_maps_directory / "robocross_map.vpm");
-    celeris.load_waypoint_path(saved_waypoint_paths_directory / "path3.wpp");
+    celeris.load_map(saved_maps_directory / "robocross_sim.vpm");
+    celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim.wpp");
     celeris.start(std::move(planner_submit_context));
 
     CelerisVisualizer celeris_visualizer(

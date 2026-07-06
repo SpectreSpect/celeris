@@ -186,6 +186,16 @@ void WaypointPath::load(const std::filesystem::path& path) {
     }
 
     m_waypoints = std::move(loaded_waypoints);
+    m_first_visible_waypoint_index = 0;
+    refresh_visualization();
+}
+
+void WaypointPath::set_first_visible_waypoint_index(size_t index) {
+    const size_t clamped_index = std::min(index, m_waypoints.size());
+    if (m_first_visible_waypoint_index == clamped_index)
+        return;
+
+    m_first_visible_waypoint_index = clamped_index;
     refresh_visualization();
 }
 
@@ -203,16 +213,33 @@ size_t WaypointPath::directional_waypoint_count() const noexcept {
     ));
 }
 
+size_t WaypointPath::first_visible_waypoint_index() const noexcept {
+    return m_first_visible_waypoint_index;
+}
+
 glm::vec3 WaypointPath::marker_vertical_offset() const noexcept {
     return glm::vec3(0.0f, WAYPOINT_VERTICAL_OFFSET, 0.0f);
 }
 
 std::vector<LineInstance> WaypointPath::make_lines() const {
     std::vector<LineInstance> lines;
-    lines.reserve(std::min<size_t>(m_waypoints.size(), m_max_line_count));
+    if (m_first_visible_waypoint_index >= m_waypoints.size()) {
+        return std::vector<LineInstance>{LineInstance{
+            .p0 = glm::vec3(0.0f),
+            .p1 = glm::vec3(0.0f),
+            .color = glm::vec4(0.0f)
+        }};
+    }
+
+    lines.reserve(std::min<size_t>(
+        m_waypoints.size() - m_first_visible_waypoint_index,
+        m_max_line_count
+    ));
 
     const glm::vec3 offset = marker_vertical_offset();
-    for (uint32_t i = 1; i < m_waypoints.size() && lines.size() < m_max_line_count; i++) {
+    for (size_t i = m_first_visible_waypoint_index + 1;
+         i < m_waypoints.size() && lines.size() < m_max_line_count;
+         i++) {
         lines.push_back(LineInstance{
             .p0 = m_waypoints[i - 1].world_position() + offset,
             .p1 = m_waypoints[i].world_position() + offset,
@@ -238,7 +265,9 @@ void WaypointPath::refresh_visualization() {
     size_t pose_marker_id = 0;
     const glm::vec3 offset = marker_vertical_offset();
 
-    for (const Waypoint& waypoint : m_waypoints) {
+    const size_t first_visible = std::min(m_first_visible_waypoint_index, m_waypoints.size());
+    for (size_t waypoint_id = first_visible; waypoint_id < m_waypoints.size(); waypoint_id++) {
+        const Waypoint& waypoint = m_waypoints[waypoint_id];
         if (waypoint.directional()) {
             while (m_pose_markers.size() <= pose_marker_id)
                 create_pose_marker();

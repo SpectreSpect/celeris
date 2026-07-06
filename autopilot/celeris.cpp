@@ -1027,6 +1027,7 @@ void Celeris::reset_waypoint_navigation() noexcept {
     m_active_waypoint_index = 0;
     m_waypoint_path_completed = false;
     is_stop_waiting = false;
+    m_waypoint_path.set_first_visible_waypoint_index(0);
 }
 
 bool Celeris::has_active_waypoint() const noexcept {
@@ -1078,9 +1079,12 @@ void Celeris::update_waypoint_navigation() {
         return;
     }
 
-    if (m_waypoint_path_completed)
+    if (m_waypoint_path_completed) {
+        m_waypoint_path.set_first_visible_waypoint_index(m_waypoint_path.waypoints().size());
         return;
+    }
 
+    m_waypoint_path.set_first_visible_waypoint_index(m_active_waypoint_index);
     bool advanced = false;
 
     while (has_active_waypoint()) {
@@ -1096,12 +1100,14 @@ void Celeris::update_waypoint_navigation() {
             m_goal_position = waypoint_goal_pose(m_active_waypoint_index);
             m_active_waypoint_index = m_waypoint_path.waypoints().size();
             m_waypoint_path_completed = true;
+            m_waypoint_path.set_first_visible_waypoint_index(m_active_waypoint_index);
             std::lock_guard<std::mutex> lock(m_path_mutex);
             current_target_path_point_id = static_cast<uint32_t>(nonholonomic_astar_path.size());
             return;
         }
 
         m_active_waypoint_index++;
+        m_waypoint_path.set_first_visible_waypoint_index(m_active_waypoint_index);
     }
 
     if (!advanced || !has_active_waypoint())
