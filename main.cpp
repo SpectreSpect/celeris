@@ -438,10 +438,10 @@ int main() {
             .footprint_vertical_inflation_size = vertical_inflation_size
         }
     );
-    const glm::vec3 start_lidar_scan_position(0.0f, 0.0f, 0.0f);
-    celeris.set_start(NonholonomicPos{.pos = start_lidar_scan_position});
+    const NonholonomicPos start_lidar_scan_position{.pos = glm::vec3(0.0f, 0.0f, 0.0f)};
+    // celeris.set_start(start_lidar_scan_position);
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
-    celeris.set_start_lidar_scan_position(start_lidar_scan_position);
+    // celeris.set_start_lidar_scan_position(start_lidar_scan_position);
     celeris.load_map(saved_maps_directory / "robocross_map.vpm");
     celeris.start(std::move(planner_submit_context));
 

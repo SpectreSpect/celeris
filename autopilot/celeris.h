@@ -79,6 +79,7 @@ public:
     void set_start(const NonholonomicPos& position);
     void set_goal(const NonholonomicPos& position);
     void set_start_lidar_scan_position(glm::vec3 position) noexcept;
+    void set_start_lidar_scan_position(const NonholonomicPos& position) noexcept;
     void set_car_speed(float speed) noexcept;
 
     LidarScan* network_scan();
@@ -170,7 +171,9 @@ private:
     uint32_t m_received_scan_count = 0;
     bool m_has_previous_lidar_pose = false;
     bool m_has_start_lidar_scan_position = false;
+    bool m_has_start_lidar_scan_rotation = false;
     glm::vec3 m_start_lidar_scan_position{0.0f};
+    glm::quat m_start_lidar_scan_rotation{1.0f, 0.0f, 0.0f, 0.0f};
     glm::vec3 m_previous_lidar_position{0.0f};
     glm::quat m_previous_lidar_rotation{1.0f, 0.0f, 0.0f, 0.0f};
     std::vector<glm::vec3> m_collision_raw_position_history;

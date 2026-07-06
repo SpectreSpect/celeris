@@ -192,7 +192,9 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         if (!m_has_previous_lidar_pose) {
             if (m_has_start_lidar_scan_position) {
                 m_network_scan->point_cloud().transform.position = m_start_lidar_scan_position;
-                m_network_scan->point_cloud().transform.rotation = raw_rotation;
+                m_network_scan->point_cloud().transform.rotation = m_has_start_lidar_scan_rotation
+                    ? m_start_lidar_scan_rotation
+                    : raw_rotation;
             } else {
                 m_network_scan->point_cloud().transform.position = glm::vec3(0.0f);
                 m_network_scan->point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
@@ -304,11 +306,21 @@ void Celeris::set_goal(const NonholonomicPos& position) {
 
 void Celeris::set_start_lidar_scan_position(glm::vec3 position) noexcept {
     m_has_start_lidar_scan_position = true;
+    m_has_start_lidar_scan_rotation = false;
     m_start_lidar_scan_position = position;
 
     if (m_has_map_bounding_box && m_voxel_point_map.map_point_count() > 0u) {
         m_needs_map_localization = false;
     }
+}
+
+void Celeris::set_start_lidar_scan_position(const NonholonomicPos& position) noexcept {
+    set_start_lidar_scan_position(position.pos);
+    m_has_start_lidar_scan_rotation = true;
+    m_start_lidar_scan_rotation = glm::angleAxis(
+        glm::pi<float>() - position.theta,
+        glm::vec3(0.0f, 1.0f, 0.0f)
+    );
 }
 
 void Celeris::set_car_speed(float speed) noexcept {
