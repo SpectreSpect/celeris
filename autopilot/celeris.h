@@ -60,6 +60,7 @@ public:
         uint32_t localization_gicp_iterations = 2;
         float waypoint_reach_radius = 2.0f;
         bool controller_commands_enabled = false;
+        VehicleCommand controller_command;
         NonholonomicAStar::NonholonomicAStarDesc nonholonomic_astar_desc;
     };
 

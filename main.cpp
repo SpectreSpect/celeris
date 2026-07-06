@@ -71,7 +71,6 @@
 #include "autopilot/spherical_pose_marker.h"
 #include "autopilot/celeris.h"
 #include "autopilot/celeris_visualizer.h"
-#include "autopilot/gamepad_controller.h"
 #include "autopilot/vehicle_geometry.h"
 #include "voxel_grid_vulkan/voxel_grid_gpu_debugger.h"
 #include "camera/controllers/third_person_camera_controller.h"
@@ -424,6 +423,11 @@ int main() {
         engine.compute_queue(1)
     );
 
+    const VehicleCommand fixed_test_command{
+        .speed = 2.0f,
+        .steering_angle = 0.0f
+    };
+
     Celeris celeris(
         engine,
         engine.compute_queue(),
@@ -439,7 +443,9 @@ int main() {
             .vehicle_geometry = vehicle_geometry,
             .footprint_sample_count = 5,
             .footprint_horizontal_inflation_size = horizontal_inflation_size,
-            .footprint_vertical_inflation_size = vertical_inflation_size
+            .footprint_vertical_inflation_size = vertical_inflation_size,
+            .controller_commands_enabled = true,
+            .controller_command = fixed_test_command
         }
     );
 
@@ -746,12 +752,6 @@ int main() {
     bool place_footprint_pressed = false;
     bool fps_camera_pressed = false;
     bool third_person_camera_pressed = false;
-    GamepadController gamepad_controller;
-    bool manual_command_mode = false;
-    VehicleCommand manual_command{
-        .speed = 2.0f,
-        .steering_angle = 0.0f
-    };
 
     int step = 0;
     
@@ -832,14 +832,6 @@ int main() {
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
-        gamepad_controller.update(celeris.car_speed());
-
-        if (manual_command_mode) {
-            celeris.set_controller_commands_enabled(true);
-            celeris.set_controller_command(manual_command);
-        } else {
-            celeris.set_controller_command(gamepad_controller.command());
-        }
 
         if (skybox_environment_update_pending) {
             engine.device().wait_idle();
@@ -1330,25 +1322,9 @@ int main() {
 
                     ImGui::Separator();
 
-                    bool controller_commands_enabled = celeris.controller_commands_enabled();
-                    if (ImGui::Checkbox("Controller driving", &controller_commands_enabled)) {
-                        celeris.set_controller_commands_enabled(controller_commands_enabled);
-                    }
-
-                    bool print_controller_input = gamepad_controller.print_input_events();
-                    if (ImGui::Checkbox("Print controller input", &print_controller_input)) {
-                        gamepad_controller.set_print_input_events(print_controller_input);
-                    }
-
                     const VehicleCommand controller_command = celeris.controller_command();
                     ImGui::Text(
-                        "Controller: %s%s",
-                        gamepad_controller.gamepad_present() ? "gamepad" :
-                        (gamepad_controller.raw_joystick_present() ? "raw joystick" : "not connected"),
-                        gamepad_controller.brake_pressed() ? " (R1 brake)" : ""
-                    );
-                    ImGui::Text(
-                        "Controller command: speed %.2f, steering %.2f",
+                        "Fixed test command: speed %.2f, steering %.2f",
                         controller_command.speed,
                         controller_command.steering_angle
                     );
@@ -1357,33 +1333,6 @@ int main() {
                         celeris.command_sender_running() ? "running" : "stopped",
                         celeris.command_sender_connected() ? "connected" : "not connected"
                     );
-
-                    if (ImGui::Checkbox("Manual command", &manual_command_mode) &&
-                        !manual_command_mode) {
-                        manual_command = VehicleCommand{};
-                    }
-
-                    if (manual_command_mode) {
-                        ImGui::SliderFloat("Manual speed", &manual_command.speed, -10.0f, 10.0f, "%.2f");
-                        ImGui::SliderFloat(
-                            "Manual steering",
-                            &manual_command.steering_angle,
-                            -0.4f,
-                            0.4f,
-                            "%.2f"
-                        );
-
-                        if (ImGui::Button("Forward test")) {
-                            manual_command = VehicleCommand{
-                                .speed = 2.0f,
-                                .steering_angle = 0.0f
-                            };
-                        }
-                        ImGui::SameLine();
-                        if (ImGui::Button("Stop command")) {
-                            manual_command = VehicleCommand{};
-                        }
-                    }
 
                     ImGui::Separator();
 

@@ -139,6 +139,9 @@ Celeris::Celeris(VulkanEngine& engine,
 
     m_waypoint_reach_radius = desc.waypoint_reach_radius;
     m_controller_commands_enabled = desc.controller_commands_enabled;
+    m_controller_command = desc.controller_command;
+    if (m_controller_commands_enabled)
+        m_command_sender.set_command(m_controller_command);
     m_voxel_map_reseter.reset(m_voxel_point_map);
 }
 
@@ -166,9 +169,8 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
     logger().check(m_voxel_grid, "Voxel grid was null");
 
     sync_path_planner_result();
-    m_command_sender.set_command(
-        m_controller_commands_enabled ? m_controller_command : get_path_following_command()
-    );
+    if (!m_controller_commands_enabled)
+        m_command_sender.set_command(get_path_following_command());
 
     if (auto scan = m_scan_receiver.try_pop_scan(*m_manager_bundle)) {
         glm::vec3 raw_position = scan->point_cloud().transform.position;
@@ -343,8 +345,11 @@ void Celeris::set_waypoint_reach_radius(float radius) noexcept {
 
 void Celeris::set_controller_commands_enabled(bool enabled) noexcept {
     m_controller_commands_enabled = enabled;
-    if (!enabled)
+    if (enabled) {
+        m_command_sender.set_command(m_controller_command);
+    } else {
         m_controller_command = VehicleCommand{};
+    }
 }
 
 void Celeris::set_controller_command(VehicleCommand command) noexcept {
@@ -352,6 +357,8 @@ void Celeris::set_controller_command(VehicleCommand command) noexcept {
         return;
 
     m_controller_command = command;
+    if (m_controller_commands_enabled)
+        m_command_sender.set_command(m_controller_command);
 }
 
 void Celeris::add_waypoint(glm::vec3 position) {
