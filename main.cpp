@@ -747,6 +747,11 @@ int main() {
     bool fps_camera_pressed = false;
     bool third_person_camera_pressed = false;
     GamepadController gamepad_controller;
+    bool manual_command_mode = false;
+    VehicleCommand manual_command{
+        .speed = 2.0f,
+        .steering_angle = 0.0f
+    };
 
     int step = 0;
     
@@ -828,7 +833,13 @@ int main() {
     while (!engine.window().should_close()) {
         engine.window().poll_events();
         gamepad_controller.update(celeris.car_speed());
-        celeris.set_controller_command(gamepad_controller.command());
+
+        if (manual_command_mode) {
+            celeris.set_controller_commands_enabled(true);
+            celeris.set_controller_command(manual_command);
+        } else {
+            celeris.set_controller_command(gamepad_controller.command());
+        }
 
         if (skybox_environment_update_pending) {
             engine.device().wait_idle();
@@ -1346,6 +1357,33 @@ int main() {
                         celeris.command_sender_running() ? "running" : "stopped",
                         celeris.command_sender_connected() ? "connected" : "not connected"
                     );
+
+                    if (ImGui::Checkbox("Manual command", &manual_command_mode) &&
+                        !manual_command_mode) {
+                        manual_command = VehicleCommand{};
+                    }
+
+                    if (manual_command_mode) {
+                        ImGui::SliderFloat("Manual speed", &manual_command.speed, -10.0f, 10.0f, "%.2f");
+                        ImGui::SliderFloat(
+                            "Manual steering",
+                            &manual_command.steering_angle,
+                            -0.4f,
+                            0.4f,
+                            "%.2f"
+                        );
+
+                        if (ImGui::Button("Forward test")) {
+                            manual_command = VehicleCommand{
+                                .speed = 2.0f,
+                                .steering_angle = 0.0f
+                            };
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Stop command")) {
+                            manual_command = VehicleCommand{};
+                        }
+                    }
 
                     ImGui::Separator();
 
