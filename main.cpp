@@ -1217,6 +1217,21 @@ int main() {
                         waypoints.size(),
                         directional_waypoint_count
                     );
+                    ImGui::Text(
+                        "Active waypoint: %zu%s",
+                        celeris.active_waypoint_index(),
+                        celeris.waypoint_path_completed() ? " (complete)" : ""
+                    );
+
+                    float waypoint_reach_radius = celeris.waypoint_reach_radius();
+                    if (ImGui::SliderFloat(
+                            "Waypoint reach radius",
+                            &waypoint_reach_radius,
+                            0.1f,
+                            20.0f,
+                            "%.2f m")) {
+                        celeris.set_waypoint_reach_radius(waypoint_reach_radius);
+                    }
 
                     ImGui::InputText(
                         "Waypoint path file",

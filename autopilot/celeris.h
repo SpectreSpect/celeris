@@ -58,6 +58,7 @@ public:
         float localization_probe_step = 4.0f;
         uint32_t localization_max_candidates = 512;
         uint32_t localization_gicp_iterations = 2;
+        float waypoint_reach_radius = 2.0f;
         NonholonomicAStar::NonholonomicAStarDesc nonholonomic_astar_desc;
     };
 
@@ -84,6 +85,7 @@ public:
     void set_start_lidar_scan_position(glm::vec3 position) noexcept;
     void set_start_lidar_scan_position(const NonholonomicPos& position) noexcept;
     void set_car_speed(float speed) noexcept;
+    void set_waypoint_reach_radius(float radius) noexcept;
     void add_waypoint(glm::vec3 position);
     void add_waypoint(const NonholonomicPos& position);
     void delete_last_waypoint();
@@ -93,6 +95,9 @@ public:
     NonholonomicPos start_position() const noexcept;
     NonholonomicPos goal_position() const noexcept;
     float car_speed() const noexcept;
+    float waypoint_reach_radius() const noexcept;
+    size_t active_waypoint_index() const noexcept;
+    bool waypoint_path_completed() const noexcept;
     uint32_t received_scan_count() const noexcept;
     const std::vector<Waypoint>& waypoints() const noexcept;
 
@@ -177,6 +182,9 @@ private:
     NonholonomicPos m_goal_position;
     Transform m_lidar_transform;
     float m_car_speed = 10.0f;
+    float m_waypoint_reach_radius = 2.0f;
+    size_t m_active_waypoint_index = 0;
+    bool m_waypoint_path_completed = false;
 
     std::unique_ptr<LidarScan> m_network_scan;
     std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;
@@ -223,6 +231,11 @@ private:
     void remember_collision_raw_position(glm::vec3 point_pos);
 
     bool is_path_impended(VulkanSubmitContext& submit_context);
+    void reset_waypoint_navigation() noexcept;
+    void update_waypoint_navigation();
+    bool has_active_waypoint() const noexcept;
+    NonholonomicPos waypoint_goal_pose(size_t waypoint_index) const;
+    bool active_waypoint_goal_pose(NonholonomicPos& output) const;
 
     void sync_path_planner_result();
     Transform rear_axle_transform_from_lidar_transform(const Transform& lidar_transform) const;
