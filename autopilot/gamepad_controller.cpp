@@ -147,7 +147,7 @@ void GamepadController::update_gamepad_command(
         return;
     }
 
-    const float steering_axis = apply_deadzone(state.axes[GLFW_GAMEPAD_AXIS_LEFT_X]);
+    const float steering_axis = apply_deadzone(state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X]);
     const float speed_axis = apply_deadzone(state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y]);
     const float finite_max_speed = std::isfinite(max_speed) ? max_speed : 0.0f;
 
@@ -175,16 +175,16 @@ void GamepadController::update_raw_joystick_command(float max_speed) {
     }
 
     if (!axes ||
-        m_desc.raw_left_stick_x_axis < 0 ||
         m_desc.raw_left_stick_y_axis < 0 ||
-        m_desc.raw_left_stick_x_axis >= axis_count ||
-        m_desc.raw_left_stick_y_axis >= axis_count) {
+        m_desc.raw_right_stick_x_axis < 0 ||
+        m_desc.raw_left_stick_y_axis >= axis_count ||
+        m_desc.raw_right_stick_x_axis >= axis_count) {
         m_command = VehicleCommand{};
         return;
     }
 
     const float steering_axis = apply_deadzone(
-        std::clamp(axes[m_desc.raw_left_stick_x_axis], -1.0f, 1.0f)
+        std::clamp(axes[m_desc.raw_right_stick_x_axis], -1.0f, 1.0f)
     );
     const float speed_axis = apply_deadzone(
         std::clamp(axes[m_desc.raw_left_stick_y_axis], -1.0f, 1.0f)

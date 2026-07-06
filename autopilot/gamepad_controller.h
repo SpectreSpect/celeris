@@ -14,10 +14,10 @@ public:
         float axis_epsilon = 0.05f;
         float axis_deadzone = 0.12f;
         float max_steering_angle = 0.4f;
-        int raw_left_stick_x_axis = 0;
         int raw_left_stick_y_axis = 1;
+        int raw_right_stick_x_axis = 2;
         int raw_right_bumper_button = 5;
-        bool print_input_events = true;
+        bool print_input_events = false;
     };
 
     GamepadController();

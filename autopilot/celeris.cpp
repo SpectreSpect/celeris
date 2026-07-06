@@ -138,10 +138,10 @@ Celeris::Celeris(VulkanEngine& engine,
     logger().check(desc.waypoint_reach_radius > 0.0f, "Waypoint reach radius must be greater than 0");
 
     m_waypoint_reach_radius = desc.waypoint_reach_radius;
-    m_controller_commands_enabled = desc.controller_commands_enabled;
-    m_controller_command = desc.controller_command;
-    if (m_controller_commands_enabled)
-        m_command_sender.set_command(m_controller_command);
+    m_gamepad_commands_enabled = desc.gamepad_commands_enabled;
+    m_gamepad_command = desc.gamepad_command;
+    if (m_gamepad_commands_enabled)
+        m_command_sender.set_command(m_gamepad_command);
     m_voxel_map_reseter.reset(m_voxel_point_map);
 }
 
@@ -169,7 +169,7 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
     logger().check(m_voxel_grid, "Voxel grid was null");
 
     sync_path_planner_result();
-    if (!m_controller_commands_enabled)
+    if (!m_gamepad_commands_enabled)
         m_command_sender.set_command(get_path_following_command());
 
     if (auto scan = m_scan_receiver.try_pop_scan(*m_manager_bundle)) {
@@ -343,22 +343,22 @@ void Celeris::set_waypoint_reach_radius(float radius) noexcept {
         m_waypoint_reach_radius = radius;
 }
 
-void Celeris::set_controller_commands_enabled(bool enabled) noexcept {
-    m_controller_commands_enabled = enabled;
+void Celeris::set_gamepad_commands_enabled(bool enabled) noexcept {
+    m_gamepad_commands_enabled = enabled;
     if (enabled) {
-        m_command_sender.set_command(m_controller_command);
+        m_command_sender.set_command(m_gamepad_command);
     } else {
-        m_controller_command = VehicleCommand{};
+        m_gamepad_command = VehicleCommand{};
     }
 }
 
-void Celeris::set_controller_command(VehicleCommand command) noexcept {
+void Celeris::set_gamepad_command(VehicleCommand command) noexcept {
     if (!std::isfinite(command.speed) || !std::isfinite(command.steering_angle))
         return;
 
-    m_controller_command = command;
-    if (m_controller_commands_enabled)
-        m_command_sender.set_command(m_controller_command);
+    m_gamepad_command = command;
+    if (m_gamepad_commands_enabled)
+        m_command_sender.set_command(m_gamepad_command);
 }
 
 void Celeris::add_waypoint(glm::vec3 position) {
@@ -400,12 +400,12 @@ float Celeris::waypoint_reach_radius() const noexcept {
     return m_waypoint_reach_radius;
 }
 
-bool Celeris::controller_commands_enabled() const noexcept {
-    return m_controller_commands_enabled;
+bool Celeris::gamepad_commands_enabled() const noexcept {
+    return m_gamepad_commands_enabled;
 }
 
-VehicleCommand Celeris::controller_command() const noexcept {
-    return m_controller_command;
+VehicleCommand Celeris::gamepad_command() const noexcept {
+    return m_gamepad_command;
 }
 
 bool Celeris::command_sender_running() const noexcept {
