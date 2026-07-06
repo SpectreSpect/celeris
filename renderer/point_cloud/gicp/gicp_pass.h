@@ -46,8 +46,19 @@ public:
 
     GICPPass(VulkanEngine& engine, ComputePassManager& compute_pass_manager);
 
-    double step(VoxelPointMap& voxel_point_map, PointCloud& source_point_cloud, VulkanBuffer& source_normal_buffer);
-    double fit(VoxelPointMap& voxel_point_map, PointCloud& source_point_cloud, VulkanBuffer& source_normal_buffer, uint32_t max_steps);
+    double step(
+        VoxelPointMap& voxel_point_map,
+        PointCloud& source_point_cloud,
+        VulkanBuffer& source_normal_buffer,
+        bool log_failures = true
+    );
+    double fit(
+        VoxelPointMap& voxel_point_map,
+        PointCloud& source_point_cloud,
+        VulkanBuffer& source_normal_buffer,
+        uint32_t max_steps,
+        bool log_failures = true
+    );
 
 private:
     uint32_t max_partial_count = 1000000;

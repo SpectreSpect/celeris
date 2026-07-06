@@ -1,15 +1,19 @@
 #include "celeris.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <imgui.h>
 #include <iostream>
 #include <limits>
 #include <utility>
+#include <vector>
 
 #include <glm/gtc/constants.hpp>
 #include "../path_utils.h"
+#include "../renderer/point_cloud/point_instance.h"
 #include "../vulkan_self/vulkan_device.h"
 #include "../vulkan_self/vulkan_queue.h"
 #include "../vulkan_self/vulkan_submit_context.h"
@@ -25,6 +29,26 @@ namespace {
 
     float length_sq(glm::vec3 value) noexcept {
         return glm::dot(value, value);
+    }
+
+    bool finite_vec3(glm::vec3 value) noexcept {
+        return std::isfinite(value.x) &&
+               std::isfinite(value.y) &&
+               std::isfinite(value.z);
+    }
+
+    uint32_t probe_count_for_range(float min_value, float max_value, float step) noexcept {
+        const float range = std::max(max_value - min_value, 0.0f);
+        return std::max(1u, static_cast<uint32_t>(std::floor(range / step)) + 1u);
+    }
+
+    float probe_coordinate(float min_value, float max_value, uint32_t index, uint32_t count) noexcept {
+        if (count <= 1u) {
+            return (min_value + max_value) * 0.5f;
+        }
+
+        const float t = static_cast<float>(index) / static_cast<float>(count - 1u);
+        return glm::mix(min_value, max_value, t);
     }
 
     glm::vec3 vehicle_geometry_position_to_model_offset(
@@ -166,8 +190,14 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         // );
 
         if (!m_has_previous_lidar_pose) {
-            m_network_scan->point_cloud().transform.position = glm::vec3(0.0f);
-            m_network_scan->point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+            if (m_has_start_lidar_scan_position) {
+                m_network_scan->point_cloud().transform.position = m_start_lidar_scan_position;
+                m_network_scan->point_cloud().transform.rotation = raw_rotation;
+            } else {
+                m_network_scan->point_cloud().transform.position = glm::vec3(0.0f);
+                m_network_scan->point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+            }
+
             m_has_previous_lidar_pose = true;
         } else {
             if (glm::dot(m_previous_lidar_rotation, raw_rotation) < 0.0f) {
@@ -188,7 +218,9 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
 
             m_network_scan->point_cloud().transform.position = previous_map_position + delta_position;
             m_network_scan->point_cloud().transform.rotation = glm::normalize(delta_rotation * previous_map_rotation);
+        }
 
+        if (!m_needs_map_localization && m_voxel_point_map.map_point_count() > 0u) {
             m_gicp_pass.fit(m_voxel_point_map,
                             m_network_scan->point_cloud(),
                             m_network_scan->normal_buffer(),
@@ -206,14 +238,16 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         // start_sphere.transform.position = m_network_scan->point_cloud().transform.position;
         // start_direction_sphere.transform.position = start_pos.pos + direction_offset(start_pos.theta) * 0.85f + glm::vec3(0, 0.4f, 0);
 
+        // //=====================
         m_voxel_map_inserter.insert(m_voxel_point_map, m_network_scan->point_cloud(), m_network_scan->normal_buffer());
         m_voxel_grid->voxelize_point_cloud(
-            *m_engine, 
-            m_network_scan->point_cloud(), 
+            *m_engine,
+            m_network_scan->point_cloud(),
             m_network_scan->normal_buffer(),
-            voxel_write_list, 
+            voxel_write_list,
             m_desc.max_write_count
         );
+        // //=====================
 
         // VoxelWriteGPU blue_voxelize_prefab;
         // blue_voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
@@ -266,6 +300,15 @@ void Celeris::set_start(const NonholonomicPos& position) {
 
 void Celeris::set_goal(const NonholonomicPos& position) {
     m_goal_position = position;
+}
+
+void Celeris::set_start_lidar_scan_position(glm::vec3 position) noexcept {
+    m_has_start_lidar_scan_position = true;
+    m_start_lidar_scan_position = position;
+
+    if (m_has_map_bounding_box && m_voxel_point_map.map_point_count() > 0u) {
+        m_needs_map_localization = false;
+    }
 }
 
 void Celeris::set_car_speed(float speed) noexcept {
@@ -694,7 +737,197 @@ void Celeris::save_map(const std::filesystem::path& path) {
 
 void Celeris::load_map(const std::filesystem::path& path) {
     m_voxel_point_map.load(resolve_celeris_file_path(path));
+    update_map_bounding_box();
+    m_needs_map_localization =
+        m_has_map_bounding_box &&
+        m_voxel_point_map.map_point_count() > 0u &&
+        !m_has_start_lidar_scan_position;
     sync_point_map_and_voxel_grid();
+}
+
+bool Celeris::localize_on_map() {
+    if (!m_network_scan) {
+        std::cout << "Localizing on map failed: no LiDAR scan is loaded" << std::endl;
+        return false;
+    }
+
+    if (!m_has_map_bounding_box || m_voxel_point_map.map_point_count() == 0u) {
+        std::cout << "Localizing on map failed: no loaded map bounds are available" << std::endl;
+        return false;
+    }
+
+    PointCloud& source_point_cloud = m_network_scan->point_cloud();
+
+    const glm::vec3 original_position = source_point_cloud.transform.position;
+    const glm::quat original_rotation = glm::normalize(source_point_cloud.transform.rotation);
+
+    const glm::quat probe_rotation = m_received_scan_count > 0u
+        ? glm::normalize(m_previous_lidar_rotation)
+        : original_rotation;
+
+    const glm::vec3 bounds_min(m_map_bounding_box.min);
+    const glm::vec3 bounds_max(m_map_bounding_box.max);
+
+    float probe_step = std::max(m_desc.localization_probe_step, 0.1f);
+    uint32_t x_count = probe_count_for_range(bounds_min.x, bounds_max.x, probe_step);
+    uint32_t z_count = probe_count_for_range(bounds_min.z, bounds_max.z, probe_step);
+
+    const uint32_t max_candidates = std::max(m_desc.localization_max_candidates, 1u);
+    uint64_t candidate_count = static_cast<uint64_t>(x_count) * static_cast<uint64_t>(z_count);
+
+    if (candidate_count > max_candidates) {
+        const float spacing_scale = std::sqrt(
+            static_cast<float>(candidate_count) / static_cast<float>(max_candidates)
+        );
+        probe_step *= spacing_scale;
+        x_count = probe_count_for_range(bounds_min.x, bounds_max.x, probe_step);
+        z_count = probe_count_for_range(bounds_min.z, bounds_max.z, probe_step);
+    }
+    candidate_count = static_cast<uint64_t>(x_count) * static_cast<uint64_t>(z_count);
+
+    bool found_candidate = false;
+    double best_rmse = std::numeric_limits<double>::infinity();
+    glm::vec3 best_position = original_position;
+    glm::quat best_rotation = original_rotation;
+
+    std::cout << "Localizing on map: probing " << candidate_count
+              << " candidates (" << x_count << " x " << z_count
+              << ", step " << probe_step << ")" << std::endl;
+
+    uint64_t processed_candidates = 0;
+    uint32_t last_progress_percent = 0;
+    auto last_progress_time = std::chrono::steady_clock::now();
+
+    auto print_progress = [&]() {
+        const uint32_t progress_percent = static_cast<uint32_t>(
+            (processed_candidates * 100u) / std::max<uint64_t>(candidate_count, 1u)
+        );
+
+        const auto now = std::chrono::steady_clock::now();
+        const bool should_print =
+            progress_percent != last_progress_percent ||
+            processed_candidates == candidate_count ||
+            now - last_progress_time >= std::chrono::milliseconds(500);
+
+        if (!should_print) {
+            return;
+        }
+
+        last_progress_percent = progress_percent;
+        last_progress_time = now;
+
+        std::cout << "\rLocalizing on map: " << progress_percent << "% ("
+                  << processed_candidates << "/" << candidate_count << ")";
+
+        if (found_candidate) {
+            std::cout << ", best RMSE " << best_rmse;
+        }
+
+        std::cout << std::flush;
+    };
+
+    std::cout << "Localizing on map: 0% (0/" << candidate_count << ")" << std::flush;
+
+    for (uint32_t z_id = 0; z_id < z_count; z_id++) {
+        const float z = probe_coordinate(bounds_min.z, bounds_max.z, z_id, z_count);
+
+        for (uint32_t x_id = 0; x_id < x_count; x_id++) {
+            const float x = probe_coordinate(bounds_min.x, bounds_max.x, x_id, x_count);
+
+            source_point_cloud.transform.position = glm::vec3(x, original_position.y, z);
+            source_point_cloud.transform.rotation = probe_rotation;
+
+            const double rmse = m_gicp_pass.fit(
+                m_voxel_point_map,
+                source_point_cloud,
+                m_network_scan->normal_buffer(),
+                m_desc.localization_gicp_iterations,
+                false
+            );
+
+            if (std::isfinite(rmse) && rmse < 9999.0 && rmse < best_rmse) {
+                found_candidate = true;
+                best_rmse = rmse;
+                best_position = source_point_cloud.transform.position;
+                best_rotation = glm::normalize(source_point_cloud.transform.rotation);
+            }
+
+            processed_candidates++;
+            print_progress();
+        }
+    }
+
+    std::cout << std::endl;
+
+    if (!found_candidate) {
+        source_point_cloud.transform.position = original_position;
+        source_point_cloud.transform.rotation = original_rotation;
+        std::cout << "Localizing on map failed: no valid GICP candidate found" << std::endl;
+        return false;
+    }
+
+    source_point_cloud.transform.position = best_position;
+    source_point_cloud.transform.rotation = best_rotation;
+    m_lidar_transform = source_point_cloud.transform;
+    m_start_position.from_transform(rear_axle_transform_from_lidar_transform(m_lidar_transform));
+    m_needs_map_localization = false;
+
+    std::cout << "Localizing on map succeeded: position ("
+              << best_position.x << ", " << best_position.y << ", " << best_position.z
+              << "), RMSE " << best_rmse << std::endl;
+
+    return true;
+}
+
+const AABB& Celeris::get_bounding_box() const noexcept {
+    return m_map_bounding_box;
+}
+
+bool Celeris::has_map_bounding_box() const noexcept {
+    return m_has_map_bounding_box;
+}
+
+void Celeris::update_map_bounding_box() {
+    m_has_map_bounding_box = false;
+    m_map_bounding_box = AABB{
+        .min = glm::vec4(0.0f),
+        .max = glm::vec4(0.0f)
+    };
+
+    const uint32_t point_count = m_voxel_point_map.map_point_count();
+    if (point_count == 0u) {
+        return;
+    }
+
+    std::vector<PointInstance> points(point_count);
+    m_voxel_point_map.map_point_buffer.read(
+        points.data(),
+        sizeof(PointInstance) * points.size(),
+        0
+    );
+
+    glm::vec3 bounds_min(std::numeric_limits<float>::infinity());
+    glm::vec3 bounds_max(-std::numeric_limits<float>::infinity());
+
+    for (const PointInstance& point : points) {
+        const glm::vec3 position(point.position);
+        if (!finite_vec3(position)) {
+            continue;
+        }
+
+        bounds_min = glm::min(bounds_min, position);
+        bounds_max = glm::max(bounds_max, position);
+        m_has_map_bounding_box = true;
+    }
+
+    if (!m_has_map_bounding_box) {
+        return;
+    }
+
+    m_map_bounding_box = AABB{
+        .min = glm::vec4(bounds_min, 1.0f),
+        .max = glm::vec4(bounds_max, 1.0f)
+    };
 }
 
 bool Celeris::is_path_impended(VulkanSubmitContext& submit_context) {

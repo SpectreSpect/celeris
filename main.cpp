@@ -438,8 +438,10 @@ int main() {
             .footprint_vertical_inflation_size = vertical_inflation_size
         }
     );
-    celeris.set_start(NonholonomicPos{.pos = glm::vec3(0.0f, 1.5f, 0.0f)});
+    const glm::vec3 start_lidar_scan_position(0.0f, 0.0f, 0.0f);
+    celeris.set_start(NonholonomicPos{.pos = start_lidar_scan_position});
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
+    celeris.set_start_lidar_scan_position(start_lidar_scan_position);
     celeris.load_map(saved_maps_directory / "robocross_map.vpm");
     celeris.start(std::move(planner_submit_context));
 
@@ -497,6 +499,8 @@ int main() {
     char map_save_file_name[128] = "map";
     std::string map_save_status;
     bool map_save_failed = false;
+    std::string map_localization_status;
+    bool map_localization_failed = false;
 
     
 
@@ -1095,6 +1099,26 @@ int main() {
                             ? ImVec4(1.0f, 0.25f, 0.25f, 1.0f)
                             : ImVec4(0.35f, 1.0f, 0.45f, 1.0f);
                         ImGui::TextColored(color, "%s", map_save_status.c_str());
+                    }
+
+                    if (ImGui::Button("Localize on map")) {
+                        try {
+                            const bool localized = celeris.localize_on_map();
+                            map_localization_failed = !localized;
+                            map_localization_status = localized
+                                ? "Localized on map"
+                                : "Localization failed";
+                        } catch (const std::exception& error) {
+                            map_localization_failed = true;
+                            map_localization_status = error.what();
+                        }
+                    }
+
+                    if (!map_localization_status.empty()) {
+                        const ImVec4 color = map_localization_failed
+                            ? ImVec4(1.0f, 0.25f, 0.25f, 1.0f)
+                            : ImVec4(0.35f, 1.0f, 0.45f, 1.0f);
+                        ImGui::TextColored(color, "%s", map_localization_status.c_str());
                     }
                 }
 
