@@ -98,6 +98,7 @@ Celeris::Celeris(VulkanEngine& engine,
         m_scan_index_buffer(&scan_index_buffer),
         m_mesher(&mesher),
         m_desc(desc),
+        m_waypoint_path(engine, manager_bundle.mesh_manager(), material_instance_manager),
         m_gicp_pass(engine, manager_bundle.compute_pass_manager()),
         m_point_cloud_preprocessor(engine.device(), compute_queue, manager_bundle.compute_pass_manager()),
         m_scan_receiver(m_point_cloud_preprocessor),
@@ -134,7 +135,9 @@ Celeris::Celeris(VulkanEngine& engine,
     logger().check(desc.unimpended_path_window_size > 1, "Unimpended path window size must be greater than 1");
     logger().check(desc.unimpended_path_max_astar_points > 0, "Unimpended path max astar points must be greater than 0");
     logger().check(desc.max_write_count > 0, "Max write count must be greater than 0");
+    logger().check(desc.waypoint_reach_radius > 0.0f, "Waypoint reach radius must be greater than 0");
 
+    m_waypoint_reach_radius = desc.waypoint_reach_radius;
     m_voxel_map_reseter.reset(m_voxel_point_map);
 }
 
@@ -151,7 +154,7 @@ void Celeris::start_lidar_receiver() {
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     start_lidar_receiver();
     // m_command_sender.start();
-    // m_path_planner.start(std::move(planner_submit_context));
+    m_path_planner.start(std::move(planner_submit_context));
 }
 
 void Celeris::update(VulkanSubmitContext& submit_context) {
@@ -285,7 +288,9 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         );
         remember_collision_raw_position(collision_raw_position);
 
-        if (is_path_impended(submit_context))
+        update_waypoint_navigation();
+
+        if (!m_waypoint_path_completed && is_path_impended(submit_context))
             request_path_replan();
 
         m_previous_lidar_position = raw_position;
@@ -328,6 +333,26 @@ void Celeris::set_car_speed(float speed) noexcept {
         m_car_speed = speed;
 }
 
+void Celeris::set_waypoint_reach_radius(float radius) noexcept {
+    if (std::isfinite(radius) && radius > 0.0f)
+        m_waypoint_reach_radius = radius;
+}
+
+void Celeris::add_waypoint(glm::vec3 position) {
+    m_waypoint_path.add_waypoint(position);
+    reset_waypoint_navigation();
+}
+
+void Celeris::add_waypoint(const NonholonomicPos& position) {
+    m_waypoint_path.add_waypoint(position);
+    reset_waypoint_navigation();
+}
+
+void Celeris::delete_last_waypoint() {
+    m_waypoint_path.delete_last_waypoint();
+    reset_waypoint_navigation();
+}
+
 LidarScan* Celeris::network_scan() {
     return m_network_scan.get();
 }
@@ -346,6 +371,18 @@ NonholonomicPos Celeris::goal_position() const noexcept {
 
 float Celeris::car_speed() const noexcept {
     return m_car_speed;
+}
+
+float Celeris::waypoint_reach_radius() const noexcept {
+    return m_waypoint_reach_radius;
+}
+
+size_t Celeris::active_waypoint_index() const noexcept {
+    return m_active_waypoint_index;
+}
+
+bool Celeris::waypoint_path_completed() const noexcept {
+    return m_waypoint_path_completed;
 }
 
 VulkanEngine* Celeris::engine() {
@@ -376,8 +413,20 @@ VoxelGrid* Celeris::voxel_grid() noexcept {
     return m_voxel_grid;
 }
 
+WaypointPath& Celeris::waypoint_path() noexcept {
+    return m_waypoint_path;
+}
+
+const WaypointPath& Celeris::waypoint_path() const noexcept {
+    return m_waypoint_path;
+}
+
 uint32_t Celeris::received_scan_count() const noexcept {
     return m_received_scan_count;
+}
+
+const std::vector<Celeris::Waypoint>& Celeris::waypoints() const noexcept {
+    return m_waypoint_path.waypoints();
 }
 
 bool Celeris::collision_point_is_free(glm::vec3 point) {
@@ -629,7 +678,17 @@ void Celeris::remember_collision_raw_position(glm::vec3 point_pos) {
 }
 
 void Celeris::request_path_replan() {
-    m_path_planner.request_path_replan(m_start_position, m_goal_position);
+    if (m_waypoint_path_completed && !m_waypoint_path.waypoints().empty()) {
+        reset_waypoint_navigation();
+    }
+
+    NonholonomicPos goal = m_goal_position;
+
+    if (active_waypoint_goal_pose(goal)) {
+        m_goal_position = goal;
+    }
+
+    m_path_planner.request_path_replan(m_start_position, goal);
 }
 
 bool Celeris::adjust_to_ground(
@@ -755,6 +814,24 @@ void Celeris::load_map(const std::filesystem::path& path) {
         m_voxel_point_map.map_point_count() > 0u &&
         !m_has_start_lidar_scan_position;
     sync_point_map_and_voxel_grid();
+}
+
+void Celeris::save_waypoint_path(const std::filesystem::path& path) {
+    std::filesystem::path resolved_path = resolve_celeris_file_path(path);
+    resolved_path.replace_extension(".wpp");
+
+    const std::filesystem::path parent_path = resolved_path.parent_path();
+
+    if (!parent_path.empty()) {
+        std::filesystem::create_directories(parent_path);
+    }
+
+    m_waypoint_path.save(resolved_path);
+}
+
+void Celeris::load_waypoint_path(const std::filesystem::path& path) {
+    m_waypoint_path.load(resolve_celeris_file_path(path));
+    reset_waypoint_navigation();
 }
 
 bool Celeris::localize_on_map() {
@@ -946,6 +1023,105 @@ bool Celeris::is_path_impended(VulkanSubmitContext& submit_context) {
     return m_path_planner.request_is_path_impended(submit_context);
 }
 
+void Celeris::reset_waypoint_navigation() noexcept {
+    m_active_waypoint_index = 0;
+    m_waypoint_path_completed = false;
+    is_stop_waiting = false;
+    m_waypoint_path.set_first_visible_waypoint_index(0);
+}
+
+bool Celeris::has_active_waypoint() const noexcept {
+    return !m_waypoint_path_completed &&
+           m_active_waypoint_index < m_waypoint_path.waypoints().size();
+}
+
+NonholonomicPos Celeris::waypoint_goal_pose(size_t waypoint_index) const {
+    const std::vector<Waypoint>& path = m_waypoint_path.waypoints();
+    logger().check(waypoint_index < path.size(), "Waypoint index was out of range");
+
+    const Waypoint& waypoint = path[waypoint_index];
+    NonholonomicPos goal;
+    goal.pos = waypoint.world_position();
+
+    if (waypoint.directional()) {
+        goal.theta = *waypoint.theta;
+        return goal;
+    }
+
+    glm::vec3 heading_vector(0.0f);
+    if (waypoint_index + 1 < path.size()) {
+        heading_vector = path[waypoint_index + 1].world_position() - goal.pos;
+    } else {
+        heading_vector = goal.pos - m_start_position.pos;
+    }
+
+    heading_vector.y = 0.0f;
+    if (length_sq(heading_vector) <= 1e-8f) {
+        goal.theta = m_start_position.theta;
+    } else {
+        goal.theta = std::atan2(heading_vector.z, heading_vector.x);
+    }
+
+    return goal;
+}
+
+bool Celeris::active_waypoint_goal_pose(NonholonomicPos& output) const {
+    if (!has_active_waypoint())
+        return false;
+
+    output = waypoint_goal_pose(m_active_waypoint_index);
+    return true;
+}
+
+void Celeris::update_waypoint_navigation() {
+    if (m_waypoint_path.waypoints().empty()) {
+        reset_waypoint_navigation();
+        return;
+    }
+
+    if (m_waypoint_path_completed) {
+        m_waypoint_path.set_first_visible_waypoint_index(m_waypoint_path.waypoints().size());
+        return;
+    }
+
+    m_waypoint_path.set_first_visible_waypoint_index(m_active_waypoint_index);
+    bool advanced = false;
+
+    while (has_active_waypoint()) {
+        const Waypoint& waypoint = m_waypoint_path.waypoints()[m_active_waypoint_index];
+        const float dist_sq = length_sq(waypoint.world_position() - m_start_position.pos);
+        if (dist_sq > m_waypoint_reach_radius * m_waypoint_reach_radius)
+            break;
+
+        advanced = true;
+        is_stop_waiting = false;
+
+        if (m_active_waypoint_index + 1 >= m_waypoint_path.waypoints().size()) {
+            m_goal_position = waypoint_goal_pose(m_active_waypoint_index);
+            m_active_waypoint_index = m_waypoint_path.waypoints().size();
+            m_waypoint_path_completed = true;
+            m_waypoint_path.set_first_visible_waypoint_index(m_active_waypoint_index);
+            std::lock_guard<std::mutex> lock(m_path_mutex);
+            current_target_path_point_id = static_cast<uint32_t>(nonholonomic_astar_path.size());
+            return;
+        }
+
+        m_active_waypoint_index++;
+        m_waypoint_path.set_first_visible_waypoint_index(m_active_waypoint_index);
+    }
+
+    if (!advanced || !has_active_waypoint())
+        return;
+
+    NonholonomicPos next_goal = waypoint_goal_pose(m_active_waypoint_index);
+    m_goal_position = next_goal;
+    {
+        std::lock_guard<std::mutex> lock(m_path_mutex);
+        current_target_path_point_id = 0;
+    }
+    m_path_planner.request_path_replan(m_start_position, next_goal);
+}
+
 void Celeris::sync_path_planner_result() {
     PathPlanner::PathPlannerResult result = m_path_planner.request_result_snapshot();
     if (result.generation == m_synced_path_generation)
@@ -1010,6 +1186,12 @@ bool Celeris::find_closest_next_path_point(uint32_t current_id, uint32_t& output
 
 VehicleCommand Celeris::get_path_following_command() {
     std::lock_guard<std::mutex> lock(m_path_mutex);
+
+    if (m_waypoint_path_completed && !m_waypoint_path.waypoints().empty())
+        return VehicleCommand{
+            .speed = 0,
+            .steering_angle = 0
+        };
 
     if (nonholonomic_astar_path.empty() || current_target_path_point_id >= nonholonomic_astar_path.size())
         return VehicleCommand{

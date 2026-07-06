@@ -1,5 +1,6 @@
 #pragma once
 
+#include "celeris.h"
 #include "gazelle_next.h"
 #include "spherical_pose_marker.h"
 #include "../a_star/a_star_structures.h"
@@ -16,7 +17,6 @@
 #include <vector>
 #include <chrono>
 
-class Celeris;
 struct VehicleGeometry;
 
 class CelerisVisualizer : public SceneObject {

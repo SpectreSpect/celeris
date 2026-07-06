@@ -141,6 +141,7 @@ add_executable(app
   autopilot/gazelle_next.cpp
   autopilot/vehicle_command_sender.cpp
   autopilot/path_planner.cpp
+  autopilot/waypoint_path.cpp
   autopilot/celeris.cpp
   autopilot/celeris_visualizer.cpp
   autopilot/vehicle_geometry.cpp

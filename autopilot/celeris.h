@@ -20,6 +20,7 @@
 #include "path_planner.h"
 #include "vehicle_command_sender.h"
 #include "vehicle_geometry.h"
+#include "waypoint_path.h"
 #include "../utils/avg_timer.h"
 
 #include <chrono>
@@ -38,6 +39,8 @@ class Celeris {
 public:
     _XCLASS_NAME(Celeris);
 
+    using Waypoint = WaypointPath::Waypoint;
+
     struct CelerisDesc {
         uint16_t receiver_port = 5000;
         uint32_t voxel_point_map_num_hash_table_slots = 1500000;
@@ -55,6 +58,7 @@ public:
         float localization_probe_step = 4.0f;
         uint32_t localization_max_candidates = 512;
         uint32_t localization_gicp_iterations = 2;
+        float waypoint_reach_radius = 2.0f;
         NonholonomicAStar::NonholonomicAStarDesc nonholonomic_astar_desc;
     };
 
@@ -81,13 +85,21 @@ public:
     void set_start_lidar_scan_position(glm::vec3 position) noexcept;
     void set_start_lidar_scan_position(const NonholonomicPos& position) noexcept;
     void set_car_speed(float speed) noexcept;
+    void set_waypoint_reach_radius(float radius) noexcept;
+    void add_waypoint(glm::vec3 position);
+    void add_waypoint(const NonholonomicPos& position);
+    void delete_last_waypoint();
 
     LidarScan* network_scan();
     const Transform& lidar_transform() const noexcept;
     NonholonomicPos start_position() const noexcept;
     NonholonomicPos goal_position() const noexcept;
     float car_speed() const noexcept;
+    float waypoint_reach_radius() const noexcept;
+    size_t active_waypoint_index() const noexcept;
+    bool waypoint_path_completed() const noexcept;
     uint32_t received_scan_count() const noexcept;
+    const std::vector<Waypoint>& waypoints() const noexcept;
 
     VulkanEngine* engine();
 
@@ -97,6 +109,8 @@ public:
     VoxelMapPointReseter& voxel_map_reseter();
     Footprint& footprint() noexcept;
     VoxelGrid* voxel_grid() noexcept;
+    WaypointPath& waypoint_path() noexcept;
+    const WaypointPath& waypoint_path() const noexcept;
 
     void request_path_replan();
     bool adjust_to_ground(
@@ -129,6 +143,8 @@ public:
     void sync_point_map_and_voxel_grid();
     void save_map(const std::filesystem::path& path);
     void load_map(const std::filesystem::path& path);
+    void save_waypoint_path(const std::filesystem::path& path);
+    void load_waypoint_path(const std::filesystem::path& path);
     bool localize_on_map();
     const AABB& get_bounding_box() const noexcept;
     const AABB& get_bouding_box() const noexcept { return get_bounding_box(); }
@@ -145,6 +161,7 @@ private:
     PointCloudMesher* m_mesher = nullptr;
     CelerisDesc m_desc;
 
+    WaypointPath m_waypoint_path;
     GICPPass m_gicp_pass;
 
     PointCloudPreprocessor m_point_cloud_preprocessor;
@@ -165,6 +182,9 @@ private:
     NonholonomicPos m_goal_position;
     Transform m_lidar_transform;
     float m_car_speed = 10.0f;
+    float m_waypoint_reach_radius = 2.0f;
+    size_t m_active_waypoint_index = 0;
+    bool m_waypoint_path_completed = false;
 
     std::unique_ptr<LidarScan> m_network_scan;
     std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;
@@ -211,6 +231,11 @@ private:
     void remember_collision_raw_position(glm::vec3 point_pos);
 
     bool is_path_impended(VulkanSubmitContext& submit_context);
+    void reset_waypoint_navigation() noexcept;
+    void update_waypoint_navigation();
+    bool has_active_waypoint() const noexcept;
+    NonholonomicPos waypoint_goal_pose(size_t waypoint_index) const;
+    bool active_waypoint_goal_pose(NonholonomicPos& output) const;
 
     void sync_path_planner_result();
     Transform rear_axle_transform_from_lidar_transform(const Transform& lidar_transform) const;

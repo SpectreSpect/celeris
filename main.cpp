@@ -99,6 +99,8 @@ int main() {
     queue_request.compute_count = 2;
 
     const std::filesystem::path saved_maps_directory = std::filesystem::path("saved_maps");
+    const std::filesystem::path saved_waypoint_paths_directory =
+        std::filesystem::path("saved_waypoint_paths");
 
     auto vehicle_config_path = []() {
         const std::filesystem::path relative_path =
@@ -136,7 +138,7 @@ int main() {
     ShaderManager shader_manager(engine.device());
     ComputePassManager compute_pass_manager(engine.device(), shader_manager);
     TextureManager texture_manager(engine, resource_loader, compute_pass_manager);
-    
+
     LightingSystem lighting_system(engine, compute_pass_manager);
     FrameResources frame_resources(engine, lighting_system, engine.num_frames_in_flight());
 
@@ -285,7 +287,7 @@ int main() {
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     );
-    
+
     VoxelWriteGPU blue_voxelize_prefab;
     blue_voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
     blue_voxelize_prefab.set_flags = OVERWRITE_BIT;
@@ -438,11 +440,13 @@ int main() {
             .footprint_vertical_inflation_size = vertical_inflation_size
         }
     );
+
     const NonholonomicPos start_lidar_scan_position{.pos = glm::vec3(0.0f, 0.0f, 0.0f)};
     // celeris.set_start(start_lidar_scan_position);
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
     // celeris.set_start_lidar_scan_position(start_lidar_scan_position);
-    celeris.load_map(saved_maps_directory / "robocross_map.vpm");
+    celeris.load_map(saved_maps_directory / "robocross_sim.vpm");
+    celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim.wpp");
     celeris.start(std::move(planner_submit_context));
 
     CelerisVisualizer celeris_visualizer(
@@ -501,6 +505,9 @@ int main() {
     bool map_save_failed = false;
     std::string map_localization_status;
     bool map_localization_failed = false;
+    char waypoint_path_file_name[128] = "path";
+    std::string waypoint_path_status;
+    bool waypoint_path_failed = false;
 
     
 
@@ -598,6 +605,24 @@ int main() {
             has_planned_path = false;
             start_path_planning();
         }
+    };
+
+    auto add_directional_waypoint = [&]() {
+        NonholonomicPos pose;
+        if (make_pose_from_camera(pose)) {
+            celeris.add_waypoint(pose);
+        }
+    };
+
+    auto add_nondirectional_waypoint = [&]() {
+        glm::vec3 position = camera.position;
+        if (celeris.adjust_to_ground(position)) {
+            celeris.add_waypoint(position);
+        }
+    };
+
+    auto delete_last_waypoint = [&]() {
+        celeris.delete_last_waypoint();
     };
 
     // LidarVideo lidar_video(
@@ -710,6 +735,8 @@ int main() {
     skybox.update(scene);
 
     bool g_pressed = false;
+    bool t_pressed = false;
+    bool l_pressed = false;
     bool n_pressed = false;
     bool place_start_pressed = false;
     bool place_end_pressed = false;
@@ -931,21 +958,31 @@ int main() {
             place_footprint_pressed = false;
         }
 
+        if (!t_pressed && glfwGetKey(window.handle(), GLFW_KEY_T) == GLFW_PRESS) {
+            t_pressed = true;
+            add_directional_waypoint();
+        }
+
+        if (t_pressed && glfwGetKey(window.handle(), GLFW_KEY_T) == GLFW_RELEASE) {
+            t_pressed = false;
+        }
+
         if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
             g_pressed = true;
-
-            // uint32_t current_frame_id = lidar_video.current_frame_id();
-
-            // if (current_frame_id > 0) {
-            //     LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
-            //     gicp_pass.step(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
-            // }
-
-            // step++;
+            add_nondirectional_waypoint();
         }
 
         if (g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_RELEASE) {
             g_pressed = false;
+        }
+
+        if (!l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_PRESS) {
+            l_pressed = true;
+            delete_last_waypoint();
+        }
+
+        if (l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_RELEASE) {
+            l_pressed = false;
         }
 
         if (!n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_PRESS) {
@@ -1164,6 +1201,118 @@ int main() {
                     }
                     ImGui::SameLine();
                     ImGui::TextUnformatted("Key: 4");
+
+                    const std::vector<Celeris::Waypoint>& waypoints = celeris.waypoints();
+                    const size_t directional_waypoint_count = std::count_if(
+                        waypoints.begin(),
+                        waypoints.end(),
+                        [](const Celeris::Waypoint& waypoint) {
+                            return waypoint.directional();
+                        }
+                    );
+
+                    ImGui::Separator();
+                    ImGui::Text(
+                        "Waypoints: %zu (%zu directional)",
+                        waypoints.size(),
+                        directional_waypoint_count
+                    );
+                    ImGui::Text(
+                        "Active waypoint: %zu%s",
+                        celeris.active_waypoint_index(),
+                        celeris.waypoint_path_completed() ? " (complete)" : ""
+                    );
+
+                    float waypoint_reach_radius = celeris.waypoint_reach_radius();
+                    if (ImGui::SliderFloat(
+                            "Waypoint reach radius",
+                            &waypoint_reach_radius,
+                            0.1f,
+                            20.0f,
+                            "%.2f m")) {
+                        celeris.set_waypoint_reach_radius(waypoint_reach_radius);
+                    }
+
+                    ImGui::InputText(
+                        "Waypoint path file",
+                        waypoint_path_file_name,
+                        sizeof(waypoint_path_file_name)
+                    );
+
+                    if (ImGui::Button("Save waypoint path")) {
+                        std::filesystem::path save_file_name =
+                            std::filesystem::path(waypoint_path_file_name).filename();
+
+                        if (save_file_name.empty()) {
+                            waypoint_path_failed = true;
+                            waypoint_path_status = "File name is empty";
+                        } else {
+                            save_file_name.replace_extension(".wpp");
+                            const std::filesystem::path save_path =
+                                saved_waypoint_paths_directory / save_file_name;
+
+                            try {
+                                celeris.save_waypoint_path(save_path);
+                                waypoint_path_failed = false;
+                                waypoint_path_status = "Saved " + save_path.string();
+                            } catch (const std::exception& error) {
+                                waypoint_path_failed = true;
+                                waypoint_path_status = error.what();
+                            }
+                        }
+                    }
+
+                    ImGui::SameLine();
+
+                    if (ImGui::Button("Load waypoint path")) {
+                        std::filesystem::path load_file_name =
+                            std::filesystem::path(waypoint_path_file_name).filename();
+
+                        if (load_file_name.empty()) {
+                            waypoint_path_failed = true;
+                            waypoint_path_status = "File name is empty";
+                        } else {
+                            load_file_name.replace_extension(".wpp");
+                            const std::filesystem::path load_path =
+                                saved_waypoint_paths_directory / load_file_name;
+
+                            try {
+                                celeris.load_waypoint_path(load_path);
+                                waypoint_path_failed = false;
+                                waypoint_path_status = "Loaded " + load_path.string();
+                            } catch (const std::exception& error) {
+                                waypoint_path_failed = true;
+                                waypoint_path_status = error.what();
+                            }
+                        }
+                    }
+
+                    if (!waypoint_path_status.empty()) {
+                        const ImVec4 color = waypoint_path_failed
+                            ? ImVec4(1.0f, 0.25f, 0.25f, 1.0f)
+                            : ImVec4(0.35f, 1.0f, 0.45f, 1.0f);
+                        ImGui::TextColored(color, "%s", waypoint_path_status.c_str());
+                    }
+
+                    if (ImGui::Button("Add directional waypoint")) {
+                        add_directional_waypoint();
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("Key: T");
+
+                    if (ImGui::Button("Add nondirectional waypoint")) {
+                        add_nondirectional_waypoint();
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("Key: G");
+
+                    if (ImGui::Button("Delete last waypoint")) {
+                        delete_last_waypoint();
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("Key: L");
+
+                    ImGui::Separator();
 
                     if (ImGui::Button("Play car path")) {
                         start_car_playback();

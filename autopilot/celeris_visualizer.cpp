@@ -12,16 +12,6 @@
 #include <algorithm>
 #include <cmath>
 
-// namespace {
-//     void set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position) {
-//         marker.transform.position = nonholonomic_position.pos;
-//         marker.transform.rotation = glm::angleAxis(
-//             glm::pi<float>() - nonholonomic_position.theta,
-//             glm::vec3(0.0f, 1.0f, 0.0f)
-//         );
-//     }
-// }
-
 CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager, 
                                      MaterialInstanceManager& material_instance_manager, 
                                      Celeris& celeris,
@@ -99,6 +89,7 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
     add_child(m_guide_path_line_cloud);
     add_child(m_explored_paths_line_cloud);
     add_child(m_unimpended_path_line_cloud);
+    add_child(m_celeris->waypoint_path());
     add_child(m_point_map_point_cloud);
 
 
@@ -213,6 +204,7 @@ void CelerisVisualizer::display_debug_controls() {
         ImGui::Checkbox("Plain A* path", &show_guide_path);
         ImGui::Checkbox("Explored paths", &show_explored_paths);
         ImGui::Checkbox("Unimpeded path", &show_unimpeded_path);
+        ImGui::Checkbox("Waypoints", &m_celeris->waypoint_path().visible);
         ImGui::Checkbox("Start pose marker", &show_start_marker);
         ImGui::Checkbox("Gazelle Next", &show_gazelle_next);
     }
