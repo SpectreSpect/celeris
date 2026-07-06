@@ -446,7 +446,7 @@ int main() {
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
     has_end_pos = true;
     // celeris.set_start_lidar_scan_position(start_lidar_scan_position);
-    celeris.load_map(saved_maps_directory / "robocross_sim_2.vpm");
+    // celeris.load_map(saved_maps_directory / "robocross_sim_2.vpm");
     celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim.wpp");
     celeris.start(std::move(planner_submit_context));
 
@@ -1021,7 +1021,7 @@ int main() {
                 // if (network_scan)
                 //     renderer.render(command_buffer, network_scan->point_cloud(), network_scan->point_cloud().transform.get_model_matrix());
 
-                // renderer.render(command_buffer, voxel_grid.render_object());
+                renderer.render(command_buffer, voxel_grid.render_object());
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
