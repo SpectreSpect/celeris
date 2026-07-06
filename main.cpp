@@ -78,9 +78,13 @@
 #include "vulkan_self/vulkan_submit_context.h"
 
 #include <algorithm>
+#include <exception>
+#include <filesystem>
+#include <fstream>
 #include <cmath>
 #include <vector>
 #include <random>
+#include <string>
 
 VkClearValue clear_color = {0.05f, 0.05f, 0.05f, 1.0f};
 
@@ -93,6 +97,10 @@ int main() {
     queue_request.graphics_count = 2;
     queue_request.present_count = 1;
     queue_request.compute_count = 2;
+
+    const std::filesystem::path saved_maps_directory = std::filesystem::path("saved_maps");
+    const std::filesystem::path saved_waypoint_paths_directory =
+        std::filesystem::path("saved_waypoint_paths");
 
     auto vehicle_config_path = []() {
         const std::filesystem::path relative_path =
@@ -130,7 +138,7 @@ int main() {
     ShaderManager shader_manager(engine.device());
     ComputePassManager compute_pass_manager(engine.device(), shader_manager);
     TextureManager texture_manager(engine, resource_loader, compute_pass_manager);
-    
+
     LightingSystem lighting_system(engine, compute_pass_manager);
     FrameResources frame_resources(engine, lighting_system, engine.num_frames_in_flight());
 
@@ -139,13 +147,13 @@ int main() {
     MaterialManager material_manager(engine, shader_manager, frame_resources);
     MaterialInstanceManager material_instance_manager(engine, material_manager, texture_manager);
     MeshManager mesh_manager(engine, resource_loader);
-    ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, 
+    ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager,
                                  material_instance_manager, mesh_manager, compute_pass_manager);
 
     VulkanSubmitContext compute_submit_context(engine.device(), engine.compute_queue(0));
 
     PointCloudPreprocessor point_cloud_preprocessor(
-        engine.device(), 
+        engine.device(),
         engine.compute_queue(),
         compute_pass_manager
     );
@@ -279,7 +287,7 @@ int main() {
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     );
-    
+
     VoxelWriteGPU blue_voxelize_prefab;
     blue_voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
     blue_voxelize_prefab.set_flags = OVERWRITE_BIT;
@@ -418,9 +426,9 @@ int main() {
         engine,
         engine.compute_queue(),
         compute_submit_context,
-        manager_bundle, 
+        manager_bundle,
         material_instance_manager,
-        voxel_grid, 
+        voxel_grid,
         voxelizator,
         scan_vertex_buffer,
         scan_index_buffer,
@@ -432,14 +440,118 @@ int main() {
             .footprint_vertical_inflation_size = vertical_inflation_size
         }
     );
+
+    const NonholonomicPos start_lidar_scan_position{.pos = glm::vec3(0.0f, 0.0f, 0.0f)};
+    // celeris.set_start(start_lidar_scan_position);
+    celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
+    has_end_pos = true;
+    // celeris.set_start_lidar_scan_position(start_lidar_scan_position);
+    celeris.load_map(saved_maps_directory / "robocross_sim_2.vpm");
+    celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim.wpp");
     celeris.start(std::move(planner_submit_context));
 
-    CelerisVisualizer celeris_visualizer(mesh_manager, 
-                                         material_instance_manager, 
-                                         celeris, 
-                                         vehicle_geometry,
-                                         20000, 
-                                         skybox_exposure);
+    CelerisVisualizer celeris_visualizer(
+        mesh_manager,
+        material_instance_manager,
+        celeris,
+        vehicle_geometry,
+        20000,
+        skybox_exposure
+    );
+
+    LidarScan target_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
+    LidarScan source_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
+
+    target_scan.point_cloud().set_color(glm::vec4(0, 0, 1, 1));
+    source_scan.point_cloud().set_color(glm::vec4(1, 0, 0, 1));
+
+    source_scan.point_cloud().transform.position += glm::vec3(-2, 2, -2);
+
+
+    // celeris.voxel_map_point_inserter().insert(
+    //     celeris.voxel_point_map(),
+    //     target_scan.point_cloud(),
+    //     target_scan.normal_buffer()
+    // );
+
+    // celeris.voxel_map_point_inserter().insert(
+    //     celeris.voxel_point_map(),
+    //     source_scan.point_cloud(),
+    //     source_scan.normal_buffer()
+    // );
+
+    // std::vector<PointInstance> point_map_points(
+    //     celeris.voxel_point_map().map_point_count()
+    // );
+
+    // std::vector<glm::vec4> point_map_normals(
+    //     celeris.voxel_point_map().map_point_count()
+    // );
+
+    // celeris.voxel_point_map().map_point_buffer.read(
+    //     point_map_points.data(),
+    //     celeris.voxel_point_map().map_point_count() * sizeof(PointInstance),
+    //     0
+    // );
+
+    // celeris.voxel_point_map().map_normal_buffer.read(
+    //     point_map_normals.data(),
+    //     celeris.voxel_point_map().map_point_count() * sizeof(glm::vec4),
+    //     0
+    // );
+
+
+    char map_save_file_name[128] = "map";
+    std::string map_save_status;
+    bool map_save_failed = false;
+    std::string map_localization_status;
+    bool map_localization_failed = false;
+    char waypoint_path_file_name[128] = "path";
+    std::string waypoint_path_status;
+    bool waypoint_path_failed = false;
+
+
+
+    // std::ofstream saved_file("/home/spectre/Projects/celeris/saved_maps/map.cel");
+
+    // saved_file << celeris.voxel_point_map().map_point_count() << "\n";
+
+    // for (int i = 0; i < celeris.voxel_point_map().map_point_count(); i++) {
+    //     saved_file
+    //         << point_map_points[i].position.x << "\n"
+    //         << point_map_points[i].position.y << "\n"
+    //         << point_map_points[i].position.z << "\n"
+    //         << point_map_points[i].position.w << "\n"
+
+    //         << point_map_points[i].color.r << "\n"
+    //         << point_map_points[i].color.g << "\n"
+    //         << point_map_points[i].color.b << "\n"
+    //         << point_map_points[i].color.a << "\n";
+    // }
+
+    // for (int i = 0; i < celeris.voxel_point_map().map_point_count(); i++) {
+    //     saved_file
+    //         << point_map_normals[i].x << "\n"
+    //         << point_map_normals[i].y << "\n"
+    //         << point_map_normals[i].z << "\n"
+    //         << point_map_normals[i].w << "\n";
+    // }
+
+    // saved_file.close();
+
+
+
+    // celeris.voxel_point_map
+
+    // VoxelPointMap voxel_point_map(
+    //     engine,
+    //     1500000,
+    //     1500000
+    // );
+
+
+
+
 
     auto use_fps_camera_controller = [&]() {
         if (camera_controller_mode == CameraControllerMode::FPS)
@@ -500,10 +612,28 @@ int main() {
         has_planned_path = false;
     };
 
+    auto add_directional_waypoint = [&]() {
+        NonholonomicPos pose;
+        if (make_pose_from_camera(pose)) {
+            celeris.add_waypoint(pose);
+        }
+    };
+
+    auto add_nondirectional_waypoint = [&]() {
+        glm::vec3 position = camera.position;
+        if (celeris.adjust_to_ground(position)) {
+            celeris.add_waypoint(position);
+        }
+    };
+
+    auto delete_last_waypoint = [&]() {
+        celeris.delete_last_waypoint();
+    };
+
     // LidarVideo lidar_video(
-    //     manager_bundle, 
-    //     point_cloud_preprocessor, 
-    //     "/home/spectre/TEMP_lidar_output_mesh/recording_16/index.csv", 
+    //     manager_bundle,
+    //     point_cloud_preprocessor,
+    //     "/home/spectre/TEMP_lidar_output_mesh/recording_16/index.csv",
     //     0,
     //     2
     // );
@@ -529,24 +659,18 @@ int main() {
     // lidar_video.get_scan(0).point_cloud().transform.position = glm::vec3(0.0f);
     // lidar_video.get_scan(0).point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
-    LidarScan target_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
-    LidarScan source_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
 
-    target_scan.point_cloud().set_color(glm::vec4(0, 0, 1, 1));
-    source_scan.point_cloud().set_color(glm::vec4(1, 0, 0, 1));
-
-    source_scan.point_cloud().transform.position += glm::vec3(-2, 2, -2);
 
     // celeris.voxel_map_reseter().reset(celeris.voxel_point_map());
     // celeris.voxel_map_point_inserter().insert(
-    //     celeris.voxel_point_map(), 
-    //     lidar_video.get_scan(0).point_cloud(), 
+    //     celeris.voxel_point_map(),
+    //     lidar_video.get_scan(0).point_cloud(),
     //     lidar_video.get_scan(0).normal_buffer()
     // );
 
     PointCloud voxel_point_map(
-        manager_bundle, 
-        celeris.voxel_point_map().map_point_buffer, 
+        manager_bundle,
+        celeris.voxel_point_map().map_point_buffer,
         celeris.voxel_point_map().m_map_point_count
     );
     voxel_point_map.set_color(glm::vec4(0, 0, 0, 1));
@@ -612,10 +736,12 @@ int main() {
     // scene.add(source_scan);
 
     // scene.add(lidar_video);
-    
+
     skybox.update(scene);
 
     bool g_pressed = false;
+    bool t_pressed = false;
+    bool l_pressed = false;
     bool n_pressed = false;
     bool place_start_pressed = false;
     bool place_end_pressed = false;
@@ -626,7 +752,7 @@ int main() {
     bool third_person_camera_pressed = false;
 
     int step = 0;
-    
+
     float last_frame_time = 0.0f;
     float start_time = (float)glfwGetTime();
     float timer = 0;
@@ -726,7 +852,7 @@ int main() {
         //         transparent_voxelize_prefab,
         //         vox_box.mesh_view(),
         //         transform,
-        //         &voxel_grid.local_voxel_write_list()        
+        //         &voxel_grid.local_voxel_write_list()
         //     );
         // }
 
@@ -739,7 +865,7 @@ int main() {
         //         blue_voxelize_prefab,
         //         vox_box.mesh_view(),
         //         vox_box.transform.get_model_matrix(),
-        //         &voxel_grid.local_voxel_write_list()        
+        //         &voxel_grid.local_voxel_write_list()
         //     );
 
         //     transform_mem[i] = vox_box.transform.get_model_matrix();
@@ -800,7 +926,7 @@ int main() {
 
         lighting_system.update(engine.current_frame(), window, camera);
 
-        voxel_grid.update(window, camera);        
+        voxel_grid.update(window, camera);
 
         if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
             place_start_pressed = true;
@@ -847,21 +973,31 @@ int main() {
             place_footprint_pressed = false;
         }
 
+        if (!t_pressed && glfwGetKey(window.handle(), GLFW_KEY_T) == GLFW_PRESS) {
+            t_pressed = true;
+            add_directional_waypoint();
+        }
+
+        if (t_pressed && glfwGetKey(window.handle(), GLFW_KEY_T) == GLFW_RELEASE) {
+            t_pressed = false;
+        }
+
         if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
             g_pressed = true;
-
-            // uint32_t current_frame_id = lidar_video.current_frame_id();
-
-            // if (current_frame_id > 0) {
-            //     LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
-            //     gicp_pass.step(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
-            // }
-
-            // step++;
+            add_nondirectional_waypoint();
         }
 
         if (g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_RELEASE) {
             g_pressed = false;
+        }
+
+        if (!l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_PRESS) {
+            l_pressed = true;
+            delete_last_waypoint();
+        }
+
+        if (l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_RELEASE) {
+            l_pressed = false;
         }
 
         if (!n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_PRESS) {
@@ -885,11 +1021,11 @@ int main() {
                 // if (network_scan)
                 //     renderer.render(command_buffer, network_scan->point_cloud(), network_scan->point_cloud().transform.get_model_matrix());
 
-                renderer.render(command_buffer, voxel_grid.render_object());
+                // renderer.render(command_buffer, voxel_grid.render_object());
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
-                
+
                 // {
                 //     VulkanCommandBuffer& debugger_command_buffer = debugger.command_buffer();
                 //     auto scope = debugger_command_buffer.begin_scope();
@@ -902,7 +1038,7 @@ int main() {
                 //     debugger.display_hash_table_window();
                 // }
                 // debugger.submit_commands();
-                
+
 
                 ImGui::Begin("Debug");
 
@@ -985,9 +1121,62 @@ int main() {
                     }
                 }
 
+                if (ImGui::CollapsingHeader("Voxel point map")) {
+                    ImGui::InputText("Save file", map_save_file_name, sizeof(map_save_file_name));
+
+                    if (ImGui::Button("Save map")) {
+                        std::filesystem::path save_file_name =
+                            std::filesystem::path(map_save_file_name).filename();
+
+                        if (save_file_name.empty()) {
+                            map_save_failed = true;
+                            map_save_status = "File name is empty";
+                        } else {
+                            save_file_name.replace_extension(".vpm");
+                            const std::filesystem::path save_path = saved_maps_directory / save_file_name;
+
+                            try {
+                                celeris.save_map(save_path);
+                                map_save_failed = false;
+                                map_save_status = "Saved " + save_path.string();
+                            } catch (const std::exception& error) {
+                                map_save_failed = true;
+                                map_save_status = error.what();
+                            }
+                        }
+                    }
+
+                    if (!map_save_status.empty()) {
+                        const ImVec4 color = map_save_failed
+                            ? ImVec4(1.0f, 0.25f, 0.25f, 1.0f)
+                            : ImVec4(0.35f, 1.0f, 0.45f, 1.0f);
+                        ImGui::TextColored(color, "%s", map_save_status.c_str());
+                    }
+
+                    if (ImGui::Button("Localize on map")) {
+                        try {
+                            const bool localized = celeris.localize_on_map();
+                            map_localization_failed = !localized;
+                            map_localization_status = localized
+                                ? "Localized on map"
+                                : "Localization failed";
+                        } catch (const std::exception& error) {
+                            map_localization_failed = true;
+                            map_localization_status = error.what();
+                        }
+                    }
+
+                    if (!map_localization_status.empty()) {
+                        const ImVec4 color = map_localization_failed
+                            ? ImVec4(1.0f, 0.25f, 0.25f, 1.0f)
+                            : ImVec4(0.35f, 1.0f, 0.45f, 1.0f);
+                        ImGui::TextColored(color, "%s", map_localization_status.c_str());
+                    }
+                }
+
                 celeris_visualizer.display_debug_controls();
                 celeris.display_path_planner_debug_controls();
-                
+
                 // ImGui::TextColored(ImVec4(1.0f, 0.35f, 1.0f, 1.0f), "Current frame id: %d", lidar_video.current_frame_id());
 
                 // if (ImGui::Button("FPS controller")) {
@@ -1012,7 +1201,7 @@ int main() {
                     if (ImGui::Button("Place end")) {
                         place_end();
                     }
-                    
+
                     ImGui::SameLine();
                     ImGui::TextUnformatted("Key: 2");
 
@@ -1033,6 +1222,118 @@ int main() {
                     }
                     ImGui::SameLine();
                     ImGui::TextUnformatted("Key: 5");
+
+                    const std::vector<Celeris::Waypoint>& waypoints = celeris.waypoints();
+                    const size_t directional_waypoint_count = std::count_if(
+                        waypoints.begin(),
+                        waypoints.end(),
+                        [](const Celeris::Waypoint& waypoint) {
+                            return waypoint.directional();
+                        }
+                    );
+
+                    ImGui::Separator();
+                    ImGui::Text(
+                        "Waypoints: %zu (%zu directional)",
+                        waypoints.size(),
+                        directional_waypoint_count
+                    );
+                    ImGui::Text(
+                        "Active waypoint: %zu%s",
+                        celeris.active_waypoint_index(),
+                        celeris.waypoint_path_completed() ? " (complete)" : ""
+                    );
+
+                    float waypoint_reach_radius = celeris.waypoint_reach_radius();
+                    if (ImGui::SliderFloat(
+                            "Waypoint reach radius",
+                            &waypoint_reach_radius,
+                            0.1f,
+                            20.0f,
+                            "%.2f m")) {
+                        celeris.set_waypoint_reach_radius(waypoint_reach_radius);
+                    }
+
+                    ImGui::InputText(
+                        "Waypoint path file",
+                        waypoint_path_file_name,
+                        sizeof(waypoint_path_file_name)
+                    );
+
+                    if (ImGui::Button("Save waypoint path")) {
+                        std::filesystem::path save_file_name =
+                            std::filesystem::path(waypoint_path_file_name).filename();
+
+                        if (save_file_name.empty()) {
+                            waypoint_path_failed = true;
+                            waypoint_path_status = "File name is empty";
+                        } else {
+                            save_file_name.replace_extension(".wpp");
+                            const std::filesystem::path save_path =
+                                saved_waypoint_paths_directory / save_file_name;
+
+                            try {
+                                celeris.save_waypoint_path(save_path);
+                                waypoint_path_failed = false;
+                                waypoint_path_status = "Saved " + save_path.string();
+                            } catch (const std::exception& error) {
+                                waypoint_path_failed = true;
+                                waypoint_path_status = error.what();
+                            }
+                        }
+                    }
+
+                    ImGui::SameLine();
+
+                    if (ImGui::Button("Load waypoint path")) {
+                        std::filesystem::path load_file_name =
+                            std::filesystem::path(waypoint_path_file_name).filename();
+
+                        if (load_file_name.empty()) {
+                            waypoint_path_failed = true;
+                            waypoint_path_status = "File name is empty";
+                        } else {
+                            load_file_name.replace_extension(".wpp");
+                            const std::filesystem::path load_path =
+                                saved_waypoint_paths_directory / load_file_name;
+
+                            try {
+                                celeris.load_waypoint_path(load_path);
+                                waypoint_path_failed = false;
+                                waypoint_path_status = "Loaded " + load_path.string();
+                            } catch (const std::exception& error) {
+                                waypoint_path_failed = true;
+                                waypoint_path_status = error.what();
+                            }
+                        }
+                    }
+
+                    if (!waypoint_path_status.empty()) {
+                        const ImVec4 color = waypoint_path_failed
+                            ? ImVec4(1.0f, 0.25f, 0.25f, 1.0f)
+                            : ImVec4(0.35f, 1.0f, 0.45f, 1.0f);
+                        ImGui::TextColored(color, "%s", waypoint_path_status.c_str());
+                    }
+
+                    if (ImGui::Button("Add directional waypoint")) {
+                        add_directional_waypoint();
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("Key: T");
+
+                    if (ImGui::Button("Add nondirectional waypoint")) {
+                        add_nondirectional_waypoint();
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("Key: G");
+
+                    if (ImGui::Button("Delete last waypoint")) {
+                        delete_last_waypoint();
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("Key: L");
+
+                    ImGui::Separator();
 
                     if (ImGui::Button("Play car path")) {
                         start_car_playback();
@@ -1057,7 +1358,7 @@ int main() {
                 // }
 
                 ImGui::End();
-                
+
                 ui.end_frame(command_buffer);
             }
         }

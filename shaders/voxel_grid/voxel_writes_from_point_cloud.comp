@@ -75,7 +75,6 @@ void main() {
     vec3 local = world_pos / voxel_size.xyz;
 
     ivec4 voxel_pos = ivec4(ivec3(floor(local)), 1);
-    
 
     VoxelData voxel_data;
 

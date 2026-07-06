@@ -137,35 +137,35 @@ const VulkanCommandPool& VulkanEngine::upload_command_pool() const noexcept {
 }
 
 const VulkanQueue& VulkanEngine::graphics_queue(uint32_t index) const {
-    return device().graphics_queue();
+    return device().graphics_queue(index);
 }
 
 VulkanQueue& VulkanEngine::graphics_queue(uint32_t index) {
-    return device().graphics_queue();
+    return device().graphics_queue(index);
 }
 
 const VulkanQueue& VulkanEngine::present_queue(uint32_t index) const {
-    return device().present_queue();
+    return device().present_queue(index);
 }
 
 VulkanQueue& VulkanEngine::present_queue(uint32_t index) {
-    return device().present_queue();
+    return device().present_queue(index);
 }
 
 const VulkanQueue& VulkanEngine::compute_queue(uint32_t index) const {
-    return device().compute_queue();
+    return device().compute_queue(index);
 }
 
 VulkanQueue& VulkanEngine::compute_queue(uint32_t index) {
-    return device().compute_queue();
+    return device().compute_queue(index);
 }
 
 const VulkanQueue& VulkanEngine::transfer_queue(uint32_t index) const {
-    return device().transfer_queue();
+    return device().transfer_queue(index);
 }
 
 VulkanQueue& VulkanEngine::transfer_queue(uint32_t index) {
-    return device().transfer_queue();
+    return device().transfer_queue(index);
 }
 
 const VulkanInstance& VulkanEngine::instance() const {

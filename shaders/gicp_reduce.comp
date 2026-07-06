@@ -1,10 +1,17 @@
 #version 460
+
+#ifdef GICP_USE_FLOAT32
+#define GICPScalar float
+#else
+#define GICPScalar double
+#endif
+
 layout(local_size_x = 64) in;
 
 struct GICPPartial {
-    double H[6][6];
-    double g[6];
-    double total_weighted_sq_error;
+    GICPScalar H[6][6];
+    GICPScalar g[6];
+    GICPScalar total_weighted_sq_error;
     uint valid_count;
 };
 

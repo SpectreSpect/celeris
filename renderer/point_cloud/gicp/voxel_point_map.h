@@ -1,5 +1,7 @@
 #pragma once
 
+#include <filesystem>
+
 #include "../../../vulkan_self/pass/instance/pass_instance.h"
 #include "../../../vulkan_self/vulkan_buffer.h"
 
@@ -10,6 +12,8 @@
 class InstanceBufferView;
 class VoxelGrid;
 
+inline constexpr uint32_t COUNT_HASH_TABLE_COUNTERS = 16;
+
 class VoxelPointMap {
 public:
     struct VoxelPointMapUniform {
@@ -18,9 +22,9 @@ public:
     };
 
     struct HashTableCountersGpu {
-        uint32_t count_empty[16];
-        uint32_t count_occupied[16];
-        uint32_t count_tomb[16];
+        uint32_t count_empty[COUNT_HASH_TABLE_COUNTERS];
+        uint32_t count_occupied[COUNT_HASH_TABLE_COUNTERS];
+        uint32_t count_tomb[COUNT_HASH_TABLE_COUNTERS];
     };
 
     struct IndexHashTableSlotGpu {
@@ -37,6 +41,10 @@ public:
     InstanceBufferView get_map_instance_view();
 
     void upload_voxels(VulkanEngine& engine, VoxelGrid& voxel_grid);
+    uint32_t map_point_count() const noexcept;
+
+    void save(const std::filesystem::path& path);
+    void load(const std::filesystem::path& path);
 
     // VoxelPointMap() = default;
     // void create(VulkanBuffer& engine, uint32_t num_hash_table_slots, uint32_t max_map_point_count);
@@ -47,8 +55,13 @@ public:
     uint32_t m_map_point_count = 0;
 
     VulkanBuffer map_uniform_buffer;
-    VulkanBuffer map_hash_table_buffer;
+
+
+    VulkanBuffer map_hash_table_buffer; // this
+
     VulkanBuffer map_point_buffer;
     VulkanBuffer map_normal_buffer;
-    VulkanBuffer map_point_count_buffer;
+
+
+    VulkanBuffer map_point_count_buffer; // this
 };

@@ -16,18 +16,8 @@
 #include <cmath>
 #include <limits>
 
-// namespace {
-//     void set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position) {
-//         marker.transform.position = nonholonomic_position.pos;
-//         marker.transform.rotation = glm::angleAxis(
-//             glm::pi<float>() - nonholonomic_position.theta,
-//             glm::vec3(0.0f, 1.0f, 0.0f)
-//         );
-//     }
-// }
-
-CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager, 
-                                     MaterialInstanceManager& material_instance_manager, 
+CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
+                                     MaterialInstanceManager& material_instance_manager,
                                      Celeris& celeris,
                                      const VehicleGeometry& vehicle_geometry,
                                      uint32_t max_path_line_count,
@@ -36,18 +26,18 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
         scan_generation(celeris.received_scan_count()),
         m_celeris(&celeris),
         m_start_marker(
-            mesh_manager, 
-            material_instance_manager, 
+            mesh_manager,
+            material_instance_manager,
             PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(1, 0, 0, 1))
         ),
         m_goal_marker(
-            mesh_manager, 
-            material_instance_manager, 
+            mesh_manager,
+            material_instance_manager,
             PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(0, 0, 1, 1))
         ),
         m_vehicle_marker(
-            mesh_manager, 
-            material_instance_manager, 
+            mesh_manager,
+            material_instance_manager,
             PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(0, 1, 0, 1))
         ),
         m_gazelle_next(mesh_manager, material_instance_manager, vehicle_geometry, skybox_exposure),
@@ -70,7 +60,14 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
         m_local_candidate_line_cloud(*m_celeris->engine(),
                    mesh_manager.line_quad,
                    material_instance_manager.line,
-                   max_path_line_count) {
+                   max_path_line_count),
+        m_point_map_point_cloud(
+            *m_celeris->engine(),
+            mesh_manager,
+            material_instance_manager,
+            m_celeris->voxel_point_map().map_point_buffer,
+            celeris.voxel_point_map().m_map_point_count
+        ) {
     m_path_line_cloud.set_material_data(LineMaterialData{
         .color = glm::vec4(1, 1, 1, 1),
         .line_width_pixels = 5
@@ -80,6 +77,12 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
         .color = glm::vec4(0.3f, 1.0f, 0.3f, 1.0f),
         .line_width_pixels = 5
     });
+
+    // PointCloud voxel_point_map(
+    //     manager_bundle,
+    //     celeris.voxel_point_map().map_point_buffer,
+    //     celeris.voxel_point_map().m_map_point_count
+    // );
 
     m_explored_paths_line_cloud.set_material_data(LineMaterialData{
         .color = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
@@ -96,6 +99,10 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
         .line_width_pixels = 4
     });
 
+    // m_point_map_point_cloud.set_material_data(PointCloudMaterialData{
+    //     .color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)
+    // });
+
     add_child(m_start_marker);
     add_child(m_gazelle_next);
     add_child(m_goal_marker);
@@ -105,6 +112,8 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
     add_child(m_explored_paths_line_cloud);
     add_child(m_unimpended_path_line_cloud);
     add_child(m_local_candidate_line_cloud);
+    add_child(m_celeris->waypoint_path());
+    add_child(m_point_map_point_cloud);
 
     if (m_celeris->has_start_position())
         set_start(m_celeris->start_position());
@@ -118,14 +127,14 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
 
 void CelerisVisualizer::set_start(const NonholonomicPos& nonholonomic_position) {
     set_marker_pose(m_start_marker, nonholonomic_position);
-    set_gazelle_pose_from_lidar_transform();
+    set_gazelle_pose(m_celeris->vehicle_position());
     reset_marker_interpolation(m_start_marker, m_start_marker_interpolation);
 }
 
 void CelerisVisualizer::set_start(const Transform& transform) {
     m_start_marker.transform = transform;
     m_start_marker.transform.position += marker_vertical_offset();
-    set_gazelle_pose_from_lidar_transform();
+    set_gazelle_pose(m_celeris->vehicle_position());
     reset_marker_interpolation(m_start_marker, m_start_marker_interpolation);
 }
 
@@ -144,7 +153,7 @@ void CelerisVisualizer::set_vehicle(const Transform& transform) {
     m_vehicle_marker.transform = transform;
     m_vehicle_marker.transform.position += marker_vertical_offset();
     reset_marker_interpolation(m_vehicle_marker, m_vehicle_marker_interpolation);
-}   
+}
 
 void CelerisVisualizer::set_vehicle(const NonholonomicPos& nonholonomic_position) {
     set_marker_pose(m_vehicle_marker, nonholonomic_position);
@@ -178,10 +187,15 @@ void CelerisVisualizer::update() {
         set_start(m_celeris->start_position());
     if (m_celeris->has_goal_position())
         set_goal(m_celeris->goal_position());
+
+    m_point_map_point_cloud.set_instance_view(
+        m_celeris->voxel_point_map().get_map_instance_view()
+    );
+
     if (m_has_car_pose_override)
         set_gazelle_pose(m_car_pose_override);
     else
-        set_gazelle_pose_from_lidar_transform();
+        set_gazelle_pose(m_celeris->vehicle_position());
 
     m_start_marker.visible = show_start_marker && m_celeris->has_start_position();
     m_goal_marker.visible = show_goal_marker && m_celeris->has_goal_position();
@@ -258,6 +272,7 @@ void CelerisVisualizer::display_debug_controls() {
         ImGui::Checkbox("Plain A* path", &show_guide_path);
         ImGui::Checkbox("Explored paths", &show_explored_paths);
         ImGui::Checkbox("Unimpeded path", &show_unimpeded_path);
+        ImGui::Checkbox("Waypoints", &m_celeris->waypoint_path().visible);
         ImGui::Checkbox("Start pose marker", &show_start_marker);
         ImGui::Checkbox("Goal pose marker", &show_goal_marker);
         ImGui::Checkbox("Vehicle pose marker", &show_vehicle_marker);
@@ -292,16 +307,6 @@ void CelerisVisualizer::set_gazelle_pose(const NonholonomicPos& nonholonomic_pos
     );
 
     m_gazelle_next.set_rear_axle_transform(rear_axle_transform);
-}
-
-void CelerisVisualizer::set_gazelle_pose_from_lidar_transform() {
-    m_gazelle_next.set_lidar_transform(m_celeris->lidar_transform());
-    m_gazelle_next.transform.position += marker_vertical_offset();
-    // m_gazelle_next.transform = m_celeris->lidar_transform();
-    // m_gazelle_next.transform.rotation = glm::normalize(
-    //     m_gazelle_next.transform.rotation *
-    //     glm::angleAxis(glm::pi<float>(), glm::vec3(0.0f, 1.0f, 0.0f))
-    // );
 }
 
 void CelerisVisualizer::reset_marker_interpolation(
@@ -461,7 +466,7 @@ std::vector<LineInstance> CelerisVisualizer::make_path_lines(
         path_lines.push_back(LineInstance{.p0 = glm::vec3(0.0f),
                                             .p1 = glm::vec3(0.0f),
                                             .color = glm::vec4(0.0f)});
-    
+
     return path_lines;
 }
 

@@ -106,6 +106,11 @@ int voxel_y_offset(ivec3 pos, uint max_step_up_u, uint max_drop_u, inout VoxelLo
         ivec3 stand_pos = pos + ivec3(0, -drop, 0);
         ivec3 ground_pos = stand_pos + ivec3(0, -1, 0);
 
+        uint ground_flags = voxel_flags(ground_pos, cache);
+        if ((ground_flags & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) != 0u) {
+            return -(max_drop + 1);
+        }
+
         if (!is_blocking_voxel(stand_pos, cache) && is_ground_voxel(ground_pos, cache)) {
             return -drop;
         }

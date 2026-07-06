@@ -39,6 +39,7 @@ public:
 
     VkPhysicalDevice handle() const noexcept;
     const QueueAllocation& queue_allocation() const noexcept;
+    bool supports_shader_float64() const noexcept;
 
 public:
     struct SwapchainSupportDetails {
@@ -65,4 +66,5 @@ private:
     QueueAllocation m_queue_allocation{};
     VkPhysicalDevice m_physical_device = VK_NULL_HANDLE;
     VkSurfaceKHR m_surface = VK_NULL_HANDLE;
+    VkPhysicalDeviceFeatures m_features{};
 };

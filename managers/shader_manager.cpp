@@ -1,5 +1,6 @@
 #include "shader_manager.h"
 #include "../path_utils.h"
+#include "../vulkan_self/vulkan_device.h"
 
 ShaderManager::ShaderManager(VulkanDevice& device) 
     :   blinn_phong_vs(device, path_utils::executable_dir() / "shaders" / "triangle.vert.spv"),
@@ -24,10 +25,20 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         fill_buffer_cs(device, path_utils::executable_dir() / "shaders" / "fill_buffer.comp.spv"),
 
         // GICP
-        gicp_step_cs(device, path_utils::executable_dir() / "shaders" / "gicp_step.comp.spv"),
+        gicp_step_cs(
+            device,
+            path_utils::executable_dir() /
+                "shaders" /
+                (device.supports_shader_float64() ? "gicp_step.comp.spv" : "gicp_step_fp32.comp.spv")
+        ),
         insert_points_into_voxel_map_cs(device, path_utils::executable_dir() / "shaders" / "insert_points_into_voxel_map.comp.spv"),
         reset_point_voxel_map_cs(device, path_utils::executable_dir() / "shaders" / "reset_voxel_point_map.comp.spv"),
-        gicp_reduce_cs(device, path_utils::executable_dir() / "shaders" / "gicp_reduce.comp.spv"),
+        gicp_reduce_cs(
+            device,
+            path_utils::executable_dir() /
+                "shaders" /
+                (device.supports_shader_float64() ? "gicp_reduce.comp.spv" : "gicp_reduce_fp32.comp.spv")
+        ),
 
         // Cloud to mesh
         generate_mesh_cs(device, path_utils::executable_dir() / "shaders" / "cloud_to_mesh" / "generate_mesh_cs.comp.spv"),

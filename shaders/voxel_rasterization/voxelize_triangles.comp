@@ -21,7 +21,6 @@ layout(push_constant) uniform VoxelizeTrianglesPushConstants {
     mat4 u_transform;
 
     uint u_counter_hash_table_size;
-    uint u_count_voxels_in_chunk;
 
     uint u_vertex_stride_bytes;
     uint u_vertex_position_offset_bytes;
@@ -130,7 +129,7 @@ vec4 voxel_index_to_position(uint voxel_id) {
 void main() {
     uint voxel_id = gl_GlobalInvocationID.x;
     uint active_key_list_id = gl_GlobalInvocationID.y;
-    if (voxel_id >= u_count_voxels_in_chunk) return;
+    if (voxel_id >= u_chunk_dim.w) return;
     if (active_key_list_id >= active_chunk_keys_counter) return;
 
     uvec2 chunk_key = active_chunk_keys_list[active_key_list_id];

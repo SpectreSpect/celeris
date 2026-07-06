@@ -289,11 +289,15 @@ void Voxelizator::voxelize_chunks(
     uint32_t count_triangles = mesh.index_count() / 3;
 
     m_pass_instances.voxelize_triangles_pi.push_constants(command_buffer, VoxelizeTrianglesPushConstants{
-        .u_chunk_dim = glm::uvec4(m_params.chunk_size.x, m_params.chunk_size.y, m_params.chunk_size.z, 0),
+        .u_chunk_dim = glm::uvec4(
+            m_params.chunk_size.x,
+            m_params.chunk_size.y,
+            m_params.chunk_size.z,
+            m_params.chunk_size.x * m_params.chunk_size.y * m_params.chunk_size.z
+        ),
         .u_voxel_size = glm::vec4(m_params.voxel_size.x, m_params.voxel_size.y, m_params.voxel_size.z, 0.0f),
         .u_transform = transform,
         .u_counter_hash_table_size = m_params.counter_hash_table_size,
-        .u_count_voxels_in_chunk = static_cast<uint32_t>(m_params.chunk_size.x * m_params.chunk_size.y * m_params.chunk_size.z),
         .u_vertex_stride_bytes = vertex_stride,
         .u_vertex_position_offset_bytes = position_attribute_offset,
         .u_pack_offset = math_utils::OFFSET,

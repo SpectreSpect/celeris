@@ -1,11 +1,13 @@
 #pragma once
 
+#include "celeris.h"
 #include "gazelle_next.h"
 #include "spherical_pose_marker.h"
 #include "../a_star/a_star_structures.h"
 #include "../renderer/scene_object.h"
 #include "../renderer/lines/line_cloud.h"
 #include "../a_star/vehichle.h"
+#include "../renderer/point_cloud/point_cloud.h"
 
 #include "../vulkan_self/logger/logger_header.h"
 
@@ -16,7 +18,6 @@
 #include <vector>
 #include <chrono>
 
-class Celeris;
 struct VehicleGeometry;
 
 class CelerisVisualizer : public SceneObject {
@@ -73,6 +74,8 @@ private:
     LineCloud m_unimpended_path_line_cloud;
     LineCloud m_local_candidate_line_cloud;
 
+    PointCloud m_point_map_point_cloud;
+
     MarkerInterpolationState m_start_marker_interpolation;
     MarkerInterpolationState m_goal_marker_interpolation;
     MarkerInterpolationState m_vehicle_marker_interpolation;
@@ -96,7 +99,6 @@ private:
 
     void set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position);
     void set_gazelle_pose(const NonholonomicPos& nonholonomic_position);
-    void set_gazelle_pose_from_lidar_transform();
     void reset_marker_interpolation(
         SphericalPoseMarker& marker,
         MarkerInterpolationState& state

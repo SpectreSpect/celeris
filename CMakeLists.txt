@@ -142,6 +142,7 @@ add_executable(app
   autopilot/vehicle_command_sender.cpp
   autopilot/vehicle_state_receiver.cpp
   autopilot/path_planner.cpp
+  autopilot/waypoint_path.cpp
   autopilot/celeris.cpp
   autopilot/celeris_visualizer.cpp
   autopilot/vehicle_geometry.cpp
@@ -288,6 +289,49 @@ foreach(SHADER ${SHADER_SOURCES})
   endif()
 
   list(APPEND SPIRV_OUTPUTS "${SPIRV_OUTPUT}")
+endforeach()
+
+set(GICP_FP32_SHADERS
+  "gicp_step.comp"
+  "gicp_reduce.comp"
+)
+
+foreach(GICP_SHADER_REL_PATH ${GICP_FP32_SHADERS})
+  set(GICP_SHADER "${SHADERS_SRC_DIR}/${GICP_SHADER_REL_PATH}")
+  string(REPLACE ".comp" "_fp32.comp" GICP_FP32_REL_PATH "${GICP_SHADER_REL_PATH}")
+  set(GICP_FP32_OUTPUT "${SHADERS_BUILD_DIR}/${GICP_FP32_REL_PATH}.spv")
+  get_filename_component(GICP_FP32_OUTPUT_DIR "${GICP_FP32_OUTPUT}" DIRECTORY)
+
+  if(VULKAN_SHADER_COMPILER_KIND STREQUAL "glslc")
+    add_custom_command(
+      OUTPUT "${GICP_FP32_OUTPUT}"
+      COMMAND ${CMAKE_COMMAND} -E make_directory "${GICP_FP32_OUTPUT_DIR}"
+      COMMAND "${VULKAN_SHADER_COMPILER}"
+              "-I${SHADERS_SRC_DIR}"
+              "-DGICP_USE_FLOAT32"
+              "${GICP_SHADER}"
+              -o "${GICP_FP32_OUTPUT}"
+      DEPENDS "${GICP_SHADER}" ${SHADER_INCLUDE_FILES}
+      COMMENT "Compiling fp32 GICP shader ${GICP_FP32_REL_PATH}"
+      VERBATIM
+    )
+  else()
+    add_custom_command(
+      OUTPUT "${GICP_FP32_OUTPUT}"
+      COMMAND ${CMAKE_COMMAND} -E make_directory "${GICP_FP32_OUTPUT_DIR}"
+      COMMAND "${VULKAN_SHADER_COMPILER}"
+              -V
+              "-I${SHADERS_SRC_DIR}"
+              "-DGICP_USE_FLOAT32"
+              "${GICP_SHADER}"
+              -o "${GICP_FP32_OUTPUT}"
+      DEPENDS "${GICP_SHADER}" ${SHADER_INCLUDE_FILES}
+      COMMENT "Compiling fp32 GICP shader ${GICP_FP32_REL_PATH}"
+      VERBATIM
+    )
+  endif()
+
+  list(APPEND SPIRV_OUTPUTS "${GICP_FP32_OUTPUT}")
 endforeach()
 
 add_custom_target(compile_shaders ALL
