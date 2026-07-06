@@ -71,6 +71,7 @@
 #include "autopilot/spherical_pose_marker.h"
 #include "autopilot/celeris.h"
 #include "autopilot/celeris_visualizer.h"
+#include "autopilot/gamepad_controller.h"
 #include "autopilot/vehicle_geometry.h"
 #include "voxel_grid_vulkan/voxel_grid_gpu_debugger.h"
 #include "camera/controllers/third_person_camera_controller.h"
@@ -81,6 +82,7 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <cmath>
 #include <vector>
 #include <random>
@@ -744,6 +746,7 @@ int main() {
     bool place_footprint_pressed = false;
     bool fps_camera_pressed = false;
     bool third_person_camera_pressed = false;
+    GamepadController gamepad_controller;
 
     int step = 0;
     
@@ -824,6 +827,8 @@ int main() {
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
+        gamepad_controller.update(celeris.car_speed());
+        celeris.set_controller_command(gamepad_controller.command());
 
         if (skybox_environment_update_pending) {
             engine.device().wait_idle();
@@ -1311,6 +1316,36 @@ int main() {
                     }
                     ImGui::SameLine();
                     ImGui::TextUnformatted("Key: L");
+
+                    ImGui::Separator();
+
+                    bool controller_commands_enabled = celeris.controller_commands_enabled();
+                    if (ImGui::Checkbox("Controller driving", &controller_commands_enabled)) {
+                        celeris.set_controller_commands_enabled(controller_commands_enabled);
+                    }
+
+                    bool print_controller_input = gamepad_controller.print_input_events();
+                    if (ImGui::Checkbox("Print controller input", &print_controller_input)) {
+                        gamepad_controller.set_print_input_events(print_controller_input);
+                    }
+
+                    const VehicleCommand controller_command = celeris.controller_command();
+                    ImGui::Text(
+                        "Controller: %s%s",
+                        gamepad_controller.gamepad_present() ? "gamepad" :
+                        (gamepad_controller.raw_joystick_present() ? "raw joystick" : "not connected"),
+                        gamepad_controller.brake_pressed() ? " (R1 brake)" : ""
+                    );
+                    ImGui::Text(
+                        "Controller command: speed %.2f, steering %.2f",
+                        controller_command.speed,
+                        controller_command.steering_angle
+                    );
+                    ImGui::Text(
+                        "Command sender: %s, %s",
+                        celeris.command_sender_running() ? "running" : "stopped",
+                        celeris.command_sender_connected() ? "connected" : "not connected"
+                    );
 
                     ImGui::Separator();
 

@@ -138,6 +138,7 @@ Celeris::Celeris(VulkanEngine& engine,
     logger().check(desc.waypoint_reach_radius > 0.0f, "Waypoint reach radius must be greater than 0");
 
     m_waypoint_reach_radius = desc.waypoint_reach_radius;
+    m_controller_commands_enabled = desc.controller_commands_enabled;
     m_voxel_map_reseter.reset(m_voxel_point_map);
 }
 
@@ -153,7 +154,7 @@ void Celeris::start_lidar_receiver() {
 
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     start_lidar_receiver();
-    // m_command_sender.start();
+    m_command_sender.start();
     m_path_planner.start(std::move(planner_submit_context));
 }
 
@@ -165,7 +166,9 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
     logger().check(m_voxel_grid, "Voxel grid was null");
 
     sync_path_planner_result();
-    m_command_sender.set_command(get_path_following_command());
+    m_command_sender.set_command(
+        m_controller_commands_enabled ? m_controller_command : get_path_following_command()
+    );
 
     if (auto scan = m_scan_receiver.try_pop_scan(*m_manager_bundle)) {
         glm::vec3 raw_position = scan->point_cloud().transform.position;
@@ -338,6 +341,19 @@ void Celeris::set_waypoint_reach_radius(float radius) noexcept {
         m_waypoint_reach_radius = radius;
 }
 
+void Celeris::set_controller_commands_enabled(bool enabled) noexcept {
+    m_controller_commands_enabled = enabled;
+    if (!enabled)
+        m_controller_command = VehicleCommand{};
+}
+
+void Celeris::set_controller_command(VehicleCommand command) noexcept {
+    if (!std::isfinite(command.speed) || !std::isfinite(command.steering_angle))
+        return;
+
+    m_controller_command = command;
+}
+
 void Celeris::add_waypoint(glm::vec3 position) {
     m_waypoint_path.add_waypoint(position);
     reset_waypoint_navigation();
@@ -375,6 +391,22 @@ float Celeris::car_speed() const noexcept {
 
 float Celeris::waypoint_reach_radius() const noexcept {
     return m_waypoint_reach_radius;
+}
+
+bool Celeris::controller_commands_enabled() const noexcept {
+    return m_controller_commands_enabled;
+}
+
+VehicleCommand Celeris::controller_command() const noexcept {
+    return m_controller_command;
+}
+
+bool Celeris::command_sender_running() const noexcept {
+    return m_command_sender.is_running();
+}
+
+bool Celeris::command_sender_connected() const noexcept {
+    return m_command_sender.is_connected();
 }
 
 size_t Celeris::active_waypoint_index() const noexcept {
