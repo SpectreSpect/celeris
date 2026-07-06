@@ -78,6 +78,7 @@
 #include "vulkan_self/vulkan_submit_context.h"
 
 #include <algorithm>
+#include <fstream>
 #include <cmath>
 #include <vector>
 #include <random>
@@ -433,17 +434,102 @@ int main() {
         }
     );
     celeris.set_start(NonholonomicPos{.pos = glm::vec3(0.0f, 1.5f, 0.0f)});
-    // celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.92f, -51.30f)});
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
-    // celeris.set_goal(NonholonomicPos{.pos = glm::vec3(-170.69f, 1.5f, -0.0f)});
     celeris.start(std::move(planner_submit_context));
 
-    CelerisVisualizer celeris_visualizer(mesh_manager, 
-                                         material_instance_manager, 
-                                         celeris, 
-                                         vehicle_geometry,
-                                         20000, 
-                                         skybox_exposure);
+    CelerisVisualizer celeris_visualizer(
+        mesh_manager, 
+        material_instance_manager, 
+        celeris, 
+        vehicle_geometry,
+        20000, 
+        skybox_exposure
+    );
+
+    LidarScan target_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
+    LidarScan source_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
+
+    target_scan.point_cloud().set_color(glm::vec4(0, 0, 1, 1));
+    source_scan.point_cloud().set_color(glm::vec4(1, 0, 0, 1));
+
+    source_scan.point_cloud().transform.position += glm::vec3(-2, 2, -2);
+
+
+    celeris.voxel_map_point_inserter().insert(
+        celeris.voxel_point_map(),
+        target_scan.point_cloud(),
+        target_scan.normal_buffer()
+    );
+
+    celeris.voxel_map_point_inserter().insert(
+        celeris.voxel_point_map(),
+        source_scan.point_cloud(),
+        source_scan.normal_buffer()
+    );
+
+    // std::vector<PointInstance> point_map_points(
+    //     celeris.voxel_point_map().map_point_count()
+    // );
+
+    // std::vector<glm::vec4> point_map_normals(
+    //     celeris.voxel_point_map().map_point_count()
+    // );
+
+    // celeris.voxel_point_map().map_point_buffer.read(
+    //     point_map_points.data(), 
+    //     celeris.voxel_point_map().map_point_count() * sizeof(PointInstance),
+    //     0
+    // );
+
+    // celeris.voxel_point_map().map_normal_buffer.read(
+    //     point_map_normals.data(), 
+    //     celeris.voxel_point_map().map_point_count() * sizeof(glm::vec4),
+    //     0
+    // );
+
+
+    celeris.voxel_point_map().load("/home/spectre/Projects/celeris/saved_maps/map.cel");
+
+    // std::ofstream saved_file("/home/spectre/Projects/celeris/saved_maps/map.cel");
+
+    // saved_file << celeris.voxel_point_map().map_point_count() << "\n";
+
+    // for (int i = 0; i < celeris.voxel_point_map().map_point_count(); i++) {
+    //     saved_file 
+    //         << point_map_points[i].position.x << "\n"
+    //         << point_map_points[i].position.y << "\n"
+    //         << point_map_points[i].position.z << "\n"
+    //         << point_map_points[i].position.w << "\n"
+
+    //         << point_map_points[i].color.r << "\n"
+    //         << point_map_points[i].color.g << "\n"
+    //         << point_map_points[i].color.b << "\n"
+    //         << point_map_points[i].color.a << "\n";
+    // }
+
+    // for (int i = 0; i < celeris.voxel_point_map().map_point_count(); i++) {
+    //     saved_file 
+    //         << point_map_normals[i].x << "\n"
+    //         << point_map_normals[i].y << "\n"
+    //         << point_map_normals[i].z << "\n"
+    //         << point_map_normals[i].w << "\n";
+    // }
+    
+    // saved_file.close();
+
+    
+
+    // celeris.voxel_point_map
+
+    // VoxelPointMap voxel_point_map(
+    //     engine,
+    //     1500000,
+    //     1500000
+    // );
+
+
+
+
 
     auto use_fps_camera_controller = [&]() {
         if (camera_controller_mode == CameraControllerMode::FPS)
@@ -529,13 +615,7 @@ int main() {
     // lidar_video.get_scan(0).point_cloud().transform.position = glm::vec3(0.0f);
     // lidar_video.get_scan(0).point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
-    LidarScan target_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
-    LidarScan source_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
 
-    target_scan.point_cloud().set_color(glm::vec4(0, 0, 1, 1));
-    source_scan.point_cloud().set_color(glm::vec4(1, 0, 0, 1));
-
-    source_scan.point_cloud().transform.position += glm::vec3(-2, 2, -2);
 
     // celeris.voxel_map_reseter().reset(celeris.voxel_point_map());
     // celeris.voxel_map_point_inserter().insert(

@@ -17,7 +17,7 @@ VoxelPointMap::VoxelPointMap(VulkanEngine& engine, uint32_t num_hash_table_slots
         )),
         // map_point_buffer(VulkanBuffer::create_storage_buffer(engine, sizeof(PointInstance) * max_map_point_count)),
         map_point_buffer(VulkanBuffer(engine.physical_device(), engine.device(), sizeof(PointInstance) * max_map_point_count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)),        
-        map_normal_buffer(VulkanBuffer::create_storage_buffer(engine, sizeof(glm::vec4) * max_map_point_count)), 
+        map_normal_buffer(VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(glm::vec4) * max_map_point_count)), 
         map_point_count_buffer(VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t))){
 }
 
@@ -64,4 +64,120 @@ void VoxelPointMap::upload_voxels(VulkanEngine& engine, VoxelGrid& voxel_grid) {
     VulkanFence compute_fence(engine.device());
     engine.compute_submit(compute_command_buffer, &compute_fence);
     compute_fence.wait();
+}
+
+uint32_t VoxelPointMap::map_point_count() const noexcept {
+    return m_map_point_count;
+}
+
+void VoxelPointMap::save(const std::filesystem::path& path) {
+    std::ofstream out(path, std::ios::binary);
+    if (!out) throw std::runtime_error("Failed to open: " + path.string());
+
+    std::vector<PointInstance> point_map_points(
+        m_map_point_count
+    );
+
+    std::vector<glm::vec4> point_map_normals(
+        m_map_point_count
+    );
+
+    HashTableCountersGpu point_hash_table_counters;
+
+    std::vector<IndexHashTableSlotGpu> point_hash_table(
+        m_map_point_count
+    );
+
+    map_point_buffer.read(
+        point_map_points.data(), 
+        m_map_point_count * sizeof(PointInstance),
+        0
+    );
+
+    map_normal_buffer.read(
+        point_map_normals.data(), 
+        m_map_point_count * sizeof(glm::vec4),
+        0
+    );
+
+    map_hash_table_buffer.read(
+        &point_hash_table_counters,
+        sizeof(HashTableCountersGpu),
+        0
+    );
+
+    map_hash_table_buffer.read(
+        point_hash_table.data(),
+        m_map_point_count * sizeof(IndexHashTableSlotGpu),
+        sizeof(HashTableCountersGpu)
+    );
+
+    out.write(&m_map_point_count, 0);
+    out.write(point_map_points.data(), sizeof(PointInstance) * m_map_point_count);
+    out.write(point_map_normals.data(), sizeof(glm::vec4) * m_map_point_count);
+    out.write(&point_hash_table_counters, sizeof(HashTableCountersGpu));
+    out.write(point_hash_table.data(), sizeof(IndexHashTableSlotGpu) * m_map_point_count);
+    
+    save_file.close();
+}
+
+void VoxelPointMap::load(std::string path) {
+    std::ifstream in(path, std::ios::binary);
+
+    map_file >> m_map_point_count;
+
+    std::vector<PointInstance> point_map_points(
+        m_map_point_count
+    );
+
+    std::vector<glm::vec4> point_map_normals(
+        m_map_point_count
+    );
+
+    for (int i = 0; i < m_map_point_count; i++) {
+        PointInstance point_instance{};
+
+        map_file >> point_instance.position.x;
+        map_file >> point_instance.position.y;
+        map_file >> point_instance.position.z;
+        map_file >> point_instance.position.w;
+
+        map_file >> point_instance.color.r;
+        map_file >> point_instance.color.g;
+        map_file >> point_instance.color.b;
+        map_file >> point_instance.color.a;
+
+        point_map_points.push_back(point_instance);
+    }
+
+    for (int i = 0; i < m_map_point_count; i++) {
+        glm::vec4 normal{};
+
+        map_file >> normal.x;
+        map_file >> normal.y;
+        map_file >> normal.z;
+        map_file >> normal.w;
+
+        point_map_normals.push_back(normal);
+    }
+
+    map_point_buffer.upload(
+        point_map_points.data(), 
+        m_map_point_count * sizeof(PointInstance),
+        0
+    );
+
+    map_normal_buffer.upload(
+        point_map_normals.data(), 
+        m_map_point_count * sizeof(glm::vec4),
+        0
+    );
+
+    // for (int i = 0; i < m_map_point_count; i++) {
+    //     saved_file 
+    //         << point_map_normals[i].x << "\n"
+    //         << point_map_normals[i].y << "\n"
+    //         << point_map_normals[i].z << "\n"
+    //         << point_map_normals[i].w << "\n";
+    // }
 }

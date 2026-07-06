@@ -5,6 +5,7 @@
 #include "../a_star/a_star_structures.h"
 #include "../renderer/scene_object.h"
 #include "../renderer/lines/line_cloud.h"
+#include "../renderer/point_cloud/point_cloud.h"
 
 #include "../vulkan_self/logger/logger_header.h"
 
@@ -66,6 +67,8 @@ private:
     LineCloud m_guide_path_line_cloud;
     LineCloud m_explored_paths_line_cloud;
     LineCloud m_unimpended_path_line_cloud;
+
+    PointCloud m_point_map_point_cloud;
 
     MarkerInterpolationState m_start_marker_interpolation;
     MarkerInterpolationState m_goal_marker_interpolation;
