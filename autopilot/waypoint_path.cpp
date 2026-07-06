@@ -9,12 +9,69 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
+#include <cstring>
+#include <fstream>
+#include <stdexcept>
+#include <utility>
 
 namespace {
     constexpr glm::vec4 WAYPOINT_PATH_COLOR = glm::vec4(0.45f, 0.85f, 1.0f, 1.0f);
     constexpr float WAYPOINT_SPHERE_SCALE = 0.25f;
     constexpr float WAYPOINT_POSE_MARKER_SCALE = 0.45f;
     constexpr float WAYPOINT_VERTICAL_OFFSET = 0.5f;
+
+    struct WaypointPathFileHeader {
+        char magic[8];
+        uint32_t version;
+        uint32_t waypoint_count;
+        uint32_t waypoint_record_size;
+    };
+
+    struct WaypointPathFileRecord {
+        glm::vec4 position;
+        uint32_t has_theta;
+        float theta;
+        uint32_t reserved[2];
+    };
+
+    static_assert(sizeof(WaypointPathFileRecord) == 32);
+
+    constexpr char WAYPOINT_PATH_MAGIC[8] = {'C', 'W', 'P', 'A', 'T', 'H', '0', '1'};
+    constexpr uint32_t WAYPOINT_PATH_VERSION = 1u;
+
+    template <class T>
+    void write_pod(std::ofstream& out, const T& value, const std::filesystem::path& path) {
+        out.write(reinterpret_cast<const char*>(&value), static_cast<std::streamsize>(sizeof(T)));
+        if (!out) {
+            throw std::runtime_error("Failed to write: " + path.string());
+        }
+    }
+
+    void write_bytes(std::ofstream& out, const void* data, size_t size_bytes, const std::filesystem::path& path) {
+        if (size_bytes == 0) return;
+
+        out.write(reinterpret_cast<const char*>(data), static_cast<std::streamsize>(size_bytes));
+        if (!out) {
+            throw std::runtime_error("Failed to write: " + path.string());
+        }
+    }
+
+    template <class T>
+    void read_pod(std::ifstream& in, T& value, const std::filesystem::path& path) {
+        in.read(reinterpret_cast<char*>(&value), static_cast<std::streamsize>(sizeof(T)));
+        if (!in) {
+            throw std::runtime_error("Failed to read: " + path.string());
+        }
+    }
+
+    void read_bytes(std::ifstream& in, void* data, size_t size_bytes, const std::filesystem::path& path) {
+        if (size_bytes == 0) return;
+
+        in.read(reinterpret_cast<char*>(data), static_cast<std::streamsize>(size_bytes));
+        if (!in) {
+            throw std::runtime_error("Failed to read: " + path.string());
+        }
+    }
 }
 
 WaypointPath::WaypointPath(
@@ -66,6 +123,69 @@ void WaypointPath::delete_last_waypoint() {
 
 void WaypointPath::clear() {
     m_waypoints.clear();
+    refresh_visualization();
+}
+
+void WaypointPath::save(const std::filesystem::path& path) const {
+    std::ofstream out(path, std::ios::binary);
+    if (!out) throw std::runtime_error("Failed to open: " + path.string());
+
+    WaypointPathFileHeader header{};
+    std::memcpy(header.magic, WAYPOINT_PATH_MAGIC, sizeof(header.magic));
+    header.version = WAYPOINT_PATH_VERSION;
+    header.waypoint_count = static_cast<uint32_t>(m_waypoints.size());
+    header.waypoint_record_size = sizeof(WaypointPathFileRecord);
+
+    std::vector<WaypointPathFileRecord> records;
+    records.reserve(m_waypoints.size());
+
+    for (const Waypoint& waypoint : m_waypoints) {
+        WaypointPathFileRecord record{};
+        record.position = waypoint.position;
+        record.has_theta = waypoint.directional() ? 1u : 0u;
+        record.theta = waypoint.theta.value_or(0.0f);
+        records.push_back(record);
+    }
+
+    write_pod(out, header, path);
+    write_bytes(out, records.data(), sizeof(WaypointPathFileRecord) * records.size(), path);
+}
+
+void WaypointPath::load(const std::filesystem::path& path) {
+    std::ifstream in(path, std::ios::binary);
+    if (!in) throw std::runtime_error("Failed to open: " + path.string());
+
+    WaypointPathFileHeader header{};
+    read_pod(in, header, path);
+
+    if (std::memcmp(header.magic, WAYPOINT_PATH_MAGIC, sizeof(header.magic)) != 0) {
+        throw std::runtime_error("Invalid waypoint path file: " + path.string());
+    }
+
+    if (header.version != WAYPOINT_PATH_VERSION) {
+        throw std::runtime_error("Unsupported waypoint path file version: " + path.string());
+    }
+
+    if (header.waypoint_record_size != sizeof(WaypointPathFileRecord)) {
+        throw std::runtime_error("Waypoint path file layout does not match this build: " + path.string());
+    }
+
+    std::vector<WaypointPathFileRecord> records(header.waypoint_count);
+    read_bytes(in, records.data(), sizeof(WaypointPathFileRecord) * records.size(), path);
+
+    std::vector<Waypoint> loaded_waypoints;
+    loaded_waypoints.reserve(records.size());
+
+    for (const WaypointPathFileRecord& record : records) {
+        loaded_waypoints.push_back(Waypoint{
+            .position = record.position,
+            .theta = record.has_theta != 0u
+                ? std::optional<float>(record.theta)
+                : std::nullopt
+        });
+    }
+
+    m_waypoints = std::move(loaded_waypoints);
     refresh_visualization();
 }
 

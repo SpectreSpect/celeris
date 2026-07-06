@@ -138,6 +138,8 @@ public:
     void sync_point_map_and_voxel_grid();
     void save_map(const std::filesystem::path& path);
     void load_map(const std::filesystem::path& path);
+    void save_waypoint_path(const std::filesystem::path& path);
+    void load_waypoint_path(const std::filesystem::path& path);
     bool localize_on_map();
     const AABB& get_bounding_box() const noexcept;
     const AABB& get_bouding_box() const noexcept { return get_bounding_box(); }

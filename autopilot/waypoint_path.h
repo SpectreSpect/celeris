@@ -9,6 +9,9 @@
 
 #include <glm/glm.hpp>
 
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -48,6 +51,8 @@ public:
     void add_waypoint(const NonholonomicPos& position);
     void delete_last_waypoint();
     void clear();
+    void save(const std::filesystem::path& path) const;
+    void load(const std::filesystem::path& path);
 
     const std::vector<Waypoint>& waypoints() const noexcept;
     size_t directional_waypoint_count() const noexcept;

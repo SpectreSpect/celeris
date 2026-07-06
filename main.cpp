@@ -99,6 +99,8 @@ int main() {
     queue_request.compute_count = 2;
 
     const std::filesystem::path saved_maps_directory = std::filesystem::path("saved_maps");
+    const std::filesystem::path saved_waypoint_paths_directory =
+        std::filesystem::path("saved_waypoint_paths");
 
     auto vehicle_config_path = []() {
         const std::filesystem::path relative_path =
@@ -444,6 +446,7 @@ int main() {
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
     // celeris.set_start_lidar_scan_position(start_lidar_scan_position);
     celeris.load_map(saved_maps_directory / "robocross_map.vpm");
+    celeris.load_waypoint_path(saved_waypoint_paths_directory / "path3.wpp");
     celeris.start(std::move(planner_submit_context));
 
     CelerisVisualizer celeris_visualizer(
@@ -502,6 +505,9 @@ int main() {
     bool map_save_failed = false;
     std::string map_localization_status;
     bool map_localization_failed = false;
+    char waypoint_path_file_name[128] = "path";
+    std::string waypoint_path_status;
+    bool waypoint_path_failed = false;
 
     
 
@@ -1211,6 +1217,67 @@ int main() {
                         waypoints.size(),
                         directional_waypoint_count
                     );
+
+                    ImGui::InputText(
+                        "Waypoint path file",
+                        waypoint_path_file_name,
+                        sizeof(waypoint_path_file_name)
+                    );
+
+                    if (ImGui::Button("Save waypoint path")) {
+                        std::filesystem::path save_file_name =
+                            std::filesystem::path(waypoint_path_file_name).filename();
+
+                        if (save_file_name.empty()) {
+                            waypoint_path_failed = true;
+                            waypoint_path_status = "File name is empty";
+                        } else {
+                            save_file_name.replace_extension(".wpp");
+                            const std::filesystem::path save_path =
+                                saved_waypoint_paths_directory / save_file_name;
+
+                            try {
+                                celeris.save_waypoint_path(save_path);
+                                waypoint_path_failed = false;
+                                waypoint_path_status = "Saved " + save_path.string();
+                            } catch (const std::exception& error) {
+                                waypoint_path_failed = true;
+                                waypoint_path_status = error.what();
+                            }
+                        }
+                    }
+
+                    ImGui::SameLine();
+
+                    if (ImGui::Button("Load waypoint path")) {
+                        std::filesystem::path load_file_name =
+                            std::filesystem::path(waypoint_path_file_name).filename();
+
+                        if (load_file_name.empty()) {
+                            waypoint_path_failed = true;
+                            waypoint_path_status = "File name is empty";
+                        } else {
+                            load_file_name.replace_extension(".wpp");
+                            const std::filesystem::path load_path =
+                                saved_waypoint_paths_directory / load_file_name;
+
+                            try {
+                                celeris.load_waypoint_path(load_path);
+                                waypoint_path_failed = false;
+                                waypoint_path_status = "Loaded " + load_path.string();
+                            } catch (const std::exception& error) {
+                                waypoint_path_failed = true;
+                                waypoint_path_status = error.what();
+                            }
+                        }
+                    }
+
+                    if (!waypoint_path_status.empty()) {
+                        const ImVec4 color = waypoint_path_failed
+                            ? ImVec4(1.0f, 0.25f, 0.25f, 1.0f)
+                            : ImVec4(0.35f, 1.0f, 0.45f, 1.0f);
+                        ImGui::TextColored(color, "%s", waypoint_path_status.c_str());
+                    }
 
                     if (ImGui::Button("Add directional waypoint")) {
                         add_directional_waypoint();

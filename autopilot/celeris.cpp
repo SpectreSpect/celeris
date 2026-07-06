@@ -782,6 +782,23 @@ void Celeris::load_map(const std::filesystem::path& path) {
     sync_point_map_and_voxel_grid();
 }
 
+void Celeris::save_waypoint_path(const std::filesystem::path& path) {
+    std::filesystem::path resolved_path = resolve_celeris_file_path(path);
+    resolved_path.replace_extension(".wpp");
+
+    const std::filesystem::path parent_path = resolved_path.parent_path();
+
+    if (!parent_path.empty()) {
+        std::filesystem::create_directories(parent_path);
+    }
+
+    m_waypoint_path.save(resolved_path);
+}
+
+void Celeris::load_waypoint_path(const std::filesystem::path& path) {
+    m_waypoint_path.load(resolve_celeris_file_path(path));
+}
+
 bool Celeris::localize_on_map() {
     if (!m_network_scan) {
         std::cout << "Localizing on map failed: no LiDAR scan is loaded" << std::endl;
