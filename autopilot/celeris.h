@@ -22,6 +22,7 @@
 #include "../utils/avg_timer.h"
 #include "../a_star/vehichle.h"
 #include "../a_star/local_planner.h"
+#include "../a_star/pure_pursuit_local_planner.h"
 #include "vehicle_state_receiver.h"
 
 #include <chrono>
@@ -166,9 +167,9 @@ private:
 
     VehicleStateReceiver m_vehicle_state_receiver;
 
-    Vehicle m_vehicle;
+    PurePursuitVehicle m_vehicle;
     PathPlanner m_path_planner;
-    LocalPlanner m_local_planner;
+    PurePursuitLocalPlanner m_local_planner;
     
     VoxelPointMap m_voxel_point_map;
     VoxelMapPointInserter m_voxel_map_inserter;

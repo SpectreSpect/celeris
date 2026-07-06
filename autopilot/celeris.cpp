@@ -218,7 +218,7 @@ Celeris::Celeris(VulkanEngine& engine,
     logger().check(desc.unimpended_path_max_astar_points > 0, "Unimpended path max astar points must be greater than 0");
     logger().check(desc.max_write_count > 0, "Max write count must be greater than 0");
 
-    Vehicle::SimulationFollowParams& follow_params = m_vehicle.follow_params();
+    PurePursuitVehicle::PurePursuitParams& follow_params = m_vehicle.params();
     follow_params.cruise_speed = std::max(0.0f, desc.vehicle_cruise_speed);
     follow_params.slowdown_distance_from_path = std::max(0.0f, desc.vehicle_slowdown_distance_from_path);
     follow_params.min_off_path_speed_factor = std::clamp(
@@ -228,8 +228,6 @@ Celeris::Celeris(VulkanEngine& engine,
     );
     follow_params.projection_backtrack_window = std::max(0.0f, desc.vehicle_projection_backtrack_window);
     follow_params.projection_lookahead_base = std::max(0.0f, desc.vehicle_projection_lookahead_base);
-    follow_params.min_direction_segment_virtual_length =
-        std::max(0.0f, desc.vehicle_min_direction_segment_virtual_length);
     follow_params.direction_switch_arrival_distance =
         std::max(0.0f, desc.vehicle_direction_switch_arrival_distance);
     follow_params.direction_switch_arrival_speed =
@@ -463,7 +461,7 @@ void Celeris::set_car_speed(float speed) noexcept {
         return;
 
     m_car_speed = std::max(0.0f, speed);
-    m_vehicle.follow_params().cruise_speed = m_car_speed;
+    m_vehicle.params().cruise_speed = m_car_speed;
 }
 
 LidarScan* Celeris::network_scan() {
@@ -495,7 +493,7 @@ NonholonomicPos Celeris::goal_position() const noexcept {
 }
 
 float Celeris::car_speed() const noexcept {
-    return m_vehicle.follow_params().cruise_speed;
+    return m_vehicle.params().cruise_speed;
 }
 
 VulkanEngine* Celeris::engine() {
@@ -521,7 +519,8 @@ VoxelMapPointReseter& Celeris::voxel_map_reseter() {
 const std::vector<Vehicle::SimulationControlCandidate>&
 Celeris::local_planner_candidates() const noexcept
 {
-    return m_local_planner.last_simulation_candidates();
+    static const std::vector<Vehicle::SimulationControlCandidate> empty_candidates;
+    return empty_candidates;
 }
 
 float Celeris::local_planner_path_window_min_s() const noexcept {
@@ -953,16 +952,34 @@ void Celeris::display_path_planner_debug_controls() {
     }
 
     const Vehicle::VehicleTransformState& state = m_vehicle.state();
-    const Vehicle::SimulationFollowParams& follow_params = m_vehicle.follow_params();
+    const PurePursuitVehicle::PurePursuitParams& follow_params = m_vehicle.params();
     ImGui::Text("Vehicle speed: %.3f", state.m_speed);
     ImGui::Text("Vehicle cruise speed: %.3f", follow_params.cruise_speed);
     ImGui::Text("Vehicle acceleration: %.3f", state.m_speed_acceleration);
     ImGui::Text("Steering angle: %.3f", state.m_steering_angle);
     ImGui::Text("Steering velocity: %.3f", state.m_steering_angle_velocity);
 
-    const std::vector<Vehicle::SimulationControlCandidate>& candidates =
-        m_local_planner.last_simulation_candidates();
-    ImGui::Text("Local candidates: %zu", candidates.size());
+    const PurePursuitVehicle::PurePursuitStepResult& pure_pursuit_step =
+        m_local_planner.last_step_result();
+    ImGui::Text("Local planner: Pure Pursuit");
+    ImGui::Text("Pure Pursuit lookahead: %.3f", pure_pursuit_step.lookahead_distance);
+    ImGui::Text(
+        "Pure Pursuit s: %.2f -> %.2f",
+        pure_pursuit_step.current_projection.s,
+        pure_pursuit_step.target_projection.s
+    );
+    ImGui::Text(
+        "Pure Pursuit target point: %.2f, %.2f",
+        pure_pursuit_step.target_projection.point.x,
+        pure_pursuit_step.target_projection.point.y
+    );
+    ImGui::Text("Pure Pursuit target speed: %.3f", pure_pursuit_step.target_speed);
+    ImGui::Text("Pure Pursuit target steering: %.3f", pure_pursuit_step.target_steering_angle);
+    ImGui::Text(
+        "Pure Pursuit command: acc=%.3f steer_vel=%.3f",
+        pure_pursuit_step.control_command.speed_acceleration,
+        pure_pursuit_step.control_command.steering_angle_velocity
+    );
     if (ImGui::DragFloat("Local planner update period", &m_desc.local_planner_update_period, 0.001f, 0.0f, 0.2f, "%.3f")) {
         m_desc.local_planner_update_period = std::max(0.0f, m_desc.local_planner_update_period);
     }
@@ -980,87 +997,41 @@ void Celeris::display_path_planner_debug_controls() {
         "Local path generation: %llu",
         static_cast<unsigned long long>(m_local_planner.path_generation())
     );
-    if (!candidates.empty()) {
-        auto display_candidate_loss_breakdown =
-            [](const Vehicle::SimulationLossBreakdown& breakdown) {
-                ImGui::Text(
-                    "    loss parts: pos=%+.2f head=%+.2f speed=%+.2f prog=%+.2f steer=%+.2f ctrl=%+.2f sum=%+.2f",
-                    breakdown.position,
-                    breakdown.heading,
-                    breakdown.speed,
-                    breakdown.progress,
-                    breakdown.steering,
-                    breakdown.control,
-                    breakdown.total()
-                );
-            };
-
-        auto display_candidate_summary =
-            [&](size_t i, const Vehicle::SimulationControlCandidate& candidate) {
-                const Vehicle::SimulationControlCandidateDebug& candidate_debug = candidate.debug;
-                ImGui::Text(
-                    "#%zu loss=%.2f acc=%.2f steer_acc=%.2f len=%.2f s=%.2f->%.2f target=%.2f err=%.2f v=%.2f",
-                    i,
-                    candidate.loss,
-                    candidate.control_command.speed_acceleration,
-                    candidate.control_command.steer_acceleration,
-                    candidate_debug.trajectory_length,
-                    candidate_debug.start_s,
-                    candidate_debug.end_s,
-                    candidate_debug.target_end_s,
-                    candidate_debug.target_end_dist,
-                    candidate.predicted_state.m_speed
-                );
-                display_candidate_loss_breakdown(candidate_debug.loss_breakdown);
-            };
-
-        const Vehicle::SimulationControlCandidate& best = candidates.front();
-        const Vehicle::SimulationControlCandidateDebug& debug = best.debug;
-        ImGui::Text("Best loss: %.3f", best.loss);
-        ImGui::Text("Best acceleration: %.3f", best.control_command.speed_acceleration);
-        ImGui::Text("Best steering acceleration: %.3f", best.control_command.steer_acceleration);
-        ImGui::Text("Best trajectory length: %.3f", debug.trajectory_length);
-        ImGui::Text(
-            "Best s: %.2f -> %.2f, target %.2f",
-            debug.start_s,
-            debug.end_s,
-            debug.target_end_s
-        );
-        ImGui::Text(
-            "Best dist to path: %.3f -> %.3f",
-            debug.start_dist,
-            debug.end_dist
-        );
-        ImGui::Text("Best target end error: %.3f", debug.target_end_dist);
-        ImGui::Text("Best reference path speed: %.3f", debug.reference_initial_path_speed);
-        ImGui::Text("Best predicted speed: %.3f", best.predicted_state.m_speed);
-        ImGui::Text("Best predicted steering: %.3f", best.predicted_state.m_steering_angle);
-        ImGui::Text("Best predicted steering velocity: %.3f", best.predicted_state.m_steering_angle_velocity);
-        display_candidate_loss_breakdown(debug.loss_breakdown);
-
-        if (ImGui::TreeNode("Top local candidates")) {
-            const size_t display_count = std::min<size_t>(candidates.size(), 8);
-            for (size_t i = 0; i < display_count; i++) {
-                display_candidate_summary(i, candidates[i]);
-            }
-            ImGui::TreePop();
-        }
-
-        if (ImGui::TreeNode("All local candidates")) {
-            for (size_t i = 0; i < candidates.size(); i++) {
-                display_candidate_summary(i, candidates[i]);
-            }
-            ImGui::TreePop();
-        }
-    }
 
     ImGui::Separator();
     if (ImGui::TreeNode("Local planner follow params")) {
-        Vehicle::SimulationFollowParams& params = m_vehicle.follow_params();
+        PurePursuitVehicle::PurePursuitParams& params = m_vehicle.params();
 
         float cruise_speed = params.cruise_speed;
         if (ImGui::DragFloat("Cruise speed", &cruise_speed, 0.1f, 0.0f, 40.0f, "%.3f")) {
             set_car_speed(cruise_speed);
+        }
+        if (ImGui::DragFloat("Lookahead distance", &params.lookahead_distance, 0.05f, 0.0f, 50.0f, "%.3f")) {
+            params.lookahead_distance = std::max(0.0f, params.lookahead_distance);
+        }
+        if (ImGui::DragFloat("Lookahead speed gain", &params.lookahead_speed_gain, 0.01f, 0.0f, 10.0f, "%.3f")) {
+            params.lookahead_speed_gain = std::max(0.0f, params.lookahead_speed_gain);
+        }
+        if (ImGui::DragFloat("Min lookahead distance", &params.min_lookahead_distance, 0.05f, 0.0f, 50.0f, "%.3f")) {
+            params.min_lookahead_distance = std::max(0.0f, params.min_lookahead_distance);
+        }
+        if (ImGui::DragFloat("Max lookahead distance", &params.max_lookahead_distance, 0.05f, 0.0f, 100.0f, "%.3f")) {
+            params.max_lookahead_distance = std::max(params.min_lookahead_distance, params.max_lookahead_distance);
+        }
+        if (ImGui::DragFloat("Min steering lookahead distance", &params.min_steering_lookahead_distance, 0.05f, 0.0f, 50.0f, "%.3f")) {
+            params.min_steering_lookahead_distance = std::max(0.0f, params.min_steering_lookahead_distance);
+        }
+        if (ImGui::DragFloat("Goal steering release distance", &params.goal_steering_release_distance, 0.05f, 0.0f, 20.0f, "%.3f")) {
+            params.goal_steering_release_distance = std::max(0.0f, params.goal_steering_release_distance);
+        }
+        if (ImGui::DragFloat("Goal steering release speed", &params.goal_steering_release_speed, 0.01f, 0.0f, 10.0f, "%.3f")) {
+            params.goal_steering_release_speed = std::max(0.0f, params.goal_steering_release_speed);
+        }
+        if (ImGui::DragFloat("Speed P gain", &params.speed_p_gain, 0.01f, 0.0f, 20.0f, "%.3f")) {
+            params.speed_p_gain = std::max(0.0f, params.speed_p_gain);
+        }
+        if (ImGui::DragFloat("Steering P gain", &params.steering_p_gain, 0.05f, 0.0f, 50.0f, "%.3f")) {
+            params.steering_p_gain = std::max(0.0f, params.steering_p_gain);
         }
         if (ImGui::DragFloat("Slowdown distance from path", &params.slowdown_distance_from_path, 0.05f, 0.0f, 50.0f, "%.3f")) {
             params.slowdown_distance_from_path = std::max(0.0f, params.slowdown_distance_from_path);
@@ -1074,9 +1045,6 @@ void Celeris::display_path_planner_debug_controls() {
         if (ImGui::DragFloat("Projection lookahead base", &params.projection_lookahead_base, 0.05f, 0.0f, 50.0f, "%.3f")) {
             params.projection_lookahead_base = std::max(0.0f, params.projection_lookahead_base);
         }
-        if (ImGui::DragFloat("Min virtual direction segment length", &params.min_direction_segment_virtual_length, 0.05f, 0.0f, 20.0f, "%.3f")) {
-            params.min_direction_segment_virtual_length = std::max(0.0f, params.min_direction_segment_virtual_length);
-        }
         if (ImGui::DragFloat("Direction switch arrival distance", &params.direction_switch_arrival_distance, 0.01f, 0.0f, 5.0f, "%.3f")) {
             params.direction_switch_arrival_distance = std::max(0.0f, params.direction_switch_arrival_distance);
         }
@@ -1088,6 +1056,7 @@ void Celeris::display_path_planner_debug_controls() {
         }
 
         if (ImGui::Button("Reset follow params")) {
+            params = PurePursuitVehicle::PurePursuitParams{};
             params.cruise_speed = std::max(0.0f, m_desc.vehicle_cruise_speed);
             params.slowdown_distance_from_path = std::max(0.0f, m_desc.vehicle_slowdown_distance_from_path);
             params.min_off_path_speed_factor = std::clamp(
@@ -1097,8 +1066,6 @@ void Celeris::display_path_planner_debug_controls() {
             );
             params.projection_backtrack_window = std::max(0.0f, m_desc.vehicle_projection_backtrack_window);
             params.projection_lookahead_base = std::max(0.0f, m_desc.vehicle_projection_lookahead_base);
-            params.min_direction_segment_virtual_length =
-                std::max(0.0f, m_desc.vehicle_min_direction_segment_virtual_length);
             params.direction_switch_arrival_distance =
                 std::max(0.0f, m_desc.vehicle_direction_switch_arrival_distance);
             params.direction_switch_arrival_speed =
@@ -1107,32 +1074,6 @@ void Celeris::display_path_planner_debug_controls() {
                 std::max(0.0f, m_desc.vehicle_direction_switch_approach_speed);
             m_car_speed = params.cruise_speed;
         }
-
-        ImGui::TreePop();
-    }
-
-    ImGui::Separator();
-    if (ImGui::TreeNode("Local planner loss weights")) {
-        Vehicle::SimulationLossWeights& weights = m_vehicle.loss_weights();
-
-        auto drag_non_negative_float = [](const char* label, float& value, float speed, float max_value) {
-            if (ImGui::DragFloat(label, &value, speed, 0.0f, max_value, "%.3f")) {
-                value = std::max(0.0f, value);
-            }
-        };
-
-        drag_non_negative_float("Position", weights.position, 0.05f, 100.0f);
-        drag_non_negative_float("Heading", weights.heading, 0.01f, 20.0f);
-        drag_non_negative_float("Speed", weights.speed, 0.01f, 20.0f);
-        drag_non_negative_float("Progress tracking", weights.progress_tracking, 0.01f, 50.0f);
-        drag_non_negative_float("Forward progress", weights.forward_progress, 0.01f, 20.0f);
-        drag_non_negative_float("Backward motion", weights.backward_progress, 0.05f, 100.0f);
-        drag_non_negative_float("Steering", weights.steering, 0.01f, 20.0f);
-        drag_non_negative_float("Control", weights.control, 0.001f, 5.0f);
-        drag_non_negative_float("Steering rate", weights.steering_rate, 0.01f, 20.0f);
-
-        if (ImGui::Button("Reset loss weights"))
-            m_vehicle.reset_loss_weights();
 
         ImGui::TreePop();
     }
