@@ -328,6 +328,25 @@ void Celeris::set_car_speed(float speed) noexcept {
         m_car_speed = speed;
 }
 
+void Celeris::add_waypoint(glm::vec3 position) {
+    m_waypoints.push_back(Waypoint{
+        .position = glm::vec4(position, 1.0f),
+        .theta = std::nullopt
+    });
+}
+
+void Celeris::add_waypoint(const NonholonomicPos& position) {
+    m_waypoints.push_back(Waypoint{
+        .position = glm::vec4(position.pos, 1.0f),
+        .theta = position.theta
+    });
+}
+
+void Celeris::delete_last_waypoint() {
+    if (!m_waypoints.empty())
+        m_waypoints.pop_back();
+}
+
 LidarScan* Celeris::network_scan() {
     return m_network_scan.get();
 }
@@ -378,6 +397,10 @@ VoxelGrid* Celeris::voxel_grid() noexcept {
 
 uint32_t Celeris::received_scan_count() const noexcept {
     return m_received_scan_count;
+}
+
+const std::vector<Celeris::Waypoint>& Celeris::waypoints() const noexcept {
+    return m_waypoints;
 }
 
 bool Celeris::collision_point_is_free(glm::vec3 point) {

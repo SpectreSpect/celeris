@@ -25,6 +25,7 @@
 #include <chrono>
 #include <cstddef>
 #include <filesystem>
+#include <optional>
 #include <span>
 
 
@@ -37,6 +38,19 @@ class VulkanSubmitContext;
 class Celeris {
 public:
     _XCLASS_NAME(Celeris);
+
+    struct Waypoint {
+        glm::vec4 position{0.0f, 0.0f, 0.0f, 1.0f};
+        std::optional<float> theta;
+
+        glm::vec3 world_position() const noexcept {
+            return glm::vec3(position);
+        }
+
+        bool directional() const noexcept {
+            return theta.has_value();
+        }
+    };
 
     struct CelerisDesc {
         uint16_t receiver_port = 5000;
@@ -81,6 +95,9 @@ public:
     void set_start_lidar_scan_position(glm::vec3 position) noexcept;
     void set_start_lidar_scan_position(const NonholonomicPos& position) noexcept;
     void set_car_speed(float speed) noexcept;
+    void add_waypoint(glm::vec3 position);
+    void add_waypoint(const NonholonomicPos& position);
+    void delete_last_waypoint();
 
     LidarScan* network_scan();
     const Transform& lidar_transform() const noexcept;
@@ -88,6 +105,7 @@ public:
     NonholonomicPos goal_position() const noexcept;
     float car_speed() const noexcept;
     uint32_t received_scan_count() const noexcept;
+    const std::vector<Waypoint>& waypoints() const noexcept;
 
     VulkanEngine* engine();
 
@@ -163,6 +181,7 @@ private:
 
     NonholonomicPos m_start_position;
     NonholonomicPos m_goal_position;
+    std::vector<Waypoint> m_waypoints;
     Transform m_lidar_transform;
     float m_car_speed = 10.0f;
 

@@ -136,7 +136,7 @@ int main() {
     ShaderManager shader_manager(engine.device());
     ComputePassManager compute_pass_manager(engine.device(), shader_manager);
     TextureManager texture_manager(engine, resource_loader, compute_pass_manager);
-    
+
     LightingSystem lighting_system(engine, compute_pass_manager);
     FrameResources frame_resources(engine, lighting_system, engine.num_frames_in_flight());
 
@@ -285,7 +285,7 @@ int main() {
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     );
-    
+
     VoxelWriteGPU blue_voxelize_prefab;
     blue_voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
     blue_voxelize_prefab.set_flags = OVERWRITE_BIT;
@@ -438,6 +438,7 @@ int main() {
             .footprint_vertical_inflation_size = vertical_inflation_size
         }
     );
+
     const NonholonomicPos start_lidar_scan_position{.pos = glm::vec3(0.0f, 0.0f, 0.0f)};
     // celeris.set_start(start_lidar_scan_position);
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
@@ -600,6 +601,24 @@ int main() {
         }
     };
 
+    auto add_directional_waypoint = [&]() {
+        NonholonomicPos pose;
+        if (make_pose_from_camera(pose)) {
+            celeris.add_waypoint(pose);
+        }
+    };
+
+    auto add_nondirectional_waypoint = [&]() {
+        glm::vec3 position = camera.position;
+        if (celeris.adjust_to_ground(position)) {
+            celeris.add_waypoint(position);
+        }
+    };
+
+    auto delete_last_waypoint = [&]() {
+        celeris.delete_last_waypoint();
+    };
+
     // LidarVideo lidar_video(
     //     manager_bundle, 
     //     point_cloud_preprocessor, 
@@ -710,6 +729,8 @@ int main() {
     skybox.update(scene);
 
     bool g_pressed = false;
+    bool t_pressed = false;
+    bool l_pressed = false;
     bool n_pressed = false;
     bool place_start_pressed = false;
     bool place_end_pressed = false;
@@ -931,21 +952,31 @@ int main() {
             place_footprint_pressed = false;
         }
 
+        if (!t_pressed && glfwGetKey(window.handle(), GLFW_KEY_T) == GLFW_PRESS) {
+            t_pressed = true;
+            add_directional_waypoint();
+        }
+
+        if (t_pressed && glfwGetKey(window.handle(), GLFW_KEY_T) == GLFW_RELEASE) {
+            t_pressed = false;
+        }
+
         if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
             g_pressed = true;
-
-            // uint32_t current_frame_id = lidar_video.current_frame_id();
-
-            // if (current_frame_id > 0) {
-            //     LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
-            //     gicp_pass.step(voxel_point_map, current_scan.point_cloud(), current_scan.normal_buffer());
-            // }
-
-            // step++;
+            add_nondirectional_waypoint();
         }
 
         if (g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_RELEASE) {
             g_pressed = false;
+        }
+
+        if (!l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_PRESS) {
+            l_pressed = true;
+            delete_last_waypoint();
+        }
+
+        if (l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_RELEASE) {
+            l_pressed = false;
         }
 
         if (!n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_PRESS) {
@@ -1164,6 +1195,42 @@ int main() {
                     }
                     ImGui::SameLine();
                     ImGui::TextUnformatted("Key: 4");
+
+                    const std::vector<Celeris::Waypoint>& waypoints = celeris.waypoints();
+                    const size_t directional_waypoint_count = std::count_if(
+                        waypoints.begin(),
+                        waypoints.end(),
+                        [](const Celeris::Waypoint& waypoint) {
+                            return waypoint.directional();
+                        }
+                    );
+
+                    ImGui::Separator();
+                    ImGui::Text(
+                        "Waypoints: %zu (%zu directional)",
+                        waypoints.size(),
+                        directional_waypoint_count
+                    );
+
+                    if (ImGui::Button("Add directional waypoint")) {
+                        add_directional_waypoint();
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("Key: T");
+
+                    if (ImGui::Button("Add nondirectional waypoint")) {
+                        add_nondirectional_waypoint();
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("Key: G");
+
+                    if (ImGui::Button("Delete last waypoint")) {
+                        delete_last_waypoint();
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("Key: L");
+
+                    ImGui::Separator();
 
                     if (ImGui::Button("Play car path")) {
                         start_car_playback();

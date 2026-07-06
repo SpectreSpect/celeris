@@ -11,16 +11,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
-// namespace {
-//     void set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position) {
-//         marker.transform.position = nonholonomic_position.pos;
-//         marker.transform.rotation = glm::angleAxis(
-//             glm::pi<float>() - nonholonomic_position.theta,
-//             glm::vec3(0.0f, 1.0f, 0.0f)
-//         );
-//     }
-// }
+namespace {
+    constexpr glm::vec4 WAYPOINT_PATH_COLOR = glm::vec4(0.45f, 0.85f, 1.0f, 1.0f);
+    constexpr float WAYPOINT_SPHERE_SCALE = 0.25f;
+}
 
 CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager, 
                                      MaterialInstanceManager& material_instance_manager, 
@@ -31,6 +27,8 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
     :   max_path_line_count(max_path_line_count),
         scan_generation(celeris.received_scan_count()),
         m_celeris(&celeris),
+        m_waypoint_sphere_mesh(&mesh_manager.sphere),
+        m_waypoint_sphere_material(&material_instance_manager.pbr),
         m_start_marker(mesh_manager, 
                      material_instance_manager, 
                      PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(1, 0, 0, 1))),
@@ -51,6 +49,10 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
                    material_instance_manager.line,
                    max_path_line_count),
         m_unimpended_path_line_cloud(*m_celeris->engine(),
+                   mesh_manager.line_quad,
+                   material_instance_manager.line,
+                   max_path_line_count),
+        m_waypoint_path_line_cloud(*m_celeris->engine(),
                    mesh_manager.line_quad,
                    material_instance_manager.line,
                    max_path_line_count),
@@ -88,6 +90,11 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
         .line_width_pixels = 5
     });
 
+    m_waypoint_path_line_cloud.set_material_data(LineMaterialData{
+        .color = WAYPOINT_PATH_COLOR,
+        .line_width_pixels = 5
+    });
+
     // m_point_map_point_cloud.set_material_data(PointCloudMaterialData{
     //     .color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)
     // });
@@ -99,6 +106,7 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
     add_child(m_guide_path_line_cloud);
     add_child(m_explored_paths_line_cloud);
     add_child(m_unimpended_path_line_cloud);
+    add_child(m_waypoint_path_line_cloud);
     add_child(m_point_map_point_cloud);
 
 
@@ -205,6 +213,8 @@ void CelerisVisualizer::update() {
         show_unimpeded_path ? make_path_lines(path_result.unimpended_path) : hidden_lines
     );
 
+    update_waypoint_path_visualization();
+
 }
 
 void CelerisVisualizer::display_debug_controls() {
@@ -213,6 +223,7 @@ void CelerisVisualizer::display_debug_controls() {
         ImGui::Checkbox("Plain A* path", &show_guide_path);
         ImGui::Checkbox("Explored paths", &show_explored_paths);
         ImGui::Checkbox("Unimpeded path", &show_unimpeded_path);
+        ImGui::Checkbox("Waypoints", &show_waypoints);
         ImGui::Checkbox("Start pose marker", &show_start_marker);
         ImGui::Checkbox("Gazelle Next", &show_gazelle_next);
     }
@@ -395,4 +406,68 @@ std::vector<LineInstance> CelerisVisualizer::make_path_lines(const std::vector<g
                                             .color = glm::vec4(0.0f)});
 
     return path_lines;
+}
+
+std::vector<LineInstance> CelerisVisualizer::make_waypoint_path_lines(
+    const std::vector<Celeris::Waypoint>& waypoints)
+{
+    std::vector<LineInstance> path_lines;
+    path_lines.reserve(std::min<size_t>(waypoints.size(), max_path_line_count));
+
+    const glm::vec3 offset(0.0f, 0.25f, 0.0f);
+    for (uint32_t i = 1; i < waypoints.size() && path_lines.size() < max_path_line_count; i++) {
+        path_lines.push_back(LineInstance{
+            .p0 = waypoints[i - 1].world_position() + offset,
+            .p1 = waypoints[i].world_position() + offset,
+            .color = WAYPOINT_PATH_COLOR
+        });
+    }
+
+    if (path_lines.empty())
+        path_lines.push_back(LineInstance{.p0 = glm::vec3(0.0f),
+                                            .p1 = glm::vec3(0.0f),
+                                            .color = glm::vec4(0.0f)});
+
+    return path_lines;
+}
+
+void CelerisVisualizer::update_waypoint_path_visualization() {
+    const std::vector<Celeris::Waypoint>& waypoints = m_celeris->waypoints();
+
+    m_waypoint_path_line_cloud.set_lines(
+        show_waypoints ? make_waypoint_path_lines(waypoints)
+                       : std::vector<LineInstance>{LineInstance{
+                             .p0 = glm::vec3(0.0f),
+                             .p1 = glm::vec3(0.0f),
+                             .color = glm::vec4(0.0f)
+                         }}
+    );
+
+    while (m_waypoint_spheres.size() < waypoints.size()) {
+        auto sphere = std::make_unique<RenderObject>(
+            *m_waypoint_sphere_mesh,
+            *m_waypoint_sphere_material
+        );
+        sphere->set_material_data(PBRMaterialData::create(
+            1.0f,
+            0.7f,
+            1.8f,
+            WAYPOINT_PATH_COLOR
+        ));
+        sphere->transform.scale = glm::vec3(WAYPOINT_SPHERE_SCALE);
+        add_child(*sphere);
+        m_waypoint_spheres.push_back(std::move(sphere));
+    }
+
+    const glm::vec3 offset(0.0f, 0.25f, 0.0f);
+    for (size_t i = 0; i < m_waypoint_spheres.size(); i++) {
+        RenderObject& sphere = *m_waypoint_spheres[i];
+        const bool visible = show_waypoints && i < waypoints.size();
+        sphere.visible = visible;
+
+        if (!visible)
+            continue;
+
+        sphere.transform.position = waypoints[i].world_position() + offset;
+    }
 }
