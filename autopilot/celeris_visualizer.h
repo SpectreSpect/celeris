@@ -7,7 +7,6 @@
 #include "../renderer/scene_object.h"
 #include "../renderer/lines/line_cloud.h"
 #include "../renderer/point_cloud/point_cloud.h"
-#include "../renderer/render_object.h"
 
 #include "../vulkan_self/logger/logger_header.h"
 
@@ -17,11 +16,8 @@
 
 #include <vector>
 #include <chrono>
-#include <memory>
 
 struct VehicleGeometry;
-class Mesh;
-class SlotPassInstance;
 
 class CelerisVisualizer : public SceneObject {
 public:
@@ -62,8 +58,6 @@ private:
     uint32_t scan_generation = 0;
     
     Celeris* m_celeris = nullptr;
-    Mesh* m_waypoint_sphere_mesh = nullptr;
-    SlotPassInstance* m_waypoint_sphere_material = nullptr;
 
     SphericalPoseMarker m_start_marker;
     SphericalPoseMarker m_goal_marker;
@@ -73,10 +67,8 @@ private:
     LineCloud m_guide_path_line_cloud;
     LineCloud m_explored_paths_line_cloud;
     LineCloud m_unimpended_path_line_cloud;
-    LineCloud m_waypoint_path_line_cloud;
 
     PointCloud m_point_map_point_cloud;
-    std::vector<std::unique_ptr<RenderObject>> m_waypoint_spheres;
 
     MarkerInterpolationState m_start_marker_interpolation;
     MarkerInterpolationState m_goal_marker_interpolation;
@@ -85,7 +77,6 @@ private:
     bool show_guide_path = true;
     bool show_explored_paths = false;
     bool show_unimpeded_path = true;
-    bool show_waypoints = true;
     bool show_start_marker = false;
     bool show_gazelle_next = true;
     bool m_has_car_pose_override = false;
@@ -112,6 +103,4 @@ private:
     std::vector<LineInstance> make_path_lines(const std::vector<NonholonomicPos>& path, bool override_color = false);
     std::vector<LineInstance> make_path_lines(const std::vector<glm::vec3>& path);
     std::vector<LineInstance> make_path_lines(const std::vector<glm::ivec3>& path);
-    std::vector<LineInstance> make_waypoint_path_lines(const std::vector<Celeris::Waypoint>& waypoints);
-    void update_waypoint_path_visualization();
 };

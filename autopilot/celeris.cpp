@@ -98,6 +98,7 @@ Celeris::Celeris(VulkanEngine& engine,
         m_scan_index_buffer(&scan_index_buffer),
         m_mesher(&mesher),
         m_desc(desc),
+        m_waypoint_path(engine, manager_bundle.mesh_manager(), material_instance_manager),
         m_gicp_pass(engine, manager_bundle.compute_pass_manager()),
         m_point_cloud_preprocessor(engine.device(), compute_queue, manager_bundle.compute_pass_manager()),
         m_scan_receiver(m_point_cloud_preprocessor),
@@ -329,22 +330,15 @@ void Celeris::set_car_speed(float speed) noexcept {
 }
 
 void Celeris::add_waypoint(glm::vec3 position) {
-    m_waypoints.push_back(Waypoint{
-        .position = glm::vec4(position, 1.0f),
-        .theta = std::nullopt
-    });
+    m_waypoint_path.add_waypoint(position);
 }
 
 void Celeris::add_waypoint(const NonholonomicPos& position) {
-    m_waypoints.push_back(Waypoint{
-        .position = glm::vec4(position.pos, 1.0f),
-        .theta = position.theta
-    });
+    m_waypoint_path.add_waypoint(position);
 }
 
 void Celeris::delete_last_waypoint() {
-    if (!m_waypoints.empty())
-        m_waypoints.pop_back();
+    m_waypoint_path.delete_last_waypoint();
 }
 
 LidarScan* Celeris::network_scan() {
@@ -395,12 +389,20 @@ VoxelGrid* Celeris::voxel_grid() noexcept {
     return m_voxel_grid;
 }
 
+WaypointPath& Celeris::waypoint_path() noexcept {
+    return m_waypoint_path;
+}
+
+const WaypointPath& Celeris::waypoint_path() const noexcept {
+    return m_waypoint_path;
+}
+
 uint32_t Celeris::received_scan_count() const noexcept {
     return m_received_scan_count;
 }
 
 const std::vector<Celeris::Waypoint>& Celeris::waypoints() const noexcept {
-    return m_waypoints;
+    return m_waypoint_path.waypoints();
 }
 
 bool Celeris::collision_point_is_free(glm::vec3 point) {

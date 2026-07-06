@@ -20,12 +20,12 @@
 #include "path_planner.h"
 #include "vehicle_command_sender.h"
 #include "vehicle_geometry.h"
+#include "waypoint_path.h"
 #include "../utils/avg_timer.h"
 
 #include <chrono>
 #include <cstddef>
 #include <filesystem>
-#include <optional>
 #include <span>
 
 
@@ -39,18 +39,7 @@ class Celeris {
 public:
     _XCLASS_NAME(Celeris);
 
-    struct Waypoint {
-        glm::vec4 position{0.0f, 0.0f, 0.0f, 1.0f};
-        std::optional<float> theta;
-
-        glm::vec3 world_position() const noexcept {
-            return glm::vec3(position);
-        }
-
-        bool directional() const noexcept {
-            return theta.has_value();
-        }
-    };
+    using Waypoint = WaypointPath::Waypoint;
 
     struct CelerisDesc {
         uint16_t receiver_port = 5000;
@@ -115,6 +104,8 @@ public:
     VoxelMapPointReseter& voxel_map_reseter();
     Footprint& footprint() noexcept;
     VoxelGrid* voxel_grid() noexcept;
+    WaypointPath& waypoint_path() noexcept;
+    const WaypointPath& waypoint_path() const noexcept;
 
     void request_path_replan();
     bool adjust_to_ground(
@@ -163,6 +154,7 @@ private:
     PointCloudMesher* m_mesher = nullptr;
     CelerisDesc m_desc;
 
+    WaypointPath m_waypoint_path;
     GICPPass m_gicp_pass;
 
     PointCloudPreprocessor m_point_cloud_preprocessor;
@@ -181,7 +173,6 @@ private:
 
     NonholonomicPos m_start_position;
     NonholonomicPos m_goal_position;
-    std::vector<Waypoint> m_waypoints;
     Transform m_lidar_transform;
     float m_car_speed = 10.0f;
 
