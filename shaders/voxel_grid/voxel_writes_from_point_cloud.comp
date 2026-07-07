@@ -59,6 +59,14 @@ bool valid_normal(vec3 normal) {
     return dot(normal, normal) > 1e-12;
 }
 
+vec3 source_normal_to_world(vec3 normal) {
+    vec3 source_normal = normalize(normal);
+    mat3 normal_matrix = transpose(inverse(mat3(source_point_cloud_model)));
+    vec3 world_normal = normal_matrix * source_normal;
+
+    return normalize(world_normal);
+}
+
 void main() {
     uint point_id = gl_GlobalInvocationID.x;
 
@@ -68,7 +76,10 @@ void main() {
     vec4 normal = source_normal_buffer.normals[point_id];
     if (!valid_normal(normal.xyz)) return;
 
-    float curvature = 1.0 - max(dot(normal.xyz, vec3(0.0, 1.0, 0.0)), 0);
+    vec3 world_normal = source_normal_to_world(normal.xyz);
+    if (!valid_normal(world_normal)) return;
+
+    float curvature = 1.0 - max(dot(world_normal, vec3(0.0, 1.0, 0.0)), 0);
     float curvature_limit = 0.05;
 
     vec3 world_pos = (source_point_cloud_model * source_point_buffer.points[point_id].position).xyz;
