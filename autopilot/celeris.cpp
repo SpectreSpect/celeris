@@ -1281,7 +1281,7 @@ void Celeris::display_path_planner_debug_controls() {
     }
 
     ImGui::Separator();
-    if (ImGui::TreeNode("Local planner loss weights")) {
+    if (ImGui::TreeNode("Local planner potential weights")) {
         Vehicle::SimulationLossWeights& weights = m_vehicle.loss_weights();
 
         auto drag_non_negative_float = [](const char* label, float& value, float speed, float max_value) {
@@ -1290,14 +1290,12 @@ void Celeris::display_path_planner_debug_controls() {
             }
         };
 
-        drag_non_negative_float("Position", weights.position, 0.05f, 100.0f);
-        drag_non_negative_float("Heading", weights.heading, 0.01f, 20.0f);
-        drag_non_negative_float("Speed", weights.speed, 0.01f, 20.0f);
-        drag_non_negative_float("Progress tracking", weights.progress_tracking, 0.01f, 50.0f);
-        drag_non_negative_float("Forward progress", weights.forward_progress, 0.01f, 20.0f);
-        drag_non_negative_float("Backward motion", weights.backward_progress, 0.05f, 100.0f);
-        drag_non_negative_float("Steering", weights.steering, 0.01f, 20.0f);
-        drag_non_negative_float("Control", weights.control, 0.001f, 5.0f);
+        drag_non_negative_float("Attach position", weights.position, 0.05f, 100.0f);
+        drag_non_negative_float("Attach heading", weights.heading, 0.01f, 20.0f);
+        drag_non_negative_float("Speed recovery", weights.speed, 0.01f, 20.0f);
+        drag_non_negative_float("Remaining path", weights.progress_tracking, 0.01f, 50.0f);
+        drag_non_negative_float("Steering state", weights.steering, 0.01f, 20.0f);
+        drag_non_negative_float("Control effort", weights.control, 0.001f, 5.0f);
         drag_non_negative_float("Steering rate", weights.steering_rate, 0.01f, 20.0f);
 
         if (ImGui::Button("Reset loss weights"))

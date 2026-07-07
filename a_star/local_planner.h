@@ -4,6 +4,7 @@
 #include <limits>
 #include <chrono>
 #include <cstdint>
+#include <cstddef>
 #include <optional>
 
 #include "../vulkan_self/logger/logger_header.h"
@@ -70,10 +71,18 @@ private:
         float steering_angle_velocity = 0.0f;
     };
 
+    struct PathSegment {
+        float s_begin = 0.0f;
+        float s_end = 0.0f;
+        float dir = 1.0f;
+    };
+
     LocalPlannerMode m_mode = LocalPlannerMode::FOLLOWING_ASTAR;
     std::vector<VehiclePathPoint> m_global_astar_path;
     std::vector<VehiclePathPoint> m_mini_reeds_shepp_path;
     Vehicle::PathArcLengthTable m_global_astar_path_arc_lengths;
+    std::vector<PathSegment> m_path_segments;
+    size_t m_active_path_segment = 0;
     std::optional<Clock::time_point> m_previous_timestamp = std::nullopt;
     std::optional<Clock::time_point> m_current_timestamp = std::nullopt;
     std::optional<Clock::time_point> m_previous_command_timestamp = std::nullopt;
@@ -92,5 +101,9 @@ private:
 
     void set_vehicle_path(std::vector<VehiclePathPoint> path, bool reset_tracking);
     void reset_tracking_state();
+    void rebuild_path_segments();
+    const PathSegment* active_path_segment() const noexcept;
+    bool active_path_segment_has_next() const noexcept;
+    bool active_path_segment_ends_with_direction_switch() const noexcept;
     float calculate_command_delta_time();
 };

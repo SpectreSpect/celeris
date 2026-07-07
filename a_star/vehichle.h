@@ -48,6 +48,8 @@ public:
         float dt = 0.05f;
         float initial_projection_min_s = 0.0f;
         float initial_projection_max_s = std::numeric_limits<float>::infinity();
+        bool slow_down_at_projection_max = false;
+        float projection_max_target_speed_abs = 0.0f;
         bool debug = false;
     };
 
@@ -308,6 +310,14 @@ public:
         float s
     );
 
+    PointProjection find_path_projection(
+        const VehicleTransformState& state,
+        const std::vector<VehiclePathPoint>& path,
+        const PathArcLengthTable& path_arc_lengths,
+        float min_s = 0.0f,
+        float max_s = std::numeric_limits<float>::infinity()
+    ) const;
+
     static PathArcLengthTable build_path_arc_length_table(
         const std::vector<VehiclePathPoint>& path
     );
@@ -345,6 +355,15 @@ private:
 
         float total() const noexcept {
             return position + heading + speed + progress + steering + control;
+        }
+    };
+
+    struct PathPotentialEvaluation {
+        PointProjection projection;
+        SimulationLossBreakdown components;
+
+        float total() const noexcept {
+            return components.total();
         }
     };
 
@@ -407,6 +426,31 @@ private:
         float steer_acceleration
     ) const;
 
+    float compute_potential_control_regularization(
+        const VehicleTransformState& state,
+        float speed_acceleration,
+        float steer_acceleration
+    ) const;
+
+    float compute_path_target_speed(
+        const PointProjection& projection,
+        float active_segment_end_s,
+        bool slow_down_at_projection_max,
+        float projection_max_target_speed_abs
+    ) const;
+
+    PathPotentialEvaluation evaluate_path_potential(
+        const VehicleTransformState& state,
+        const std::vector<VehiclePathPoint>& path,
+        const PathArcLengthTable& path_arc_lengths,
+        float active_segment_min_s,
+        float active_segment_max_s,
+        bool slow_down_at_projection_max,
+        float projection_max_target_speed_abs,
+        float speed_acceleration,
+        float steer_acceleration
+    ) const;
+
     SimulationLossCoefficients compute_simulation_loss_coefficients(
         const VehicleTransformState& state,
         const PointProjection& projection,
@@ -431,6 +475,8 @@ private:
         bool debug = true,
         float initial_projection_min_s = 0.0f,
         float initial_projection_max_s = std::numeric_limits<float>::infinity(),
+        bool slow_down_at_projection_max = false,
+        float projection_max_target_speed_abs = 0.0f,
         std::vector<glm::vec2>* trajectory = nullptr,
         SimulationControlCandidateDebug* candidate_debug = nullptr
     ) const;

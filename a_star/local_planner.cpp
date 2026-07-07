@@ -13,7 +13,10 @@ namespace {
     constexpr float kMaxSteeringAngle = 0.7f;
     constexpr float kPathChangePositionEps2 = 0.05f * 0.05f;
     constexpr float kPathChangeAngleEps = 0.05f;
-    constexpr float kDirectionSwitchProgressEps = 1e-3f;
+    constexpr float kPathSegmentMinLength = 1e-3f;
+    constexpr float kTopologicalConflictDistance = 0.75f;
+    constexpr float kTopologicalConflictMinSSeparation = 2.0f;
+    constexpr float kSegmentTransitionEps = 0.05f;
 
     float angle_diff(float from, float to)
     {
@@ -49,6 +52,90 @@ namespace {
             same_path_point(a.front(), b.front()) &&
             same_path_point(a[middle], b[middle]) &&
             same_path_point(a.back(), b.back());
+    }
+
+    float cross2(glm::vec2 a, glm::vec2 b)
+    {
+        return a.x * b.y - a.y * b.x;
+    }
+
+    void add_breakpoint(std::vector<float>& breakpoints, float s, float path_length)
+    {
+        if (!std::isfinite(s))
+            return;
+
+        breakpoints.push_back(std::clamp(s, 0.0f, path_length));
+    }
+
+    bool segment_intersection_parameters(
+        glm::vec2 a,
+        glm::vec2 b,
+        glm::vec2 c,
+        glm::vec2 d,
+        float& t,
+        float& u)
+    {
+        const glm::vec2 r = b - a;
+        const glm::vec2 s = d - c;
+        const float denominator = cross2(r, s);
+        if (std::abs(denominator) <= 1e-6f)
+            return false;
+
+        const glm::vec2 c_minus_a = c - a;
+        t = cross2(c_minus_a, s) / denominator;
+        u = cross2(c_minus_a, r) / denominator;
+        return
+            t >= -1e-5f && t <= 1.0f + 1e-5f &&
+            u >= -1e-5f && u <= 1.0f + 1e-5f;
+    }
+
+    void closest_segment_parameters(
+        glm::vec2 a,
+        glm::vec2 b,
+        glm::vec2 c,
+        glm::vec2 d,
+        float& t,
+        float& u)
+    {
+        const glm::vec2 segment_a = b - a;
+        const glm::vec2 segment_b = d - c;
+        const glm::vec2 offset = a - c;
+        const float aa = glm::dot(segment_a, segment_a);
+        const float bb = glm::dot(segment_b, segment_b);
+        const float ab = glm::dot(segment_a, segment_b);
+        const float ao = glm::dot(segment_a, offset);
+        const float bo = glm::dot(segment_b, offset);
+        const float denominator = aa * bb - ab * ab;
+
+        if (aa <= Utils::eps && bb <= Utils::eps) {
+            t = 0.0f;
+            u = 0.0f;
+            return;
+        }
+        if (aa <= Utils::eps) {
+            t = 0.0f;
+            u = std::clamp(bo / std::max(bb, Utils::eps), 0.0f, 1.0f);
+            return;
+        }
+        if (bb <= Utils::eps) {
+            t = std::clamp(-ao / std::max(aa, Utils::eps), 0.0f, 1.0f);
+            u = 0.0f;
+            return;
+        }
+
+        if (std::abs(denominator) > 1e-6f) {
+            t = std::clamp((ab * bo - bb * ao) / denominator, 0.0f, 1.0f);
+        } else {
+            t = std::clamp(-ao / aa, 0.0f, 1.0f);
+        }
+
+        u = std::clamp((ab * t + bo) / bb, 0.0f, 1.0f);
+
+        const float previous_t = t;
+        t = std::clamp((ab * u - ao) / aa, 0.0f, 1.0f);
+        if (std::abs(t - previous_t) > 1e-4f) {
+            u = std::clamp((ab * t + bo) / bb, 0.0f, 1.0f);
+        }
     }
 }
 
@@ -139,6 +226,7 @@ void LocalPlanner::reset_tracking_state()
     m_path_window_min_s = 0.0f;
     m_path_window_max_s = 0.0f;
     m_path_progress_floor_s = 0.0f;
+    m_active_path_segment = 0;
     m_has_path_progress = false;
     m_last_simulation_candidates.clear();
     last_control_command.reset();
@@ -152,9 +240,137 @@ void LocalPlanner::set_vehicle_path(std::vector<VehiclePathPoint> path, bool res
     m_global_astar_path_arc_lengths =
         Vehicle::build_path_arc_length_table(m_global_astar_path);
     m_path_length = Vehicle::polyline_length(m_global_astar_path_arc_lengths);
+    rebuild_path_segments();
 
     if (reset_tracking)
         reset_tracking_state();
+}
+
+void LocalPlanner::rebuild_path_segments()
+{
+    m_path_segments.clear();
+    if (m_global_astar_path.size() < 2 || m_path_length <= Utils::eps)
+        return;
+
+    std::vector<float> breakpoints;
+    breakpoints.reserve(m_global_astar_path.size() + m_global_astar_path_arc_lengths.direction_change_s.size() + 2u);
+    add_breakpoint(breakpoints, 0.0f, m_path_length);
+    add_breakpoint(breakpoints, m_path_length, m_path_length);
+
+    for (float direction_change_s : m_global_astar_path_arc_lengths.direction_change_s) {
+        add_breakpoint(breakpoints, direction_change_s, m_path_length);
+    }
+
+    const std::vector<float>& point_s = m_global_astar_path_arc_lengths.point_s;
+    const float conflict_distance2 =
+        kTopologicalConflictDistance * kTopologicalConflictDistance;
+
+    for (size_t i = 1; i < m_global_astar_path.size(); i++) {
+        const glm::vec2 a = m_global_astar_path[i - 1].position;
+        const glm::vec2 b = m_global_astar_path[i].position;
+        const float length_a = point_s[i] - point_s[i - 1];
+        if (length_a <= Utils::eps)
+            continue;
+
+        for (size_t j = i + 2; j < m_global_astar_path.size(); j++) {
+            const glm::vec2 c = m_global_astar_path[j - 1].position;
+            const glm::vec2 d = m_global_astar_path[j].position;
+            const float length_b = point_s[j] - point_s[j - 1];
+            if (length_b <= Utils::eps)
+                continue;
+
+            float t = 0.0f;
+            float u = 0.0f;
+            const bool intersects =
+                segment_intersection_parameters(a, b, c, d, t, u);
+            if (!intersects) {
+                closest_segment_parameters(a, b, c, d, t, u);
+                const glm::vec2 closest_a = a + (b - a) * t;
+                const glm::vec2 closest_b = c + (d - c) * u;
+                const glm::vec2 diff = closest_a - closest_b;
+                if (glm::dot(diff, diff) > conflict_distance2)
+                    continue;
+            }
+
+            const float s_a = point_s[i - 1] + std::clamp(t, 0.0f, 1.0f) * length_a;
+            const float s_b = point_s[j - 1] + std::clamp(u, 0.0f, 1.0f) * length_b;
+            if (std::abs(s_a - s_b) < kTopologicalConflictMinSSeparation)
+                continue;
+
+            add_breakpoint(breakpoints, s_a, m_path_length);
+            add_breakpoint(breakpoints, s_b, m_path_length);
+        }
+    }
+
+    std::sort(breakpoints.begin(), breakpoints.end());
+    breakpoints.erase(
+        std::unique(
+            breakpoints.begin(),
+            breakpoints.end(),
+            [](float a, float b) {
+                return std::abs(a - b) <= kPathSegmentMinLength;
+            }
+        ),
+        breakpoints.end()
+    );
+
+    if (breakpoints.size() < 2) {
+        m_path_segments.push_back(PathSegment{
+            .s_begin = 0.0f,
+            .s_end = m_path_length,
+            .dir = Vehicle::sample_polyline_at_s(
+                m_global_astar_path,
+                m_global_astar_path_arc_lengths,
+                0.0f
+            ).dir
+        });
+        return;
+    }
+
+    for (size_t i = 1; i < breakpoints.size(); i++) {
+        const float s_begin = breakpoints[i - 1];
+        const float s_end = breakpoints[i];
+        if (s_end - s_begin <= kPathSegmentMinLength)
+            continue;
+
+        const float mid_s = 0.5f * (s_begin + s_end);
+        const Vehicle::PointProjection mid_point =
+            Vehicle::sample_polyline_at_s(
+                m_global_astar_path,
+                m_global_astar_path_arc_lengths,
+                mid_s
+            );
+        m_path_segments.push_back(PathSegment{
+            .s_begin = s_begin,
+            .s_end = s_end,
+            .dir = mid_point.dir
+        });
+    }
+}
+
+const LocalPlanner::PathSegment* LocalPlanner::active_path_segment() const noexcept
+{
+    if (m_path_segments.empty())
+        return nullptr;
+
+    const size_t clamped_index =
+        std::min(m_active_path_segment, m_path_segments.size() - 1u);
+    return &m_path_segments[clamped_index];
+}
+
+bool LocalPlanner::active_path_segment_has_next() const noexcept
+{
+    return m_active_path_segment + 1u < m_path_segments.size();
+}
+
+bool LocalPlanner::active_path_segment_ends_with_direction_switch() const noexcept
+{
+    if (!active_path_segment_has_next())
+        return false;
+
+    const PathSegment& current = m_path_segments[m_active_path_segment];
+    const PathSegment& next = m_path_segments[m_active_path_segment + 1u];
+    return current.dir != next.dir;
 }
 
 void LocalPlanner::set_astar_path(const std::vector<NonholonomicPos>& astar_path) {
@@ -209,82 +425,80 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
 
     const float command_delta_time = calculate_command_delta_time();
     const Vehicle::SimulationFollowParams& follow_params = vehicle.follow_params();
-    float projection_min_s = m_path_progress_floor_s;
-    float projection_max_s = std::numeric_limits<float>::infinity();
-    if (m_has_path_progress) {
-        projection_min_s = std::max(
-            m_path_progress_floor_s,
-            m_path_progress_s - follow_params.projection_backtrack_window
-        );
-        projection_max_s = std::min(
-            m_path_length,
-            m_path_progress_s +
-                follow_params.projection_lookahead_base +
-                std::abs(vehicle.state().m_speed) * command_delta_time
-        );
+
+    if (m_path_segments.empty()) {
+        rebuild_path_segments();
     }
 
-    Vehicle::PointProjection current_projection = Vehicle::find_polyline_projection(
-        m_global_astar_path,
-        m_global_astar_path_arc_lengths,
-        vehicle.state().m_position,
-        projection_min_s,
-        projection_max_s
-    );
+    if (m_path_segments.empty()) {
+        m_last_simulation_candidates.clear();
+        last_control_command = Vehicle::VehicleControlCommand{};
+        m_last_applied_command = AppliedVehicleCommand{};
+        m_path_window_min_s = 0.0f;
+        m_path_window_max_s = 0.0f;
+        m_path_progress_floor_s = 0.0f;
+        return VehicleCommand{};
+    }
 
-    const float next_switch_s = Vehicle::next_direction_change_s(
-        m_global_astar_path,
-        m_global_astar_path_arc_lengths,
-        current_projection.s
-    );
-    if (std::isfinite(next_switch_s)) {
-        const float switch_distance_s = next_switch_s - current_projection.s;
-        const float arrival_distance =
-            std::max(0.0f, follow_params.direction_switch_arrival_distance);
-        const float arrival_speed =
-            std::max(
-                std::max(0.0f, follow_params.direction_switch_arrival_speed),
-                std::max(0.0f, follow_params.direction_switch_approach_speed)
-            );
-        const bool close_to_switch =
-            switch_distance_s >= -Utils::eps &&
-            switch_distance_s <= arrival_distance;
-        const bool almost_stopped = std::abs(vehicle.state().m_speed) <= arrival_speed;
+    if (m_active_path_segment >= m_path_segments.size()) {
+        m_active_path_segment = m_path_segments.size() - 1u;
+    }
+
+    auto project_on_active_segment = [&]() {
+        const PathSegment& segment = m_path_segments[m_active_path_segment];
+        return vehicle.find_path_projection(
+            vehicle.state(),
+            m_global_astar_path,
+            m_global_astar_path_arc_lengths,
+            segment.s_begin,
+            segment.s_end
+        );
+    };
+
+    Vehicle::PointProjection current_projection = project_on_active_segment();
+    for (;;) {
+        if (!active_path_segment_has_next())
+            break;
+
+        const PathSegment& segment = m_path_segments[m_active_path_segment];
+        const bool direction_switch = active_path_segment_ends_with_direction_switch();
+        const float remaining_to_segment_end =
+            std::max(0.0f, segment.s_end - current_projection.s);
+        const float transition_distance = direction_switch
+            ? std::max(0.0f, follow_params.direction_switch_arrival_distance)
+            : kSegmentTransitionEps;
+        const float handoff_speed =
+            std::max(0.0f, follow_params.direction_switch_arrival_speed);
+
+        const bool close_to_segment_end =
+            remaining_to_segment_end <= std::max(kSegmentTransitionEps, transition_distance);
+        const bool speed_allows_handoff =
+            !direction_switch || std::abs(vehicle.state().m_speed) <= handoff_speed;
         const bool close_to_path =
             current_projection.dist <=
             std::max(0.5f, follow_params.slowdown_distance_from_path);
 
-        if (close_to_switch && almost_stopped && close_to_path) {
-            m_path_progress_floor_s = std::min(
-                m_path_length,
-                next_switch_s + kDirectionSwitchProgressEps
-            );
-            current_projection = Vehicle::find_polyline_projection(
-                m_global_astar_path,
-                m_global_astar_path_arc_lengths,
-                vehicle.state().m_position,
-                m_path_progress_floor_s,
-                std::min(
-                    m_path_length,
-                    m_path_progress_floor_s + follow_params.projection_lookahead_base
-                )
-            );
-        }
+        if (!close_to_segment_end || !speed_allows_handoff || !close_to_path)
+            break;
+
+        m_active_path_segment++;
+        m_path_progress_floor_s = m_path_segments[m_active_path_segment].s_begin;
+        current_projection = project_on_active_segment();
     }
 
     m_path_progress_s = current_projection.s;
     m_has_path_progress = true;
 
-    const float candidate_projection_min_s = std::max(
-        m_path_progress_floor_s,
-        current_projection.s - follow_params.projection_backtrack_window
-    );
-    const float candidate_projection_max_s = std::min(
-        m_path_length,
-        current_projection.s +
-            follow_params.projection_lookahead_base +
-            std::abs(vehicle.state().m_speed) * command_delta_time
-    );
+    const PathSegment* active_segment = active_path_segment();
+    if (!active_segment) {
+        m_last_simulation_candidates.clear();
+        last_control_command = Vehicle::VehicleControlCommand{};
+        m_last_applied_command = AppliedVehicleCommand{};
+        return VehicleCommand{};
+    }
+
+    const float candidate_projection_min_s = active_segment->s_begin;
+    const float candidate_projection_max_s = active_segment->s_end;
     m_path_window_min_s = candidate_projection_min_s;
     m_path_window_max_s = candidate_projection_max_s;
 
@@ -294,6 +508,13 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
         search_desc.steer_acceleration_samples;
     search_desc.initial_projection_min_s = candidate_projection_min_s;
     search_desc.initial_projection_max_s = candidate_projection_max_s;
+    search_desc.slow_down_at_projection_max =
+        !active_path_segment_has_next() ||
+        active_path_segment_ends_with_direction_switch();
+    search_desc.projection_max_target_speed_abs =
+        active_path_segment_has_next()
+            ? std::max(0.0f, follow_params.direction_switch_arrival_speed)
+            : 0.0f;
 
     m_last_simulation_candidates = vehicle.find_best_simulation_controls(
         m_global_astar_path,
