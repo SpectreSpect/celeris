@@ -212,6 +212,7 @@ int main() {
     );
 
     bool display_inflated_voxels = voxel_grid.params().display_inflated_voxels != 0u;
+    bool show_voxel_grid = true;
     float inflated_voxel_color[4] = {
         float((voxel_grid.params().inflated_voxel_color >> 24u) & 0xFFu) / 255.0f,
         float((voxel_grid.params().inflated_voxel_color >> 16u) & 0xFFu) / 255.0f,
@@ -448,7 +449,7 @@ int main() {
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
     has_end_pos = true;
     // celeris.set_start_lidar_scan_position(start_lidar_scan_position);
-    // celeris.load_map(saved_maps_directory / "robocross_sim_2.vpm");
+    celeris.load_map(saved_maps_directory / "robocross_sim_2.vpm");
     celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim.wpp");
     celeris.start(std::move(planner_submit_context));
 
@@ -587,7 +588,11 @@ int main() {
         out_pose.pos = camera.position;
         out_pose.theta = std::atan2(horizontal_front.z, horizontal_front.x);
 
-        return celeris.adjust_to_ground(out_pose.pos);
+        glm::vec3 grounded_position = out_pose.pos;
+        if (celeris.adjust_to_ground(grounded_position))
+            out_pose.pos = grounded_position;
+
+        return true;
     };
 
     auto place_start = [&]() {
@@ -731,6 +736,7 @@ int main() {
     scene.add(skybox);
 
     scene.add(celeris_visualizer);
+    scene.add(voxel_grid.render_object());
     // scene.add(footprint_visualizer);
     // scene.add(gazelle);
     // scene.add(target_scan);
@@ -935,6 +941,7 @@ int main() {
 
         lighting_system.update(engine.current_frame(), window, camera);
 
+        voxel_grid.render_object().visible = show_voxel_grid;
         voxel_grid.update(window, camera);
 
         if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
@@ -1030,7 +1037,7 @@ int main() {
                 // if (network_scan)
                 //     renderer.render(command_buffer, network_scan->point_cloud(), network_scan->point_cloud().transform.get_model_matrix());
 
-                renderer.render(command_buffer, voxel_grid.render_object());
+                // renderer.render(command_buffer, voxel_grid.render_object());
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
@@ -1062,6 +1069,8 @@ int main() {
                 ImGui::TextColored(ImVec4(0.0f, 0.35f, 1.0f, 1.0f), "z: %.2f", camera.position.z);
 
                 if (ImGui::CollapsingHeader("Voxel grid debug")) {
+                    ImGui::Checkbox("Show voxel grid", &show_voxel_grid);
+
                     bool inflated_settings_changed = false;
                     inflated_settings_changed |= ImGui::Checkbox(
                         "Display inflated voxels",

@@ -118,23 +118,25 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
     if (m_celeris->has_start_position())
         set_start(m_celeris->start_position());
     set_vehicle(m_celeris->vehicle_position());
+    set_gazelle_lidar_transform(m_celeris->lidar_transform());
     if (m_celeris->has_goal_position())
         set_goal(m_celeris->goal_position());
 
     m_start_marker.visible = show_start_marker && m_celeris->has_start_position();
     m_goal_marker.visible = show_goal_marker && m_celeris->has_goal_position();
+    m_point_map_point_cloud.visible = show_voxel_point_map;
 }
 
 void CelerisVisualizer::set_start(const NonholonomicPos& nonholonomic_position) {
     set_marker_pose(m_start_marker, nonholonomic_position);
-    set_gazelle_pose(m_celeris->vehicle_position());
+    set_gazelle_lidar_transform(m_celeris->lidar_transform());
     reset_marker_interpolation(m_start_marker, m_start_marker_interpolation);
 }
 
 void CelerisVisualizer::set_start(const Transform& transform) {
     m_start_marker.transform = transform;
     m_start_marker.transform.position += marker_vertical_offset();
-    set_gazelle_pose(m_celeris->vehicle_position());
+    set_gazelle_lidar_transform(m_celeris->lidar_transform());
     reset_marker_interpolation(m_start_marker, m_start_marker_interpolation);
 }
 
@@ -188,18 +190,21 @@ void CelerisVisualizer::update() {
     if (m_celeris->has_goal_position())
         set_goal(m_celeris->goal_position());
 
-    m_point_map_point_cloud.set_instance_view(
-        m_celeris->voxel_point_map().get_map_instance_view()
-    );
+    if (show_voxel_point_map) {
+        m_point_map_point_cloud.set_instance_view(
+            m_celeris->voxel_point_map().get_map_instance_view()
+        );
+    }
 
     if (m_has_car_pose_override)
         set_gazelle_pose(m_car_pose_override);
     else
-        set_gazelle_pose(m_celeris->vehicle_position());
+        set_gazelle_lidar_transform(m_celeris->lidar_transform());
 
     m_start_marker.visible = show_start_marker && m_celeris->has_start_position();
     m_goal_marker.visible = show_goal_marker && m_celeris->has_goal_position();
     m_gazelle_next.visible = show_gazelle_next;
+    m_point_map_point_cloud.visible = show_voxel_point_map;
 
     // interpolate_marker_pose(
     //     m_start_marker,
@@ -279,6 +284,7 @@ void CelerisVisualizer::display_debug_controls() {
         ImGui::Checkbox("Gazelle Next", &show_gazelle_next);
         ImGui::Checkbox("Local candidates", &show_local_candidates);
         ImGui::Checkbox("Local s window", &show_local_s_window);
+        ImGui::Checkbox("Show voxel point map##visualizer_voxel_point_map", &show_voxel_point_map);
     }
 }
 
@@ -300,13 +306,19 @@ void CelerisVisualizer::set_marker_pose(SphericalPoseMarker& marker, Nonholonomi
 
 void CelerisVisualizer::set_gazelle_pose(const NonholonomicPos& nonholonomic_position) {
     Transform rear_axle_transform;
-    rear_axle_transform.position = nonholonomic_position.pos;
+    rear_axle_transform.position = nonholonomic_position.pos + marker_vertical_offset();
     rear_axle_transform.rotation = glm::angleAxis(
         -nonholonomic_position.theta,
         glm::vec3(0.0f, 1.0f, 0.0f)
     );
 
     m_gazelle_next.set_rear_axle_transform(rear_axle_transform);
+}
+
+void CelerisVisualizer::set_gazelle_lidar_transform(const Transform& lidar_transform) {
+    Transform visual_lidar_transform = lidar_transform;
+    visual_lidar_transform.position += marker_vertical_offset();
+    m_gazelle_next.set_lidar_transform(visual_lidar_transform);
 }
 
 void CelerisVisualizer::reset_marker_interpolation(

@@ -90,6 +90,7 @@ private:
     bool show_gazelle_next = true;
     bool show_local_candidates = true;
     bool show_local_s_window = true;
+    bool show_voxel_point_map = false;
     bool m_has_car_pose_override = false;
     NonholonomicPos m_car_pose_override;
 
@@ -99,6 +100,7 @@ private:
 
     void set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position);
     void set_gazelle_pose(const NonholonomicPos& nonholonomic_position);
+    void set_gazelle_lidar_transform(const Transform& lidar_transform);
     void reset_marker_interpolation(
         SphericalPoseMarker& marker,
         MarkerInterpolationState& state
