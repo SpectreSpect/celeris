@@ -71,6 +71,7 @@
 #include "autopilot/spherical_pose_marker.h"
 #include "autopilot/celeris.h"
 #include "autopilot/celeris_visualizer.h"
+#include "autopilot/gamepad_controller.h"
 #include "autopilot/vehicle_geometry.h"
 #include "voxel_grid_vulkan/voxel_grid_gpu_debugger.h"
 #include "camera/controllers/third_person_camera_controller.h"
@@ -211,6 +212,7 @@ int main() {
     );
 
     bool display_inflated_voxels = voxel_grid.params().display_inflated_voxels != 0u;
+    bool show_voxel_grid = true;
     float inflated_voxel_color[4] = {
         float((voxel_grid.params().inflated_voxel_color >> 24u) & 0xFFu) / 255.0f,
         float((voxel_grid.params().inflated_voxel_color >> 16u) & 0xFFu) / 255.0f,
@@ -437,7 +439,8 @@ int main() {
             .vehicle_geometry = vehicle_geometry,
             .footprint_sample_count = 5,
             .footprint_horizontal_inflation_size = horizontal_inflation_size,
-            .footprint_vertical_inflation_size = vertical_inflation_size
+            .footprint_vertical_inflation_size = vertical_inflation_size,
+            .gamepad_commands_enabled = true
         }
     );
 
@@ -446,8 +449,8 @@ int main() {
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
     has_end_pos = true;
     // celeris.set_start_lidar_scan_position(start_lidar_scan_position);
-    // celeris.load_map(saved_maps_directory / "robocross_sim_2.vpm");
-    celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim.wpp");
+    celeris.load_map(saved_maps_directory / "robocross_sim_2.vpm");
+    celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim_3.wpp");
     celeris.start(std::move(planner_submit_context));
 
     CelerisVisualizer celeris_visualizer(
@@ -585,7 +588,11 @@ int main() {
         out_pose.pos = camera.position;
         out_pose.theta = std::atan2(horizontal_front.z, horizontal_front.x);
 
-        return celeris.adjust_to_ground(out_pose.pos);
+        glm::vec3 grounded_position = out_pose.pos;
+        if (celeris.adjust_to_ground(grounded_position))
+            out_pose.pos = grounded_position;
+
+        return true;
     };
 
     auto place_start = [&]() {
@@ -729,6 +736,7 @@ int main() {
     scene.add(skybox);
 
     scene.add(celeris_visualizer);
+    scene.add(voxel_grid.render_object());
     // scene.add(footprint_visualizer);
     // scene.add(gazelle);
     // scene.add(target_scan);
@@ -750,6 +758,7 @@ int main() {
     bool place_footprint_pressed = false;
     bool fps_camera_pressed = false;
     bool third_person_camera_pressed = false;
+    GamepadController gamepad_controller;
 
     int step = 0;
 
@@ -830,6 +839,12 @@ int main() {
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
+        gamepad_controller.update(
+            celeris.car_speed(),
+            celeris.vehicle_speed(),
+            celeris.vehicle_steering_angle()
+        );
+        celeris.set_gamepad_command(gamepad_controller.command());
 
         if (skybox_environment_update_pending) {
             engine.device().wait_idle();
@@ -926,6 +941,7 @@ int main() {
 
         lighting_system.update(engine.current_frame(), window, camera);
 
+        voxel_grid.render_object().visible = show_voxel_grid;
         voxel_grid.update(window, camera);
 
         if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
@@ -1021,7 +1037,7 @@ int main() {
                 // if (network_scan)
                 //     renderer.render(command_buffer, network_scan->point_cloud(), network_scan->point_cloud().transform.get_model_matrix());
 
-                renderer.render(command_buffer, voxel_grid.render_object());
+                // renderer.render(command_buffer, voxel_grid.render_object());
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
@@ -1053,6 +1069,8 @@ int main() {
                 ImGui::TextColored(ImVec4(0.0f, 0.35f, 1.0f, 1.0f), "z: %.2f", camera.position.z);
 
                 if (ImGui::CollapsingHeader("Voxel grid debug")) {
+                    ImGui::Checkbox("Show voxel grid", &show_voxel_grid);
+
                     bool inflated_settings_changed = false;
                     inflated_settings_changed |= ImGui::Checkbox(
                         "Display inflated voxels",
@@ -1332,6 +1350,36 @@ int main() {
                     }
                     ImGui::SameLine();
                     ImGui::TextUnformatted("Key: L");
+
+                    ImGui::Separator();
+
+                    bool gamepad_commands_enabled = celeris.gamepad_commands_enabled();
+                    if (ImGui::Checkbox("Gamepad driving", &gamepad_commands_enabled)) {
+                        celeris.set_gamepad_commands_enabled(gamepad_commands_enabled);
+                    }
+
+                    bool print_gamepad_input = gamepad_controller.print_input_events();
+                    if (ImGui::Checkbox("Print gamepad input", &print_gamepad_input)) {
+                        gamepad_controller.set_print_input_events(print_gamepad_input);
+                    }
+
+                    const VehicleCommand gamepad_command = celeris.gamepad_command();
+                    ImGui::Text(
+                        "Gamepad: %s%s",
+                        gamepad_controller.gamepad_present() ? "gamepad" :
+                        (gamepad_controller.raw_joystick_present() ? "raw joystick" : "not connected"),
+                        gamepad_controller.brake_pressed() ? " (R1 brake)" : ""
+                    );
+                    ImGui::Text(
+                        "Gamepad command: acceleration %.2f, steering velocity %.2f",
+                        gamepad_command.acceleration,
+                        gamepad_command.steering_angle_velocity
+                    );
+                    ImGui::Text(
+                        "Command sender: %s, %s",
+                        celeris.command_sender_running() ? "running" : "stopped",
+                        celeris.command_sender_connected() ? "connected" : "not connected"
+                    );
 
                     ImGui::Separator();
 

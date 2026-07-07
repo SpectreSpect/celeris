@@ -78,6 +78,8 @@ public:
         uint32_t localization_max_candidates = 512;
         uint32_t localization_gicp_iterations = 2;
         float waypoint_reach_radius = 2.0f;
+        bool gamepad_commands_enabled = false;
+        VehicleCommand gamepad_command;
         NonholonomicAStar::NonholonomicAStarDesc nonholonomic_astar_desc;
     };
 
@@ -105,6 +107,8 @@ public:
     void set_start_lidar_scan_position(const NonholonomicPos& position) noexcept;
     void set_car_speed(float speed) noexcept;
     void set_waypoint_reach_radius(float radius) noexcept;
+    void set_gamepad_commands_enabled(bool enabled) noexcept;
+    void set_gamepad_command(VehicleCommand command) noexcept;
     void add_waypoint(glm::vec3 position);
     void add_waypoint(const NonholonomicPos& position);
     void delete_last_waypoint();
@@ -117,10 +121,16 @@ public:
     NonholonomicPos vehicle_position() const noexcept;
     NonholonomicPos goal_position() const noexcept;
     float car_speed() const noexcept;
+    float vehicle_speed() const noexcept;
+    float vehicle_steering_angle() const noexcept;
     const std::vector<Vehicle::SimulationControlCandidate>& local_planner_candidates() const noexcept;
     float local_planner_path_window_min_s() const noexcept;
     float local_planner_path_window_max_s() const noexcept;
     float waypoint_reach_radius() const noexcept;
+    bool gamepad_commands_enabled() const noexcept;
+    VehicleCommand gamepad_command() const noexcept;
+    bool command_sender_running() const noexcept;
+    bool command_sender_connected() const noexcept;
     size_t active_waypoint_index() const noexcept;
     bool waypoint_path_completed() const noexcept;
     uint32_t received_scan_count() const noexcept;
@@ -219,6 +229,8 @@ private:
     Transform m_lidar_transform;
     float m_car_speed = 10.0f;
     float m_waypoint_reach_radius = 2.0f;
+    bool m_gamepad_commands_enabled = false;
+    VehicleCommand m_gamepad_command;
     size_t m_active_waypoint_index = 0;
     bool m_waypoint_path_completed = false;
 

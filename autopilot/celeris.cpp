@@ -282,6 +282,10 @@ Celeris::Celeris(VulkanEngine& engine,
     m_car_speed = follow_params.cruise_speed;
 
     m_waypoint_reach_radius = desc.waypoint_reach_radius;
+    m_gamepad_commands_enabled = desc.gamepad_commands_enabled;
+    m_gamepad_command = desc.gamepad_command;
+    if (m_gamepad_commands_enabled)
+        m_command_sender.set_command(m_gamepad_command);
     m_voxel_map_reseter.reset(m_voxel_point_map);
 }
 
@@ -318,7 +322,22 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
     if (has_vehicle_feedback) {
         apply_vehicle_feedback(vehicle_feedback);
     }
-    m_local_planner.predict_vehicle_state(m_vehicle);
+    if (m_gamepad_commands_enabled) {
+        const float delta_time = m_local_planner.calculate_delta_time();
+        if (delta_time > 0.0f) {
+            m_vehicle.state().m_steering_angle_velocity =
+                m_gamepad_command.steering_angle_velocity;
+            m_vehicle.simulate_vehicle(
+                m_gamepad_command.acceleration,
+                0.0f,
+                delta_time,
+                std::min(delta_time, 0.05f),
+                false
+            );
+        }
+    } else {
+        m_local_planner.predict_vehicle_state(m_vehicle);
+    }
 
     float vehicle_height = m_vehicle_position.pos.y;
 
@@ -379,7 +398,8 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
             m_network_scan->point_cloud().transform.rotation = glm::normalize(delta_rotation * previous_map_rotation);
         }
 
-        if (!m_needs_map_localization && m_voxel_point_map.map_point_count() > 0u) {
+        // if (!m_needs_map_localization && m_voxel_point_map.map_point_count() > 0u) {
+        if (m_voxel_point_map.map_point_count() > 0u) {
             m_gicp_pass.fit(m_voxel_point_map,
                             m_network_scan->point_cloud(),
                             m_network_scan->normal_buffer(),
@@ -443,20 +463,21 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         std::chrono::duration<float>(now - m_last_local_planner_update_timestamp).count() >=
             local_planner_update_period;
 
-    if (should_update_local_planner) {
-        VehicleCommand vehicle_command;
-        if (!m_waypoint_path_completed || m_waypoint_path.waypoints().empty()) {
-            vehicle_command = m_local_planner.step(
-                m_vehicle,
-                m_path_intersection_detector,
-                submit_context
-            );
-        }
+    // if (should_update_local_planner) {
+    //     VehicleCommand vehicle_command;
+    //     if (!m_waypoint_path_completed || m_waypoint_path.waypoints().empty()) {
+    //         vehicle_command = m_local_planner.step(
+    //             m_vehicle,
+    //             m_path_intersection_detector,
+    //             submit_context
+    //         );
+    //     }
 
-        m_command_sender.set_command(vehicle_command);
-        m_last_local_planner_update_timestamp = now;
-        m_has_last_local_planner_update_timestamp = true;
-    }
+    //     if (!m_gamepad_commands_enabled)
+    //         m_command_sender.set_command(vehicle_command);
+    //     m_last_local_planner_update_timestamp = now;
+    //     m_has_last_local_planner_update_timestamp = true;
+    // }
 }
 
 void Celeris::apply_vehicle_feedback(const VehicleFeedback& feedback) {
@@ -554,6 +575,24 @@ void Celeris::set_waypoint_reach_radius(float radius) noexcept {
         m_waypoint_reach_radius = radius;
 }
 
+void Celeris::set_gamepad_commands_enabled(bool enabled) noexcept {
+    m_gamepad_commands_enabled = enabled;
+    if (enabled) {
+        m_command_sender.set_command(m_gamepad_command);
+    } else {
+        m_gamepad_command = VehicleCommand{};
+    }
+}
+
+void Celeris::set_gamepad_command(VehicleCommand command) noexcept {
+    if (!std::isfinite(command.acceleration) || !std::isfinite(command.steering_angle_velocity))
+        return;
+
+    m_gamepad_command = command;
+    if (m_gamepad_commands_enabled)
+        m_command_sender.set_command(m_gamepad_command);
+}
+
 void Celeris::add_waypoint(glm::vec3 position) {
     m_waypoint_path.add_waypoint(position);
     reset_waypoint_navigation();
@@ -601,8 +640,32 @@ float Celeris::car_speed() const noexcept {
     return m_vehicle.follow_params().cruise_speed;
 }
 
+float Celeris::vehicle_speed() const noexcept {
+    return m_vehicle.state().m_speed;
+}
+
+float Celeris::vehicle_steering_angle() const noexcept {
+    return m_vehicle.state().m_steering_angle;
+}
+
 float Celeris::waypoint_reach_radius() const noexcept {
     return m_waypoint_reach_radius;
+}
+
+bool Celeris::gamepad_commands_enabled() const noexcept {
+    return m_gamepad_commands_enabled;
+}
+
+VehicleCommand Celeris::gamepad_command() const noexcept {
+    return m_gamepad_command;
+}
+
+bool Celeris::command_sender_running() const noexcept {
+    return m_command_sender.is_running();
+}
+
+bool Celeris::command_sender_connected() const noexcept {
+    return m_command_sender.is_connected();
 }
 
 size_t Celeris::active_waypoint_index() const noexcept {
@@ -938,27 +1001,43 @@ bool Celeris::request_path_replan() {
 }
 
 bool Celeris::request_grounded_path_replan(NonholonomicPos start, NonholonomicPos goal) {
+    const NonholonomicPos requested_start = start;
+    const NonholonomicPos requested_goal = goal;
+    const bool allow_flying = m_desc.nonholonomic_astar_desc.allow_flying_over_precipices;
+
     const bool start_adjusted = m_path_planner.request_adjust_to_ground(
         start.pos,
         500,
         500,
         -1,
-        false
+        allow_flying
     );
     const bool goal_adjusted = m_path_planner.request_adjust_to_ground(
         goal.pos,
         500,
         500,
         -1,
-        false
+        allow_flying
     );
 
     if (!start_adjusted || !goal_adjusted) {
+        if (!allow_flying) {
+            logger().log_error()
+                << "Failed to adjust path endpoints to ground. "
+                << "start_adjusted=" << (start_adjusted ? "true" : "false")
+                << " goal_adjusted=" << (goal_adjusted ? "true" : "false") << "\n";
+            return false;
+        }
+
         logger().log_error()
-            << "Failed to adjust path endpoints to ground. "
+            << "Failed to adjust path endpoints to ground; using requested positions because flying is allowed. "
             << "start_adjusted=" << (start_adjusted ? "true" : "false")
             << " goal_adjusted=" << (goal_adjusted ? "true" : "false") << "\n";
-        return false;
+
+        if (!start_adjusted)
+            start = requested_start;
+        if (!goal_adjusted)
+            goal = requested_goal;
     }
 
     m_path_planner.request_path_replan(start, goal);
