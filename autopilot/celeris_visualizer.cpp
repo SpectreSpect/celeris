@@ -118,6 +118,7 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
     if (m_celeris->has_start_position())
         set_start(m_celeris->start_position());
     set_vehicle(m_celeris->vehicle_position());
+    set_gazelle_lidar_transform(m_celeris->lidar_transform());
     if (m_celeris->has_goal_position())
         set_goal(m_celeris->goal_position());
 
@@ -127,14 +128,14 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
 
 void CelerisVisualizer::set_start(const NonholonomicPos& nonholonomic_position) {
     set_marker_pose(m_start_marker, nonholonomic_position);
-    set_gazelle_pose(m_celeris->vehicle_position());
+    set_gazelle_lidar_transform(m_celeris->lidar_transform());
     reset_marker_interpolation(m_start_marker, m_start_marker_interpolation);
 }
 
 void CelerisVisualizer::set_start(const Transform& transform) {
     m_start_marker.transform = transform;
     m_start_marker.transform.position += marker_vertical_offset();
-    set_gazelle_pose(m_celeris->vehicle_position());
+    set_gazelle_lidar_transform(m_celeris->lidar_transform());
     reset_marker_interpolation(m_start_marker, m_start_marker_interpolation);
 }
 
@@ -195,7 +196,7 @@ void CelerisVisualizer::update() {
     if (m_has_car_pose_override)
         set_gazelle_pose(m_car_pose_override);
     else
-        set_gazelle_pose(m_celeris->vehicle_position());
+        set_gazelle_lidar_transform(m_celeris->lidar_transform());
 
     m_start_marker.visible = show_start_marker && m_celeris->has_start_position();
     m_goal_marker.visible = show_goal_marker && m_celeris->has_goal_position();
@@ -307,6 +308,10 @@ void CelerisVisualizer::set_gazelle_pose(const NonholonomicPos& nonholonomic_pos
     );
 
     m_gazelle_next.set_rear_axle_transform(rear_axle_transform);
+}
+
+void CelerisVisualizer::set_gazelle_lidar_transform(const Transform& lidar_transform) {
+    m_gazelle_next.set_lidar_transform(lidar_transform);
 }
 
 void CelerisVisualizer::reset_marker_interpolation(

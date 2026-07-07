@@ -731,6 +731,7 @@ int main() {
     scene.add(skybox);
 
     scene.add(celeris_visualizer);
+    scene.add(voxel_grid.render_object());
     // scene.add(footprint_visualizer);
     // scene.add(gazelle);
     // scene.add(target_scan);
@@ -1030,7 +1031,7 @@ int main() {
                 // if (network_scan)
                 //     renderer.render(command_buffer, network_scan->point_cloud(), network_scan->point_cloud().transform.get_model_matrix());
 
-                renderer.render(command_buffer, voxel_grid.render_object());
+                // renderer.render(command_buffer, voxel_grid.render_object());
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);

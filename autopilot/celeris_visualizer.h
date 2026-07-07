@@ -99,6 +99,7 @@ private:
 
     void set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position);
     void set_gazelle_pose(const NonholonomicPos& nonholonomic_position);
+    void set_gazelle_lidar_transform(const Transform& lidar_transform);
     void reset_marker_interpolation(
         SphericalPoseMarker& marker,
         MarkerInterpolationState& state
