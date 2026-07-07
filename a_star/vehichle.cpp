@@ -583,6 +583,12 @@ Vehicle::PointProjection Vehicle::find_polyline_projection(
 
         const float local_min_s = std::max(clamped_min_s, segment_start_s);
         const float local_max_s = std::min(clamped_max_s, segment_end_s);
+        if (local_max_s - local_min_s <= Utils::eps &&
+            clamped_max_s - clamped_min_s > Utils::eps)
+        {
+            continue;
+        }
+
         const float local_min_t = (local_min_s - segment_start_s) / segment_length;
         const float local_max_t = (local_max_s - segment_start_s) / segment_length;
 

@@ -5,6 +5,7 @@
 #include "spherical_pose_marker.h"
 #include "../a_star/a_star_structures.h"
 #include "../renderer/scene_object.h"
+#include "../renderer/render_object.h"
 #include "../renderer/lines/line_cloud.h"
 #include "../a_star/vehichle.h"
 #include "../renderer/point_cloud/point_cloud.h"
@@ -73,6 +74,8 @@ private:
     LineCloud m_explored_paths_line_cloud;
     LineCloud m_unimpended_path_line_cloud;
     LineCloud m_local_candidate_line_cloud;
+    LineCloud m_segment_switch_sphere_line_cloud;
+    RenderObject m_segment_switch_rear_axle_point;
 
     PointCloud m_point_map_point_cloud;
 
@@ -90,6 +93,7 @@ private:
     bool show_gazelle_next = true;
     bool show_local_candidates = true;
     bool show_local_s_window = true;
+    bool show_segment_switch_debug = true;
     bool show_voxel_point_map = false;
     bool m_has_car_pose_override = false;
     NonholonomicPos m_car_pose_override;
@@ -125,4 +129,13 @@ private:
         const std::vector<Vehicle::SimulationControlCandidate>& candidates,
         float height
     );
+    std::vector<LineInstance> make_segment_switch_sphere_lines(
+        glm::vec3 center,
+        float radius
+    );
+    bool sample_path_at_s(
+        const std::vector<NonholonomicPos>& path,
+        float s,
+        glm::vec3& output
+    ) const;
 };

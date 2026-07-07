@@ -14,8 +14,7 @@ namespace {
     constexpr float kPathChangePositionEps2 = 0.05f * 0.05f;
     constexpr float kPathChangeAngleEps = 0.05f;
     constexpr float kPathSegmentMinLength = 1e-3f;
-    constexpr float kTopologicalConflictDistance = 0.75f;
-    constexpr float kTopologicalConflictMinSSeparation = 2.0f;
+    constexpr float kSelfIntersectionMinSSeparation = 2.0f;
     constexpr float kSegmentTransitionEps = 0.05f;
 
     float angle_diff(float from, float to)
@@ -89,54 +88,6 @@ namespace {
             u >= -1e-5f && u <= 1.0f + 1e-5f;
     }
 
-    void closest_segment_parameters(
-        glm::vec2 a,
-        glm::vec2 b,
-        glm::vec2 c,
-        glm::vec2 d,
-        float& t,
-        float& u)
-    {
-        const glm::vec2 segment_a = b - a;
-        const glm::vec2 segment_b = d - c;
-        const glm::vec2 offset = a - c;
-        const float aa = glm::dot(segment_a, segment_a);
-        const float bb = glm::dot(segment_b, segment_b);
-        const float ab = glm::dot(segment_a, segment_b);
-        const float ao = glm::dot(segment_a, offset);
-        const float bo = glm::dot(segment_b, offset);
-        const float denominator = aa * bb - ab * ab;
-
-        if (aa <= Utils::eps && bb <= Utils::eps) {
-            t = 0.0f;
-            u = 0.0f;
-            return;
-        }
-        if (aa <= Utils::eps) {
-            t = 0.0f;
-            u = std::clamp(bo / std::max(bb, Utils::eps), 0.0f, 1.0f);
-            return;
-        }
-        if (bb <= Utils::eps) {
-            t = std::clamp(-ao / std::max(aa, Utils::eps), 0.0f, 1.0f);
-            u = 0.0f;
-            return;
-        }
-
-        if (std::abs(denominator) > 1e-6f) {
-            t = std::clamp((ab * bo - bb * ao) / denominator, 0.0f, 1.0f);
-        } else {
-            t = std::clamp(-ao / aa, 0.0f, 1.0f);
-        }
-
-        u = std::clamp((ab * t + bo) / bb, 0.0f, 1.0f);
-
-        const float previous_t = t;
-        t = std::clamp((ab * u - ao) / aa, 0.0f, 1.0f);
-        if (std::abs(t - previous_t) > 1e-4f) {
-            u = std::clamp((ab * t + bo) / bb, 0.0f, 1.0f);
-        }
-    }
 }
 
 LocalPlanner::LocalPlanner(float step_dt_min, float step_dt_max)
@@ -211,6 +162,14 @@ float LocalPlanner::path_window_max_s() const noexcept {
     return m_path_window_max_s;
 }
 
+size_t LocalPlanner::active_path_segment_index() const noexcept {
+    return m_active_path_segment;
+}
+
+size_t LocalPlanner::path_segment_count() const noexcept {
+    return m_path_segments.size();
+}
+
 uint64_t LocalPlanner::path_generation() const noexcept {
     return m_path_generation;
 }
@@ -262,8 +221,6 @@ void LocalPlanner::rebuild_path_segments()
     }
 
     const std::vector<float>& point_s = m_global_astar_path_arc_lengths.point_s;
-    const float conflict_distance2 =
-        kTopologicalConflictDistance * kTopologicalConflictDistance;
 
     for (size_t i = 1; i < m_global_astar_path.size(); i++) {
         const glm::vec2 a = m_global_astar_path[i - 1].position;
@@ -281,20 +238,12 @@ void LocalPlanner::rebuild_path_segments()
 
             float t = 0.0f;
             float u = 0.0f;
-            const bool intersects =
-                segment_intersection_parameters(a, b, c, d, t, u);
-            if (!intersects) {
-                closest_segment_parameters(a, b, c, d, t, u);
-                const glm::vec2 closest_a = a + (b - a) * t;
-                const glm::vec2 closest_b = c + (d - c) * u;
-                const glm::vec2 diff = closest_a - closest_b;
-                if (glm::dot(diff, diff) > conflict_distance2)
-                    continue;
-            }
+            if (!segment_intersection_parameters(a, b, c, d, t, u))
+                continue;
 
             const float s_a = point_s[i - 1] + std::clamp(t, 0.0f, 1.0f) * length_a;
             const float s_b = point_s[j - 1] + std::clamp(u, 0.0f, 1.0f) * length_b;
-            if (std::abs(s_a - s_b) < kTopologicalConflictMinSSeparation)
+            if (std::abs(s_a - s_b) < kSelfIntersectionMinSSeparation)
                 continue;
 
             add_breakpoint(breakpoints, s_a, m_path_length);
@@ -461,24 +410,18 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
             break;
 
         const PathSegment& segment = m_path_segments[m_active_path_segment];
-        const bool direction_switch = active_path_segment_ends_with_direction_switch();
-        const float remaining_to_segment_end =
-            std::max(0.0f, segment.s_end - current_projection.s);
-        const float transition_distance = direction_switch
-            ? std::max(0.0f, follow_params.direction_switch_arrival_distance)
-            : kSegmentTransitionEps;
-        const float handoff_speed =
-            std::max(0.0f, follow_params.direction_switch_arrival_speed);
+        const float segment_switch_radius =
+            std::max(kSegmentTransitionEps, follow_params.segment_switch_radius);
+        const Vehicle::PointProjection segment_end_projection =
+            Vehicle::sample_polyline_at_s(
+                m_global_astar_path,
+                m_global_astar_path_arc_lengths,
+                segment.s_end
+            );
+        const float segment_end_dist =
+            glm::length(vehicle.state().m_position - segment_end_projection.point);
 
-        const bool close_to_segment_end =
-            remaining_to_segment_end <= std::max(kSegmentTransitionEps, transition_distance);
-        const bool speed_allows_handoff =
-            !direction_switch || std::abs(vehicle.state().m_speed) <= handoff_speed;
-        const bool close_to_path =
-            current_projection.dist <=
-            std::max(0.5f, follow_params.slowdown_distance_from_path);
-
-        if (!close_to_segment_end || !speed_allows_handoff || !close_to_path)
+        if (segment_end_dist > segment_switch_radius)
             break;
 
         m_active_path_segment++;

@@ -61,6 +61,11 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
                    mesh_manager.line_quad,
                    material_instance_manager.line,
                    max_path_line_count),
+        m_segment_switch_sphere_line_cloud(*m_celeris->engine(),
+                   mesh_manager.line_quad,
+                   material_instance_manager.line,
+                   96),
+        m_segment_switch_rear_axle_point(mesh_manager.sphere, material_instance_manager.pbr),
         m_point_map_point_cloud(
             *m_celeris->engine(),
             mesh_manager,
@@ -99,6 +104,19 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
         .line_width_pixels = 4
     });
 
+    m_segment_switch_sphere_line_cloud.set_material_data(LineMaterialData{
+        .color = glm::vec4(1.0f, 0.85f, 0.05f, 1.0f),
+        .line_width_pixels = 3
+    });
+
+    m_segment_switch_rear_axle_point.set_material_data(PBRMaterialData::create(
+        1.0f,
+        0.7f,
+        skybox_exposure,
+        glm::vec4(0.0f, 1.0f, 0.25f, 1.0f)
+    ));
+    m_segment_switch_rear_axle_point.transform.scale = glm::vec3(0.35f);
+
     // m_point_map_point_cloud.set_material_data(PointCloudMaterialData{
     //     .color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)
     // });
@@ -112,6 +130,8 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
     add_child(m_explored_paths_line_cloud);
     add_child(m_unimpended_path_line_cloud);
     add_child(m_local_candidate_line_cloud);
+    add_child(m_segment_switch_sphere_line_cloud);
+    add_child(m_segment_switch_rear_axle_point);
     add_child(m_celeris->waypoint_path());
     add_child(m_point_map_point_cloud);
 
@@ -125,6 +145,8 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
     m_start_marker.visible = show_start_marker && m_celeris->has_start_position();
     m_goal_marker.visible = show_goal_marker && m_celeris->has_goal_position();
     m_point_map_point_cloud.visible = show_voxel_point_map;
+    m_segment_switch_sphere_line_cloud.visible = show_segment_switch_debug;
+    m_segment_switch_rear_axle_point.visible = show_segment_switch_debug;
 }
 
 void CelerisVisualizer::set_start(const NonholonomicPos& nonholonomic_position) {
@@ -229,6 +251,34 @@ void CelerisVisualizer::update() {
     };
 
     PathPlanner::PathPlannerResult path_result = m_celeris->path_result_snapshot();
+    glm::vec3 segment_switch_center{0.0f};
+    const float segment_switch_radius =
+        std::max(0.0f, m_celeris->local_planner_segment_switch_radius());
+    const bool has_segment_switch_center =
+        sample_path_at_s(
+            path_result.nonholonomic_astar_path,
+            m_celeris->local_planner_path_window_max_s(),
+            segment_switch_center
+        );
+    if (show_segment_switch_debug && has_segment_switch_center) {
+        const glm::vec3 visual_switch_center =
+            segment_switch_center + marker_vertical_offset();
+        m_segment_switch_sphere_line_cloud.set_lines(
+            make_segment_switch_sphere_lines(
+                visual_switch_center,
+                segment_switch_radius
+            )
+        );
+        m_segment_switch_rear_axle_point.transform.position =
+            m_celeris->vehicle_position().pos + marker_vertical_offset();
+    } else {
+        m_segment_switch_sphere_line_cloud.set_lines(hidden_lines);
+    }
+    m_segment_switch_sphere_line_cloud.visible =
+        show_segment_switch_debug && has_segment_switch_center;
+    m_segment_switch_rear_axle_point.visible =
+        show_segment_switch_debug && has_segment_switch_center;
+
     m_guide_path_line_cloud.set_lines(
         show_guide_path ? make_path_lines(path_result.plain_astar_path.path) : hidden_lines
     );
@@ -284,6 +334,7 @@ void CelerisVisualizer::display_debug_controls() {
         ImGui::Checkbox("Gazelle Next", &show_gazelle_next);
         ImGui::Checkbox("Local candidates", &show_local_candidates);
         ImGui::Checkbox("Local s window", &show_local_s_window);
+        ImGui::Checkbox("Segment switch sphere", &show_segment_switch_debug);
         ImGui::Checkbox("Show voxel point map##visualizer_voxel_point_map", &show_voxel_point_map);
     }
 }
@@ -600,4 +651,85 @@ std::vector<LineInstance> CelerisVisualizer::make_local_candidate_lines(
                                                .color = glm::vec4(0.0f)});
 
     return candidate_lines;
+}
+
+std::vector<LineInstance> CelerisVisualizer::make_segment_switch_sphere_lines(
+    glm::vec3 center,
+    float radius)
+{
+    constexpr size_t circle_segments = 32;
+    constexpr glm::vec4 color = glm::vec4(1.0f, 0.85f, 0.05f, 1.0f);
+
+    std::vector<LineInstance> lines;
+    lines.reserve(circle_segments * 3u);
+
+    if (!std::isfinite(radius) || radius <= Utils::eps) {
+        lines.push_back(LineInstance{
+            .p0 = center,
+            .p1 = center,
+            .color = glm::vec4(0.0f)
+        });
+        return lines;
+    }
+
+    auto append_circle = [&](glm::vec3 axis_a, glm::vec3 axis_b) {
+        for (size_t i = 0; i < circle_segments; i++) {
+            const float t0 =
+                glm::two_pi<float>() * static_cast<float>(i) /
+                static_cast<float>(circle_segments);
+            const float t1 =
+                glm::two_pi<float>() * static_cast<float>(i + 1u) /
+                static_cast<float>(circle_segments);
+            lines.push_back(LineInstance{
+                .p0 = center + radius * (std::cos(t0) * axis_a + std::sin(t0) * axis_b),
+                .p1 = center + radius * (std::cos(t1) * axis_a + std::sin(t1) * axis_b),
+                .color = color
+            });
+        }
+    };
+
+    append_circle(glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    append_circle(glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    append_circle(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+    return lines;
+}
+
+bool CelerisVisualizer::sample_path_at_s(
+    const std::vector<NonholonomicPos>& path,
+    float s,
+    glm::vec3& output) const
+{
+    if (path.empty() || !std::isfinite(s))
+        return false;
+
+    if (path.size() == 1 || s <= 0.0f) {
+        output = path.front().pos;
+        return true;
+    }
+
+    float current_s = 0.0f;
+    for (size_t i = 1; i < path.size(); i++) {
+        const glm::vec3 p0 = path[i - 1].pos;
+        const glm::vec3 p1 = path[i].pos;
+        const float segment_length = glm::distance(
+            glm::vec2(p0.x, p0.z),
+            glm::vec2(p1.x, p1.z)
+        );
+
+        if (segment_length <= Utils::eps)
+            continue;
+
+        const float next_s = current_s + segment_length;
+        if (s <= next_s || i + 1u == path.size()) {
+            const float t = std::clamp((s - current_s) / segment_length, 0.0f, 1.0f);
+            output = glm::mix(p0, p1, t);
+            return true;
+        }
+
+        current_s = next_s;
+    }
+
+    output = path.back().pos;
+    return true;
 }

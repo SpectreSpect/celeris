@@ -42,7 +42,7 @@ public:
 
     struct SimulationControlSearchDesc {
         int speed_acceleration_samples = 7;
-        int steer_acceleration_samples = 7;
+        int steer_acceleration_samples = 30;
         int max_results = 5;
         float simulation_time = 2.0f;
         float dt = 0.05f;
@@ -71,8 +71,8 @@ public:
         float min_off_path_speed_factor = 0.25f;
         float projection_backtrack_window = 0.75f;
         float projection_lookahead_base = 3.0f;
+        float segment_switch_radius = 0.35f;
         float min_direction_segment_virtual_length = 3.0f;
-        float direction_switch_arrival_distance = 0.25f;
         float direction_switch_arrival_speed = 0.9f;
         float direction_switch_approach_speed = 0.75f;
     };

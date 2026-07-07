@@ -63,6 +63,8 @@ public:
     float path_length() const noexcept;
     float path_window_min_s() const noexcept;
     float path_window_max_s() const noexcept;
+    size_t active_path_segment_index() const noexcept;
+    size_t path_segment_count() const noexcept;
     uint64_t path_generation() const noexcept;
 
 private:

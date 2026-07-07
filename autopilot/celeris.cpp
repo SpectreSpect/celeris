@@ -271,10 +271,10 @@ Celeris::Celeris(VulkanEngine& engine,
     );
     follow_params.projection_backtrack_window = std::max(0.0f, desc.vehicle_projection_backtrack_window);
     follow_params.projection_lookahead_base = std::max(0.0f, desc.vehicle_projection_lookahead_base);
+    follow_params.segment_switch_radius =
+        std::max(0.0f, desc.vehicle_segment_switch_radius);
     follow_params.min_direction_segment_virtual_length =
         std::max(0.0f, desc.vehicle_min_direction_segment_virtual_length);
-    follow_params.direction_switch_arrival_distance =
-        std::max(0.0f, desc.vehicle_direction_switch_arrival_distance);
     follow_params.direction_switch_arrival_speed =
         std::max(0.0f, desc.vehicle_direction_switch_arrival_speed);
     follow_params.direction_switch_approach_speed =
@@ -463,21 +463,21 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         std::chrono::duration<float>(now - m_last_local_planner_update_timestamp).count() >=
             local_planner_update_period;
 
-    // if (should_update_local_planner) {
-    //     VehicleCommand vehicle_command;
-    //     if (!m_waypoint_path_completed || m_waypoint_path.waypoints().empty()) {
-    //         vehicle_command = m_local_planner.step(
-    //             m_vehicle,
-    //             m_path_intersection_detector,
-    //             submit_context
-    //         );
-    //     }
+    if (should_update_local_planner) {
+        VehicleCommand vehicle_command;
+        if (!m_waypoint_path_completed || m_waypoint_path.waypoints().empty()) {
+            vehicle_command = m_local_planner.step(
+                m_vehicle,
+                m_path_intersection_detector,
+                submit_context
+            );
+        }
 
-    //     if (!m_gamepad_commands_enabled)
-    //         m_command_sender.set_command(vehicle_command);
-    //     m_last_local_planner_update_timestamp = now;
-    //     m_has_last_local_planner_update_timestamp = true;
-    // }
+        if (!m_gamepad_commands_enabled)
+            m_command_sender.set_command(vehicle_command);
+        m_last_local_planner_update_timestamp = now;
+        m_has_last_local_planner_update_timestamp = true;
+    }
 }
 
 void Celeris::apply_vehicle_feedback(const VehicleFeedback& feedback) {
@@ -708,6 +708,10 @@ float Celeris::local_planner_path_window_min_s() const noexcept {
 
 float Celeris::local_planner_path_window_max_s() const noexcept {
     return m_local_planner.path_window_max_s();
+}
+
+float Celeris::local_planner_segment_switch_radius() const noexcept {
+    return m_vehicle.follow_params().segment_switch_radius;
 }
 
 Footprint& Celeris::footprint() noexcept {
@@ -1225,6 +1229,11 @@ void Celeris::display_path_planner_debug_controls() {
         m_local_planner.path_window_max_s()
     );
     ImGui::Text(
+        "Local path segment: %zu / %zu",
+        m_local_planner.active_path_segment_index(),
+        m_local_planner.path_segment_count()
+    );
+    ImGui::Text(
         "Local path generation: %llu",
         static_cast<unsigned long long>(m_local_planner.path_generation())
     );
@@ -1322,11 +1331,11 @@ void Celeris::display_path_planner_debug_controls() {
         if (ImGui::DragFloat("Projection lookahead base", &params.projection_lookahead_base, 0.05f, 0.0f, 50.0f, "%.3f")) {
             params.projection_lookahead_base = std::max(0.0f, params.projection_lookahead_base);
         }
+        if (ImGui::DragFloat("Segment switch radius", &params.segment_switch_radius, 0.01f, 0.0f, 10.0f, "%.3f")) {
+            params.segment_switch_radius = std::max(0.0f, params.segment_switch_radius);
+        }
         if (ImGui::DragFloat("Min virtual direction segment length", &params.min_direction_segment_virtual_length, 0.05f, 0.0f, 20.0f, "%.3f")) {
             params.min_direction_segment_virtual_length = std::max(0.0f, params.min_direction_segment_virtual_length);
-        }
-        if (ImGui::DragFloat("Direction switch arrival distance", &params.direction_switch_arrival_distance, 0.01f, 0.0f, 5.0f, "%.3f")) {
-            params.direction_switch_arrival_distance = std::max(0.0f, params.direction_switch_arrival_distance);
         }
         if (ImGui::DragFloat("Direction switch arrival speed", &params.direction_switch_arrival_speed, 0.01f, 0.0f, 5.0f, "%.3f")) {
             params.direction_switch_arrival_speed = std::max(0.0f, params.direction_switch_arrival_speed);
@@ -1345,10 +1354,9 @@ void Celeris::display_path_planner_debug_controls() {
             );
             params.projection_backtrack_window = std::max(0.0f, m_desc.vehicle_projection_backtrack_window);
             params.projection_lookahead_base = std::max(0.0f, m_desc.vehicle_projection_lookahead_base);
+            params.segment_switch_radius = std::max(0.0f, m_desc.vehicle_segment_switch_radius);
             params.min_direction_segment_virtual_length =
                 std::max(0.0f, m_desc.vehicle_min_direction_segment_virtual_length);
-            params.direction_switch_arrival_distance =
-                std::max(0.0f, m_desc.vehicle_direction_switch_arrival_distance);
             params.direction_switch_arrival_speed =
                 std::max(0.0f, m_desc.vehicle_direction_switch_arrival_speed);
             params.direction_switch_approach_speed =

@@ -440,7 +440,7 @@ int main() {
             .footprint_sample_count = 5,
             .footprint_horizontal_inflation_size = horizontal_inflation_size,
             .footprint_vertical_inflation_size = vertical_inflation_size,
-            .gamepad_commands_enabled = true
+            .gamepad_commands_enabled = false
         }
     );
 
@@ -449,8 +449,8 @@ int main() {
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
     has_end_pos = true;
     // celeris.set_start_lidar_scan_position(start_lidar_scan_position);
-    celeris.load_map(saved_maps_directory / "robocross_sim_2.vpm");
-    celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim_3.wpp");
+    // celeris.load_map(saved_maps_directory / "robocross_sim_2.vpm");
+    // celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim_3.wpp");
     celeris.start(std::move(planner_submit_context));
 
     CelerisVisualizer celeris_visualizer(
