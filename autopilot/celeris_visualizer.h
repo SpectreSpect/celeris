@@ -90,6 +90,7 @@ private:
     bool show_gazelle_next = true;
     bool show_local_candidates = true;
     bool show_local_s_window = true;
+    bool show_voxel_point_map = true;
     bool m_has_car_pose_override = false;
     NonholonomicPos m_car_pose_override;
 

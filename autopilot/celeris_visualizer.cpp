@@ -124,6 +124,7 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
 
     m_start_marker.visible = show_start_marker && m_celeris->has_start_position();
     m_goal_marker.visible = show_goal_marker && m_celeris->has_goal_position();
+    m_point_map_point_cloud.visible = show_voxel_point_map;
 }
 
 void CelerisVisualizer::set_start(const NonholonomicPos& nonholonomic_position) {
@@ -189,9 +190,11 @@ void CelerisVisualizer::update() {
     if (m_celeris->has_goal_position())
         set_goal(m_celeris->goal_position());
 
-    m_point_map_point_cloud.set_instance_view(
-        m_celeris->voxel_point_map().get_map_instance_view()
-    );
+    if (show_voxel_point_map) {
+        m_point_map_point_cloud.set_instance_view(
+            m_celeris->voxel_point_map().get_map_instance_view()
+        );
+    }
 
     if (m_has_car_pose_override)
         set_gazelle_pose(m_car_pose_override);
@@ -201,6 +204,7 @@ void CelerisVisualizer::update() {
     m_start_marker.visible = show_start_marker && m_celeris->has_start_position();
     m_goal_marker.visible = show_goal_marker && m_celeris->has_goal_position();
     m_gazelle_next.visible = show_gazelle_next;
+    m_point_map_point_cloud.visible = show_voxel_point_map;
 
     // interpolate_marker_pose(
     //     m_start_marker,
@@ -280,6 +284,7 @@ void CelerisVisualizer::display_debug_controls() {
         ImGui::Checkbox("Gazelle Next", &show_gazelle_next);
         ImGui::Checkbox("Local candidates", &show_local_candidates);
         ImGui::Checkbox("Local s window", &show_local_s_window);
+        ImGui::Checkbox("Show voxel point map##visualizer_voxel_point_map", &show_voxel_point_map);
     }
 }
 
