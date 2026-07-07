@@ -322,7 +322,22 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
     if (has_vehicle_feedback) {
         apply_vehicle_feedback(vehicle_feedback);
     }
-    m_local_planner.predict_vehicle_state(m_vehicle);
+    if (m_gamepad_commands_enabled) {
+        const float delta_time = m_local_planner.calculate_delta_time();
+        if (delta_time > 0.0f) {
+            m_vehicle.state().m_steering_angle_velocity =
+                m_gamepad_command.steering_angle_velocity;
+            m_vehicle.simulate_vehicle(
+                m_gamepad_command.acceleration,
+                0.0f,
+                delta_time,
+                std::min(delta_time, 0.05f),
+                false
+            );
+        }
+    } else {
+        m_local_planner.predict_vehicle_state(m_vehicle);
+    }
 
     float vehicle_height = m_vehicle_position.pos.y;
 
@@ -622,6 +637,14 @@ NonholonomicPos Celeris::goal_position() const noexcept {
 
 float Celeris::car_speed() const noexcept {
     return m_vehicle.follow_params().cruise_speed;
+}
+
+float Celeris::vehicle_speed() const noexcept {
+    return m_vehicle.state().m_speed;
+}
+
+float Celeris::vehicle_steering_angle() const noexcept {
+    return m_vehicle.state().m_steering_angle;
 }
 
 float Celeris::waypoint_reach_radius() const noexcept {

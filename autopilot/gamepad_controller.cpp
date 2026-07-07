@@ -44,7 +44,11 @@ GamepadController::GamepadController(Desc desc)
     reset_gamepad_history();
 }
 
-void GamepadController::update(float max_speed) {
+void GamepadController::update(
+    float max_speed,
+    float current_speed,
+    float current_steering_angle)
+{
     GLFWgamepadstate gamepad_state{};
     const bool gamepad_present = glfwJoystickIsGamepad(m_desc.joystick_id) &&
                                  glfwGetGamepadState(m_desc.joystick_id, &gamepad_state);
@@ -66,7 +70,12 @@ void GamepadController::update(float max_speed) {
     }
 
     if (gamepad_present) {
-        update_gamepad_command(gamepad_state, max_speed);
+        update_gamepad_command(
+            gamepad_state,
+            max_speed,
+            current_speed,
+            current_steering_angle
+        );
         if (m_desc.print_input_events)
             print_gamepad_events(gamepad_state);
 
@@ -96,7 +105,7 @@ void GamepadController::update(float max_speed) {
     }
 
     if (raw_present) {
-        update_raw_joystick_command(max_speed);
+        update_raw_joystick_command(max_speed, current_speed, current_steering_angle);
     }
 
     if (raw_present && m_desc.print_input_events)
@@ -137,27 +146,65 @@ float GamepadController::apply_deadzone(float value) const noexcept {
     return std::copysign(std::clamp(normalized, 0.0f, 1.0f), value);
 }
 
-void GamepadController::update_gamepad_command(
-    const GLFWgamepadstate& state,
-    float max_speed)
+VehicleCommand GamepadController::make_drive_command(
+    float speed_axis,
+    float steering_axis,
+    float max_speed,
+    float current_speed,
+    float current_steering_angle,
+    bool brake) const noexcept
 {
-    m_brake_pressed = state.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER] == GLFW_PRESS;
-    if (m_brake_pressed) {
-        m_command = VehicleCommand{};
-        return;
-    }
+    const float finite_max_speed = std::isfinite(max_speed) ? std::max(0.0f, max_speed) : 0.0f;
+    const float measured_speed = std::isfinite(current_speed) ? current_speed : 0.0f;
+    const float measured_steering =
+        std::isfinite(current_steering_angle) ? current_steering_angle : 0.0f;
 
-    const float steering_axis = apply_deadzone(state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X]);
-    const float speed_axis = apply_deadzone(state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y]);
-    const float finite_max_speed = std::isfinite(max_speed) ? max_speed : 0.0f;
+    const float target_speed = brake ? 0.0f : -speed_axis * finite_max_speed;
+    const float target_steering_angle = steering_axis * m_desc.max_steering_angle;
 
-    m_command = VehicleCommand{
-        .acceleration = -speed_axis * finite_max_speed,
-        .steering_angle_velocity = steering_axis * m_desc.max_steering_angle
+    const float deceleration_limit = brake ? m_desc.brake_deceleration : m_desc.max_deceleration;
+    const float acceleration = std::clamp(
+        (target_speed - measured_speed) * m_desc.speed_response,
+        -std::max(0.0f, deceleration_limit),
+        std::max(0.0f, m_desc.max_acceleration)
+    );
+    const float steering_angle_velocity = std::clamp(
+        (target_steering_angle - measured_steering) * m_desc.steering_response,
+        -std::max(0.0f, m_desc.max_steering_angle_velocity),
+        std::max(0.0f, m_desc.max_steering_angle_velocity)
+    );
+
+    return VehicleCommand{
+        .acceleration = acceleration,
+        .steering_angle_velocity = steering_angle_velocity
     };
 }
 
-void GamepadController::update_raw_joystick_command(float max_speed) {
+void GamepadController::update_gamepad_command(
+    const GLFWgamepadstate& state,
+    float max_speed,
+    float current_speed,
+    float current_steering_angle)
+{
+    m_brake_pressed = state.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER] == GLFW_PRESS;
+
+    const float steering_axis = apply_deadzone(state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X]);
+    const float speed_axis = apply_deadzone(state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y]);
+    m_command = make_drive_command(
+        speed_axis,
+        steering_axis,
+        max_speed,
+        current_speed,
+        current_steering_angle,
+        m_brake_pressed
+    );
+}
+
+void GamepadController::update_raw_joystick_command(
+    float max_speed,
+    float current_speed,
+    float current_steering_angle)
+{
     int axis_count = 0;
     const float* axes = glfwGetJoystickAxes(m_desc.joystick_id, &axis_count);
     int button_count = 0;
@@ -168,11 +215,6 @@ void GamepadController::update_raw_joystick_command(float max_speed) {
         m_desc.raw_right_bumper_button >= 0 &&
         m_desc.raw_right_bumper_button < button_count &&
         buttons[m_desc.raw_right_bumper_button] == GLFW_PRESS;
-
-    if (m_brake_pressed) {
-        m_command = VehicleCommand{};
-        return;
-    }
 
     if (!axes ||
         m_desc.raw_left_stick_y_axis < 0 ||
@@ -189,12 +231,14 @@ void GamepadController::update_raw_joystick_command(float max_speed) {
     const float speed_axis = apply_deadzone(
         std::clamp(axes[m_desc.raw_left_stick_y_axis], -1.0f, 1.0f)
     );
-    const float finite_max_speed = std::isfinite(max_speed) ? max_speed : 0.0f;
-
-    m_command = VehicleCommand{
-        .acceleration = -speed_axis * finite_max_speed,
-        .steering_angle_velocity = steering_axis * m_desc.max_steering_angle
-    };
+    m_command = make_drive_command(
+        speed_axis,
+        steering_axis,
+        max_speed,
+        current_speed,
+        current_steering_angle,
+        m_brake_pressed
+    );
 }
 
 void GamepadController::print_gamepad_events(const GLFWgamepadstate& state) {

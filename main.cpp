@@ -833,7 +833,11 @@ int main() {
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
-        gamepad_controller.update(celeris.car_speed());
+        gamepad_controller.update(
+            celeris.car_speed(),
+            celeris.vehicle_speed(),
+            celeris.vehicle_steering_angle()
+        );
         celeris.set_gamepad_command(gamepad_controller.command());
 
         if (skybox_environment_update_pending) {

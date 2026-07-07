@@ -121,6 +121,8 @@ public:
     NonholonomicPos vehicle_position() const noexcept;
     NonholonomicPos goal_position() const noexcept;
     float car_speed() const noexcept;
+    float vehicle_speed() const noexcept;
+    float vehicle_steering_angle() const noexcept;
     const std::vector<Vehicle::SimulationControlCandidate>& local_planner_candidates() const noexcept;
     float local_planner_path_window_min_s() const noexcept;
     float local_planner_path_window_max_s() const noexcept;
