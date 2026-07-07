@@ -154,6 +154,8 @@ add_executable(app
   utils/avg_timer.cpp
   a_star/vehichle.cpp
   a_star/local_planner.cpp
+  a_star/pure_pursuit_vehicle.cpp
+  a_star/pure_pursuit_local_planner.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

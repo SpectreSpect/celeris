@@ -24,6 +24,7 @@
 #include "../utils/avg_timer.h"
 #include "../a_star/vehichle.h"
 #include "../a_star/local_planner.h"
+#include "../a_star/pure_pursuit_local_planner.h"
 #include "vehicle_state_receiver.h"
 
 #include <chrono>
@@ -59,15 +60,16 @@ public:
         float max_vehicle_acceleration = 3;
         float max_vehicle_steer_acceleration = 2;
         float vehicle_wheel_base = 4.29f;
-        float vehicle_cruise_speed = 10.0f;
-        float vehicle_slowdown_distance_from_path = 2.5f;
+        float vehicle_cruise_speed = 12.0f;
+        float vehicle_slowdown_distance_from_path = 3.5f;
         float vehicle_min_off_path_speed_factor = 0.25f;
-        float vehicle_projection_backtrack_window = 0.75f;
-        float vehicle_projection_lookahead_base = 3.0f;
+        float vehicle_projection_backtrack_window = 1.0f;
+        float vehicle_projection_lookahead_base = 8.0f;
         float vehicle_min_direction_segment_virtual_length = 3.0f;
-        float vehicle_direction_switch_arrival_distance = 0.25f;
-        float vehicle_direction_switch_arrival_speed = 0.9f;
-        float vehicle_direction_switch_approach_speed = 0.75f;
+        float vehicle_direction_switch_arrival_distance = 0.5f;
+        float vehicle_direction_switch_arrival_speed = 1.5f;
+        float vehicle_direction_switch_approach_distance = 6.0f;
+        float vehicle_direction_switch_approach_speed = 2.0f;
         float global_path_direction_cleanup_min_segment_length = 1.0f;
         float local_planner_update_period = 0.05f;
         VehicleGeometry vehicle_geometry;
@@ -126,6 +128,8 @@ public:
     const std::vector<Vehicle::SimulationControlCandidate>& local_planner_candidates() const noexcept;
     float local_planner_path_window_min_s() const noexcept;
     float local_planner_path_window_max_s() const noexcept;
+    bool has_local_planner_lookahead_point() const noexcept;
+    glm::vec3 local_planner_lookahead_point() const noexcept;
     float waypoint_reach_radius() const noexcept;
     bool gamepad_commands_enabled() const noexcept;
     VehicleCommand gamepad_command() const noexcept;
@@ -208,9 +212,9 @@ private:
 
     VehicleStateReceiver m_vehicle_state_receiver;
 
-    Vehicle m_vehicle;
+    PurePursuitVehicle m_vehicle;
     PathPlanner m_path_planner;
-    LocalPlanner m_local_planner;
+    PurePursuitLocalPlanner m_local_planner;
     
     VoxelPointMap m_voxel_point_map;
     VoxelMapPointInserter m_voxel_map_inserter;
