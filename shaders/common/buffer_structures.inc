@@ -59,6 +59,7 @@ struct VoxelData {
 };
 
 #define OVERWRITE_BIT 1u
+#define CURVATURE_PRIORITY_OVERWRITE_BIT 2u
 
 struct VoxelWrite {
     ivec4 world_voxel; // xyz use, w unused

@@ -95,6 +95,7 @@ void main() {
     uint voxel_write_id = atomicAdd(voxel_write_list.count_voxel_writes, 1u);
     voxel_write_list.voxel_writes[voxel_write_id].world_voxel = voxel_pos;
     voxel_write_list.voxel_writes[voxel_write_id].voxel_data = voxel_data;
-    voxel_write_list.voxel_writes[voxel_write_id].set_flags = OVERWRITE_BIT;
+    voxel_write_list.voxel_writes[voxel_write_id].set_flags =
+        OVERWRITE_BIT | CURVATURE_PRIORITY_OVERWRITE_BIT;
     voxel_write_list.voxel_writes[voxel_write_id]._pad1 = 0u;
 }
