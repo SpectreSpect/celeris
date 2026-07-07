@@ -67,6 +67,14 @@ struct VoxelWrite {
     uint _pad1;
 };
 
+struct VoxelWriteUniqueSlot {
+    ivec4 world_voxel;
+    uint selected_rank;
+    uint state;
+    uint pad0;
+    uint pad1;
+};
+
 struct Vertex {
     vec4 pos;
     uint color;

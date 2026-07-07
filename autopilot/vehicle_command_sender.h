@@ -9,8 +9,8 @@
 #include <thread>
 
 struct VehicleCommand {
-    float speed = 0.0f;
-    float steering_angle = 0.0f;
+    float acceleration = 0.0f;
+    float steering_angle_velocity = 0.0f;
 };
 
 class VehicleCommandSender {
@@ -29,12 +29,14 @@ public:
     void stop();
 
     void set_command(VehicleCommand command);
-    void set_command(float speed, float steering_angle);
+    void set_command(float acceleration, float steering_angle_velocity);
     void send_stop();
 
     VehicleCommand command() const;
     bool is_running() const noexcept;
     bool is_connected() const noexcept;
+    uint64_t sent_packet_count() const noexcept;
+    uint64_t send_failure_count() const noexcept;
 
 private:
     std::string m_host;
@@ -49,6 +51,8 @@ private:
 
     std::atomic<bool> m_running{false};
     std::atomic<bool> m_connected{false};
+    std::atomic<uint64_t> m_sent_packet_count{0};
+    std::atomic<uint64_t> m_send_failure_count{0};
     std::thread m_thread;
 
     void send_loop();

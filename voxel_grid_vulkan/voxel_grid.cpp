@@ -883,6 +883,12 @@ VoxelGrid::VoxelGridParams VoxelGrid::create_params(const VoxelGridDesc& desc) c
     params.count_active_chunks = desc.count_active_chunks;
     params.count_evict_buckets = desc.count_evict_buckets;
     params.max_write_count = desc.max_write_count;
+
+    logger().check(desc.max_write_count <= (1u << 30u), "Voxel write unique table size would overflow");
+    params.voxel_write_unique_table_size = math_utils::next_pow2_u32(
+        std::max(1u, desc.max_write_count * 2u)
+    );
+
     params.min_free_chunks = desc.min_free_chunks;
     params.tomb_fraction_to_rebuild = desc.tomb_fraction_to_rebuild;
     params.eviction_bucket_shell_thickness = desc.eviction_bucket_shell_thickness;
@@ -991,6 +997,8 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
     VkDeviceSize to_inflate_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
     VkDeviceSize local_voxel_write_list_size = sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * m_params.max_write_count;
     VkDeviceSize voxel_write_list_size = sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * m_params.max_write_count;
+    VkDeviceSize voxel_write_unique_table_size =
+        sizeof(VoxelWriteUniqueSlotGPU) * m_params.voxel_write_unique_table_size;
     VkDeviceSize voxels_size = sizeof(VoxelDataGPU) * vox_per_chunk() * (size_t)m_params.count_active_chunks;
     VkDeviceSize indirect_cmds_size = sizeof(uint32_t) + sizeof(DrawElementsIndirectCommand) * m_params.count_active_chunks;
     VkDeviceSize failed_dirty_list_size = sizeof(uint32_t) * (size_t)(1 + m_params.count_active_chunks);
@@ -1034,6 +1042,30 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         physical_device,
         device,
         local_voxel_write_list_size,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        ssbo_memory_properties
+    );
+
+    VulkanBuffer voxel_write_list = VulkanBuffer(
+        physical_device,
+        device,
+        voxel_write_list_size,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        ssbo_memory_properties
+    );
+
+    VulkanBuffer unique_voxel_write_list = VulkanBuffer(
+        physical_device,
+        device,
+        voxel_write_list_size,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        ssbo_memory_properties
+    );
+
+    VulkanBuffer voxel_write_unique_table = VulkanBuffer(
+        physical_device,
+        device,
+        voxel_write_unique_table_size,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         ssbo_memory_properties
     );
@@ -1107,6 +1139,9 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
         auto scope = m_command_buffer.begin_scope();
 
         local_voxel_write_list.fill(m_command_buffer, 0u);
+        voxel_write_list.fill(m_command_buffer, 0u);
+        unique_voxel_write_list.fill(m_command_buffer, 0u);
+        voxel_write_unique_table.fill(m_command_buffer, 0u);
         vb_returned_nodes_list.fill(m_command_buffer, 0u);
         ib_returned_nodes_list.fill(m_command_buffer, 0u);
 
@@ -1204,13 +1239,9 @@ VoxelGrid::VoxelGridBuffers VoxelGrid::create_buffers(
             ssbo_memory_properties
         ),
         .local_voxel_write_list = std::move(local_voxel_write_list),
-        .voxel_write_list = VulkanBuffer(
-            physical_device,
-            device,
-            voxel_write_list_size,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            ssbo_memory_properties
-        ),
+        .voxel_write_list = std::move(voxel_write_list),
+        .unique_voxel_write_list = std::move(unique_voxel_write_list),
+        .voxel_write_unique_table = std::move(voxel_write_unique_table),
         .voxels = VulkanBuffer(
             physical_device,
             device,

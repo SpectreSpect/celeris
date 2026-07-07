@@ -22,6 +22,9 @@
 #include "vehicle_geometry.h"
 #include "waypoint_path.h"
 #include "../utils/avg_timer.h"
+#include "../a_star/vehichle.h"
+#include "../a_star/local_planner.h"
+#include "vehicle_state_receiver.h"
 
 #include <chrono>
 #include <cstddef>
@@ -51,6 +54,22 @@ public:
         uint32_t unimpended_path_max_astar_points = 4096;
         uint32_t collision_history_size = 8;
         uint32_t collision_escape_search_radius_voxels = 8;
+        uint16_t vehicle_state_receiver_port = 5002;
+        float vehicle_state_timeout = 0.25f;
+        float max_vehicle_acceleration = 3;
+        float max_vehicle_steer_acceleration = 2;
+        float vehicle_wheel_base = 4.29f;
+        float vehicle_cruise_speed = 10.0f;
+        float vehicle_slowdown_distance_from_path = 2.5f;
+        float vehicle_min_off_path_speed_factor = 0.25f;
+        float vehicle_projection_backtrack_window = 0.75f;
+        float vehicle_projection_lookahead_base = 3.0f;
+        float vehicle_min_direction_segment_virtual_length = 3.0f;
+        float vehicle_direction_switch_arrival_distance = 0.25f;
+        float vehicle_direction_switch_arrival_speed = 0.9f;
+        float vehicle_direction_switch_approach_speed = 0.75f;
+        float global_path_direction_cleanup_min_segment_length = 1.0f;
+        float local_planner_update_period = 0.05f;
         VehicleGeometry vehicle_geometry;
         uint32_t footprint_sample_count = 5;
         uint32_t footprint_horizontal_inflation_size = 1;
@@ -96,9 +115,15 @@ public:
 
     LidarScan* network_scan();
     const Transform& lidar_transform() const noexcept;
+    bool has_start_position() const noexcept;
+    bool has_goal_position() const noexcept;
     NonholonomicPos start_position() const noexcept;
+    NonholonomicPos vehicle_position() const noexcept;
     NonholonomicPos goal_position() const noexcept;
     float car_speed() const noexcept;
+    const std::vector<Vehicle::SimulationControlCandidate>& local_planner_candidates() const noexcept;
+    float local_planner_path_window_min_s() const noexcept;
+    float local_planner_path_window_max_s() const noexcept;
     float waypoint_reach_radius() const noexcept;
     bool gamepad_commands_enabled() const noexcept;
     VehicleCommand gamepad_command() const noexcept;
@@ -120,12 +145,13 @@ public:
     WaypointPath& waypoint_path() noexcept;
     const WaypointPath& waypoint_path() const noexcept;
 
-    void request_path_replan();
+    bool request_path_replan();
+    void reset_local_planner_tracking();
     bool adjust_to_ground(
-        glm::vec3& output, 
-        int max_step_up = 500, 
-        int max_drop = 500, 
-        int max_y_diff = -1, 
+        glm::vec3& output,
+        int max_step_up = 500,
+        int max_drop = 500,
+        int max_y_diff = -1,
         bool allow_flying_over_precepices = true
     );
     bool adjust_to_ground(
@@ -145,7 +171,8 @@ public:
     );
     bool has_planned_path() const;
     PathPlanner::PathPlannerResult path_result_snapshot() const;
-    void display_path_planner_debug_controls() const;
+    std::vector<NonholonomicPos> get_nonholonomic_astar_path() const;
+    void display_path_planner_debug_controls();
     glm::vec3 voxel_size();
     glm::vec3 voxel_center_world_pos(const glm::ivec3& voxel_pos);
     void sync_point_map_and_voxel_grid();
@@ -171,11 +198,17 @@ private:
 
     WaypointPath m_waypoint_path;
     GICPPass m_gicp_pass;
+    PathIntersectionDetector m_path_intersection_detector;
 
     PointCloudPreprocessor m_point_cloud_preprocessor;
     LidarScanReceiver m_scan_receiver;
     VehicleCommandSender m_command_sender;
+
+    VehicleStateReceiver m_vehicle_state_receiver;
+
+    Vehicle m_vehicle;
     PathPlanner m_path_planner;
+    LocalPlanner m_local_planner;
     
     VoxelPointMap m_voxel_point_map;
     VoxelMapPointInserter m_voxel_map_inserter;
@@ -187,7 +220,10 @@ private:
     bool m_needs_map_localization = false;
 
     NonholonomicPos m_start_position;
+    NonholonomicPos m_vehicle_position;
     NonholonomicPos m_goal_position;
+    bool m_has_start_position = false;
+    bool m_has_goal_position = false;
     Transform m_lidar_transform;
     float m_car_speed = 10.0f;
     float m_waypoint_reach_radius = 2.0f;
@@ -199,6 +235,8 @@ private:
     std::unique_ptr<LidarScan> m_network_scan;
     std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;
     uint32_t m_received_scan_count = 0;
+    std::chrono::steady_clock::time_point m_last_local_planner_update_timestamp{};
+    bool m_has_last_local_planner_update_timestamp = false;
     bool m_has_previous_lidar_pose = false;
     bool m_has_start_lidar_scan_position = false;
     bool m_has_start_lidar_scan_rotation = false;
@@ -212,6 +250,8 @@ private:
     uint32_t path_replanning_interval = 5;
 
     uint64_t m_synced_path_generation = 0;
+    uint64_t m_path_direction_cleanup_revision = 0;
+    uint64_t m_synced_path_direction_cleanup_revision = 0;
     uint32_t current_target_path_point_id = 0;
     mutable std::mutex m_path_mutex;
     PlainAstarData plain_astar_path;
@@ -240,12 +280,17 @@ private:
     bool find_collision_escape_point(glm::vec3 point_pos, glm::vec3 direction, glm::vec3& resolved_pos);
     void remember_collision_raw_position(glm::vec3 point_pos);
 
+    void apply_vehicle_feedback(const VehicleFeedback& feedback);
+    bool is_vehicle_feedback_fresh(const VehicleFeedback& feedback) const;
+    void sync_vehicle_position_from_state(float height);
+
     bool is_path_impended(VulkanSubmitContext& submit_context);
     void reset_waypoint_navigation() noexcept;
     void update_waypoint_navigation();
     bool has_active_waypoint() const noexcept;
     NonholonomicPos waypoint_goal_pose(size_t waypoint_index) const;
     bool active_waypoint_goal_pose(NonholonomicPos& output) const;
+    bool request_grounded_path_replan(NonholonomicPos start, NonholonomicPos goal);
 
     void sync_path_planner_result();
     Transform rear_axle_transform_from_lidar_transform(const Transform& lidar_transform) const;
@@ -253,6 +298,5 @@ private:
     glm::vec3 lidar_offset() const;
 
     bool find_closest_next_path_point(uint32_t current_id, uint32_t& output_id, uint32_t& output_dist);
-    VehicleCommand get_path_following_command();
     void update_map_bounding_box();
 };

@@ -152,8 +152,8 @@ void GamepadController::update_gamepad_command(
     const float finite_max_speed = std::isfinite(max_speed) ? max_speed : 0.0f;
 
     m_command = VehicleCommand{
-        .speed = -speed_axis * finite_max_speed,
-        .steering_angle = steering_axis * m_desc.max_steering_angle
+        .acceleration = -speed_axis * finite_max_speed,
+        .steering_angle_velocity = steering_axis * m_desc.max_steering_angle
     };
 }
 
@@ -192,8 +192,8 @@ void GamepadController::update_raw_joystick_command(float max_speed) {
     const float finite_max_speed = std::isfinite(max_speed) ? max_speed : 0.0f;
 
     m_command = VehicleCommand{
-        .speed = -speed_axis * finite_max_speed,
-        .steering_angle = steering_axis * m_desc.max_steering_angle
+        .acceleration = -speed_axis * finite_max_speed,
+        .steering_angle_velocity = steering_axis * m_desc.max_steering_angle
     };
 }
 

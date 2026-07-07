@@ -146,6 +146,17 @@ struct alignas(16) VoxelWriteGPU {
 static_assert(sizeof(VoxelWriteGPU) == 32);
 static_assert(alignof(VoxelWriteGPU) == 16);
 
+struct alignas(16) VoxelWriteUniqueSlotGPU {
+    glm::ivec4 world_voxel;
+    uint32_t selected_rank;
+    uint32_t state;
+    uint32_t pad0;
+    uint32_t pad1;
+};
+
+static_assert(sizeof(VoxelWriteUniqueSlotGPU) == 32);
+static_assert(alignof(VoxelWriteUniqueSlotGPU) == 16);
+
 struct BucketHead {
     uint32_t id;
     uint32_t count;

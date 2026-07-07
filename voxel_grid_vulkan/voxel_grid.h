@@ -108,6 +108,7 @@ public:
         uint32_t count_active_chunks = 0u;
         uint32_t count_evict_buckets = 0u;
         uint32_t max_write_count = 0u;
+        uint32_t voxel_write_unique_table_size = 0u;
         uint32_t min_free_chunks = 0u;
         uint32_t chunk_hash_table_size = 0u;
         float tomb_fraction_to_rebuild = 0.0f;
@@ -154,6 +155,8 @@ public:
         VulkanBuffer to_inflate_list;
         VulkanBuffer local_voxel_write_list;
         VulkanBuffer voxel_write_list;
+        VulkanBuffer unique_voxel_write_list;
+        VulkanBuffer voxel_write_unique_table;
         VulkanBuffer voxels;
 
         VulkanBuffer bucket_heads;
@@ -348,10 +351,19 @@ private:
     void reset_load_list_counter(VulkanCommandBuffer& command_buffer);
     void reset_to_inflate_list_counter(VulkanCommandBuffer& command_buffer);
     void mark_chunk_to_generate(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks);
-    void mark_write_chunks_to_generate(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void mark_write_chunks_to_generate(
+        VulkanCommandBuffer& command_buffer,
+        const VulkanBuffer& dispatch_args
+    );
     void generate_terrain(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args, uint32_t seed);
-    void write_voxels_to_grid(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
-    void inflate_voxel_writes(VulkanCommandBuffer& command_buffer, const VulkanBuffer& dispatch_args);
+    void write_voxels_to_grid(
+        VulkanCommandBuffer& command_buffer,
+        const VulkanBuffer& dispatch_args
+    );
+    void inflate_voxel_writes(
+        VulkanCommandBuffer& command_buffer,
+        const VulkanBuffer& dispatch_args
+    );
     void reset_voxel_write_list_counter(VulkanCommandBuffer& command_buffer, VulkanBuffer& voxel_write_list);
     void stream_chunks_sphere(VulkanCommandBuffer& command_buffer, glm::vec3 cam_world_pos, int radius_chunks, uint32_t seed);
     

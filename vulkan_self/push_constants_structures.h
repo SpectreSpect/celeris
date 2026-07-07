@@ -153,6 +153,11 @@ struct WriteVoxelsToGridPushConstants {
     uint32_t u_mark_recently_inserted;
 };
 
+struct UniquifyVoxelWriteListPushConstants {
+    uint32_t u_hash_table_size;
+    uint32_t u_max_write_count;
+};
+
 struct ReadVoxelGridChunkPushConstants {
     glm::ivec4 u_chunk_dim;
     glm::ivec4 chunk_pos;

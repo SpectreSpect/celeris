@@ -12,6 +12,8 @@
 #include "logger/logger_header.h"
 
 namespace Utils {
+    constexpr float eps = 1e-6f;
+
     constexpr uint32_t align_up(uint32_t value, uint32_t alignment) {
         return (value + alignment - 1) / alignment * alignment;
     }
@@ -326,5 +328,32 @@ namespace Utils {
         }
 
         return count;
+    }
+
+    inline float sample_symmetric_range(float max_abs_value, int sample_id, int sample_count) {
+        if (sample_count <= 1 || max_abs_value <= eps) {
+            return 0.0f;
+        }
+
+        const float t = static_cast<float>(sample_id) / static_cast<float>(sample_count - 1);
+        return -max_abs_value + 2.0f * max_abs_value * t;
+    }
+
+    constexpr float normalized_dir(float dir) {
+        return dir < 0.0f ? -1.0f : 1.0f;
+    }
+
+    constexpr float angle_diff(float from, float to) {
+        constexpr float two_pi = 6.2831853071795864769f;
+        constexpr float pi = 3.14159265358979323846f;
+
+        float diff = std::fmod(to - from, two_pi);
+        if (diff <= -pi) diff += two_pi;
+        if (diff > pi) diff -= two_pi;
+        return diff;
+    }
+
+    constexpr float lerp_angle(float from, float to, float t) {
+        return from + angle_diff(from, to) * t;
     }
 }

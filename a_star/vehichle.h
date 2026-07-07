@@ -1,0 +1,437 @@
+#pragma once
+
+#include <glm/glm.hpp>
+#include <limits>
+#include <vector>
+
+#include "../vulkan_self/logger/logger_header.h"
+#include "../renderer/transform.h"
+#include "a_star_structures.h"
+
+class Vehicle {
+public:
+    _XCLASS_NAME(Vehicle);
+
+public:
+    struct PointProjection {
+        float s = 0.0f;
+        float dist = 0.0f;
+        glm::vec2 point = glm::vec2{0.0f};
+        glm::vec2 tangent = glm::vec2{1.0f, 0.0f};
+        float heading = 0.0f;
+        float dir = 1.0f;
+    };
+
+    struct PathArcLengthTable {
+        std::vector<float> point_s;
+        std::vector<float> direction_change_s;
+        float total_length = 0.0f;
+    };
+
+public:
+    struct VehicleTransformState {
+        glm::vec2 m_position = glm::vec2{0.0f}; // p(t). Позиция машины
+        float m_speed = 0.0f; // Скорость движения машины в направлении "взгляда"
+        float m_speed_acceleration = 0.0f; // p''(t). Текущее продольное ускорение
+        float m_heading = 0.0f; // theta(t). Направление кузова машины в плоскости XZ
+
+        float m_steering_angle = 0.0f; // delta(t). Угол поворота передних колес относительно кузова
+        float m_steering_angle_velocity = 0.0f; // delta'(t). Скорость изменения угла поворота колес
+        float m_steering_angle_acceleration = 0.0f; // delta''(t). Ускорение угла поворота колес
+    };
+
+    struct SimulationControlSearchDesc {
+        int speed_acceleration_samples = 7;
+        int steer_acceleration_samples = 7;
+        int max_results = 5;
+        float simulation_time = 2.0f;
+        float dt = 0.05f;
+        float initial_projection_min_s = 0.0f;
+        float initial_projection_max_s = std::numeric_limits<float>::infinity();
+        bool debug = false;
+    };
+
+    struct SimulationLossWeights {
+        float position = 4.0f;
+        float heading = 0.6f;
+        float speed = 0.25f;
+        float progress_tracking = 1.0f;
+        float forward_progress = 0.25f;
+        float backward_progress = 3.0f;
+        float steering = 0.8f;
+        float control = 0.04f;
+        float steering_rate = 0.2f;
+    };
+
+    struct SimulationFollowParams {
+        float cruise_speed = 3.0f;
+        float slowdown_distance_from_path = 2.5f;
+        float min_off_path_speed_factor = 0.25f;
+        float projection_backtrack_window = 0.75f;
+        float projection_lookahead_base = 3.0f;
+        float min_direction_segment_virtual_length = 3.0f;
+        float direction_switch_arrival_distance = 0.25f;
+        float direction_switch_arrival_speed = 0.9f;
+        float direction_switch_approach_speed = 0.75f;
+    };
+
+    struct VehicleControlCommand {
+        float speed_acceleration = 0.0f;
+        float steer_acceleration = 0.0f;
+    };
+
+    struct SimulationLossBreakdown {
+        float position = 0.0f;
+        float heading = 0.0f;
+        float speed = 0.0f;
+        float progress = 0.0f;
+        float steering = 0.0f;
+        float control = 0.0f;
+
+        float total() const noexcept {
+            return position + heading + speed + progress + steering + control;
+        }
+    };
+
+    struct SimulationControlCandidateDebug {
+        float start_s = 0.0f;
+        float end_s = 0.0f;
+        float target_end_s = 0.0f;
+        float start_dist = 0.0f;
+        float end_dist = 0.0f;
+        float target_end_dist = 0.0f;
+        float reference_initial_path_speed = 0.0f;
+        float trajectory_length = 0.0f;
+        SimulationLossBreakdown loss_breakdown;
+        glm::vec2 start_position = glm::vec2{0.0f};
+        glm::vec2 end_position = glm::vec2{0.0f};
+        glm::vec2 target_end_point = glm::vec2{0.0f};
+    };
+
+    struct SimulationControlCandidate {
+        VehicleControlCommand control_command;
+        float loss = std::numeric_limits<float>::infinity();
+        VehicleTransformState predicted_state;
+        std::vector<glm::vec2> trajectory;
+        SimulationControlCandidateDebug debug;
+    };
+
+    struct PolylineFollowStepResult {
+        SimulationControlCandidate selected_control;
+        VehicleTransformState state_after_step;
+    };
+
+public:
+    Vehicle(
+        const VehicleTransformState& initial_state,
+        float max_acceleration,
+        float max_steer_acceleration,
+        float wheel_base = 2.5f
+    );
+
+    Vehicle(
+        float max_acceleration,
+        float max_steer_acceleration,
+        float wheel_base = 2.5f
+    );
+    ~Vehicle() noexcept = default;
+
+    Vehicle(const Vehicle&) = delete;
+    Vehicle& operator=(const Vehicle&) = delete;
+
+    Vehicle(Vehicle&&) noexcept = default;
+    Vehicle& operator=(Vehicle&&) noexcept = default;
+
+    VehicleTransformState& state() noexcept;
+    const VehicleTransformState& state() const noexcept;
+    SimulationLossWeights& loss_weights() noexcept;
+    const SimulationLossWeights& loss_weights() const noexcept;
+    void reset_loss_weights() noexcept;
+    SimulationFollowParams& follow_params() noexcept;
+    const SimulationFollowParams& follow_params() const noexcept;
+    void reset_follow_params() noexcept;
+
+    void vehicle_simulation_step(
+        VehicleTransformState& state,
+        float speed_acceleration,
+        float steer_acceleration,
+        float dt = 0.05f,
+        bool debug = true
+    ) const;
+
+    VehicleTransformState get_vehicle_simulation_step(
+        const VehicleTransformState& state,
+        float speed_acceleration,
+        float steer_acceleration,
+        float dt = 0.05f,
+        bool debug = true
+    ) const;
+
+    void vehicle_simulation_step(
+        float speed_acceleration,
+        float steer_acceleration,
+        float dt = 0.05f,
+        bool debug = true
+    );
+
+    VehicleTransformState get_vehicle_simulation_step(
+        float speed_acceleration,
+        float steer_acceleration,
+        float dt = 0.05f,
+        bool debug = true
+    );
+
+    void simulate_vehicle(
+        float speed_acceleration,
+        float steer_acceleration,
+        float simulation_time, 
+        float dt = 0.05f,
+        bool debug = true
+    );
+
+    PolylineFollowStepResult follow_polyline_step(
+        VehicleTransformState& state,
+        const std::vector<glm::vec2>& polyline
+    ) const;
+
+    PolylineFollowStepResult follow_polyline_step(
+        VehicleTransformState& state,
+        const std::vector<VehiclePathPoint>& path
+    ) const;
+
+    PolylineFollowStepResult follow_polyline_step(
+        VehicleTransformState& state,
+        const std::vector<glm::vec2>& polyline,
+        const SimulationControlSearchDesc& desc
+    ) const;
+
+    PolylineFollowStepResult follow_polyline_step(
+        VehicleTransformState& state,
+        const std::vector<VehiclePathPoint>& path,
+        const SimulationControlSearchDesc& desc
+    ) const;
+
+    PolylineFollowStepResult follow_polyline_step(
+        const std::vector<glm::vec2>& polyline
+    );
+
+    PolylineFollowStepResult follow_polyline_step(
+        const std::vector<VehiclePathPoint>& path
+    );
+
+    PolylineFollowStepResult follow_polyline_step(
+        const std::vector<glm::vec2>& polyline,
+        const SimulationControlSearchDesc& desc
+    );
+
+    PolylineFollowStepResult follow_polyline_step(
+        const std::vector<VehiclePathPoint>& path,
+        const SimulationControlSearchDesc& desc
+    );
+
+    std::vector<SimulationControlCandidate> find_best_simulation_controls(
+        const VehicleTransformState& state,
+        const std::vector<glm::vec2>& polyline
+    ) const;
+
+    std::vector<SimulationControlCandidate> find_best_simulation_controls(
+        const VehicleTransformState& state,
+        const std::vector<VehiclePathPoint>& path
+    ) const;
+
+    std::vector<SimulationControlCandidate> find_best_simulation_controls(
+        const VehicleTransformState& state,
+        const std::vector<glm::vec2>& polyline,
+        const SimulationControlSearchDesc& desc
+    ) const;
+
+    std::vector<SimulationControlCandidate> find_best_simulation_controls(
+        const VehicleTransformState& state,
+        const std::vector<VehiclePathPoint>& path,
+        const SimulationControlSearchDesc& desc
+    ) const;
+
+    std::vector<SimulationControlCandidate> find_best_simulation_controls(
+        const VehicleTransformState& state,
+        const std::vector<VehiclePathPoint>& path,
+        const PathArcLengthTable& path_arc_lengths,
+        const SimulationControlSearchDesc& desc
+    ) const;
+
+    std::vector<SimulationControlCandidate> find_best_simulation_controls(
+        const std::vector<glm::vec2>& polyline
+    ) const;
+
+    std::vector<SimulationControlCandidate> find_best_simulation_controls(
+        const std::vector<VehiclePathPoint>& path
+    ) const;
+
+    std::vector<SimulationControlCandidate> find_best_simulation_controls(
+        const std::vector<glm::vec2>& polyline,
+        const SimulationControlSearchDesc& desc
+    ) const;
+
+    std::vector<SimulationControlCandidate> find_best_simulation_controls(
+        const std::vector<VehiclePathPoint>& path,
+        const SimulationControlSearchDesc& desc
+    ) const;
+
+    std::vector<SimulationControlCandidate> find_best_simulation_controls(
+        const std::vector<VehiclePathPoint>& path,
+        const PathArcLengthTable& path_arc_lengths,
+        const SimulationControlSearchDesc& desc
+    ) const;
+
+    static PointProjection find_polyline_projection(
+        const std::vector<VehiclePathPoint>& path,
+        glm::vec2 point,
+        float min_s = 0.0f,
+        float max_s = std::numeric_limits<float>::infinity()
+    );
+
+    static PointProjection find_polyline_projection(
+        const std::vector<VehiclePathPoint>& path,
+        const PathArcLengthTable& path_arc_lengths,
+        glm::vec2 point,
+        float min_s = 0.0f,
+        float max_s = std::numeric_limits<float>::infinity()
+    );
+
+    static PointProjection sample_polyline_at_s(
+        const std::vector<VehiclePathPoint>& path,
+        float s
+    );
+
+    static PointProjection sample_polyline_at_s(
+        const std::vector<VehiclePathPoint>& path,
+        const PathArcLengthTable& path_arc_lengths,
+        float s
+    );
+
+    static PathArcLengthTable build_path_arc_length_table(
+        const std::vector<VehiclePathPoint>& path
+    );
+    static float polyline_length(const std::vector<VehiclePathPoint>& path);
+    static float polyline_length(const PathArcLengthTable& path_arc_lengths) noexcept;
+    static float next_direction_change_s(
+        const std::vector<VehiclePathPoint>& path,
+        float s,
+        bool include_current = false
+    );
+    static float next_direction_change_s(
+        const std::vector<VehiclePathPoint>& path,
+        const PathArcLengthTable& path_arc_lengths,
+        float s,
+        bool include_current = false
+    );
+
+private:
+    VehicleTransformState m_vehicle_state;
+
+    float m_max_acceleration; // max(p''(t)). Максимальное ускорение машины
+    float m_max_steer_acceleration; // max(delta''(t)). Максимальное ускорение угла поворота колес
+    float m_wheel_base; // L. Расстояние между передней и задней осями
+    SimulationLossWeights m_loss_weights;
+    SimulationFollowParams m_follow_params;
+
+private:
+    struct SimulationLossCoefficients {
+        float position = 0.0f;
+        float heading = 0.0f;
+        float speed = 0.0f;
+        float progress = 0.0f;
+        float steering = 0.0f;
+        float control = 0.0f;
+
+        float total() const noexcept {
+            return position + heading + speed + progress + steering + control;
+        }
+    };
+
+    void check_simulation_step(
+        float speed_acceleration,
+        float steer_acceleration,
+        float dt
+    ) const;
+
+    void simulate_vehicle(
+        VehicleTransformState& state,
+        float speed_acceleration,
+        float steer_acceleration,
+        float simulation_time, 
+        float dt = 0.05f,
+        bool debug = true
+    ) const;
+
+    static float angle_diff(float from, float to);
+    static glm::vec2 forward_vector(const VehicleTransformState& state);
+
+    float compute_reference_progress(
+        float initial_path_speed,
+        float time
+    ) const;
+
+    float compute_position_loss_coefficient(
+        const VehicleTransformState& state,
+        const PointProjection& target_projection
+    ) const;
+
+    float compute_heading_loss_coefficient(
+        const VehicleTransformState& state,
+        const PointProjection& target_projection
+    ) const;
+
+    float compute_speed_loss_coefficient(
+        const VehicleTransformState& state,
+        const PointProjection& projection,
+        const PathArcLengthTable& path_arc_lengths,
+        float total_polyline_length,
+        float current_next_direction_change_s
+    ) const;
+
+    float compute_progress_loss_coefficient(
+        const VehicleTransformState& state,
+        const PointProjection& projection,
+        const PointProjection& target_projection,
+        float progress_reference_s
+    ) const;
+
+    float compute_steering_loss_coefficient(
+        const VehicleTransformState& state,
+        const PointProjection& target_projection
+    ) const;
+
+    float compute_control_loss_coefficient(
+        const VehicleTransformState& state,
+        float speed_acceleration,
+        float steer_acceleration
+    ) const;
+
+    SimulationLossCoefficients compute_simulation_loss_coefficients(
+        const VehicleTransformState& state,
+        const PointProjection& projection,
+        const PointProjection& target_projection,
+        const PathArcLengthTable& path_arc_lengths,
+        float total_polyline_length,
+        float progress_reference_s,
+        float current_next_direction_change_s,
+        float speed_acceleration,
+        float steer_acceleration
+    ) const;
+
+    float compute_simulation_loss(
+        VehicleTransformState& state,
+        const std::vector<VehiclePathPoint>& path,
+        const PathArcLengthTable& path_arc_lengths,
+        float total_polyline_length,
+        float speed_acceleration,
+        float steer_acceleration,
+        float simulation_time, 
+        float dt = 0.05f,
+        bool debug = true,
+        float initial_projection_min_s = 0.0f,
+        float initial_projection_max_s = std::numeric_limits<float>::infinity(),
+        std::vector<glm::vec2>* trajectory = nullptr,
+        SimulationControlCandidateDebug* candidate_debug = nullptr
+    ) const;
+};

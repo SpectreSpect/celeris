@@ -9,6 +9,7 @@
 #include <iostream>
 #include <limits>
 #include <utility>
+#include <glm/gtc/quaternion.hpp>
 #include <vector>
 
 #include <glm/gtc/constants.hpp>
@@ -22,6 +23,14 @@
 
 namespace {
     constexpr int COLLISION_BINARY_SEARCH_ITERATIONS = 16;
+    constexpr float PATH_DIRECTION_CLEANUP_EPS = 1e-5f;
+
+    struct DirectionRun {
+        size_t first_segment = 1;
+        size_t past_last_segment = 1;
+        float dir = 1.0f;
+        float length = 0.0f;
+    };
 
     float min_component(glm::vec3 value) noexcept {
         return std::min({value.x, value.y, value.z});
@@ -29,6 +38,106 @@ namespace {
 
     float length_sq(glm::vec3 value) noexcept {
         return glm::dot(value, value);
+    }
+
+    bool is_finite(float value) noexcept {
+        return std::isfinite(value);
+    }
+
+    bool is_finite(glm::vec3 value) noexcept {
+        return
+            is_finite(value.x) &&
+            is_finite(value.y) &&
+            is_finite(value.z);
+    }
+
+    float normalized_path_dir(float dir) noexcept {
+        return dir < 0.0f ? -1.0f : 1.0f;
+    }
+
+    float path_segment_length_xz(const NonholonomicPos& from, const NonholonomicPos& to) noexcept {
+        const glm::vec2 delta{
+            to.pos.x - from.pos.x,
+            to.pos.z - from.pos.z
+        };
+        return glm::length(delta);
+    }
+
+    std::vector<DirectionRun> build_direction_runs(const std::vector<NonholonomicPos>& path) {
+        std::vector<DirectionRun> runs;
+        if (path.size() < 2)
+            return runs;
+
+        for (size_t segment = 1; segment < path.size(); segment++) {
+            const float segment_dir = normalized_path_dir(path[segment].dir);
+            const float segment_length = path_segment_length_xz(path[segment - 1], path[segment]);
+
+            if (runs.empty() || runs.back().dir != segment_dir) {
+                runs.push_back(DirectionRun{
+                    .first_segment = segment,
+                    .past_last_segment = segment + 1,
+                    .dir = segment_dir,
+                    .length = segment_length
+                });
+            } else {
+                runs.back().past_last_segment = segment + 1;
+                runs.back().length += segment_length;
+            }
+        }
+
+        return runs;
+    }
+
+    uint32_t cleanup_short_direction_runs(
+        std::vector<NonholonomicPos>& path,
+        float min_segment_length)
+    {
+        if (path.size() < 4 || min_segment_length <= PATH_DIRECTION_CLEANUP_EPS)
+            return 0;
+
+        uint32_t rewritten_segments = 0;
+        for (size_t pass = 0; pass < path.size(); pass++) {
+            const std::vector<DirectionRun> runs = build_direction_runs(path);
+            if (runs.size() < 3)
+                break;
+
+            bool changed = false;
+            for (size_t run_id = 1; run_id + 1 < runs.size(); run_id++) {
+                const DirectionRun& run = runs[run_id];
+                if (run.length >= min_segment_length)
+                    continue;
+
+                const DirectionRun& left = runs[run_id - 1];
+                const DirectionRun& right = runs[run_id + 1];
+                const float replacement_dir =
+                    left.dir == right.dir
+                        ? left.dir
+                        : (left.length >= right.length ? left.dir : right.dir);
+
+                if (replacement_dir == run.dir)
+                    continue;
+
+                for (size_t segment = run.first_segment;
+                     segment < run.past_last_segment && segment < path.size();
+                     segment++)
+                {
+                    if (normalized_path_dir(path[segment].dir) != replacement_dir) {
+                        path[segment].dir = replacement_dir;
+                        rewritten_segments++;
+                    }
+                }
+
+                changed = true;
+            }
+
+            if (!changed)
+                break;
+        }
+
+        if (path.size() > 1)
+            path.front().dir = path[1].dir;
+
+        return rewritten_segments;
     }
 
     bool finite_vec3(glm::vec3 value) noexcept {
@@ -100,14 +209,29 @@ Celeris::Celeris(VulkanEngine& engine,
         m_desc(desc),
         m_waypoint_path(engine, manager_bundle.mesh_manager(), material_instance_manager),
         m_gicp_pass(engine, manager_bundle.compute_pass_manager()),
+        m_path_intersection_detector(
+            engine.physical_device(),
+            engine.device(),
+            submit_context,
+            manager_bundle.compute_pass_manager(),
+            voxel_grid,
+            1024
+        ),
         m_point_cloud_preprocessor(engine.device(), compute_queue, manager_bundle.compute_pass_manager()),
-        m_scan_receiver(m_point_cloud_preprocessor),
+        m_scan_receiver(m_point_cloud_preprocessor, desc.receiver_port),
         m_command_sender(),
+        m_vehicle_state_receiver(desc.vehicle_state_receiver_port),
+        m_vehicle(
+            desc.max_vehicle_acceleration,
+            desc.max_vehicle_steer_acceleration,
+            desc.vehicle_wheel_base
+        ),
         m_path_planner(
             engine,
             submit_context,
             manager_bundle,
             voxel_grid,
+            m_path_intersection_detector,
             PathPlanner::PathPlannerDesc{
                 .unimpended_path_window_size = desc.unimpended_path_window_size,
                 .unimpended_path_max_astar_points = desc.unimpended_path_max_astar_points,
@@ -137,6 +261,26 @@ Celeris::Celeris(VulkanEngine& engine,
     logger().check(desc.max_write_count > 0, "Max write count must be greater than 0");
     logger().check(desc.waypoint_reach_radius > 0.0f, "Waypoint reach radius must be greater than 0");
 
+    Vehicle::SimulationFollowParams& follow_params = m_vehicle.follow_params();
+    follow_params.cruise_speed = std::max(0.0f, desc.vehicle_cruise_speed);
+    follow_params.slowdown_distance_from_path = std::max(0.0f, desc.vehicle_slowdown_distance_from_path);
+    follow_params.min_off_path_speed_factor = std::clamp(
+        desc.vehicle_min_off_path_speed_factor,
+        0.0f,
+        1.0f
+    );
+    follow_params.projection_backtrack_window = std::max(0.0f, desc.vehicle_projection_backtrack_window);
+    follow_params.projection_lookahead_base = std::max(0.0f, desc.vehicle_projection_lookahead_base);
+    follow_params.min_direction_segment_virtual_length =
+        std::max(0.0f, desc.vehicle_min_direction_segment_virtual_length);
+    follow_params.direction_switch_arrival_distance =
+        std::max(0.0f, desc.vehicle_direction_switch_arrival_distance);
+    follow_params.direction_switch_arrival_speed =
+        std::max(0.0f, desc.vehicle_direction_switch_arrival_speed);
+    follow_params.direction_switch_approach_speed =
+        std::max(0.0f, desc.vehicle_direction_switch_approach_speed);
+    m_car_speed = follow_params.cruise_speed;
+
     m_waypoint_reach_radius = desc.waypoint_reach_radius;
     m_gamepad_commands_enabled = desc.gamepad_commands_enabled;
     m_gamepad_command = desc.gamepad_command;
@@ -157,20 +301,30 @@ void Celeris::start_lidar_receiver() {
 
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     start_lidar_receiver();
+    m_vehicle_state_receiver.start();
     m_command_sender.start();
     m_path_planner.start(std::move(planner_submit_context));
 }
 
 void Celeris::update(VulkanSubmitContext& submit_context) {
-    LOG_METHOD();
-
     logger().check(m_engine, "Engine was null");
     logger().check(m_manager_bundle, "Manager bundle was null");
     logger().check(m_voxel_grid, "Voxel grid was null");
 
     sync_path_planner_result();
-    if (!m_gamepad_commands_enabled)
-        m_command_sender.set_command(get_path_following_command());
+
+    m_local_planner.update_timestamp();
+
+    VehicleFeedback vehicle_feedback;
+    const bool has_vehicle_feedback =
+        m_vehicle_state_receiver.latest_feedback(vehicle_feedback) &&
+        is_vehicle_feedback_fresh(vehicle_feedback);
+    if (has_vehicle_feedback) {
+        apply_vehicle_feedback(vehicle_feedback);
+    }
+    m_local_planner.predict_vehicle_state(m_vehicle);
+
+    float vehicle_height = m_vehicle_position.pos.y;
 
     if (auto scan = m_scan_receiver.try_pop_scan(*m_manager_bundle)) {
         glm::vec3 raw_position = scan->point_cloud().transform.position;
@@ -210,9 +364,8 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
 
             m_has_previous_lidar_pose = true;
         } else {
-            if (glm::dot(m_previous_lidar_rotation, raw_rotation) < 0.0f) {
+            if (glm::dot(m_previous_lidar_rotation, raw_rotation) < 0.0f)
                 raw_rotation = -raw_rotation;
-            }
 
             glm::vec3 delta_position = raw_position - m_previous_lidar_position;
             glm::quat delta_rotation = glm::normalize(raw_rotation * glm::inverse(m_previous_lidar_rotation));
@@ -238,15 +391,21 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         }
         
         m_lidar_transform = m_network_scan->point_cloud().transform;
-        m_start_position.from_transform(rear_axle_transform_from_lidar_transform(m_lidar_transform));
+        const Transform vehicle_transform = rear_axle_transform_from_lidar_transform(m_lidar_transform);
+        NonholonomicPos vehicle_pose;
+        vehicle_pose.from_transform(vehicle_transform);
+        vehicle_height = vehicle_transform.position.y;
 
-        // m_start_position.pos = m_network_scan->point_cloud().transform.position;
-        // glm::quat q = glm::normalize(m_network_scan->point_cloud().transform.rotation);
-        // glm::vec3 forward = q * glm::vec3(-1.0f, 0.0f, 0.0f);
-        // m_start_position.theta = std::atan2(forward.z, forward.x);
-        
-        // start_sphere.transform.position = m_network_scan->point_cloud().transform.position;
-        // start_direction_sphere.transform.position = start_pos.pos + direction_offset(start_pos.theta) * 0.85f + glm::vec3(0, 0.4f, 0);
+        const glm::quat vehicle_rotation = glm::normalize(vehicle_transform.rotation);
+        const glm::vec3 vehicle_forward = vehicle_rotation * glm::vec3(-1.0f, 0.0f, 0.0f);
+        const float vehicle_heading = std::atan2(vehicle_forward.z, vehicle_forward.x);
+
+        // Корректируем позу машины по lidar/GICP. Скорость и руль приходят отдельно.
+        m_vehicle.state().m_position = glm::vec2{
+            vehicle_transform.position.x,
+            vehicle_transform.position.z
+        };
+        m_vehicle.state().m_heading = vehicle_heading;
 
         // //=====================
         m_voxel_map_inserter.insert(m_voxel_point_map, m_network_scan->point_cloud(), m_network_scan->normal_buffer());
@@ -259,59 +418,113 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         );
         // //=====================
 
-        // VoxelWriteGPU blue_voxelize_prefab;
-        // blue_voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
-        // blue_voxelize_prefab.set_flags = OVERWRITE_BIT;
+        const glm::vec3 collision_raw_position = vehicle_pose.pos;
 
-        // RenderObject scan_object(scan_mesh_view, m_material_instance_manager->pbr);
-        // scan_object.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
-
-        // glm::mat4 mesh_matrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f)) * 
-        //     m_network_scan->point_cloud().transform.get_model_matrix();
-
-        // m_voxelizator->voxelize<PBRVertex>(
-        //     blue_voxelize_prefab,
-        //     scan_object.mesh_view(),
-        //     mesh_matrix,
-        //     &m_voxel_grid->local_voxel_write_list()
-        // );
-
-        m_path_planner.request_adjust_to_ground(
-            m_start_position.pos, 
-            0, 
-            6, 
-            6, 
-            false
-        );
-
-        const glm::vec3 collision_raw_position = m_start_position.pos;
-
-        // Здесь нужно делать коллизию...
         collision(
             m_collision_raw_position_history,
-            m_start_position.pos
+            vehicle_pose.pos
         );
         remember_collision_raw_position(collision_raw_position);
 
+        sync_vehicle_position_from_state(vehicle_height);
         update_waypoint_navigation();
 
-        if (!m_waypoint_path_completed && is_path_impended(submit_context))
+        if (!m_waypoint_path_completed && has_planned_path() && is_path_impended(submit_context))
             request_path_replan();
 
         m_previous_lidar_position = raw_position;
         m_previous_lidar_rotation = raw_rotation;
         m_received_scan_count++;
     }
+
+    sync_vehicle_position_from_state(vehicle_height);
+
+    const auto now = std::chrono::steady_clock::now();
+    const float local_planner_update_period = std::max(0.0f, m_desc.local_planner_update_period);
+    const bool should_update_local_planner =
+        !m_has_last_local_planner_update_timestamp ||
+        local_planner_update_period <= 0.0f ||
+        std::chrono::duration<float>(now - m_last_local_planner_update_timestamp).count() >=
+            local_planner_update_period;
+
+    if (should_update_local_planner) {
+        VehicleCommand vehicle_command;
+        if (!m_waypoint_path_completed || m_waypoint_path.waypoints().empty()) {
+            vehicle_command = m_local_planner.step(
+                m_vehicle,
+                m_path_intersection_detector,
+                submit_context
+            );
+        }
+
+        if (!m_gamepad_commands_enabled)
+            m_command_sender.set_command(vehicle_command);
+        m_last_local_planner_update_timestamp = now;
+        m_has_last_local_planner_update_timestamp = true;
+    }
+}
+
+void Celeris::apply_vehicle_feedback(const VehicleFeedback& feedback) {
+    Vehicle::VehicleTransformState& state = m_vehicle.state();
+
+    if (feedback.has_odometry()) {
+        if (!feedback.has_vehicle_state() && is_finite(feedback.linear_velocity_ros)) {
+            const glm::vec3 linear_velocity_engine =
+                LidarScan::ros_pos_to_engine(feedback.linear_velocity_ros);
+            const glm::vec2 forward{
+                std::cos(state.m_heading),
+                std::sin(state.m_heading)
+            };
+            state.m_speed = glm::dot(
+                glm::vec2{linear_velocity_engine.x, linear_velocity_engine.z},
+                forward
+            );
+        }
+    }
+
+    if (feedback.has_vehicle_state()) {
+        if (std::isfinite(feedback.speed))
+            state.m_speed = feedback.speed;
+        if (std::isfinite(feedback.acceleration))
+            state.m_speed_acceleration = feedback.acceleration;
+        if (std::isfinite(feedback.steering_angle))
+            state.m_steering_angle = feedback.steering_angle;
+        if (std::isfinite(feedback.steering_angle_velocity))
+            state.m_steering_angle_velocity = feedback.steering_angle_velocity;
+        if (std::isfinite(feedback.steering_angle_acceleration))
+            state.m_steering_angle_acceleration = feedback.steering_angle_acceleration;
+    }
+}
+
+bool Celeris::is_vehicle_feedback_fresh(const VehicleFeedback& feedback) const {
+    const std::chrono::duration<float> age =
+        std::chrono::steady_clock::now() - feedback.received_at;
+    return age.count() <= m_desc.vehicle_state_timeout;
+}
+
+void Celeris::sync_vehicle_position_from_state(float height) {
+    const Vehicle::VehicleTransformState& state = m_vehicle.state();
+
+    m_vehicle_position.pos = glm::vec3{
+        state.m_position.x,
+        height,
+        state.m_position.y
+    };
+    m_vehicle_position.theta = state.m_heading;
+    m_vehicle_position.steer = state.m_steering_angle;
+    if (std::abs(state.m_speed) > 1e-4f) {
+        m_vehicle_position.dir = state.m_speed < 0.0f ? -1.0f : 1.0f;
+    }
 }
 
 void Celeris::set_start(const NonholonomicPos& position) {
     m_start_position = position;
-    m_collision_raw_position_history.clear();
-    m_has_collision_surface_point = false;
+    m_has_start_position = true;
 }
 
 void Celeris::set_goal(const NonholonomicPos& position) {
     m_goal_position = position;
+    m_has_goal_position = true;
 }
 
 void Celeris::set_start_lidar_scan_position(glm::vec3 position) noexcept {
@@ -334,8 +547,11 @@ void Celeris::set_start_lidar_scan_position(const NonholonomicPos& position) noe
 }
 
 void Celeris::set_car_speed(float speed) noexcept {
-    if (std::isfinite(speed))
-        m_car_speed = speed;
+    if (!std::isfinite(speed))
+        return;
+
+    m_car_speed = std::max(0.0f, speed);
+    m_vehicle.follow_params().cruise_speed = m_car_speed;
 }
 
 void Celeris::set_waypoint_reach_radius(float radius) noexcept {
@@ -353,7 +569,7 @@ void Celeris::set_gamepad_commands_enabled(bool enabled) noexcept {
 }
 
 void Celeris::set_gamepad_command(VehicleCommand command) noexcept {
-    if (!std::isfinite(command.speed) || !std::isfinite(command.steering_angle))
+    if (!std::isfinite(command.acceleration) || !std::isfinite(command.steering_angle_velocity))
         return;
 
     m_gamepad_command = command;
@@ -384,8 +600,20 @@ const Transform& Celeris::lidar_transform() const noexcept {
     return m_lidar_transform;
 }
 
+bool Celeris::has_start_position() const noexcept {
+    return m_has_start_position;
+}
+
+bool Celeris::has_goal_position() const noexcept {
+    return m_has_goal_position;
+}
+
 NonholonomicPos Celeris::start_position() const noexcept {
     return m_start_position;
+}
+
+NonholonomicPos Celeris::vehicle_position() const noexcept {
+    return m_vehicle_position;
 }
 
 NonholonomicPos Celeris::goal_position() const noexcept {
@@ -393,7 +621,7 @@ NonholonomicPos Celeris::goal_position() const noexcept {
 }
 
 float Celeris::car_speed() const noexcept {
-    return m_car_speed;
+    return m_vehicle.follow_params().cruise_speed;
 }
 
 float Celeris::waypoint_reach_radius() const noexcept {
@@ -442,6 +670,20 @@ VoxelMapPointInserter& Celeris::voxel_map_point_inserter() {
 
 VoxelMapPointReseter& Celeris::voxel_map_reseter() {
     return m_voxel_map_reseter;
+}
+
+const std::vector<Vehicle::SimulationControlCandidate>&
+Celeris::local_planner_candidates() const noexcept
+{
+    return m_local_planner.last_simulation_candidates();
+}
+
+float Celeris::local_planner_path_window_min_s() const noexcept {
+    return m_local_planner.path_window_min_s();
+}
+
+float Celeris::local_planner_path_window_max_s() const noexcept {
+    return m_local_planner.path_window_max_s();
 }
 
 Footprint& Celeris::footprint() noexcept {
@@ -716,31 +958,76 @@ void Celeris::remember_collision_raw_position(glm::vec3 point_pos) {
     }
 }
 
-void Celeris::request_path_replan() {
+bool Celeris::request_path_replan() {
     if (m_waypoint_path_completed && !m_waypoint_path.waypoints().empty()) {
         reset_waypoint_navigation();
     }
 
     NonholonomicPos goal = m_goal_position;
+    NonholonomicPos start = m_start_position;
 
     if (active_waypoint_goal_pose(goal)) {
+        start = m_vehicle_position;
         m_goal_position = goal;
+    } else if (!m_has_start_position || !m_has_goal_position) {
+        return false;
     }
 
-    m_path_planner.request_path_replan(m_start_position, goal);
+    return request_grounded_path_replan(start, goal);
+}
+
+bool Celeris::request_grounded_path_replan(NonholonomicPos start, NonholonomicPos goal) {
+    const bool start_adjusted = m_path_planner.request_adjust_to_ground(
+        start.pos,
+        500,
+        500,
+        -1,
+        false
+    );
+    const bool goal_adjusted = m_path_planner.request_adjust_to_ground(
+        goal.pos,
+        500,
+        500,
+        -1,
+        false
+    );
+
+    if (!start_adjusted || !goal_adjusted) {
+        logger().log_error()
+            << "Failed to adjust path endpoints to ground. "
+            << "start_adjusted=" << (start_adjusted ? "true" : "false")
+            << " goal_adjusted=" << (goal_adjusted ? "true" : "false") << "\n";
+        return false;
+    }
+
+    m_path_planner.request_path_replan(start, goal);
+    return true;
+}
+
+void Celeris::reset_local_planner_tracking() {
+    std::vector<NonholonomicPos> current_path;
+    {
+        std::lock_guard<std::mutex> lock(m_path_mutex);
+        current_path = nonholonomic_astar_path;
+    }
+
+    if (!current_path.empty())
+        m_local_planner.set_astar_path(current_path);
+
+    m_local_planner.reset_tracking();
 }
 
 bool Celeris::adjust_to_ground(
-    glm::vec3& output, 
-    int max_step_up, 
-    int max_drop, 
-    int max_y_diff, 
+    glm::vec3& output,
+    int max_step_up,
+    int max_drop,
+    int max_y_diff,
     bool allow_flying_over_precepices) {
     return m_path_planner.request_adjust_to_ground(
-        output, 
-        max_step_up, 
-        max_drop, 
-        max_y_diff, 
+        output,
+        max_step_up,
+        max_drop,
+        max_y_diff,
         allow_flying_over_precepices
     );
 }
@@ -782,16 +1069,45 @@ bool Celeris::has_planned_path() const {
 }
 
 PathPlanner::PathPlannerResult Celeris::path_result_snapshot() const {
-    return m_path_planner.request_result_snapshot();
+    PathPlanner::PathPlannerResult result = m_path_planner.request_result_snapshot();
+
+    std::lock_guard<std::mutex> lock(m_path_mutex);
+    if (result.generation == m_synced_path_generation &&
+        m_path_direction_cleanup_revision == m_synced_path_direction_cleanup_revision)
+    {
+        result.plain_astar_path = plain_astar_path;
+        result.nonholonomic_astar_path = nonholonomic_astar_path;
+        result.explored_paths = explored_paths;
+        result.unimpended_path = unimpended_path;
+        result.total_path_finding_time = total_path_finding_time;
+    }
+
+    return result;
 }
 
-void Celeris::display_path_planner_debug_controls() const {
+std::vector<NonholonomicPos> Celeris::get_nonholonomic_astar_path() const {
+    LOG_METHOD();
+
+    std::lock_guard<std::mutex> lock(m_path_mutex);
+    return nonholonomic_astar_path;
+}
+
+void Celeris::display_path_planner_debug_controls() {
     if (!ImGui::CollapsingHeader("Path planner")) {
         return;
     }
 
     PathPlanner::PathPlannerResult result = path_result_snapshot();
 
+    ImGui::Text("Start marker: %s", m_has_start_position ? "set" : "missing");
+    ImGui::Text("Goal marker: %s", m_has_goal_position ? "set" : "missing");
+    ImGui::Text(
+        "Replan: requests=%llu started=%llu pending=%d planning=%d",
+        static_cast<unsigned long long>(m_path_planner.request_replan_request_count()),
+        static_cast<unsigned long long>(m_path_planner.request_replan_start_count()),
+        m_path_planner.request_has_pending_replan() ? 1 : 0,
+        m_path_planner.request_is_planning() ? 1 : 0
+    );
     ImGui::Text("Generation: %llu", static_cast<unsigned long long>(result.generation));
     ImGui::Text("Total: %.3f ms", result.total_time_ms);
     ImGui::Separator();
@@ -805,6 +1121,229 @@ void Celeris::display_path_planner_debug_controls() const {
     ImGui::Text("Unimpeded points: %zu", result.unimpended_path.size());
     ImGui::Text("Nonholonomic points: %zu", result.nonholonomic_astar_path.size());
     ImGui::Text("Explored segments: %zu", result.explored_paths.size());
+    if (ImGui::DragFloat(
+            "Direction cleanup min segment",
+            &m_desc.global_path_direction_cleanup_min_segment_length,
+            0.05f,
+            0.0f,
+            20.0f,
+            "%.3f"))
+    {
+        m_desc.global_path_direction_cleanup_min_segment_length =
+            std::max(0.0f, m_desc.global_path_direction_cleanup_min_segment_length);
+        m_path_direction_cleanup_revision++;
+    }
+
+    ImGui::Separator();
+    ImGui::Text("Command sender: %s, %s",
+        m_command_sender.is_running() ? "running" : "stopped",
+        m_command_sender.is_connected() ? "connected" : "disconnected");
+    ImGui::Text(
+        "Command packets: %llu sent, %llu failures",
+        static_cast<unsigned long long>(m_command_sender.sent_packet_count()),
+        static_cast<unsigned long long>(m_command_sender.send_failure_count())
+    );
+
+    const VehicleCommand command = m_command_sender.command();
+    ImGui::Text("Last command acceleration: %.3f", command.acceleration);
+    ImGui::Text("Last command steering velocity: %.3f", command.steering_angle_velocity);
+
+    VehicleFeedback feedback;
+    const bool has_feedback = m_vehicle_state_receiver.latest_feedback(feedback);
+    const bool fresh_feedback = has_feedback && is_vehicle_feedback_fresh(feedback);
+    ImGui::Text("Vehicle feedback: %s, %s",
+        has_feedback ? "received" : "none",
+        fresh_feedback ? "fresh" : "stale");
+    if (has_feedback) {
+        ImGui::Text("Feedback flags: odom=%d state=%d",
+            feedback.has_odometry() ? 1 : 0,
+            feedback.has_vehicle_state() ? 1 : 0);
+    }
+
+    const Vehicle::VehicleTransformState& state = m_vehicle.state();
+    const Vehicle::SimulationFollowParams& follow_params = m_vehicle.follow_params();
+    ImGui::Text("Vehicle speed: %.3f", state.m_speed);
+    ImGui::Text("Vehicle cruise speed: %.3f", follow_params.cruise_speed);
+    ImGui::Text("Vehicle acceleration: %.3f", state.m_speed_acceleration);
+    ImGui::Text("Steering angle: %.3f", state.m_steering_angle);
+    ImGui::Text("Steering velocity: %.3f", state.m_steering_angle_velocity);
+
+    const std::vector<Vehicle::SimulationControlCandidate>& candidates =
+        m_local_planner.last_simulation_candidates();
+    ImGui::Text("Local candidates: %zu", candidates.size());
+    if (ImGui::DragFloat("Local planner update period", &m_desc.local_planner_update_period, 0.001f, 0.0f, 0.2f, "%.3f")) {
+        m_desc.local_planner_update_period = std::max(0.0f, m_desc.local_planner_update_period);
+    }
+    ImGui::Text(
+        "Local path progress: %.2f / %.2f",
+        m_local_planner.path_progress_s(),
+        m_local_planner.path_length()
+    );
+    ImGui::Text(
+        "Local s window: %.2f .. %.2f",
+        m_local_planner.path_window_min_s(),
+        m_local_planner.path_window_max_s()
+    );
+    ImGui::Text(
+        "Local path generation: %llu",
+        static_cast<unsigned long long>(m_local_planner.path_generation())
+    );
+    if (!candidates.empty()) {
+        auto display_candidate_loss_breakdown =
+            [](const Vehicle::SimulationLossBreakdown& breakdown) {
+                ImGui::Text(
+                    "    loss parts: pos=%+.2f head=%+.2f speed=%+.2f prog=%+.2f steer=%+.2f ctrl=%+.2f sum=%+.2f",
+                    breakdown.position,
+                    breakdown.heading,
+                    breakdown.speed,
+                    breakdown.progress,
+                    breakdown.steering,
+                    breakdown.control,
+                    breakdown.total()
+                );
+            };
+
+        auto display_candidate_summary =
+            [&](size_t i, const Vehicle::SimulationControlCandidate& candidate) {
+                const Vehicle::SimulationControlCandidateDebug& candidate_debug = candidate.debug;
+                ImGui::Text(
+                    "#%zu loss=%.2f acc=%.2f steer_acc=%.2f len=%.2f s=%.2f->%.2f target=%.2f err=%.2f v=%.2f",
+                    i,
+                    candidate.loss,
+                    candidate.control_command.speed_acceleration,
+                    candidate.control_command.steer_acceleration,
+                    candidate_debug.trajectory_length,
+                    candidate_debug.start_s,
+                    candidate_debug.end_s,
+                    candidate_debug.target_end_s,
+                    candidate_debug.target_end_dist,
+                    candidate.predicted_state.m_speed
+                );
+                display_candidate_loss_breakdown(candidate_debug.loss_breakdown);
+            };
+
+        const Vehicle::SimulationControlCandidate& best = candidates.front();
+        const Vehicle::SimulationControlCandidateDebug& debug = best.debug;
+        ImGui::Text("Best loss: %.3f", best.loss);
+        ImGui::Text("Best acceleration: %.3f", best.control_command.speed_acceleration);
+        ImGui::Text("Best steering acceleration: %.3f", best.control_command.steer_acceleration);
+        ImGui::Text("Best trajectory length: %.3f", debug.trajectory_length);
+        ImGui::Text(
+            "Best s: %.2f -> %.2f, target %.2f",
+            debug.start_s,
+            debug.end_s,
+            debug.target_end_s
+        );
+        ImGui::Text(
+            "Best dist to path: %.3f -> %.3f",
+            debug.start_dist,
+            debug.end_dist
+        );
+        ImGui::Text("Best target end error: %.3f", debug.target_end_dist);
+        ImGui::Text("Best reference path speed: %.3f", debug.reference_initial_path_speed);
+        ImGui::Text("Best predicted speed: %.3f", best.predicted_state.m_speed);
+        ImGui::Text("Best predicted steering: %.3f", best.predicted_state.m_steering_angle);
+        ImGui::Text("Best predicted steering velocity: %.3f", best.predicted_state.m_steering_angle_velocity);
+        display_candidate_loss_breakdown(debug.loss_breakdown);
+
+        if (ImGui::TreeNode("Top local candidates")) {
+            const size_t display_count = std::min<size_t>(candidates.size(), 8);
+            for (size_t i = 0; i < display_count; i++) {
+                display_candidate_summary(i, candidates[i]);
+            }
+            ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNode("All local candidates")) {
+            for (size_t i = 0; i < candidates.size(); i++) {
+                display_candidate_summary(i, candidates[i]);
+            }
+            ImGui::TreePop();
+        }
+    }
+
+    ImGui::Separator();
+    if (ImGui::TreeNode("Local planner follow params")) {
+        Vehicle::SimulationFollowParams& params = m_vehicle.follow_params();
+
+        float cruise_speed = params.cruise_speed;
+        if (ImGui::DragFloat("Cruise speed", &cruise_speed, 0.1f, 0.0f, 40.0f, "%.3f")) {
+            set_car_speed(cruise_speed);
+        }
+        if (ImGui::DragFloat("Slowdown distance from path", &params.slowdown_distance_from_path, 0.05f, 0.0f, 50.0f, "%.3f")) {
+            params.slowdown_distance_from_path = std::max(0.0f, params.slowdown_distance_from_path);
+        }
+        if (ImGui::DragFloat("Min off-path speed factor", &params.min_off_path_speed_factor, 0.01f, 0.0f, 1.0f, "%.3f")) {
+            params.min_off_path_speed_factor = std::clamp(params.min_off_path_speed_factor, 0.0f, 1.0f);
+        }
+        if (ImGui::DragFloat("Projection backtrack window", &params.projection_backtrack_window, 0.05f, 0.0f, 20.0f, "%.3f")) {
+            params.projection_backtrack_window = std::max(0.0f, params.projection_backtrack_window);
+        }
+        if (ImGui::DragFloat("Projection lookahead base", &params.projection_lookahead_base, 0.05f, 0.0f, 50.0f, "%.3f")) {
+            params.projection_lookahead_base = std::max(0.0f, params.projection_lookahead_base);
+        }
+        if (ImGui::DragFloat("Min virtual direction segment length", &params.min_direction_segment_virtual_length, 0.05f, 0.0f, 20.0f, "%.3f")) {
+            params.min_direction_segment_virtual_length = std::max(0.0f, params.min_direction_segment_virtual_length);
+        }
+        if (ImGui::DragFloat("Direction switch arrival distance", &params.direction_switch_arrival_distance, 0.01f, 0.0f, 5.0f, "%.3f")) {
+            params.direction_switch_arrival_distance = std::max(0.0f, params.direction_switch_arrival_distance);
+        }
+        if (ImGui::DragFloat("Direction switch arrival speed", &params.direction_switch_arrival_speed, 0.01f, 0.0f, 5.0f, "%.3f")) {
+            params.direction_switch_arrival_speed = std::max(0.0f, params.direction_switch_arrival_speed);
+        }
+        if (ImGui::DragFloat("Direction switch approach speed", &params.direction_switch_approach_speed, 0.01f, 0.0f, 5.0f, "%.3f")) {
+            params.direction_switch_approach_speed = std::max(0.0f, params.direction_switch_approach_speed);
+        }
+
+        if (ImGui::Button("Reset follow params")) {
+            params.cruise_speed = std::max(0.0f, m_desc.vehicle_cruise_speed);
+            params.slowdown_distance_from_path = std::max(0.0f, m_desc.vehicle_slowdown_distance_from_path);
+            params.min_off_path_speed_factor = std::clamp(
+                m_desc.vehicle_min_off_path_speed_factor,
+                0.0f,
+                1.0f
+            );
+            params.projection_backtrack_window = std::max(0.0f, m_desc.vehicle_projection_backtrack_window);
+            params.projection_lookahead_base = std::max(0.0f, m_desc.vehicle_projection_lookahead_base);
+            params.min_direction_segment_virtual_length =
+                std::max(0.0f, m_desc.vehicle_min_direction_segment_virtual_length);
+            params.direction_switch_arrival_distance =
+                std::max(0.0f, m_desc.vehicle_direction_switch_arrival_distance);
+            params.direction_switch_arrival_speed =
+                std::max(0.0f, m_desc.vehicle_direction_switch_arrival_speed);
+            params.direction_switch_approach_speed =
+                std::max(0.0f, m_desc.vehicle_direction_switch_approach_speed);
+            m_car_speed = params.cruise_speed;
+        }
+
+        ImGui::TreePop();
+    }
+
+    ImGui::Separator();
+    if (ImGui::TreeNode("Local planner loss weights")) {
+        Vehicle::SimulationLossWeights& weights = m_vehicle.loss_weights();
+
+        auto drag_non_negative_float = [](const char* label, float& value, float speed, float max_value) {
+            if (ImGui::DragFloat(label, &value, speed, 0.0f, max_value, "%.3f")) {
+                value = std::max(0.0f, value);
+            }
+        };
+
+        drag_non_negative_float("Position", weights.position, 0.05f, 100.0f);
+        drag_non_negative_float("Heading", weights.heading, 0.01f, 20.0f);
+        drag_non_negative_float("Speed", weights.speed, 0.01f, 20.0f);
+        drag_non_negative_float("Progress tracking", weights.progress_tracking, 0.01f, 50.0f);
+        drag_non_negative_float("Forward progress", weights.forward_progress, 0.01f, 20.0f);
+        drag_non_negative_float("Backward motion", weights.backward_progress, 0.05f, 100.0f);
+        drag_non_negative_float("Steering", weights.steering, 0.01f, 20.0f);
+        drag_non_negative_float("Control", weights.control, 0.001f, 5.0f);
+        drag_non_negative_float("Steering rate", weights.steering_rate, 0.01f, 20.0f);
+
+        if (ImGui::Button("Reset loss weights"))
+            m_vehicle.reset_loss_weights();
+
+        ImGui::TreePop();
+    }
 }
 
 glm::vec3 Celeris::voxel_size() {
@@ -997,7 +1536,19 @@ bool Celeris::localize_on_map() {
     source_point_cloud.transform.position = best_position;
     source_point_cloud.transform.rotation = best_rotation;
     m_lidar_transform = source_point_cloud.transform;
-    m_start_position.from_transform(rear_axle_transform_from_lidar_transform(m_lidar_transform));
+    const Transform vehicle_transform = rear_axle_transform_from_lidar_transform(m_lidar_transform);
+    NonholonomicPos localized_vehicle_pose;
+    localized_vehicle_pose.from_transform(vehicle_transform);
+    m_vehicle.state().m_position = glm::vec2{
+        localized_vehicle_pose.pos.x,
+        localized_vehicle_pose.pos.z
+    };
+    m_vehicle.state().m_heading = localized_vehicle_pose.theta;
+    sync_vehicle_position_from_state(localized_vehicle_pose.pos.y);
+    if (!m_has_start_position) {
+        m_start_position = m_vehicle_position;
+        m_has_start_position = true;
+    }
     m_needs_map_localization = false;
 
     std::cout << "Localizing on map succeeded: position ("
@@ -1091,12 +1642,12 @@ NonholonomicPos Celeris::waypoint_goal_pose(size_t waypoint_index) const {
     if (waypoint_index + 1 < path.size()) {
         heading_vector = path[waypoint_index + 1].world_position() - goal.pos;
     } else {
-        heading_vector = goal.pos - m_start_position.pos;
+        heading_vector = goal.pos - m_vehicle_position.pos;
     }
 
     heading_vector.y = 0.0f;
     if (length_sq(heading_vector) <= 1e-8f) {
-        goal.theta = m_start_position.theta;
+        goal.theta = m_vehicle_position.theta;
     } else {
         goal.theta = std::atan2(heading_vector.z, heading_vector.x);
     }
@@ -1128,7 +1679,7 @@ void Celeris::update_waypoint_navigation() {
 
     while (has_active_waypoint()) {
         const Waypoint& waypoint = m_waypoint_path.waypoints()[m_active_waypoint_index];
-        const float dist_sq = length_sq(waypoint.world_position() - m_start_position.pos);
+        const float dist_sq = length_sq(waypoint.world_position() - m_vehicle_position.pos);
         if (dist_sq > m_waypoint_reach_radius * m_waypoint_reach_radius)
             break;
 
@@ -1158,13 +1709,24 @@ void Celeris::update_waypoint_navigation() {
         std::lock_guard<std::mutex> lock(m_path_mutex);
         current_target_path_point_id = 0;
     }
-    m_path_planner.request_path_replan(m_start_position, next_goal);
+    request_grounded_path_replan(m_vehicle_position, next_goal);
 }
 
 void Celeris::sync_path_planner_result() {
     PathPlanner::PathPlannerResult result = m_path_planner.request_result_snapshot();
-    if (result.generation == m_synced_path_generation)
+    const bool cleanup_revision_changed =
+        m_path_direction_cleanup_revision != m_synced_path_direction_cleanup_revision;
+    if (result.generation == m_synced_path_generation && !cleanup_revision_changed)
         return;
+
+    cleanup_short_direction_runs(
+        result.nonholonomic_astar_path,
+        m_desc.global_path_direction_cleanup_min_segment_length
+    );
+    if (cleanup_revision_changed)
+        m_local_planner.set_astar_path(result.nonholonomic_astar_path);
+    else
+        m_local_planner.set_astar_path(result.nonholonomic_astar_path, result.generation);
 
     std::lock_guard<std::mutex> lock(m_path_mutex);
     plain_astar_path = std::move(result.plain_astar_path);
@@ -1173,6 +1735,7 @@ void Celeris::sync_path_planner_result() {
     unimpended_path = std::move(result.unimpended_path);
     total_path_finding_time = result.total_path_finding_time;
     m_synced_path_generation = result.generation;
+    m_synced_path_direction_cleanup_revision = m_path_direction_cleanup_revision;
     current_target_path_point_id = 0;
 }
 
@@ -1210,90 +1773,19 @@ glm::vec3 Celeris::lidar_offset() const {
 bool Celeris::find_closest_next_path_point(uint32_t current_id, uint32_t& output_id, uint32_t& output_dist) {
     if (current_id + 1 >= nonholonomic_astar_path.size())
         return false;
-    
-    if (glm::distance(m_start_position.pos, nonholonomic_astar_path[output_id].pos))
 
+    uint32_t best_id = current_id + 1;
+    float best_dist = glm::distance(m_start_position.pos, nonholonomic_astar_path[best_id].pos);
 
-    output_id = current_id + 1;
-    output_dist = glm::distance(m_start_position.pos, nonholonomic_astar_path[output_id].pos);
-    for (int i = current_id; i < nonholonomic_astar_path.size(); i++) {
-        float dist = glm::distance(m_start_position.pos, nonholonomic_astar_path[output_id].pos);
+    for (uint32_t i = current_id + 2; i < nonholonomic_astar_path.size(); i++) {
+        const float dist = glm::distance(m_start_position.pos, nonholonomic_astar_path[i].pos);
+        if (dist < best_dist) {
+            best_id = i;
+            best_dist = dist;
+        }
     }
 
+    output_id = best_id;
+    output_dist = static_cast<uint32_t>(std::round(best_dist));
     return true;
 };
-
-VehicleCommand Celeris::get_path_following_command() {
-    std::lock_guard<std::mutex> lock(m_path_mutex);
-
-    if (m_waypoint_path_completed && !m_waypoint_path.waypoints().empty())
-        return VehicleCommand{
-            .speed = 0,
-            .steering_angle = 0
-        };
-
-    if (nonholonomic_astar_path.empty() || current_target_path_point_id >= nonholonomic_astar_path.size())
-        return VehicleCommand{
-            .speed = 0,
-            .steering_angle = 0
-        };
-
-    float reach_radius = 1;
-
-    float dist_to_target_point = glm::distance(
-        m_start_position.pos, 
-        nonholonomic_astar_path[current_target_path_point_id].pos
-    );
-
-    if (dist_to_target_point <= reach_radius) {
-        
-        
-        if (nonholonomic_astar_path[current_target_path_point_id].dir == -1) {
-            if (!is_stop_waiting) {
-                is_stop_waiting = true;
-                stop_waiting_start_timestamp = std::chrono::steady_clock::now();
-            } else {
-                auto current_timestamp = std::chrono::steady_clock::now();
-                auto elapsed_time = current_timestamp - stop_waiting_start_timestamp;
-                
-                double elapsed_seconds = std::chrono::duration<double>(elapsed_time).count();
-
-                if (elapsed_seconds >= stop_waiting_time) {
-                    is_stop_waiting = false;
-                    current_target_path_point_id++;
-                    if (current_target_path_point_id >= nonholonomic_astar_path.size())
-                        return VehicleCommand{
-                            .speed = 0,
-                            .steering_angle = 0
-                        };
-                } else {
-                    return VehicleCommand{
-                        .speed = 0,
-                        .steering_angle = 0
-                    };
-                }
-            }
-        } 
-        else {
-            current_target_path_point_id++;
-            if (current_target_path_point_id >= nonholonomic_astar_path.size())
-                return VehicleCommand{
-                    .speed = 0,
-                    .steering_angle = 0
-                };
-        }    
-    }
-
-    float target_theta = nonholonomic_astar_path[current_target_path_point_id].theta;
-    float theta_error = NonholonomicAStar::angle_diff(m_start_position.theta, target_theta);
-
-    float direction = nonholonomic_astar_path[current_target_path_point_id].dir;
-    float steering = direction * theta_error;
-
-    steering = std::clamp(steering, -0.4f, 0.4f);
-
-    return VehicleCommand{
-                .speed = m_car_speed * direction,
-                .steering_angle = steering
-            };
-}

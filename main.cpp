@@ -148,13 +148,13 @@ int main() {
     MaterialManager material_manager(engine, shader_manager, frame_resources);
     MaterialInstanceManager material_instance_manager(engine, material_manager, texture_manager);
     MeshManager mesh_manager(engine, resource_loader);
-    ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager, 
+    ManagerBundle manager_bundle(engine, shader_manager, texture_manager, material_manager,
                                  material_instance_manager, mesh_manager, compute_pass_manager);
 
     VulkanSubmitContext compute_submit_context(engine.device(), engine.compute_queue(0));
 
     PointCloudPreprocessor point_cloud_preprocessor(
-        engine.device(), 
+        engine.device(),
         engine.compute_queue(),
         compute_pass_manager
     );
@@ -166,9 +166,9 @@ int main() {
     std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
 
     glm::vec3 voxel_size(1.0f);
-    uint32_t vertical_inflation_size = 
+    uint32_t vertical_inflation_size =
         static_cast<uint32_t>(std::ceil(vehicle_geometry.size.y / voxel_size.y));
-    uint32_t horizontal_inflation_size = 
+    uint32_t horizontal_inflation_size =
         static_cast<uint32_t>(std::ceil((vehicle_geometry.size.x / voxel_size.x) / 2.0f));
     glm::ivec3 chunk_size(16);
     VoxelGrid::VoxelGridDesc voxel_grid_desc {
@@ -414,8 +414,8 @@ int main() {
         skybox_exposure
     );
 
-    bool has_start_pos = true;
-    bool has_end_pos = true;
+    bool has_start_pos = false;
+    bool has_end_pos = false;
     bool has_planned_path = false;
 
     VulkanSubmitContext planner_submit_context(
@@ -427,9 +427,9 @@ int main() {
         engine,
         engine.compute_queue(),
         compute_submit_context,
-        manager_bundle, 
+        manager_bundle,
         material_instance_manager,
-        voxel_grid, 
+        voxel_grid,
         voxelizator,
         scan_vertex_buffer,
         scan_index_buffer,
@@ -446,17 +446,18 @@ int main() {
     const NonholonomicPos start_lidar_scan_position{.pos = glm::vec3(0.0f, 0.0f, 0.0f)};
     // celeris.set_start(start_lidar_scan_position);
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
+    has_end_pos = true;
     // celeris.set_start_lidar_scan_position(start_lidar_scan_position);
-    celeris.load_map(saved_maps_directory / "robocross_sim.vpm");
+    // celeris.load_map(saved_maps_directory / "robocross_sim_2.vpm");
     celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim.wpp");
     celeris.start(std::move(planner_submit_context));
 
     CelerisVisualizer celeris_visualizer(
-        mesh_manager, 
-        material_instance_manager, 
-        celeris, 
+        mesh_manager,
+        material_instance_manager,
+        celeris,
         vehicle_geometry,
-        20000, 
+        20000,
         skybox_exposure
     );
 
@@ -490,13 +491,13 @@ int main() {
     // );
 
     // celeris.voxel_point_map().map_point_buffer.read(
-    //     point_map_points.data(), 
+    //     point_map_points.data(),
     //     celeris.voxel_point_map().map_point_count() * sizeof(PointInstance),
     //     0
     // );
 
     // celeris.voxel_point_map().map_normal_buffer.read(
-    //     point_map_normals.data(), 
+    //     point_map_normals.data(),
     //     celeris.voxel_point_map().map_point_count() * sizeof(glm::vec4),
     //     0
     // );
@@ -511,14 +512,14 @@ int main() {
     std::string waypoint_path_status;
     bool waypoint_path_failed = false;
 
-    
+
 
     // std::ofstream saved_file("/home/spectre/Projects/celeris/saved_maps/map.cel");
 
     // saved_file << celeris.voxel_point_map().map_point_count() << "\n";
 
     // for (int i = 0; i < celeris.voxel_point_map().map_point_count(); i++) {
-    //     saved_file 
+    //     saved_file
     //         << point_map_points[i].position.x << "\n"
     //         << point_map_points[i].position.y << "\n"
     //         << point_map_points[i].position.z << "\n"
@@ -531,16 +532,16 @@ int main() {
     // }
 
     // for (int i = 0; i < celeris.voxel_point_map().map_point_count(); i++) {
-    //     saved_file 
+    //     saved_file
     //         << point_map_normals[i].x << "\n"
     //         << point_map_normals[i].y << "\n"
     //         << point_map_normals[i].z << "\n"
     //         << point_map_normals[i].w << "\n";
     // }
-    
+
     // saved_file.close();
 
-    
+
 
     // celeris.voxel_point_map
 
@@ -572,10 +573,10 @@ int main() {
     float car_speed = celeris.car_speed();
 
     auto start_path_planning = [&]() {
-        if (!has_start_pos || !has_end_pos)
-            return;
-
-        celeris.request_path_replan();
+        const bool already_has_path = celeris.has_planned_path();
+        has_planned_path = celeris.request_path_replan();
+        if (has_planned_path || already_has_path)
+            celeris.reset_local_planner_tracking();
     };
 
     auto make_pose_from_camera = [&](NonholonomicPos& out_pose) {
@@ -595,7 +596,6 @@ int main() {
             celeris.set_start(pose);
             has_start_pos = true;
             has_planned_path = false;
-            start_path_planning();
         }
     };
 
@@ -605,8 +605,13 @@ int main() {
             celeris.set_goal(pose);
             has_end_pos = true;
             has_planned_path = false;
-            start_path_planning();
         }
+    };
+
+    auto move_start_to_vehicle = [&]() {
+        celeris.set_start(celeris.vehicle_position());
+        has_start_pos = true;
+        has_planned_path = false;
     };
 
     auto add_directional_waypoint = [&]() {
@@ -628,9 +633,9 @@ int main() {
     };
 
     // LidarVideo lidar_video(
-    //     manager_bundle, 
-    //     point_cloud_preprocessor, 
-    //     "/home/spectre/TEMP_lidar_output_mesh/recording_16/index.csv", 
+    //     manager_bundle,
+    //     point_cloud_preprocessor,
+    //     "/home/spectre/TEMP_lidar_output_mesh/recording_16/index.csv",
     //     0,
     //     2
     // );
@@ -660,14 +665,14 @@ int main() {
 
     // celeris.voxel_map_reseter().reset(celeris.voxel_point_map());
     // celeris.voxel_map_point_inserter().insert(
-    //     celeris.voxel_point_map(), 
-    //     lidar_video.get_scan(0).point_cloud(), 
+    //     celeris.voxel_point_map(),
+    //     lidar_video.get_scan(0).point_cloud(),
     //     lidar_video.get_scan(0).normal_buffer()
     // );
 
     PointCloud voxel_point_map(
-        manager_bundle, 
-        celeris.voxel_point_map().map_point_buffer, 
+        manager_bundle,
+        celeris.voxel_point_map().map_point_buffer,
         celeris.voxel_point_map().m_map_point_count
     );
     voxel_point_map.set_color(glm::vec4(0, 0, 0, 1));
@@ -733,7 +738,7 @@ int main() {
     // scene.add(source_scan);
 
     // scene.add(lidar_video);
-    
+
     skybox.update(scene);
 
     bool g_pressed = false;
@@ -743,13 +748,14 @@ int main() {
     bool place_start_pressed = false;
     bool place_end_pressed = false;
     bool start_path_planning_pressed = false;
+    bool move_start_to_vehicle_pressed = false;
     bool place_footprint_pressed = false;
     bool fps_camera_pressed = false;
     bool third_person_camera_pressed = false;
     GamepadController gamepad_controller;
 
     int step = 0;
-    
+
     float last_frame_time = 0.0f;
     float start_time = (float)glfwGetTime();
     float timer = 0;
@@ -851,7 +857,7 @@ int main() {
         //         transparent_voxelize_prefab,
         //         vox_box.mesh_view(),
         //         transform,
-        //         &voxel_grid.local_voxel_write_list()        
+        //         &voxel_grid.local_voxel_write_list()
         //     );
         // }
 
@@ -864,7 +870,7 @@ int main() {
         //         blue_voxelize_prefab,
         //         vox_box.mesh_view(),
         //         vox_box.transform.get_model_matrix(),
-        //         &voxel_grid.local_voxel_write_list()        
+        //         &voxel_grid.local_voxel_write_list()
         //     );
 
         //     transform_mem[i] = vox_box.transform.get_model_matrix();
@@ -915,7 +921,7 @@ int main() {
         if (third_person_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_R) == GLFW_RELEASE)
             third_person_camera_pressed = false;
 
-        third_person_camera_controller.set_target(celeris_visualizer.get_start_marker_pos());
+        third_person_camera_controller.set_target(celeris.vehicle_position().pos);
         if (camera_controller_mode == CameraControllerMode::FPS)
             fps_camera_controller.update(window, delta_time);
         else
@@ -925,7 +931,7 @@ int main() {
 
         lighting_system.update(engine.current_frame(), window, camera);
 
-        voxel_grid.update(window, camera);        
+        voxel_grid.update(window, camera);
 
         if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
             place_start_pressed = true;
@@ -954,12 +960,21 @@ int main() {
             start_path_planning_pressed = false;
         }
 
-        if (!place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_PRESS) {
+        if (!move_start_to_vehicle_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_PRESS) {
+            move_start_to_vehicle_pressed = true;
+            move_start_to_vehicle();
+        }
+
+        if (move_start_to_vehicle_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_RELEASE) {
+            move_start_to_vehicle_pressed = false;
+        }
+
+        if (!place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_5) == GLFW_PRESS) {
             place_footprint_pressed = true;
             place_footprint();
         }
 
-        if (place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_RELEASE) {
+        if (place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_5) == GLFW_RELEASE) {
             place_footprint_pressed = false;
         }
 
@@ -1015,7 +1030,7 @@ int main() {
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
-                
+
                 // {
                 //     VulkanCommandBuffer& debugger_command_buffer = debugger.command_buffer();
                 //     auto scope = debugger_command_buffer.begin_scope();
@@ -1028,7 +1043,7 @@ int main() {
                 //     debugger.display_hash_table_window();
                 // }
                 // debugger.submit_commands();
-                
+
 
                 ImGui::Begin("Debug");
 
@@ -1166,7 +1181,7 @@ int main() {
 
                 celeris_visualizer.display_debug_controls();
                 celeris.display_path_planner_debug_controls();
-                
+
                 // ImGui::TextColored(ImVec4(1.0f, 0.35f, 1.0f, 1.0f), "Current frame id: %d", lidar_video.current_frame_id());
 
                 // if (ImGui::Button("FPS controller")) {
@@ -1191,7 +1206,7 @@ int main() {
                     if (ImGui::Button("Place end")) {
                         place_end();
                     }
-                    
+
                     ImGui::SameLine();
                     ImGui::TextUnformatted("Key: 2");
 
@@ -1201,11 +1216,17 @@ int main() {
                     ImGui::SameLine();
                     ImGui::TextUnformatted("Key: 3");
 
+                    if (ImGui::Button("Move start to vehicle")) {
+                        move_start_to_vehicle();
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextUnformatted("Key: 4");
+
                     if (ImGui::Button("Place footprint")) {
                         place_footprint();
                     }
                     ImGui::SameLine();
-                    ImGui::TextUnformatted("Key: 4");
+                    ImGui::TextUnformatted("Key: 5");
 
                     const std::vector<Celeris::Waypoint>& waypoints = celeris.waypoints();
                     const size_t directional_waypoint_count = std::count_if(
@@ -1337,9 +1358,9 @@ int main() {
                         gamepad_controller.brake_pressed() ? " (R1 brake)" : ""
                     );
                     ImGui::Text(
-                        "Gamepad command: speed %.2f, steering %.2f",
-                        gamepad_command.speed,
-                        gamepad_command.steering_angle
+                        "Gamepad command: acceleration %.2f, steering velocity %.2f",
+                        gamepad_command.acceleration,
+                        gamepad_command.steering_angle_velocity
                     );
                     ImGui::Text(
                         "Command sender: %s, %s",
@@ -1372,7 +1393,7 @@ int main() {
                 // }
 
                 ImGui::End();
-                
+
                 ui.end_frame(command_buffer);
             }
         }
