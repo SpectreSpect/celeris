@@ -43,6 +43,10 @@ bool has_curvature_limit_exceeded(uint type_flags) {
     return (read_voxel_flags(type_flags) & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) != 0u;
 }
 
+bool is_visible_voxel(uint type_flags) {
+    return (read_voxel_flags(type_flags) & VOXEL_VISABILITY_FLAG_BIT) != 0u;
+}
+
 void atomic_store_voxel(uint global_voxel_id, VoxelData voxel_data) {
     while (true) {
         uint old_type_flags = atomicAdd(voxels[global_voxel_id].type_flags, 0u);
@@ -62,7 +66,11 @@ bool atomic_store_voxel_with_curvature_priority(uint global_voxel_id, VoxelData 
 
     while (true) {
         uint old_type_flags = atomicAdd(voxels[global_voxel_id].type_flags, 0u);
-        if (has_curvature_limit_exceeded(old_type_flags) && !write_has_curvature_limit) {
+        bool old_is_real_curvature_voxel =
+            is_visible_voxel(old_type_flags) &&
+            has_curvature_limit_exceeded(old_type_flags);
+
+        if (old_is_real_curvature_voxel && !write_has_curvature_limit) {
             return false;
         }
 
