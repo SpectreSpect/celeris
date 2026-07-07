@@ -18,23 +18,24 @@ public:
     using PathArcLengthTable = Vehicle::PathArcLengthTable;
 
     struct PurePursuitParams {
-        float cruise_speed = 3.0f;
-        float lookahead_distance = 3.0f;
-        float lookahead_speed_gain = 0.6f;
-        float min_lookahead_distance = 1.0f;
-        float max_lookahead_distance = 8.0f;
-        float min_steering_lookahead_distance = 2.0f;
-        float goal_steering_release_distance = 1.5f;
-        float goal_steering_release_speed = 0.7f;
-        float speed_p_gain = 1.5f;
-        float steering_p_gain = 6.0f;
-        float slowdown_distance_from_path = 2.5f;
+        float cruise_speed = 12.0f;
+        float lookahead_distance = 7.0f;
+        float lookahead_speed_gain = 0.8f;
+        float min_lookahead_distance = 4.0f;
+        float max_lookahead_distance = 16.0f;
+        float min_steering_lookahead_distance = 5.0f;
+        float goal_steering_release_distance = 3.0f;
+        float goal_steering_release_speed = 1.5f;
+        float speed_p_gain = 1.0f;
+        float steering_p_gain = 2.2f;
+        float slowdown_distance_from_path = 3.5f;
         float min_off_path_speed_factor = 0.25f;
-        float projection_backtrack_window = 0.75f;
-        float projection_lookahead_base = 3.0f;
-        float direction_switch_arrival_distance = 0.25f;
-        float direction_switch_arrival_speed = 0.9f;
-        float direction_switch_approach_speed = 0.75f;
+        float projection_backtrack_window = 1.0f;
+        float projection_lookahead_base = 8.0f;
+        float direction_switch_arrival_distance = 0.5f;
+        float direction_switch_arrival_speed = 1.5f;
+        float direction_switch_approach_distance = 6.0f;
+        float direction_switch_approach_speed = 2.0f;
     };
 
     struct PurePursuitControlCommand {

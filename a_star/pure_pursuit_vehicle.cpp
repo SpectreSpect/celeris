@@ -231,14 +231,17 @@ PurePursuitVehicle::PurePursuitControlCommand PurePursuitVehicle::compute_contro
         std::max(0.0f, m_params.min_lookahead_distance),
         std::max(m_params.min_lookahead_distance, m_params.max_lookahead_distance)
     );
+    const float next_switch_s = Vehicle::next_direction_change_s(path, path_arc_lengths, current_projection.s);
+    const bool final_direction_segment = !std::isfinite(next_switch_s);
+    const float target_s = final_direction_segment
+        ? current_projection.s + lookahead_distance
+        : std::min(current_projection.s + lookahead_distance, next_switch_s);
     PointProjection target_projection = Vehicle::sample_polyline_at_s(
         path,
         path_arc_lengths,
-        current_projection.s + lookahead_distance
+        target_s
     );
 
-    const float next_switch_s = Vehicle::next_direction_change_s(path, path_arc_lengths, current_projection.s);
-    const bool final_direction_segment = !std::isfinite(next_switch_s);
     float remaining_s = std::max(0.0f, total_length - current_projection.s);
     if (!final_direction_segment) {
         remaining_s = std::max(0.0f, next_switch_s - current_projection.s);
@@ -283,13 +286,12 @@ PurePursuitVehicle::PurePursuitControlCommand PurePursuitVehicle::compute_contro
 
     const float braking_speed = std::sqrt(std::max(0.0f, 2.0f * m_max_acceleration * remaining_s));
     float target_speed_abs = std::min(std::max(0.0f, m_params.cruise_speed), braking_speed);
-    if (std::isfinite(next_switch_s)) {
-        target_speed_abs = std::max(
+    if (std::isfinite(next_switch_s) &&
+        remaining_s <= std::max(0.0f, m_params.direction_switch_approach_distance))
+    {
+        target_speed_abs = std::min(
             target_speed_abs,
-            std::min(
-                std::max(0.0f, m_params.cruise_speed),
-                std::max(0.0f, m_params.direction_switch_approach_speed)
-            )
+            std::max(0.0f, m_params.direction_switch_approach_speed)
         );
     }
 

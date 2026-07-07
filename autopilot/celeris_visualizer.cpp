@@ -50,6 +50,11 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
             material_instance_manager, 
             PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(0, 1, 0, 1))
         ),
+        m_lookahead_marker(
+            mesh_manager,
+            material_instance_manager,
+            PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(1.0f, 0.0f, 0.9f, 1.0f))
+        ),
         m_gazelle_next(mesh_manager, material_instance_manager, vehicle_geometry, skybox_exposure),
         m_path_line_cloud(*m_celeris->engine(),
                    mesh_manager.line_quad,
@@ -100,6 +105,7 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
     add_child(m_gazelle_next);
     add_child(m_goal_marker);
     add_child(m_vehicle_marker);
+    add_child(m_lookahead_marker);
     add_child(m_path_line_cloud);
     add_child(m_guide_path_line_cloud);
     add_child(m_explored_paths_line_cloud);
@@ -114,6 +120,7 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
 
     m_start_marker.visible = show_start_marker && m_celeris->has_start_position();
     m_goal_marker.visible = show_goal_marker && m_celeris->has_goal_position();
+    m_lookahead_marker.visible = false;
 }
 
 void CelerisVisualizer::set_start(const NonholonomicPos& nonholonomic_position) {
@@ -242,6 +249,30 @@ void CelerisVisualizer::update() {
     );
     m_vehicle_marker.visible = show_vehicle_marker;
 
+    const bool has_lookahead_point = m_celeris->has_local_planner_lookahead_point();
+    m_lookahead_marker.visible = show_lookahead_point && has_lookahead_point;
+    if (has_lookahead_point) {
+        glm::vec3 lookahead_position = m_celeris->local_planner_lookahead_point();
+        float best_dist2 = std::numeric_limits<float>::infinity();
+        for (const NonholonomicPos& path_point : path_result.nonholonomic_astar_path) {
+            const glm::vec2 diff{
+                path_point.pos.x - lookahead_position.x,
+                path_point.pos.z - lookahead_position.z
+            };
+            const float dist2 = glm::dot(diff, diff);
+            if (dist2 < best_dist2) {
+                best_dist2 = dist2;
+                lookahead_position.y = path_point.pos.y;
+            }
+        }
+
+        m_lookahead_marker.transform.position =
+            lookahead_position +
+            glm::vec3(0.0f, 0.2f + 0.8f * voxel_size().y, 0.0f);
+        m_lookahead_marker.transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+        m_lookahead_marker.transform.scale = glm::vec3(0.45f);
+    }
+
     m_local_candidate_line_cloud.set_lines(
         show_local_candidates
             ? make_local_candidate_lines(
@@ -261,6 +292,7 @@ void CelerisVisualizer::display_debug_controls() {
         ImGui::Checkbox("Start pose marker", &show_start_marker);
         ImGui::Checkbox("Goal pose marker", &show_goal_marker);
         ImGui::Checkbox("Vehicle pose marker", &show_vehicle_marker);
+        ImGui::Checkbox("Pure Pursuit lookahead point", &show_lookahead_point);
         ImGui::Checkbox("Gazelle Next", &show_gazelle_next);
         ImGui::Checkbox("Local candidates", &show_local_candidates);
         ImGui::Checkbox("Local s window", &show_local_s_window);
