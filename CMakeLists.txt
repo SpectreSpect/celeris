@@ -140,6 +140,7 @@ add_executable(app
   autopilot/spherical_pose_marker.cpp
   autopilot/gazelle_next.cpp
   autopilot/vehicle_command_sender.cpp
+  autopilot/gamepad_controller.cpp
   autopilot/vehicle_state_receiver.cpp
   autopilot/path_planner.cpp
   autopilot/waypoint_path.cpp

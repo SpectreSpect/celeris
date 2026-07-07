@@ -71,6 +71,7 @@
 #include "autopilot/spherical_pose_marker.h"
 #include "autopilot/celeris.h"
 #include "autopilot/celeris_visualizer.h"
+#include "autopilot/gamepad_controller.h"
 #include "autopilot/vehicle_geometry.h"
 #include "voxel_grid_vulkan/voxel_grid_gpu_debugger.h"
 #include "camera/controllers/third_person_camera_controller.h"
@@ -437,7 +438,8 @@ int main() {
             .vehicle_geometry = vehicle_geometry,
             .footprint_sample_count = 5,
             .footprint_horizontal_inflation_size = horizontal_inflation_size,
-            .footprint_vertical_inflation_size = vertical_inflation_size
+            .footprint_vertical_inflation_size = vertical_inflation_size,
+            .gamepad_commands_enabled = true
         }
     );
 
@@ -750,6 +752,7 @@ int main() {
     bool place_footprint_pressed = false;
     bool fps_camera_pressed = false;
     bool third_person_camera_pressed = false;
+    GamepadController gamepad_controller;
 
     int step = 0;
 
@@ -830,6 +833,12 @@ int main() {
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
+        gamepad_controller.update(
+            celeris.car_speed(),
+            celeris.vehicle_speed(),
+            celeris.vehicle_steering_angle()
+        );
+        celeris.set_gamepad_command(gamepad_controller.command());
 
         if (skybox_environment_update_pending) {
             engine.device().wait_idle();
@@ -1332,6 +1341,36 @@ int main() {
                     }
                     ImGui::SameLine();
                     ImGui::TextUnformatted("Key: L");
+
+                    ImGui::Separator();
+
+                    bool gamepad_commands_enabled = celeris.gamepad_commands_enabled();
+                    if (ImGui::Checkbox("Gamepad driving", &gamepad_commands_enabled)) {
+                        celeris.set_gamepad_commands_enabled(gamepad_commands_enabled);
+                    }
+
+                    bool print_gamepad_input = gamepad_controller.print_input_events();
+                    if (ImGui::Checkbox("Print gamepad input", &print_gamepad_input)) {
+                        gamepad_controller.set_print_input_events(print_gamepad_input);
+                    }
+
+                    const VehicleCommand gamepad_command = celeris.gamepad_command();
+                    ImGui::Text(
+                        "Gamepad: %s%s",
+                        gamepad_controller.gamepad_present() ? "gamepad" :
+                        (gamepad_controller.raw_joystick_present() ? "raw joystick" : "not connected"),
+                        gamepad_controller.brake_pressed() ? " (R1 brake)" : ""
+                    );
+                    ImGui::Text(
+                        "Gamepad command: acceleration %.2f, steering velocity %.2f",
+                        gamepad_command.acceleration,
+                        gamepad_command.steering_angle_velocity
+                    );
+                    ImGui::Text(
+                        "Command sender: %s, %s",
+                        celeris.command_sender_running() ? "running" : "stopped",
+                        celeris.command_sender_connected() ? "connected" : "not connected"
+                    );
 
                     ImGui::Separator();
 
