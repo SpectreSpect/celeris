@@ -1,6 +1,6 @@
 #include "compute_pipeline.h"
 
-#include <vulkan/vk_enum_string_helper.h>
+#include "../../vk_enum_string_helper.h"
 #include <string>
 
 #include "../vulkan_pipeline_layout.h"

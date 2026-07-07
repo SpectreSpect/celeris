@@ -3,7 +3,7 @@
 
 #include "../vulkan_device.h"
 #include "descriptor_set_layout_builder.h"
-#include <vulkan/vk_enum_string_helper.h>
+#include "../vk_enum_string_helper.h"
 
 DescriptorSetLayout::DescriptorSetLayout(const VulkanDevice& device, std::span<const VkDescriptorSetLayoutBinding> bindings, VkDescriptorSetLayoutCreateFlags flags
 ) : m_device(device.handle())  {

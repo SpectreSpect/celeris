@@ -39,6 +39,70 @@ layout(push_constant) uniform WriteVoxelsToGridPushConstants {
 #include "chunk_pool/voxel_index.inc"
 // -------------------
 
+bool has_curvature_limit_exceeded(uint type_flags) {
+    return (read_voxel_flags(type_flags) & VOXEL_CURVATURE_LIMIT_EXCEEDED_BIT) != 0u;
+}
+
+bool is_visible_voxel(uint type_flags) {
+    return (read_voxel_flags(type_flags) & VOXEL_VISABILITY_FLAG_BIT) != 0u;
+}
+
+void atomic_store_voxel(uint global_voxel_id, VoxelData voxel_data) {
+    while (true) {
+        uint old_type_flags = atomicAdd(voxels[global_voxel_id].type_flags, 0u);
+        if (atomicCompSwap(
+            voxels[global_voxel_id].type_flags,
+            old_type_flags,
+            voxel_data.type_flags
+        ) == old_type_flags) {
+            atomicExchange(voxels[global_voxel_id].color, voxel_data.color);
+            return;
+        }
+    }
+}
+
+bool atomic_store_voxel_with_curvature_priority(uint global_voxel_id, VoxelData voxel_data) {
+    bool write_has_curvature_limit = has_curvature_limit_exceeded(voxel_data.type_flags);
+
+    while (true) {
+        uint old_type_flags = atomicAdd(voxels[global_voxel_id].type_flags, 0u);
+        bool old_is_real_curvature_voxel =
+            is_visible_voxel(old_type_flags) &&
+            has_curvature_limit_exceeded(old_type_flags);
+
+        if (old_is_real_curvature_voxel && !write_has_curvature_limit) {
+            return false;
+        }
+
+        if (atomicCompSwap(
+            voxels[global_voxel_id].type_flags,
+            old_type_flags,
+            voxel_data.type_flags
+        ) == old_type_flags) {
+            atomicExchange(voxels[global_voxel_id].color, voxel_data.color);
+            return true;
+        }
+    }
+}
+
+bool atomic_store_voxel_if_easy_overwrite(uint global_voxel_id, VoxelData voxel_data) {
+    while (true) {
+        uint old_type_flags = atomicAdd(voxels[global_voxel_id].type_flags, 0u);
+        if ((read_voxel_flags(old_type_flags) & VOXEL_EASY_OVERWRITE_FLAG_BIT) == 0u) {
+            return false;
+        }
+
+        if (atomicCompSwap(
+            voxels[global_voxel_id].type_flags,
+            old_type_flags,
+            voxel_data.type_flags
+        ) == old_type_flags) {
+            atomicExchange(voxels[global_voxel_id].color, voxel_data.color);
+            return true;
+        }
+    }
+}
+
 void main() {
     uint voxel_write_id = gl_GlobalInvocationID.x;
     if (voxel_write_id >= count_voxel_writes) return;
@@ -62,15 +126,21 @@ void main() {
         voxel_data.type_flags |= VOXEL_RECENTLY_INSERTED_BIT << VOXEL_TYPE_BITS;
     }
 
-    if ((voxel_write.set_flags & OVERWRITE_BIT) > 0u) {
-        voxels[global_voxel_id] = voxel_data;
+    bool wrote_voxel = false;
 
-        mark_dirty_mesh_around(chunk_id, chunk_pos);
+    if ((voxel_write.set_flags & OVERWRITE_BIT) > 0u) {
+        if ((voxel_write.set_flags & CURVATURE_PRIORITY_OVERWRITE_BIT) > 0u) {
+            wrote_voxel = atomic_store_voxel_with_curvature_priority(global_voxel_id, voxel_data);
+        } else {
+            atomic_store_voxel(global_voxel_id, voxel_data);
+            wrote_voxel = true;
+        }
     }
     else {
-        if ((read_voxel_flags(voxels[global_voxel_id].type_flags) & VOXEL_EASY_OVERWRITE_FLAG_BIT) > 0u) {
-            voxels[global_voxel_id] = voxel_data;
-            mark_dirty_mesh_around(chunk_id, chunk_pos);
-        }
+        wrote_voxel = atomic_store_voxel_if_easy_overwrite(global_voxel_id, voxel_data);
+    }
+
+    if (wrote_voxel) {
+        mark_dirty_mesh_around(chunk_id, chunk_pos);
     }
 }

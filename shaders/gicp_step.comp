@@ -1,6 +1,12 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
 
+#ifdef GICP_USE_FLOAT32
+#define GICPScalar float
+#else
+#define GICPScalar double
+#endif
+
 layout(local_size_x = 32) in;
 
 #include "common/hash_table/hash_table_decl.inc"
@@ -14,9 +20,9 @@ struct PointInstance {
 };
 
 struct GICPPartial {
-    double H[6][6];
-    double g[6];
-    double total_weighted_sq_error;
+    GICPScalar H[6][6];
+    GICPScalar g[6];
+    GICPScalar total_weighted_sq_error;
     uint valid_count;
 };
 
@@ -503,19 +509,19 @@ mat3 skew_matrix(vec3 v)
     );
 }
 
-void add_mat3_block(inout double H[6][6], int row0, int col0, mat3 M)
+void add_mat3_block(inout GICPScalar H[6][6], int row0, int col0, mat3 M)
 {
     for (int r = 0; r < 3; r++) {
         for (int c = 0; c < 3; c++) {
-            H[row0 + r][col0 + c] += double(M[c][r]);
+            H[row0 + r][col0 + c] += GICPScalar(M[c][r]);
         }
     }
 }
 
-void add_vec3_block(inout double g[6], int row0, vec3 v)
+void add_vec3_block(inout GICPScalar g[6], int row0, vec3 v)
 {
     for (int r = 0; r < 3; r++) {
-        g[row0 + r] += double(v[r]);
+        g[row0 + r] += GICPScalar(v[r]);
     }
 }
 
@@ -756,7 +762,7 @@ GICPPartial get_gicp_partial(uint source_point_id, mat3 R_src, vec3 source_posit
     }
         
 
-    partial.total_weighted_sq_error = double(weighted_error);
+    partial.total_weighted_sq_error = GICPScalar(weighted_error);
     partial.valid_count = 1u;
 
     float t = clamp(dist_to_target / max_corr_dist, 0.0, 1.0);

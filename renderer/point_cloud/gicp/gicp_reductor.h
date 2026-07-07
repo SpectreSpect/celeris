@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -30,9 +32,16 @@ public:
         uint32_t valid_count;
     };
 
+    struct GICPPartialFloat32 {
+        float H[6][6];
+        float g[6];
+        float total_weighted_sq_error;
+        uint32_t valid_count;
+    };
 
     GICPReductor(VulkanEngine& engine, ComputePassManager& compute_pass_manager);
 
+    size_t partial_size() const noexcept;
     uint32_t reduce_step(VulkanBuffer& partial_src, VulkanBuffer& partial_dst, const uint32_t input_count);
     GICPPartial reduce(VulkanBuffer& partial_src, VulkanBuffer& partial_dst, const uint32_t input_count);
 
@@ -44,4 +53,5 @@ private:
     VulkanFence compute_fence;
 
     VulkanBuffer uniform_buffer;
+    bool m_uses_float64 = true;
 };

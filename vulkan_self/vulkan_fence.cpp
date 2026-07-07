@@ -2,7 +2,7 @@
 
 #include "vulkan_device.h"
 #include "collect_handles_helper.h"
-#include <vulkan/vk_enum_string_helper.h>
+#include "vk_enum_string_helper.h"
 
 #include <utility>
 #include <string>

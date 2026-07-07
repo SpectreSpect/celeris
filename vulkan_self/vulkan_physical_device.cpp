@@ -3,6 +3,20 @@
 #include <set>
 #include <string>
 
+namespace {
+const char* physical_device_type_string(VkPhysicalDeviceType type) {
+    switch (type) {
+        case VK_PHYSICAL_DEVICE_TYPE_OTHER: return "other";
+        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU: return "integrated GPU";
+        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU: return "discrete GPU";
+        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU: return "virtual GPU";
+        case VK_PHYSICAL_DEVICE_TYPE_CPU: return "CPU";
+    }
+
+    return "unknown";
+}
+}
+
 VulkanPhysicalDevice::VulkanPhysicalDevice(
     const VulkanInstance& instance,
     const VulkanSurface& surface,
@@ -33,18 +47,22 @@ VulkanPhysicalDevice::VulkanPhysicalDevice(
         m_physical_device != VK_NULL_HANDLE,
         "Failed to find a suitable GPU"
     );
+
+    vkGetPhysicalDeviceFeatures(m_physical_device, &m_features);
 }
 
 VulkanPhysicalDevice::VulkanPhysicalDevice(VulkanPhysicalDevice&& other) noexcept
     :   m_physical_device(std::exchange(other.m_physical_device, VK_NULL_HANDLE)),
         m_surface(std::exchange(other.m_surface, VK_NULL_HANDLE)),
-        m_queue_allocation(std::move(other.m_queue_allocation)) {}
+        m_queue_allocation(std::move(other.m_queue_allocation)),
+        m_features(std::exchange(other.m_features, VkPhysicalDeviceFeatures{})) {}
 
 VulkanPhysicalDevice& VulkanPhysicalDevice::operator=(VulkanPhysicalDevice&& other) noexcept {
     if (this != &other) {
         m_physical_device = std::exchange(other.m_physical_device, VK_NULL_HANDLE);
         m_surface = std::exchange(other.m_surface, VK_NULL_HANDLE);
         m_queue_allocation = std::move(other.m_queue_allocation);
+        m_features = std::exchange(other.m_features, VkPhysicalDeviceFeatures{});
     }
 
     return *this;
@@ -56,6 +74,10 @@ VkPhysicalDevice VulkanPhysicalDevice::handle() const noexcept {
 
 const QueueAllocation& VulkanPhysicalDevice::queue_allocation() const noexcept {
     return m_queue_allocation;
+}
+
+bool VulkanPhysicalDevice::supports_shader_float64() const noexcept {
+    return m_features.shaderFloat64 == VK_TRUE;
 }
 
 bool VulkanPhysicalDevice::find_queue_families(
@@ -80,8 +102,6 @@ bool VulkanPhysicalDevice::find_queue_families(
         queue_families.data()
     );
 
-    std::vector<uint32_t> used_queue_counts(queue_family_count, 0);
-
     auto try_allocate_queues = [&](
         uint32_t family_index,
         uint32_t requested_count,
@@ -95,20 +115,17 @@ bool VulkanPhysicalDevice::find_queue_families(
             return true;
         }
 
-        const uint32_t used_count = used_queue_counts[family_index];
         const uint32_t available_count = queue_families[family_index].queueCount;
 
-        if (used_count + requested_count > available_count) {
+        if (available_count == 0) {
             return false;
         }
 
-        for (uint32_t queue_index = used_count;
-             queue_index < used_count + requested_count;
+        for (uint32_t queue_index = 0;
+             queue_index < requested_count;
              ++queue_index) {
-            output.emplace_back(family_index, queue_index);
+            output.emplace_back(family_index, queue_index % available_count);
         }
-
-        used_queue_counts[family_index] += requested_count;
 
         return true;
     };
@@ -194,6 +211,10 @@ bool VulkanPhysicalDevice::check_device_extension_support(VkPhysicalDevice devic
         required_extensions.erase(extension.extensionName);
     }
 
+    for (const auto& extension_name : required_extensions) {
+        logger().log_error() << "Missing required device extension: " << extension_name << "\n";
+    }
+
     return required_extensions.empty();
 }
 
@@ -257,9 +278,17 @@ bool VulkanPhysicalDevice::is_device_suitable(
 {
     LOG_METHOD();
 
+    VkPhysicalDeviceProperties properties{};
+    vkGetPhysicalDeviceProperties(device, &properties);
+
     bool queues_allocated = find_queue_families(device, queue_request, queue_allocation);
 
     bool extensions_supported = check_device_extension_support(device);
+
+    VkPhysicalDeviceFeatures features{};
+    vkGetPhysicalDeviceFeatures(device, &features);
+
+    const bool features_supported = features.imageCubeArray == VK_TRUE;
 
     bool swapchain_adequate = false;
     if (extensions_supported) {
@@ -269,5 +298,28 @@ bool VulkanPhysicalDevice::is_device_suitable(
             !swapchain_support.present_modes.empty();
     }
 
-    return queues_allocated && extensions_supported && swapchain_adequate;
+    if (!features_supported) {
+        if (features.imageCubeArray != VK_TRUE) {
+            logger().log_error() << "Missing required physical-device feature: imageCubeArray\n";
+        }
+    }
+
+    if (!queues_allocated || !extensions_supported || !features_supported || !swapchain_adequate) {
+        logger().log_error()
+            << "Rejected GPU \""
+            << properties.deviceName
+            << "\" ("
+            << physical_device_type_string(properties.deviceType)
+            << "): queues="
+            << (queues_allocated ? "ok" : "missing")
+            << ", extensions="
+            << (extensions_supported ? "ok" : "missing")
+            << ", features="
+            << (features_supported ? "ok" : "missing")
+            << ", swapchain="
+            << (swapchain_adequate ? "ok" : "inadequate")
+            << "\n";
+    }
+
+    return queues_allocated && extensions_supported && features_supported && swapchain_adequate;
 }

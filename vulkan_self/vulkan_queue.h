@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <mutex>
+#include <memory>
 #include <utility>
 #include <span>
 
@@ -21,7 +22,12 @@ class VulkanQueue {
 public:
     _XCLASS_NAME(VulkanQueue);
 
-    explicit VulkanQueue(const VulkanDevice& device, QueueLocation location, VulkanQueueType type);
+    explicit VulkanQueue(
+        const VulkanDevice& device,
+        QueueLocation location,
+        VulkanQueueType type,
+        std::shared_ptr<std::mutex> mutex
+    );
 
     VulkanQueue(const VulkanQueue&) = delete;
     VulkanQueue& operator=(const VulkanQueue&) = delete;
@@ -71,5 +77,5 @@ private:
     VkQueue m_queue = VK_NULL_HANDLE;
     QueueLocation m_location{};
     VulkanQueueType m_type = VulkanQueueType::Graphics;
-    std::mutex m_mutex;
+    std::shared_ptr<std::mutex> m_mutex;
 };

@@ -1,6 +1,6 @@
 #include "descriptor_pool.h"
 
-#include <vulkan/vk_enum_string_helper.h>
+#include "../vk_enum_string_helper.h"
 
 #include "../vulkan_device.h"
 #include "descriptor_pool_builder.h"

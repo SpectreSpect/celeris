@@ -8,7 +8,12 @@ GICPReductor::GICPReductor(VulkanEngine& engine, ComputePassManager& compute_pas
         gicp_reduce_pass(compute_pass_manager.gicp_reduce_cp, compute_pass_manager.descriptor_pool()),
         uniform_buffer(VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(GICPReductorUniform))),
         compute_command_buffer(engine.device(), engine.compute_command_pool()),
-        compute_fence(engine.device()) {}
+        compute_fence(engine.device()),
+        m_uses_float64(engine.device().supports_shader_float64()) {}
+
+size_t GICPReductor::partial_size() const noexcept {
+    return m_uses_float64 ? sizeof(GICPPartial) : sizeof(GICPPartialFloat32);
+}
 
 uint32_t GICPReductor::reduce_step(VulkanBuffer& partial_src, VulkanBuffer& partial_dst, const uint32_t input_count) {
     GICPReductorUniform uniform_data{};
@@ -46,8 +51,27 @@ GICPReductor::GICPPartial GICPReductor::reduce(VulkanBuffer& partial_src, Vulkan
         std::swap(src, dst);
     }
 
+    if (m_uses_float64) {
+        GICPPartial output{};
+        src->read(&output, sizeof(GICPPartial), 0);
+        return output;
+    }
+
+    GICPPartialFloat32 fp32_output{};
+    src->read(&fp32_output, sizeof(GICPPartialFloat32), 0);
+
     GICPPartial output{};
-    src->read(&output, sizeof(GICPPartial), 0);
+    for (int r = 0; r < 6; ++r) {
+        output.g[r] = static_cast<double>(fp32_output.g[r]);
+
+        for (int c = 0; c < 6; ++c) {
+            output.H[r][c] = static_cast<double>(fp32_output.H[r][c]);
+        }
+    }
+
+    output.total_weighted_sq_error =
+        static_cast<double>(fp32_output.total_weighted_sq_error);
+    output.valid_count = fp32_output.valid_count;
 
     return output;
 }

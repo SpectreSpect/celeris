@@ -22,6 +22,7 @@ static constexpr uint32_t SLOT_TOMB = 0xFFFFFFFDu;
 static constexpr uint32_t SLOT_OCCUPIED = 0xFFFFFFFCu;
 
 static constexpr uint32_t OVERWRITE_BIT = 1u;
+static constexpr uint32_t CURVATURE_PRIORITY_OVERWRITE_BIT = 2u;
 
 static constexpr uint32_t DIRTY_MESH_FLAG_BIT = 1u;
 static constexpr uint32_t NEED_GENERATION_FLAG_BIT = 2u;

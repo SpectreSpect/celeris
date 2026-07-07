@@ -4,11 +4,13 @@
 #include <cstdint>
 #include <algorithm>
 #include <unordered_map>
+#include <map>
 
 VulkanDevice::VulkanDevice(const VulkanPhysicalDevice& physical_device) {
     LOG_METHOD();
 
     const QueueAllocation& queue_allocation = physical_device.queue_allocation();
+    m_supports_shader_float64 = physical_device.supports_shader_float64();
 
     std::unordered_map<uint32_t, uint32_t> queue_counts_by_family;
 
@@ -53,7 +55,7 @@ VulkanDevice::VulkanDevice(const VulkanPhysicalDevice& physical_device) {
     );
 
     VkPhysicalDeviceFeatures device_features{};
-    device_features.shaderFloat64 = VK_TRUE;
+    device_features.shaderFloat64 = m_supports_shader_float64 ? VK_TRUE : VK_FALSE;
     device_features.imageCubeArray = VK_TRUE;
 
     VkPhysicalDeviceVulkan12Features vulkan12_features{};
@@ -105,10 +107,12 @@ void VulkanDevice::destroy() {
     m_present_queues.clear();
     m_compute_queues.clear();
     m_transfer_queues.clear();
+    m_supports_shader_float64 = false;
 }
 
 VulkanDevice::VulkanDevice(VulkanDevice&& other) noexcept
     :   m_device(std::exchange(other.m_device, VK_NULL_HANDLE)),
+        m_supports_shader_float64(std::exchange(other.m_supports_shader_float64, false)),
         m_vkCmdPushDescriptorSetKHR(std::exchange(other.m_vkCmdPushDescriptorSetKHR, nullptr)),
         m_graphics_queues(std::move(other.m_graphics_queues)),
         m_present_queues(std::move(other.m_present_queues)),
@@ -120,6 +124,7 @@ VulkanDevice& VulkanDevice::operator=(VulkanDevice&& other) noexcept {
         destroy();
 
         m_device = std::exchange(other.m_device, VK_NULL_HANDLE);
+        m_supports_shader_float64 = std::exchange(other.m_supports_shader_float64, false);
         m_vkCmdPushDescriptorSetKHR = std::exchange(other.m_vkCmdPushDescriptorSetKHR, nullptr);
         m_graphics_queues = std::move(other.m_graphics_queues);
         m_present_queues = std::move(other.m_present_queues);
@@ -132,6 +137,10 @@ VulkanDevice& VulkanDevice::operator=(VulkanDevice&& other) noexcept {
 
 VkDevice VulkanDevice::handle() const noexcept {
     return m_device;
+}
+
+bool VulkanDevice::supports_shader_float64() const noexcept {
+    return m_supports_shader_float64;
 }
 
 void VulkanDevice::wait_idle() {
@@ -198,6 +207,19 @@ void VulkanDevice::load_device_functions() {
 void VulkanDevice::retrieve_queues(const QueueAllocation& queue_allocation) {
     LOG_METHOD();
 
+    std::map<std::pair<uint32_t, uint32_t>, std::shared_ptr<std::mutex>> mutexes_by_location;
+
+    auto mutex_for_location = [&mutexes_by_location](QueueLocation location) {
+        auto key = std::make_pair(location.family_index, location.queue_index);
+        auto [it, inserted] = mutexes_by_location.try_emplace(key);
+
+        if (inserted) {
+            it->second = std::make_shared<std::mutex>();
+        }
+
+        return it->second;
+    };
+
     auto retrieve_queue = [&](
         std::vector<std::unique_ptr<VulkanQueue>>& queues,
         const std::vector<QueueLocation>& locations,
@@ -207,7 +229,12 @@ void VulkanDevice::retrieve_queues(const QueueAllocation& queue_allocation) {
         queues.reserve(locations.size());
 
         for (const QueueLocation& location : locations) {
-            queues.push_back(std::make_unique<VulkanQueue>(*this, location, type));
+            queues.push_back(std::make_unique<VulkanQueue>(
+                *this,
+                location,
+                type,
+                mutex_for_location(location)
+            ));
         }
     };
 

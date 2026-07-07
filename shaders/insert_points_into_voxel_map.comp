@@ -45,7 +45,7 @@ layout(std430, set = 0, binding = 4) buffer MapPointBuffer {
 } map_point_buffer;
 
 // normals[id].xyz = accumulated normal sum
-// normals[id].w   = unused
+// normals[id].w   = 1.0 if any accumulated source point exceeded the curvature limit
 //
 // When reading for GICP, use normalize(normals[id].xyz)
 layout(std430, set = 0, binding = 5) buffer MapNormalBuffer {
@@ -73,9 +73,11 @@ layout(std430, set = 0, binding = 9) buffer WritableInsertRetryList {
 
 vec3 g_insert_world_position;
 vec3 g_insert_world_normal;
+float g_insert_curvature_limit_exceeded;
 vec4 g_insert_color;
 
 const float MIN_NORMAL_LEN = 0.00001;
+const float CURVATURE_LIMIT = 0.05;
 
 // ------------------------------------------------------------
 // Validity helpers
@@ -120,6 +122,12 @@ bool valid_normal(vec3 n)
     return len2 > MIN_NORMAL_LEN * MIN_NORMAL_LEN;
 }
 
+float curvature_limit_exceeded_from_world_normal(vec3 world_normal)
+{
+    float curvature = 1.0 - max(dot(world_normal, vec3(0.0, 1.0, 0.0)), 0.0);
+    return curvature > CURVATURE_LIMIT ? 1.0 : 0.0;
+}
+
 // ------------------------------------------------------------
 // Voxel helpers
 // ------------------------------------------------------------
@@ -155,7 +163,7 @@ void init_map_entry(uint slot_id, uvec2 key, uint entry_id)
 
     map_point_buffer.points[entry_id].color = g_insert_color;
     map_normal_buffer.normals[entry_id] =
-        vec4(g_insert_world_normal, 0.0);
+        vec4(g_insert_world_normal, g_insert_curvature_limit_exceeded);
 }
 
 #define HT_PREFIX point_hash_table
@@ -196,6 +204,7 @@ void update_voxel_surfel(
     uint surfel_id,
     vec3 world_position,
     vec3 world_normal,
+    float curvature_limit_exceeded,
     vec4 color
 ) {
     // Defensive checks.
@@ -243,7 +252,8 @@ void update_voxel_surfel(
     if (!valid_vec4(new_color))
         return;
 
-    vec3 normal_sum = map_normal_buffer.normals[surfel_id].xyz;
+    vec4 old_normal = map_normal_buffer.normals[surfel_id];
+    vec3 normal_sum = old_normal.xyz;
 
     if (!valid_vec3(normal_sum))
         return;
@@ -267,7 +277,8 @@ void update_voxel_surfel(
 
     map_point_buffer.points[surfel_id].position = vec4(new_mean, new_count);
     map_point_buffer.points[surfel_id].color = new_color;
-    map_normal_buffer.normals[surfel_id] = vec4(normal_sum, 0.0);
+    map_normal_buffer.normals[surfel_id] =
+        vec4(normal_sum, max(old_normal.w, curvature_limit_exceeded));
 }
 
 // ------------------------------------------------------------
@@ -306,6 +317,8 @@ bool voxel_insert_point_and_normal(
 
     g_insert_world_position = world_position;
     g_insert_world_normal = world_normal;
+    g_insert_curvature_limit_exceeded =
+        curvature_limit_exceeded_from_world_normal(world_normal);
     g_insert_color = color;
 
     uint slot_id;
@@ -338,6 +351,7 @@ bool voxel_insert_point_and_normal(
         surfel_id,
         world_position,
         world_normal,
+        g_insert_curvature_limit_exceeded,
         color
     );
 

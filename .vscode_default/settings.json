@@ -1,0 +1,8 @@
+{
+    "idf.currentSetup": "/home/spectre/.espressif/v6.0/esp-idf",
+
+    "C_Cpp.default.cppStandard": "c++20",
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+
+    "cmake.buildDirectory": "${workspaceFolder}/build"
+}

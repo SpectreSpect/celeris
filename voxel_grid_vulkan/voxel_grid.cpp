@@ -1939,29 +1939,49 @@ glm::vec3 VoxelGrid::voxel_size() noexcept {
 
 void VoxelGrid::voxelize_point_cloud(VulkanCommandBuffer& command_buffer, VulkanEngine& engine, 
                                      PointCloud& point_cloud, VulkanBuffer& normal_buffer, VulkanBuffer& voxel_writes, uint32_t max_write_count) {
+    voxelize_point_cloud(
+        command_buffer,
+        engine,
+        point_cloud.instance_buffer(),
+        normal_buffer,
+        point_cloud.point_count(),
+        voxel_writes,
+        max_write_count,
+        point_cloud.transform.get_model_matrix()
+    );
+}
+
+void VoxelGrid::voxelize_point_cloud(VulkanCommandBuffer& command_buffer, VulkanEngine& engine,
+                                     const VulkanBuffer& point_buffer, const VulkanBuffer& normal_buffer,
+                                     uint32_t point_count, VulkanBuffer& voxel_writes, uint32_t max_write_count,
+                                     const glm::mat4& source_point_cloud_model) {
     LOG_METHOD();
 
-    logger().check(point_cloud.point_count() < max_write_count, "Point count was greater than max write count");
-    logger().check(point_cloud.point_count() < m_params.max_write_count, "Point count was greater than max write count");
+    logger().check(point_count <= max_write_count, "Point count was greater than max write count");
+    logger().check(point_count <= m_params.max_write_count, "Point count was greater than max write count");
 
     reset_voxel_write_list_counter(command_buffer, voxel_writes);
 
-    m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(0, point_cloud.instance_buffer());
+    if (point_count == 0u) {
+        return;
+    }
+
+    m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(0, point_buffer);
     m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(1, normal_buffer);
 
     m_pass_instances.voxel_writes_from_point_cloud_pi.set_storage_buffer(2, voxel_writes);
 
     m_pass_instances.voxel_writes_from_point_cloud_pi.push_constants(command_buffer, 
     VoxelListFromPointCloudPushConstants{
-        .source_point_cloud_model = point_cloud.transform.get_model_matrix(),
+        .source_point_cloud_model = source_point_cloud_model,
         .voxel_size = glm::vec4(m_params.voxel_size, 1.0f),
-        .point_count = point_cloud.point_count(),
+        .point_count = point_count,
         .max_write_count = max_write_count
     });
     
     m_pass_instances.voxel_writes_from_point_cloud_pi.bind(command_buffer);
 
-    uint32_t x_groups = math_utils::div_up_u32(point_cloud.point_count(), 256);
+    uint32_t x_groups = math_utils::div_up_u32(point_count, 256);
 
     command_buffer.dispatch(x_groups, 1, 1);
 
@@ -1973,6 +1993,21 @@ void VoxelGrid::voxelize_point_cloud(VulkanCommandBuffer& command_buffer, Vulkan
 void VoxelGrid::voxelize_point_cloud(VulkanEngine& engine, 
                                      PointCloud& point_cloud, VulkanBuffer& normal_buffer,
                                      VulkanBuffer& voxel_writes, uint32_t max_write_count) {
+    voxelize_point_cloud(
+        engine,
+        point_cloud.instance_buffer(),
+        normal_buffer,
+        point_cloud.point_count(),
+        voxel_writes,
+        max_write_count,
+        point_cloud.transform.get_model_matrix()
+    );
+}
+
+void VoxelGrid::voxelize_point_cloud(VulkanEngine& engine,
+                                     const VulkanBuffer& point_buffer, const VulkanBuffer& normal_buffer,
+                                     uint32_t point_count, VulkanBuffer& voxel_writes, uint32_t max_write_count,
+                                     const glm::mat4& source_point_cloud_model) {
     LOG_METHOD();
     std::lock_guard lock(m_compute_mutex);
     {
@@ -1980,10 +2015,12 @@ void VoxelGrid::voxelize_point_cloud(VulkanEngine& engine,
         voxelize_point_cloud(
             m_command_buffer, 
             engine, 
-            point_cloud, 
+            point_buffer,
             normal_buffer, 
+            point_count,
             voxel_writes, 
-            max_write_count
+            max_write_count,
+            source_point_cloud_model
         );
     }
     submit_compute_commands();
