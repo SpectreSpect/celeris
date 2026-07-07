@@ -448,7 +448,7 @@ int main() {
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
     has_end_pos = true;
     // celeris.set_start_lidar_scan_position(start_lidar_scan_position);
-    // celeris.load_map(saved_maps_directory / "robocross_sim_2.vpm");
+    celeris.load_map(saved_maps_directory / "robocross_sim_2.vpm");
     celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim.wpp");
     celeris.start(std::move(planner_submit_context));
 
@@ -587,7 +587,11 @@ int main() {
         out_pose.pos = camera.position;
         out_pose.theta = std::atan2(horizontal_front.z, horizontal_front.x);
 
-        return celeris.adjust_to_ground(out_pose.pos);
+        glm::vec3 grounded_position = out_pose.pos;
+        if (celeris.adjust_to_ground(grounded_position))
+            out_pose.pos = grounded_position;
+
+        return true;
     };
 
     auto place_start = [&]() {

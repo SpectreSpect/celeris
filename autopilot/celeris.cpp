@@ -398,7 +398,8 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
             m_network_scan->point_cloud().transform.rotation = glm::normalize(delta_rotation * previous_map_rotation);
         }
 
-        if (!m_needs_map_localization && m_voxel_point_map.map_point_count() > 0u) {
+        // if (!m_needs_map_localization && m_voxel_point_map.map_point_count() > 0u) {
+        if (m_voxel_point_map.map_point_count() > 0u) {
             m_gicp_pass.fit(m_voxel_point_map,
                             m_network_scan->point_cloud(),
                             m_network_scan->normal_buffer(),
@@ -462,21 +463,21 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         std::chrono::duration<float>(now - m_last_local_planner_update_timestamp).count() >=
             local_planner_update_period;
 
-    if (should_update_local_planner) {
-        VehicleCommand vehicle_command;
-        if (!m_waypoint_path_completed || m_waypoint_path.waypoints().empty()) {
-            vehicle_command = m_local_planner.step(
-                m_vehicle,
-                m_path_intersection_detector,
-                submit_context
-            );
-        }
+    // if (should_update_local_planner) {
+    //     VehicleCommand vehicle_command;
+    //     if (!m_waypoint_path_completed || m_waypoint_path.waypoints().empty()) {
+    //         vehicle_command = m_local_planner.step(
+    //             m_vehicle,
+    //             m_path_intersection_detector,
+    //             submit_context
+    //         );
+    //     }
 
-        if (!m_gamepad_commands_enabled)
-            m_command_sender.set_command(vehicle_command);
-        m_last_local_planner_update_timestamp = now;
-        m_has_last_local_planner_update_timestamp = true;
-    }
+    //     if (!m_gamepad_commands_enabled)
+    //         m_command_sender.set_command(vehicle_command);
+    //     m_last_local_planner_update_timestamp = now;
+    //     m_has_last_local_planner_update_timestamp = true;
+    // }
 }
 
 void Celeris::apply_vehicle_feedback(const VehicleFeedback& feedback) {
@@ -1000,27 +1001,43 @@ bool Celeris::request_path_replan() {
 }
 
 bool Celeris::request_grounded_path_replan(NonholonomicPos start, NonholonomicPos goal) {
+    const NonholonomicPos requested_start = start;
+    const NonholonomicPos requested_goal = goal;
+    const bool allow_flying = m_desc.nonholonomic_astar_desc.allow_flying_over_precipices;
+
     const bool start_adjusted = m_path_planner.request_adjust_to_ground(
         start.pos,
         500,
         500,
         -1,
-        false
+        allow_flying
     );
     const bool goal_adjusted = m_path_planner.request_adjust_to_ground(
         goal.pos,
         500,
         500,
         -1,
-        false
+        allow_flying
     );
 
     if (!start_adjusted || !goal_adjusted) {
+        if (!allow_flying) {
+            logger().log_error()
+                << "Failed to adjust path endpoints to ground. "
+                << "start_adjusted=" << (start_adjusted ? "true" : "false")
+                << " goal_adjusted=" << (goal_adjusted ? "true" : "false") << "\n";
+            return false;
+        }
+
         logger().log_error()
-            << "Failed to adjust path endpoints to ground. "
+            << "Failed to adjust path endpoints to ground; using requested positions because flying is allowed. "
             << "start_adjusted=" << (start_adjusted ? "true" : "false")
             << " goal_adjusted=" << (goal_adjusted ? "true" : "false") << "\n";
-        return false;
+
+        if (!start_adjusted)
+            start = requested_start;
+        if (!goal_adjusted)
+            goal = requested_goal;
     }
 
     m_path_planner.request_path_replan(start, goal);

@@ -301,7 +301,7 @@ void CelerisVisualizer::set_marker_pose(SphericalPoseMarker& marker, Nonholonomi
 
 void CelerisVisualizer::set_gazelle_pose(const NonholonomicPos& nonholonomic_position) {
     Transform rear_axle_transform;
-    rear_axle_transform.position = nonholonomic_position.pos;
+    rear_axle_transform.position = nonholonomic_position.pos + marker_vertical_offset();
     rear_axle_transform.rotation = glm::angleAxis(
         -nonholonomic_position.theta,
         glm::vec3(0.0f, 1.0f, 0.0f)
@@ -311,7 +311,9 @@ void CelerisVisualizer::set_gazelle_pose(const NonholonomicPos& nonholonomic_pos
 }
 
 void CelerisVisualizer::set_gazelle_lidar_transform(const Transform& lidar_transform) {
-    m_gazelle_next.set_lidar_transform(lidar_transform);
+    Transform visual_lidar_transform = lidar_transform;
+    visual_lidar_transform.position += marker_vertical_offset();
+    m_gazelle_next.set_lidar_transform(visual_lidar_transform);
 }
 
 void CelerisVisualizer::reset_marker_interpolation(
