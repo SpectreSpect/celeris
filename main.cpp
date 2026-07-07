@@ -212,6 +212,7 @@ int main() {
     );
 
     bool display_inflated_voxels = voxel_grid.params().display_inflated_voxels != 0u;
+    bool show_voxel_grid = true;
     float inflated_voxel_color[4] = {
         float((voxel_grid.params().inflated_voxel_color >> 24u) & 0xFFu) / 255.0f,
         float((voxel_grid.params().inflated_voxel_color >> 16u) & 0xFFu) / 255.0f,
@@ -940,6 +941,7 @@ int main() {
 
         lighting_system.update(engine.current_frame(), window, camera);
 
+        voxel_grid.render_object().visible = show_voxel_grid;
         voxel_grid.update(window, camera);
 
         if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
@@ -1067,6 +1069,8 @@ int main() {
                 ImGui::TextColored(ImVec4(0.0f, 0.35f, 1.0f, 1.0f), "z: %.2f", camera.position.z);
 
                 if (ImGui::CollapsingHeader("Voxel grid debug")) {
+                    ImGui::Checkbox("Show voxel grid", &show_voxel_grid);
+
                     bool inflated_settings_changed = false;
                     inflated_settings_changed |= ImGui::Checkbox(
                         "Display inflated voxels",
