@@ -466,7 +466,7 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
 
                 m_network_scan->point_cloud().transform.position =
                     previous_map_position + m_lidar_velocity * scan_dt;
-                m_network_scan->point_cloud().transform.rotation =
+                m_network_scan->point_cloud().transform.rotation =  
                     glm::normalize(delta_rotation * previous_map_rotation);
                 used_acceleration_prediction = true;
             }
