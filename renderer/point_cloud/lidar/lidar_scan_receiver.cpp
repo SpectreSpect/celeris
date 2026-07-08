@@ -389,8 +389,6 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
                 valid_count++;
         }
 
-        
-
         LidarScan::build_points_for_frame(frame);
 
         if (valid_count > 0 && !frame.points.empty()) {

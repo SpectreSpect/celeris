@@ -1066,9 +1066,9 @@ int main() {
 
         if (!l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_PRESS) {
             l_pressed = true;
-            // delete_last_waypoint();
-            std::cout << "Point id: " << point_id << "  diff: " << point_id - last_point_id << std::endl;
-            last_point_id = point_id;
+            delete_last_waypoint();
+            // std::cout << "Point id: " << point_id << "  diff: " << point_id - last_point_id << std::endl;
+            // last_point_id = point_id;
         }
 
         if (l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_RELEASE) {

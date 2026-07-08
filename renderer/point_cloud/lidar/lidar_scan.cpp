@@ -94,7 +94,8 @@ LidarScan::LidarScan(
 {
     point_cloud_preprocessor.remove_points_near_origin(
         m_point_cloud.instance_buffer(),
-        m_point_cloud.point_count()
+        m_point_cloud.point_count(),
+        5.0f
     );
     point_cloud_preprocessor.get_normals_from_webots_lidar_point_cloud(
         m_point_cloud.instance_buffer(), 
