@@ -252,6 +252,8 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
             std::memcpy(&yaw,   local_p, 4); local_p += 4;
             p += 4 * 10 * m_points_freq;
 
+            // std::cout << "Point: " << time << std::endl;
+
             frame.samples[i].p_local_ros = glm::vec3(x, y, z);
             frame.samples[i].time = time;
             frame.samples[i].base_pos_ros = glm::vec3(px, py, pz);
@@ -267,7 +269,7 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
         LidarScan::build_points_for_frame(frame);
 
         if (valid_count > 0 && !frame.points.empty()) {
-            // frame.save("/home/hiber/repositories/celeris/assets/lidar_scans/lslidar_scan.bin");
+            // frame.save("/home/hiber/repositories/celeris/assets/lidar_scans/ouster_scan.bin");
             push_frame(std::move(frame));
         }
     }

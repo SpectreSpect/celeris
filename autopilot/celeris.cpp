@@ -402,7 +402,8 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
 
         // if (!m_needs_map_localization && m_voxel_point_map.map_point_count() > 0u) {
         if (m_voxel_point_map.map_point_count() > 0u) {
-            std::cout << "FIT" << std::endl;
+            // std::cout << "FIT" << std::endl;
+            
             m_gicp_pass.fit(m_voxel_point_map,
                             m_network_scan->point_cloud(),
                             m_network_scan->normal_buffer(),

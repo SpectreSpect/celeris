@@ -464,10 +464,10 @@ int main() {
         skybox_exposure
     );
 
-    // LidarScan::FrameData loaded_frame_data("assets/lidar_scans/lslidar_scan.bin");
+    LidarScan::FrameData loaded_frame_data("assets/lidar_scans/ouster_scan.bin");
 
-    // std::vector<LineInstance> line_instances;
-    // const size_t point_count = loaded_frame_data.points.size();
+    std::vector<LineInstance> line_instances;
+    const size_t point_count = loaded_frame_data.points.size();
 
     // auto is_valid_point = [](const PointInstance& point) {
     //     const glm::vec4& p = point.position;
@@ -476,31 +476,31 @@ int main() {
     //            std::isfinite(p.z);
     // };
 
-    // line_instances.reserve(point_count);
+    line_instances.reserve(point_count);
 
-    // for (int i = 1; i < point_count; i++) {
-    //     float t = (float) i / (float) point_count;
-    //     line_instances.push_back(LineInstance{
-    //             .p0 = loaded_frame_data.points[i].position,
-    //             .p1 = loaded_frame_data.points[i - 1].position,
-    //             .color = glm::vec4(1, 1, 1, 1) * t
-    //         });
-    // }
+    for (int i = 1; i < point_count; i++) {
+        float t = (float) i / (float) point_count;
+        line_instances.push_back(LineInstance{
+                .p0 = loaded_frame_data.points[i].position,
+                .p1 = loaded_frame_data.points[i - 1].position,
+                .color = glm::vec4(1, 1, 1, 1) * t
+            });
+    }
 
-    // LineCloud loaded_line_cloud(engine, mesh_manager.line_quad, material_instance_manager.line, line_instances.size());
-    // loaded_line_cloud.set_material_data(LineMaterialData{
-    //     .color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
-    //     .line_width_pixels = 2
-    // });
+    LineCloud loaded_line_cloud(engine, mesh_manager.line_quad, material_instance_manager.line, line_instances.size());
+    loaded_line_cloud.set_material_data(LineMaterialData{
+        .color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+        .line_width_pixels = 2
+    });
     
-    // loaded_line_cloud.set_lines(line_instances);
+    loaded_line_cloud.set_lines(line_instances);
 
     // LineCloud loaded_line_cloud(engine, );
 
-    // PointCloud loaded_frame_data_point_cloud(manager_bundle, loaded_frame_data.points);
-    // loaded_frame_data_point_cloud.set_material_data(PointCloudMaterialData{
-    //     .color = glm::vec4(1, 1, 1, 1)
-    // });
+    PointCloud loaded_frame_data_point_cloud(manager_bundle, loaded_frame_data.points);
+    loaded_frame_data_point_cloud.set_material_data(PointCloudMaterialData{
+        .color = glm::vec4(1, 1, 1, 1)
+    });
 
     // SphericalPoseMarker pose_marker(
     //         mesh_manager,
