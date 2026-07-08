@@ -194,6 +194,7 @@ public:
     const AABB& get_bounding_box() const noexcept;
     const AABB& get_bouding_box() const noexcept { return get_bounding_box(); }
     bool has_map_bounding_box() const noexcept;
+    void set_vehicle_command(const VehicleCommand& vehicle_command);
 
 private:
     VulkanEngine* m_engine = nullptr;

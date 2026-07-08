@@ -298,8 +298,8 @@ Celeris::Celeris(VulkanEngine& engine,
     m_waypoint_reach_radius = desc.waypoint_reach_radius;
     m_gamepad_commands_enabled = desc.gamepad_commands_enabled;
     m_gamepad_command = desc.gamepad_command;
-    if (m_gamepad_commands_enabled)
-        m_command_sender.set_command(m_gamepad_command);
+    // if (m_gamepad_commands_enabled)
+    //     m_command_sender.set_command(m_gamepad_command);
     m_voxel_map_reseter.reset(m_voxel_point_map);
 }
 
@@ -571,8 +571,8 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
             );
         }
 
-        if (!m_gamepad_commands_enabled)
-            m_command_sender.set_command(vehicle_command);
+        // if (!m_gamepad_commands_enabled)
+        //     m_command_sender.set_command(vehicle_command);
         m_last_local_planner_update_timestamp = now;
         m_has_last_local_planner_update_timestamp = true;
     }
@@ -675,11 +675,11 @@ void Celeris::set_waypoint_reach_radius(float radius) noexcept {
 
 void Celeris::set_gamepad_commands_enabled(bool enabled) noexcept {
     m_gamepad_commands_enabled = enabled;
-    if (enabled) {
-        m_command_sender.set_command(m_gamepad_command);
-    } else {
-        m_gamepad_command = VehicleCommand{};
-    }
+    // if (enabled) {
+    //     m_command_sender.set_command(m_gamepad_command);
+    // } else {
+    //     m_gamepad_command = VehicleCommand{};
+    // }
 }
 
 void Celeris::set_gamepad_command(VehicleCommand command) noexcept {
@@ -687,8 +687,8 @@ void Celeris::set_gamepad_command(VehicleCommand command) noexcept {
         return;
 
     m_gamepad_command = command;
-    if (m_gamepad_commands_enabled)
-        m_command_sender.set_command(m_gamepad_command);
+    // if (m_gamepad_commands_enabled)
+    //     m_command_sender.set_command(m_gamepad_command);
 }
 
 void Celeris::add_waypoint(glm::vec3 position) {
@@ -1667,6 +1667,10 @@ const AABB& Celeris::get_bounding_box() const noexcept {
 
 bool Celeris::has_map_bounding_box() const noexcept {
     return m_has_map_bounding_box;
+}
+
+void Celeris::set_vehicle_command(const VehicleCommand& vehicle_command) {
+    m_command_sender.set_command(vehicle_command);
 }
 
 void Celeris::update_map_bounding_box() {

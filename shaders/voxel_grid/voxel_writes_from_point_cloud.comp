@@ -80,7 +80,7 @@ void main() {
     if (!valid_normal(world_normal)) return;
 
     float curvature = 1.0 - max(dot(world_normal, vec3(0.0, 1.0, 0.0)), 0);
-    float curvature_limit = 0.05;
+    float curvature_limit = 0.2;
     bool curvature_limit_exceeded =
         curvature > curvature_limit || normal.w > 0.5;
 

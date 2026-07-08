@@ -165,19 +165,19 @@ int main() {
     std::unique_ptr<LidarScan> network_scan;
     std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
 
-    glm::vec3 voxel_size(0.2f);
-    // uint32_t vertical_inflation_size =
-    //     static_cast<uint32_t>(std::ceil(vehicle_geometry.size.y / voxel_size.y));
-    // uint32_t horizontal_inflation_size =
-    //     static_cast<uint32_t>(std::ceil((vehicle_geometry.size.x / voxel_size.x) / 2.0f));
-    uint32_t vertical_inflation_size = 1;
-    uint32_t horizontal_inflation_size = 1;
+    glm::vec3 voxel_size(0.5f);
+    uint32_t vertical_inflation_size =
+        static_cast<uint32_t>(std::ceil(vehicle_geometry.size.y / voxel_size.y));
+    uint32_t horizontal_inflation_size =
+        static_cast<uint32_t>(std::ceil((vehicle_geometry.size.x / voxel_size.x) / 2.0f));
+    // uint32_t vertical_inflation_size = 1;
+    // uint32_t horizontal_inflation_size = 1;
     glm::ivec3 chunk_size(16);
     VoxelGrid::VoxelGridDesc voxel_grid_desc {
         .chunk_size = chunk_size,
         .voxel_size = voxel_size,
-        .count_active_chunks = 30'000,
-        .max_quads = 5'000'000,
+        .count_active_chunks = 40'000,
+        .max_quads = 8'000'000,
         .chunk_hash_table_size_factor = 1.0f,
         .count_evict_buckets = 32,
         .min_free_chunks = 4'500,
@@ -454,6 +454,10 @@ int main() {
     // celeris.load_map(saved_maps_directory / "test4.vpm");
     // celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim_3.wpp");
     celeris.start(std::move(planner_submit_context));
+    celeris.set_vehicle_command(VehicleCommand{
+        .acceleration = 0.5f,
+        .steering_angle_velocity = 0.5f
+    });
 
     CelerisVisualizer celeris_visualizer(
         mesh_manager,
