@@ -464,8 +464,52 @@ int main() {
         skybox_exposure
     );
 
-    LidarScan::FrameData loaded_frame_data("assets/lidar_scans/lslidar_scan.bin");
-    LidarScan some_scan(manager_bundle, point_cloud_preprocessor, std::move(loaded_frame_data));
+    // LidarScan::FrameData loaded_frame_data("assets/lidar_scans/lslidar_scan.bin");
+
+    // std::vector<LineInstance> line_instances;
+    // const size_t point_count = loaded_frame_data.points.size();
+
+    // auto is_valid_point = [](const PointInstance& point) {
+    //     const glm::vec4& p = point.position;
+    //     return std::isfinite(p.x) &&
+    //            std::isfinite(p.y) &&
+    //            std::isfinite(p.z);
+    // };
+
+    // line_instances.reserve(point_count);
+
+    // for (int i = 1; i < point_count; i++) {
+    //     float t = (float) i / (float) point_count;
+    //     line_instances.push_back(LineInstance{
+    //             .p0 = loaded_frame_data.points[i].position,
+    //             .p1 = loaded_frame_data.points[i - 1].position,
+    //             .color = glm::vec4(1, 1, 1, 1) * t
+    //         });
+    // }
+
+    // LineCloud loaded_line_cloud(engine, mesh_manager.line_quad, material_instance_manager.line, line_instances.size());
+    // loaded_line_cloud.set_material_data(LineMaterialData{
+    //     .color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+    //     .line_width_pixels = 2
+    // });
+    
+    // loaded_line_cloud.set_lines(line_instances);
+
+    // LineCloud loaded_line_cloud(engine, );
+
+    // PointCloud loaded_frame_data_point_cloud(manager_bundle, loaded_frame_data.points);
+    // loaded_frame_data_point_cloud.set_material_data(PointCloudMaterialData{
+    //     .color = glm::vec4(1, 1, 1, 1)
+    // });
+
+    // SphericalPoseMarker pose_marker(
+    //         mesh_manager,
+    //         material_instance_manager,
+    //         PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(0, 1, 1, 1))
+    // );
+    // pose_marker.transform.scale = glm::vec3(0.2f);
+
+    // LidarScan some_scan(manager_bundle, point_cloud_preprocessor, std::move(loaded_frame_data));
 
     LidarScan target_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
     LidarScan source_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
@@ -742,6 +786,10 @@ int main() {
 
     scene.add(celeris_visualizer);
     scene.add(voxel_grid.render_object());
+    // scene.add(loaded_frame_data_point_cloud);
+    // scene.add(loaded_line_cloud);
+    // scene.add(pose_marker);
+
     // scene.add(footprint_visualizer);
     // scene.add(gazelle);
     // scene.add(target_scan);
@@ -841,6 +889,10 @@ int main() {
     };
 
     use_fps_camera_controller();
+
+    int point_id = 0;
+    int last_point_id = 0;
+    // pose_marker.transform.position = loaded_frame_data.points[point_id].position;
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
@@ -1014,7 +1066,9 @@ int main() {
 
         if (!l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_PRESS) {
             l_pressed = true;
-            delete_last_waypoint();
+            // delete_last_waypoint();
+            std::cout << "Point id: " << point_id << "  diff: " << point_id - last_point_id << std::endl;
+            last_point_id = point_id;
         }
 
         if (l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_RELEASE) {
@@ -1028,6 +1082,9 @@ int main() {
 
         if (n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_RELEASE) {
             n_pressed = false;
+
+            // point_id = (point_id + 1) % loaded_frame_data.points.size(); 
+            // pose_marker.transform.position = loaded_frame_data.points[point_id].position;
         }
         // Запись команд
         {auto command_buffer_scope = command_buffer.begin_scope();

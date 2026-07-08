@@ -70,8 +70,31 @@ public:
             samples.resize(sample_count);
             points.resize(point_count);
 
+            // point_count = 64 * 5;
+
+            // for (int i = 1; i < point_count; i++) {
+            //     float result = point_count / (float)i;
+                
+            //     if ((int)result == result)
+            //         std::cout << i << ": " << result << std::endl;
+            // }
+
             in.read(reinterpret_cast<char*>(samples.data()), sample_count * sizeof(LidarScan::TimedPointSample));
             in.read(reinterpret_cast<char*>(points.data()), point_count * sizeof(PointInstance));
+
+            for (int i = 0; i < points.size(); i++) {
+                float t = (float)i / (float)(points.size() - 1);
+
+                // float dist = glm::length(points[i].position);
+
+                // if (dist < 4.0)
+                //     std::cout << i << ": " << dist << std::endl;
+
+                if (i < 1399)
+                    points[i].color = glm::vec4(0, 1, 0, 1);
+                else
+                    points[i].color *= t;
+            }
             
             in.close();
 

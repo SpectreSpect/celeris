@@ -267,7 +267,7 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
         LidarScan::build_points_for_frame(frame);
 
         if (valid_count > 0 && !frame.points.empty()) {
-            frame.save("/home/hiber/repositories/celeris/assets/lidar_scans/lslidar_scan.bin");
+            // frame.save("/home/hiber/repositories/celeris/assets/lidar_scans/lslidar_scan.bin");
             push_frame(std::move(frame));
         }
     }
