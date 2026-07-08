@@ -29,6 +29,54 @@ public:
         uint32_t ring_count = 0;
         std::vector<TimedPointSample> samples;
         std::vector<PointInstance> points;
+
+        FrameData() = default;
+        FrameData(const std::filesystem::path& path) {
+            load(path);
+        }
+
+        void save(const std::filesystem::path& path) {
+            std::ofstream out(path.string());
+
+            uint32_t sample_count = samples.size();
+            uint32_t point_count = points.size();
+
+            out.write((const char*)&timestamp_ns, sizeof(timestamp_ns));
+            out.write((const char*)&ring_count, sizeof(ring_count));
+            out.write((const char*)&sample_count, sizeof(sample_count));
+            out.write((const char*)&point_count, sizeof(point_count));
+            out.write((const char*)samples.data(), samples.size() * sizeof(LidarScan::TimedPointSample));
+            out.write((const char*)points.data(), points.size() * sizeof(PointInstance));
+
+            out.close();
+        }
+
+        void load(const std::filesystem::path& path) {
+            std::ifstream in(path.string(), std::ios::binary);
+            
+            if (!in) throw std::runtime_error("Failed to open: " + path.string());
+
+            // in.read((const char*)&timestamp_ns, sizeof(timestamp_ns));
+
+            uint32_t sample_count = 0;
+            uint32_t point_count = 0;
+
+            in.read(reinterpret_cast<char*>(&timestamp_ns), sizeof(timestamp_ns));
+            in.read(reinterpret_cast<char*>(&ring_count), sizeof(ring_count));
+
+            in.read(reinterpret_cast<char*>(&sample_count), sizeof(sample_count));
+            in.read(reinterpret_cast<char*>(&point_count), sizeof(point_count));
+
+            samples.resize(sample_count);
+            points.resize(point_count);
+
+            in.read(reinterpret_cast<char*>(samples.data()), sample_count * sizeof(LidarScan::TimedPointSample));
+            in.read(reinterpret_cast<char*>(points.data()), point_count * sizeof(PointInstance));
+            
+            in.close();
+
+            // out.close();
+        }
     };
 
     LidarScan(

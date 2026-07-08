@@ -65,6 +65,28 @@ void LidarScanReceiver::stop() {
     }
 }
 
+void LidarScanReceiver::save_retrieved_scan(
+        const void* data, 
+        size_t size_bytes, 
+        const std::filesystem::path& path) {
+    std::ofstream out(path.string());
+    out.write((const char*)data, size_bytes);
+    out.close();
+}
+
+// void LidarScanReceiver::save_frame_data(
+//         const LidarScan::FrameData& frame_data, 
+//         const std::filesystem::path& path) {
+//     std::ofstream out(path.string());
+
+//     out.write((const char*)&frame_data.timestamp_ns, sizeof(frame_data.timestamp_ns));
+//     out.write((const char*)&frame_data.ring_count, sizeof(frame_data.ring_count));
+//     out.write((const char*)frame_data.samples.data(), frame_data.samples.size() * sizeof(LidarScan::TimedPointSample));
+//     out.write((const char*)frame_data.points.data(), frame_data.points.size() * sizeof(PointInstance));
+
+//     out.close();
+// }
+
 bool LidarScanReceiver::try_pop_frame(LidarScan::FrameData& frame) {
     std::lock_guard<std::mutex> lock(m_queue_mutex);
 
@@ -203,6 +225,10 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
         frame.ring_count = 16;
 
         frame.samples.resize(point_count / m_points_freq);
+
+        
+        // save_retrieved_scan(payload.data(), payload.size(), "/home/hiber/repositories/celeris/assets/lidar_scans/lslidar_scan.bin");
+
         const uint8_t* p = payload.data();
 
         uint32_t valid_count = 0;
@@ -236,10 +262,14 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
                 valid_count++;
         }
 
+        
+
         LidarScan::build_points_for_frame(frame);
 
-        if (valid_count > 0 && !frame.points.empty())
+        if (valid_count > 0 && !frame.points.empty()) {
+            frame.save("/home/hiber/repositories/celeris/assets/lidar_scans/lslidar_scan.bin");
             push_frame(std::move(frame));
+        }
     }
 
     return true;

@@ -9,6 +9,7 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <iostream>
 
 class ManagerBundle;
 class PointCloudPreprocessor;
@@ -28,6 +29,9 @@ public:
 
     void start();
     void stop();
+
+    void save_retrieved_scan(const void* data, size_t size_bytes, const std::filesystem::path& path);
+    // void save_frame_data(const LidarScan::FrameData& frame_data, const std::filesystem::path& path);
 
     bool try_pop_frame(LidarScan::FrameData& frame);
     std::unique_ptr<LidarScan> try_pop_scan(ManagerBundle& manager_bundle);

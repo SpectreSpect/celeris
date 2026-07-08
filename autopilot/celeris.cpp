@@ -366,6 +366,8 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         //     scan_index_count
         // );
 
+        // m_network_scan
+
         if (!m_has_previous_lidar_pose) {
             if (m_has_start_lidar_scan_position) {
                 m_network_scan->point_cloud().transform.position = m_start_lidar_scan_position;

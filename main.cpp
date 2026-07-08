@@ -464,6 +464,9 @@ int main() {
         skybox_exposure
     );
 
+    LidarScan::FrameData loaded_frame_data("assets/lidar_scans/lslidar_scan.bin");
+    LidarScan some_scan(manager_bundle, point_cloud_preprocessor, std::move(loaded_frame_data));
+
     LidarScan target_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
     LidarScan source_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
 
