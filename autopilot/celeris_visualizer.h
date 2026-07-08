@@ -7,7 +7,7 @@
 #include "../renderer/scene_object.h"
 #include "../renderer/render_object.h"
 #include "../renderer/lines/line_cloud.h"
-#include "../a_star/vehichle.h"
+#include "../a_star/vehicle.h"
 #include "../renderer/point_cloud/point_cloud.h"
 
 #include "../vulkan_self/logger/logger_header.h"

@@ -152,6 +152,8 @@ public:
     SimulationFollowParams& follow_params() noexcept;
     const SimulationFollowParams& follow_params() const noexcept;
     void reset_follow_params() noexcept;
+    float path_potential_distance_exponent() const noexcept;
+    void set_path_potential_distance_exponent(float exponent) noexcept;
 
     void vehicle_simulation_step(
         VehicleTransformState& state,
@@ -335,6 +337,16 @@ public:
         bool include_current = false
     );
 
+    float evaluate_path_potential(
+        const Vehicle::VehicleTransformState& state,
+        const std::vector<VehiclePathPoint>& path,
+        const Vehicle::PathArcLengthTable& path_arc_lengths,
+        float active_segment_min_s,
+        float active_segment_max_s,
+        float speed_acceleration,
+        float steer_acceleration
+    ) const;
+
 private:
     VehicleTransformState m_vehicle_state;
 
@@ -343,6 +355,7 @@ private:
     float m_wheel_base; // L. Расстояние между передней и задней осями
     SimulationLossWeights m_loss_weights;
     SimulationFollowParams m_follow_params;
+    float m_path_potential_distance_exponent = 0.5f;
 
 private:
     struct SimulationLossCoefficients {
@@ -464,6 +477,24 @@ private:
     ) const;
 
     float compute_simulation_loss(
+        VehicleTransformState& state,
+        const std::vector<VehiclePathPoint>& path,
+        const PathArcLengthTable& path_arc_lengths,
+        float total_polyline_length,
+        float speed_acceleration,
+        float steer_acceleration,
+        float simulation_time, 
+        float dt = 0.05f,
+        bool debug = true,
+        float initial_projection_min_s = 0.0f,
+        float initial_projection_max_s = std::numeric_limits<float>::infinity(),
+        bool slow_down_at_projection_max = false,
+        float projection_max_target_speed_abs = 0.0f,
+        std::vector<glm::vec2>* trajectory = nullptr,
+        SimulationControlCandidateDebug* candidate_debug = nullptr
+    ) const;
+
+    float compute_simulation_loss_test(
         VehicleTransformState& state,
         const std::vector<VehiclePathPoint>& path,
         const PathArcLengthTable& path_arc_lengths,

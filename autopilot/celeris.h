@@ -22,7 +22,7 @@
 #include "vehicle_geometry.h"
 #include "waypoint_path.h"
 #include "../utils/avg_timer.h"
-#include "../a_star/vehichle.h"
+#include "../a_star/vehicle.h"
 #include "../a_star/local_planner.h"
 #include "vehicle_state_receiver.h"
 
@@ -178,6 +178,7 @@ public:
     void display_path_planner_debug_controls();
     glm::vec3 voxel_size();
     glm::vec3 voxel_center_world_pos(const glm::ivec3& voxel_pos);
+    void visualize_active_path_potential();
     void sync_point_map_and_voxel_grid();
     void save_map(const std::filesystem::path& path);
     void load_map(const std::filesystem::path& path);
@@ -218,6 +219,11 @@ private:
     VoxelMapPointReseter m_voxel_map_reseter;
 
     VulkanBuffer voxel_write_list;
+    std::vector<glm::ivec3> m_path_potential_visualization_voxels;
+    float m_path_potential_visualization_radius = 100.0f;
+    float m_path_potential_visualization_step = 1.0f;
+    float m_path_potential_visualization_vertical_drop = 10.0f;
+    size_t m_last_path_potential_visualization_voxel_count = 0;
     AABB m_map_bounding_box{glm::vec4(0.0f), glm::vec4(0.0f)};
     bool m_has_map_bounding_box = false;
     bool m_needs_map_localization = false;

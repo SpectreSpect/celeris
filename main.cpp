@@ -756,6 +756,7 @@ int main() {
     bool start_path_planning_pressed = false;
     bool move_start_to_vehicle_pressed = false;
     bool place_footprint_pressed = false;
+    bool visualize_path_potential_pressed = false;
     bool fps_camera_pressed = false;
     bool third_person_camera_pressed = false;
     GamepadController gamepad_controller;
@@ -987,6 +988,15 @@ int main() {
 
         if (place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_5) == GLFW_RELEASE) {
             place_footprint_pressed = false;
+        }
+
+        if (!visualize_path_potential_pressed && glfwGetKey(window.handle(), GLFW_KEY_6) == GLFW_PRESS) {
+            visualize_path_potential_pressed = true;
+            celeris.visualize_active_path_potential();
+        }
+
+        if (visualize_path_potential_pressed && glfwGetKey(window.handle(), GLFW_KEY_6) == GLFW_RELEASE) {
+            visualize_path_potential_pressed = false;
         }
 
         if (!t_pressed && glfwGetKey(window.handle(), GLFW_KEY_T) == GLFW_PRESS) {

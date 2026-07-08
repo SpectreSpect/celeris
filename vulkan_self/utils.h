@@ -5,6 +5,10 @@
 #include <filesystem>
 #include <fstream>
 #include <glm/glm.hpp>
+#include <iostream>
+#include <cmath>
+#include <stdexcept>
+#include <limits>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -355,5 +359,39 @@ namespace Utils {
 
     constexpr float lerp_angle(float from, float to, float t) {
         return from + angle_diff(from, to) * t;
+    }
+
+    template <typename Grad, typename Hess>
+    inline double newton_minimize(
+        Grad grad,
+        Hess hess,
+        double x0,
+        int max_iterations = 100,
+        double eps = 1e-12)
+    {
+        double x = x0;
+
+        for (int i = 0; i < max_iterations; ++i) {
+            double g = grad(x);
+            double h = hess(x);
+
+            if (std::abs(h) < eps) {
+                return std::numeric_limits<double>::quiet_NaN();
+            }
+
+            double next = x - g / h;
+
+            if (!std::isfinite(next)) {
+                return std::numeric_limits<double>::quiet_NaN();
+            }
+
+            if (std::abs(next - x) < eps * (1.0 + std::abs(next))) {
+                return next;
+            }
+
+            x = next;
+        }
+
+        return std::numeric_limits<double>::quiet_NaN();
     }
 }

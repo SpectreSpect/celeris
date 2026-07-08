@@ -8,6 +8,7 @@
 #include <imgui.h>
 #include <iostream>
 #include <limits>
+#include <unordered_set>
 #include <utility>
 #include <glm/gtc/quaternion.hpp>
 #include <vector>
@@ -15,7 +16,9 @@
 #include <glm/gtc/constants.hpp>
 #include "../path_utils.h"
 #include "../renderer/point_cloud/point_instance.h"
+#include "../vulkan_self/vulkan_command_buffer.h"
 #include "../vulkan_self/vulkan_device.h"
+#include "../vulkan_self/vulkan_fence.h"
 #include "../vulkan_self/vulkan_queue.h"
 #include "../vulkan_self/vulkan_submit_context.h"
 #include "../managers/compute_pass_manager.h"
@@ -49,6 +52,58 @@ namespace {
             is_finite(value.x) &&
             is_finite(value.y) &&
             is_finite(value.z);
+    }
+
+    struct IVec3Hash {
+        size_t operator()(const glm::ivec3& value) const noexcept {
+            size_t seed = 0u;
+            auto combine = [&](int component) {
+                const size_t h = std::hash<int>{}(component);
+                seed ^= h + 0x9e3779b97f4a7c15ull + (seed << 6u) + (seed >> 2u);
+            };
+            combine(value.x);
+            combine(value.y);
+            combine(value.z);
+            return seed;
+        }
+    };
+
+    struct IVec3Equal {
+        bool operator()(const glm::ivec3& a, const glm::ivec3& b) const noexcept {
+            return a.x == b.x && a.y == b.y && a.z == b.z;
+        }
+    };
+
+    glm::ivec3 lerp_color(glm::vec3 a, glm::vec3 b, float t) noexcept {
+        const glm::vec3 color = a + (b - a) * std::clamp(t, 0.0f, 1.0f);
+        return glm::ivec3{
+            static_cast<int>(std::lround(color.x)),
+            static_cast<int>(std::lround(color.y)),
+            static_cast<int>(std::lround(color.z))
+        };
+    }
+
+    glm::ivec3 path_potential_color(float normalized) noexcept {
+        normalized = std::clamp(normalized, 0.0f, 1.0f);
+        if (normalized < 0.33f) {
+            return lerp_color(
+                glm::vec3{20.0f, 120.0f, 255.0f},
+                glm::vec3{60.0f, 220.0f, 140.0f},
+                normalized / 0.33f
+            );
+        }
+        if (normalized < 0.66f) {
+            return lerp_color(
+                glm::vec3{60.0f, 220.0f, 140.0f},
+                glm::vec3{255.0f, 218.0f, 68.0f},
+                (normalized - 0.33f) / 0.33f
+            );
+        }
+        return lerp_color(
+            glm::vec3{255.0f, 218.0f, 68.0f},
+            glm::vec3{255.0f, 58.0f, 48.0f},
+            (normalized - 0.66f) / 0.34f
+        );
     }
 
     float normalized_path_dir(float dir) noexcept {
@@ -302,7 +357,7 @@ void Celeris::start_lidar_receiver() {
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     start_lidar_receiver();
     m_vehicle_state_receiver.start();
-    m_command_sender.start();
+    // m_command_sender.start();
     m_path_planner.start(std::move(planner_submit_context));
 }
 
@@ -1237,6 +1292,32 @@ void Celeris::display_path_planner_debug_controls() {
         "Local path generation: %llu",
         static_cast<unsigned long long>(m_local_planner.path_generation())
     );
+    if (ImGui::TreeNode("Active path potential visualization")) {
+        if (ImGui::DragFloat("Field radius", &m_path_potential_visualization_radius, 0.5f, 1.0f, 100.0f, "%.2f")) {
+            m_path_potential_visualization_radius =
+                std::max(1.0f, m_path_potential_visualization_radius);
+        }
+        if (ImGui::DragFloat("Field step", &m_path_potential_visualization_step, 0.1f, 0.25f, 10.0f, "%.2f")) {
+            m_path_potential_visualization_step =
+                std::max(0.25f, m_path_potential_visualization_step);
+        }
+        if (ImGui::DragFloat("Vertical drop", &m_path_potential_visualization_vertical_drop, 0.5f, 0.0f, 100.0f, "%.2f")) {
+            m_path_potential_visualization_vertical_drop =
+                std::max(0.0f, m_path_potential_visualization_vertical_drop);
+        }
+        float distance_exponent = m_vehicle.path_potential_distance_exponent();
+        if (ImGui::DragFloat("Distance exponent", &distance_exponent, 0.01f, 0.0f, 4.0f, "%.3f")) {
+            m_vehicle.set_path_potential_distance_exponent(distance_exponent);
+        }
+        if (ImGui::Button("Visualize active path potential")) {
+            visualize_active_path_potential();
+        }
+        ImGui::Text(
+            "Potential voxels: %zu",
+            m_last_path_potential_visualization_voxel_count
+        );
+        ImGui::TreePop();
+    }
     if (!candidates.empty()) {
         auto display_candidate_loss_breakdown =
             [](const Vehicle::SimulationLossBreakdown& breakdown) {
@@ -1398,6 +1479,175 @@ glm::vec3 Celeris::voxel_size() {
 
 glm::vec3 Celeris::voxel_center_world_pos(const glm::ivec3& voxel_pos) {
     return m_path_planner.request_voxel_center_world_pos(voxel_pos);
+}
+
+void Celeris::visualize_active_path_potential() {
+    logger().check(m_engine, "Engine was null");
+    logger().check(m_voxel_grid, "Voxel grid was null");
+
+    struct PathPotentialSample {
+        glm::ivec3 voxel_pos;
+        float potential = 0.0f;
+    };
+
+    const std::vector<VehiclePathPoint>& path = m_local_planner.vehicle_path();
+    const Vehicle::PathArcLengthTable& path_arc_lengths =
+        m_local_planner.vehicle_path_arc_lengths();
+    const float active_segment_min_s = m_local_planner.path_window_min_s();
+    const float active_segment_max_s = m_local_planner.path_window_max_s();
+
+    const size_t max_write_count = static_cast<size_t>(m_desc.max_write_count);
+    const size_t max_sample_count = std::max<size_t>(1u, max_write_count / 2u);
+
+    std::vector<PathPotentialSample> samples;
+    std::unordered_set<glm::ivec3, IVec3Hash, IVec3Equal> sample_voxels;
+
+    if (path.size() >= 2u &&
+        path_arc_lengths.point_s.size() == path.size() &&
+        active_segment_max_s > active_segment_min_s + Utils::eps)
+    {
+        const glm::vec3 voxel_size = m_voxel_grid->voxel_size();
+        const float min_voxel_size = std::max(min_component(voxel_size), Utils::eps);
+        const float radius = std::max(0.0f, m_path_potential_visualization_radius);
+        const float step =
+            std::max(min_voxel_size, m_path_potential_visualization_step);
+        const float vertical_drop =
+            std::max(0.0f, m_path_potential_visualization_vertical_drop);
+        const int voxel_y =
+            static_cast<int>(std::floor((m_vehicle_position.pos.y - vertical_drop) / voxel_size.y));
+
+        const std::vector<Vehicle::SimulationControlCandidate>& candidates =
+            m_local_planner.last_simulation_candidates();
+        const Vehicle::VehicleControlCommand visualization_control =
+            candidates.empty()
+                ? Vehicle::VehicleControlCommand{}
+                : candidates.front().control_command;
+
+        Vehicle::VehicleTransformState sampled_state = m_vehicle.state();
+        float min_potential = std::numeric_limits<float>::infinity();
+        float max_potential = -std::numeric_limits<float>::infinity();
+
+        for (float dx = -radius; dx <= radius + Utils::eps; dx += step) {
+            for (float dz = -radius; dz <= radius + Utils::eps; dz += step) {
+                if (samples.size() >= max_sample_count)
+                    break;
+
+                const glm::vec3 world_pos{
+                    m_vehicle_position.pos.x + dx,
+                    m_vehicle_position.pos.y - vertical_drop,
+                    m_vehicle_position.pos.z + dz
+                };
+                const glm::ivec3 voxel_pos{
+                    static_cast<int>(std::floor(world_pos.x / voxel_size.x)),
+                    voxel_y,
+                    static_cast<int>(std::floor(world_pos.z / voxel_size.z))
+                };
+                if (sample_voxels.find(voxel_pos) != sample_voxels.end())
+                    continue;
+
+                sampled_state.m_position = glm::vec2{world_pos.x, world_pos.z};
+                const float potential = m_vehicle.evaluate_path_potential(
+                    sampled_state,
+                    path,
+                    path_arc_lengths,
+                    active_segment_min_s,
+                    active_segment_max_s,
+                    visualization_control.speed_acceleration,
+                    visualization_control.steer_acceleration
+                );
+                if (!std::isfinite(potential))
+                    continue;
+
+                sample_voxels.insert(voxel_pos);
+                min_potential = std::min(min_potential, potential);
+                max_potential = std::max(max_potential, potential);
+                samples.push_back(PathPotentialSample{
+                    .voxel_pos = voxel_pos,
+                    .potential = potential
+                });
+            }
+            if (samples.size() >= max_sample_count)
+                break;
+        }
+
+        const float potential_range = max_potential - min_potential;
+        if (potential_range <= Utils::eps) {
+            for (PathPotentialSample& sample : samples) {
+                sample.potential = 0.0f;
+            }
+        } else {
+            for (PathPotentialSample& sample : samples) {
+                sample.potential = (sample.potential - min_potential) / potential_range;
+            }
+        }
+    }
+
+    std::vector<VoxelWriteGPU> voxel_writes;
+    voxel_writes.reserve(
+        std::min(
+            max_write_count,
+            m_path_potential_visualization_voxels.size() + samples.size()
+        )
+    );
+
+    for (const glm::ivec3& voxel_pos : m_path_potential_visualization_voxels) {
+        if (voxel_writes.size() >= max_write_count)
+            break;
+        if (sample_voxels.find(voxel_pos) != sample_voxels.end())
+            continue;
+
+        voxel_writes.push_back(VoxelWriteGPU{
+            .world_voxel = glm::ivec4(voxel_pos, 0),
+            .voxel_data = VoxelDataGPU(0u, 0u, 0u),
+            .set_flags = OVERWRITE_BIT
+        });
+    }
+
+    for (const PathPotentialSample& sample : samples) {
+        if (voxel_writes.size() >= max_write_count)
+            break;
+
+        voxel_writes.push_back(VoxelWriteGPU{
+            .world_voxel = glm::ivec4(sample.voxel_pos, 0),
+            .voxel_data = VoxelDataGPU(
+                1u,
+                VOXEL_VISABILITY_FLAG_BIT | VOXEL_EASY_OVERWRITE_FLAG_BIT,
+                path_potential_color(sample.potential)
+            ),
+            .set_flags = OVERWRITE_BIT
+        });
+    }
+
+    if (!voxel_writes.empty()) {
+        VulkanBuffer path_potential_voxel_write_list =
+            VulkanBuffer::create_host_visible_storage_buffer(
+                *m_engine,
+                sizeof(uint32_t) * 4u + sizeof(VoxelWriteGPU) * voxel_writes.size()
+            );
+        const uint32_t voxel_write_count =
+            static_cast<uint32_t>(voxel_writes.size());
+        path_potential_voxel_write_list.upload_scalar<uint32_t>(voxel_write_count, 0u);
+        path_potential_voxel_write_list.upload(voxel_writes, sizeof(uint32_t) * 4u);
+
+        VulkanCommandBuffer compute_command_buffer(
+            m_engine->device(),
+            m_engine->compute_command_pool()
+        );
+        {
+            auto scope = compute_command_buffer.begin_scope();
+            m_voxel_grid->set_voxels(compute_command_buffer, path_potential_voxel_write_list);
+        }
+        VulkanFence compute_fence(m_engine->device());
+        m_engine->compute_submit(compute_command_buffer, &compute_fence);
+        compute_fence.wait();
+    }
+
+    m_path_potential_visualization_voxels.clear();
+    m_path_potential_visualization_voxels.reserve(samples.size());
+    for (const PathPotentialSample& sample : samples) {
+        m_path_potential_visualization_voxels.push_back(sample.voxel_pos);
+    }
+    m_last_path_potential_visualization_voxel_count = samples.size();
 }
 
 void Celeris::sync_point_map_and_voxel_grid() {

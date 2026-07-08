@@ -152,7 +152,7 @@ add_executable(app
   a_star/path_intersection_detector.cpp
   vulkan_self/vulkan_submit_context.cpp
   utils/avg_timer.cpp
-  a_star/vehichle.cpp
+  a_star/vehicle.cpp
   a_star/local_planner.cpp
 )
 

@@ -9,7 +9,7 @@
 
 #include "../vulkan_self/logger/logger_header.h"
 #include "a_star_structures.h"
-#include "vehichle.h"
+#include "vehicle.h"
 
 using Clock = std::chrono::high_resolution_clock;
 
@@ -66,6 +66,8 @@ public:
     size_t active_path_segment_index() const noexcept;
     size_t path_segment_count() const noexcept;
     uint64_t path_generation() const noexcept;
+    const std::vector<VehiclePathPoint>& vehicle_path() const noexcept;
+    const Vehicle::PathArcLengthTable& vehicle_path_arc_lengths() const noexcept;
 
 private:
     struct AppliedVehicleCommand {

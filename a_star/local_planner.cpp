@@ -1,6 +1,6 @@
 #include "local_planner.h"
 
-#include "vehichle.h"
+#include "vehicle.h"
 #include "path_intersection_detector.h"
 #include "../vulkan_self/vulkan_submit_context.h"
 #include "../autopilot/vehicle_command_sender.h"
@@ -172,6 +172,14 @@ size_t LocalPlanner::path_segment_count() const noexcept {
 
 uint64_t LocalPlanner::path_generation() const noexcept {
     return m_path_generation;
+}
+
+const std::vector<VehiclePathPoint>& LocalPlanner::vehicle_path() const noexcept {
+    return m_global_astar_path;
+}
+
+const Vehicle::PathArcLengthTable& LocalPlanner::vehicle_path_arc_lengths() const noexcept {
+    return m_global_astar_path_arc_lengths;
 }
 
 void LocalPlanner::reset_tracking()
