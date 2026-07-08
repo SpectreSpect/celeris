@@ -51,6 +51,10 @@ public:
         uint32_t voxel_point_map_max_map_point_count = 1500000;
         uint32_t max_write_count = 100000;
         uint32_t max_gicp_iterations = 10;
+        bool lidar_accel_prediction_enabled = true;
+        float lidar_accel_max_dt = 0.5f;
+        float lidar_accel_max_mps2 = 20.0f;
+        float lidar_velocity_max_mps = 25.0f;
         uint32_t unimpended_path_window_size = 64;
         uint32_t unimpended_path_max_astar_points = 4096;
         uint32_t collision_history_size = 8;
@@ -250,6 +254,13 @@ private:
     glm::quat m_start_lidar_scan_rotation{1.0f, 0.0f, 0.0f, 0.0f};
     glm::vec3 m_previous_lidar_position{0.0f};
     glm::quat m_previous_lidar_rotation{1.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec3 m_lidar_velocity{0.0f};
+    glm::vec3 m_lidar_gravity_engine{0.0f};
+    bool m_has_lidar_gravity_engine = false;
+    bool m_has_previous_corrected_lidar_pose = false;
+    glm::vec3 m_previous_corrected_lidar_position{0.0f};
+    glm::quat m_previous_corrected_lidar_rotation{1.0f, 0.0f, 0.0f, 0.0f};
+    uint64_t m_previous_corrected_lidar_timestamp_ns = 0;
     std::vector<glm::vec3> m_collision_raw_position_history;
     glm::vec3 m_collision_surface_point{0.0f};
     bool m_has_collision_surface_point = false;

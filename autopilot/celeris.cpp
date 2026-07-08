@@ -40,6 +40,20 @@ namespace {
         return glm::dot(value, value);
     }
 
+    glm::vec3 clamp_length(glm::vec3 value, float max_length) noexcept {
+        if (max_length <= 0.0f)
+            return glm::vec3(0.0f);
+
+        const float len = glm::length(value);
+        if (!std::isfinite(len))
+            return glm::vec3(0.0f);
+
+        if (len <= max_length || len <= 1e-6f)
+            return value;
+
+        return value * (max_length / len);
+    }
+
     bool is_finite(float value) noexcept {
         return std::isfinite(value);
     }
@@ -295,6 +309,13 @@ void Celeris::start_lidar_receiver() {
     m_scan_receiver.start();
     m_received_scan_count = 0;
     m_has_previous_lidar_pose = false;
+    m_lidar_velocity = glm::vec3(0.0f);
+    m_lidar_gravity_engine = glm::vec3(0.0f);
+    m_has_lidar_gravity_engine = false;
+    m_has_previous_corrected_lidar_pose = false;
+    m_previous_corrected_lidar_position = glm::vec3(0.0f);
+    m_previous_corrected_lidar_rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    m_previous_corrected_lidar_timestamp_ns = 0;
     m_collision_raw_position_history.clear();
     m_has_collision_surface_point = false;
 }
@@ -342,6 +363,9 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
     float vehicle_height = m_vehicle_position.pos.y;
 
     if (auto scan = m_scan_receiver.try_pop_scan(*m_manager_bundle)) {
+        const bool has_scan_acceleration = scan->has_linear_acceleration_ros();
+        const glm::vec3 scan_acceleration_ros = scan->linear_acceleration_ros();
+        const uint64_t scan_timestamp_ns = scan->timestamp_ns();
         glm::vec3 raw_position = scan->point_cloud().transform.position;
         glm::quat raw_rotation = glm::normalize(scan->point_cloud().transform.rotation);
 
@@ -368,6 +392,36 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
 
         // m_network_scan
 
+        float scan_dt = 0.0f;
+        if (m_has_previous_corrected_lidar_pose &&
+            scan_timestamp_ns > m_previous_corrected_lidar_timestamp_ns) {
+            scan_dt = static_cast<float>(
+                static_cast<double>(scan_timestamp_ns - m_previous_corrected_lidar_timestamp_ns) * 1e-9
+            );
+        }
+
+        const bool valid_scan_dt =
+            scan_dt > 0.0f &&
+            scan_dt <= std::max(0.0f, m_desc.lidar_accel_max_dt);
+
+        auto scan_acceleration_engine = [&]() {
+            const glm::vec3 local_acceleration_engine =
+                LidarScan::ros_pos_to_engine(scan_acceleration_ros);
+            const glm::vec3 acceleration_engine =
+                glm::normalize(raw_rotation) * local_acceleration_engine;
+
+            if (!m_has_lidar_gravity_engine) {
+                m_lidar_gravity_engine = acceleration_engine;
+                m_has_lidar_gravity_engine = true;
+            }
+
+            return acceleration_engine - m_lidar_gravity_engine;
+        };
+
+        if (has_scan_acceleration && !m_has_lidar_gravity_engine) {
+            (void)scan_acceleration_engine();
+        }
+
         if (!m_has_previous_lidar_pose) {
             if (m_has_start_lidar_scan_position) {
                 m_network_scan->point_cloud().transform.position = m_start_lidar_scan_position;
@@ -387,17 +441,40 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
             glm::vec3 delta_position = raw_position - m_previous_lidar_position;
             glm::quat delta_rotation = glm::normalize(raw_rotation * glm::inverse(m_previous_lidar_rotation));
 
-            glm::vec3 previous_map_position = glm::vec3(0.0f);
-            glm::quat previous_map_rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+            const glm::vec3 previous_map_position = m_has_previous_corrected_lidar_pose
+                ? m_previous_corrected_lidar_position
+                : glm::vec3(0.0f);
+            const glm::quat previous_map_rotation = m_has_previous_corrected_lidar_pose
+                ? glm::normalize(m_previous_corrected_lidar_rotation)
+                : glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
-            if (!m_retired_network_scans.empty()) {
-                PointCloud& previous_point_cloud = m_retired_network_scans.back()->point_cloud();
-                previous_map_position = previous_point_cloud.transform.position;
-                previous_map_rotation = glm::normalize(previous_point_cloud.transform.rotation);
+            bool used_acceleration_prediction = false;
+            if (m_desc.lidar_accel_prediction_enabled &&
+                has_scan_acceleration &&
+                m_has_previous_corrected_lidar_pose &&
+                valid_scan_dt) {
+                glm::vec3 acceleration_engine = scan_acceleration_engine();
+                acceleration_engine = clamp_length(
+                    acceleration_engine,
+                    std::max(0.0f, m_desc.lidar_accel_max_mps2)
+                );
+
+                m_lidar_velocity = clamp_length(
+                    m_lidar_velocity + acceleration_engine * scan_dt,
+                    std::max(0.0f, m_desc.lidar_velocity_max_mps)
+                );
+
+                m_network_scan->point_cloud().transform.position =
+                    previous_map_position + m_lidar_velocity * scan_dt;
+                m_network_scan->point_cloud().transform.rotation =
+                    glm::normalize(delta_rotation * previous_map_rotation);
+                used_acceleration_prediction = true;
             }
 
-            m_network_scan->point_cloud().transform.position = previous_map_position + delta_position;
-            m_network_scan->point_cloud().transform.rotation = glm::normalize(delta_rotation * previous_map_rotation);
+            if (!used_acceleration_prediction) {
+                m_network_scan->point_cloud().transform.position = previous_map_position + delta_position;
+                m_network_scan->point_cloud().transform.rotation = glm::normalize(delta_rotation * previous_map_rotation);
+            }
         }
 
         // if (!m_needs_map_localization && m_voxel_point_map.map_point_count() > 0u) {
@@ -409,6 +486,23 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
                             m_network_scan->normal_buffer(),
                             m_desc.max_gicp_iterations);
         }
+
+        const glm::vec3 corrected_lidar_position =
+            m_network_scan->point_cloud().transform.position;
+        const glm::quat corrected_lidar_rotation =
+            glm::normalize(m_network_scan->point_cloud().transform.rotation);
+
+        if (m_has_previous_corrected_lidar_pose && valid_scan_dt) {
+            m_lidar_velocity = clamp_length(
+                (corrected_lidar_position - m_previous_corrected_lidar_position) / scan_dt,
+                std::max(0.0f, m_desc.lidar_velocity_max_mps)
+            );
+        }
+
+        m_previous_corrected_lidar_position = corrected_lidar_position;
+        m_previous_corrected_lidar_rotation = corrected_lidar_rotation;
+        m_previous_corrected_lidar_timestamp_ns = scan_timestamp_ns;
+        m_has_previous_corrected_lidar_pose = true;
         
         m_lidar_transform = m_network_scan->point_cloud().transform;
         const Transform vehicle_transform = rear_axle_transform_from_lidar_transform(m_lidar_transform);

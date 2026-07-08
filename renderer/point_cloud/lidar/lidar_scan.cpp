@@ -1,5 +1,6 @@
 #include "lidar_scan.h"
 
+#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <limits>
@@ -16,18 +17,23 @@
 namespace {
 constexpr uint32_t imu_rpy_frame_flag = 1u << 31;
 constexpr uint32_t imu_pose_quat_frame_flag = 1u << 30;
-constexpr uint32_t point_count_mask = ~(imu_rpy_frame_flag | imu_pose_quat_frame_flag);
+constexpr uint32_t imu_accel_quat_frame_flag = 1u << 29;
+constexpr uint32_t point_count_mask = ~(imu_rpy_frame_flag | imu_pose_quat_frame_flag | imu_accel_quat_frame_flag);
 constexpr size_t gps_imu_floats_per_scan_point = 10;
 constexpr size_t imu_rpy_floats_per_scan_point = 7;
 constexpr size_t imu_pose_quat_floats_per_scan_point = 11;
+constexpr size_t imu_accel_quat_floats_per_scan_point = 11;
 
 enum class ScanPacketFormat {
     LegacyGpsRpy,
     ImuRpy,
-    ImuPoseQuat
+    ImuPoseQuat,
+    ImuAccelQuat
 };
 
 ScanPacketFormat packet_format(uint32_t count_header) {
+    if ((count_header & imu_accel_quat_frame_flag) != 0u)
+        return ScanPacketFormat::ImuAccelQuat;
     if ((count_header & imu_pose_quat_frame_flag) != 0u)
         return ScanPacketFormat::ImuPoseQuat;
     if ((count_header & imu_rpy_frame_flag) != 0u)
@@ -37,6 +43,8 @@ ScanPacketFormat packet_format(uint32_t count_header) {
 
 size_t bytes_per_scan_point(ScanPacketFormat format) {
     switch (format) {
+    case ScanPacketFormat::ImuAccelQuat:
+        return imu_accel_quat_floats_per_scan_point * sizeof(float);
     case ScanPacketFormat::ImuPoseQuat:
         return imu_pose_quat_floats_per_scan_point * sizeof(float);
     case ScanPacketFormat::ImuRpy:
@@ -130,6 +138,14 @@ uint64_t LidarScan::timestamp_ns() const noexcept {
     return m_timestamp_ns;
 }
 
+bool LidarScan::has_linear_acceleration_ros() const noexcept {
+    return m_has_linear_acceleration_ros;
+}
+
+glm::vec3 LidarScan::linear_acceleration_ros() const noexcept {
+    return m_linear_acceleration_ros;
+}
+
 LidarScan::FrameData LidarScan::read_frame_from_file(const std::filesystem::path& path) {
     std::ifstream in(path, std::ios::binary);
     if (!in) throw std::runtime_error("Failed to open: " + path.string());
@@ -150,8 +166,11 @@ LidarScan::FrameData LidarScan::read_frame_from_file(const std::filesystem::path
     if (!in) throw std::runtime_error("Unexpected EOF in: " + path.string());
 
     frame.samples.resize(count);
-    if (format == ScanPacketFormat::ImuPoseQuat) {
+    if (format == ScanPacketFormat::ImuPoseQuat || format == ScanPacketFormat::ImuAccelQuat) {
         frame.sample_orientations_ros.resize(count);
+    }
+    if (format == ScanPacketFormat::ImuAccelQuat) {
+        frame.sample_linear_accelerations_ros.resize(count);
     }
 
     const uint8_t* p = buf.data();
@@ -162,6 +181,7 @@ LidarScan::FrameData LidarScan::read_frame_from_file(const std::filesystem::path
         float px, py, pz;
         float roll, pitch, yaw;
         float qx, qy, qz, qw;
+        float ax, ay, az;
 
         std::memcpy(&x,     p, 4); p += 4;
         std::memcpy(&y,     p, 4); p += 4;
@@ -185,6 +205,22 @@ LidarScan::FrameData LidarScan::read_frame_from_file(const std::filesystem::path
             roll = 0.0f;
             pitch = 0.0f;
             yaw = 0.0f;
+            frame.sample_orientations_ros[i] = normalized_quat_or_identity(qx, qy, qz, qw);
+        } else if (format == ScanPacketFormat::ImuAccelQuat) {
+            std::memcpy(&ax, p, 4); p += 4;
+            std::memcpy(&ay, p, 4); p += 4;
+            std::memcpy(&az, p, 4); p += 4;
+            std::memcpy(&qx, p, 4); p += 4;
+            std::memcpy(&qy, p, 4); p += 4;
+            std::memcpy(&qz, p, 4); p += 4;
+            std::memcpy(&qw, p, 4); p += 4;
+            px = 0.0f;
+            py = 0.0f;
+            pz = 0.0f;
+            roll = 0.0f;
+            pitch = 0.0f;
+            yaw = 0.0f;
+            frame.sample_linear_accelerations_ros[i] = glm::vec3(ax, ay, az);
             frame.sample_orientations_ros[i] = normalized_quat_or_identity(qx, qy, qz, qw);
         } else {
             std::memcpy(&px, p, 4); p += 4;
@@ -214,6 +250,29 @@ PointCloud LidarScan::load_from_file(ManagerBundle& manager_bundle, const std::f
 
 PointCloud LidarScan::load_from_frame(ManagerBundle& manager_bundle, FrameData&& frame) {
     m_timestamp_ns = frame.timestamp_ns;
+    m_has_linear_acceleration_ros = false;
+    m_linear_acceleration_ros = glm::vec3(0.0f);
+
+    if (!frame.sample_linear_accelerations_ros.empty()) {
+        glm::vec3 sum(0.0f);
+        uint32_t valid_count = 0;
+
+        for (const glm::vec3& acceleration : frame.sample_linear_accelerations_ros) {
+            if (!std::isfinite(acceleration.x) ||
+                !std::isfinite(acceleration.y) ||
+                !std::isfinite(acceleration.z)) {
+                continue;
+            }
+
+            sum += acceleration;
+            valid_count++;
+        }
+
+        if (valid_count > 0u) {
+            m_linear_acceleration_ros = sum / static_cast<float>(valid_count);
+            m_has_linear_acceleration_ros = true;
+        }
+    }
 
     if (frame.points.empty()) {
         throw std::runtime_error("LidarScan frame had no points");

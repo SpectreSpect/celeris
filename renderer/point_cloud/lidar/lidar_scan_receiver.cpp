@@ -19,19 +19,24 @@
 namespace {
 constexpr uint32_t imu_rpy_frame_flag = 1u << 31;
 constexpr uint32_t imu_pose_quat_frame_flag = 1u << 30;
-constexpr uint32_t point_count_mask = ~(imu_rpy_frame_flag | imu_pose_quat_frame_flag);
+constexpr uint32_t imu_accel_quat_frame_flag = 1u << 29;
+constexpr uint32_t point_count_mask = ~(imu_rpy_frame_flag | imu_pose_quat_frame_flag | imu_accel_quat_frame_flag);
 constexpr size_t gps_imu_floats_per_scan_point = 10;
 constexpr size_t imu_rpy_floats_per_scan_point = 7;
 constexpr size_t imu_pose_quat_floats_per_scan_point = 11;
+constexpr size_t imu_accel_quat_floats_per_scan_point = 11;
 constexpr uint32_t max_points_per_frame = 2'000'000;
 
 enum class ScanPacketFormat {
     LegacyGpsRpy,
     ImuRpy,
-    ImuPoseQuat
+    ImuPoseQuat,
+    ImuAccelQuat
 };
 
 ScanPacketFormat packet_format(uint32_t count_header) {
+    if ((count_header & imu_accel_quat_frame_flag) != 0u)
+        return ScanPacketFormat::ImuAccelQuat;
     if ((count_header & imu_pose_quat_frame_flag) != 0u)
         return ScanPacketFormat::ImuPoseQuat;
     if ((count_header & imu_rpy_frame_flag) != 0u)
@@ -41,6 +46,8 @@ ScanPacketFormat packet_format(uint32_t count_header) {
 
 size_t bytes_per_scan_point(ScanPacketFormat format) {
     switch (format) {
+    case ScanPacketFormat::ImuAccelQuat:
+        return imu_accel_quat_floats_per_scan_point * sizeof(float);
     case ScanPacketFormat::ImuPoseQuat:
         return imu_pose_quat_floats_per_scan_point * sizeof(float);
     case ScanPacketFormat::ImuRpy:
@@ -186,6 +193,9 @@ std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_scan(ManagerBundle& manage
     const size_t ref_idx = reference_sample_id(frame);
     const auto& sample = frame.samples[ref_idx];
     const glm::vec3 base_pos_ros = sample.base_pos_ros;
+    const glm::mat3 rotation_ros = sample_orientation_matrix_ros(frame, ref_idx);
+    const glm::mat3 basis = ros_basis_to_engine_basis();
+    const glm::mat3 rotation_engine = basis * rotation_ros * glm::transpose(basis);
 
     std::unique_ptr<LidarScan> scan = std::make_unique<LidarScan>(
         manager_bundle,
@@ -194,11 +204,6 @@ std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_scan(ManagerBundle& manage
     );
 
     scan->point_cloud().transform.position = LidarScan::ros_pos_to_engine(base_pos_ros);
-
-    glm::mat3 rotation_ros = sample_orientation_matrix_ros(frame, ref_idx);
-    glm::mat3 basis = ros_basis_to_engine_basis();
-    glm::mat3 rotation_engine = basis * rotation_ros * glm::transpose(basis);
-
     scan->point_cloud().transform.rotation = glm::quat_cast(rotation_engine);
     // scan->point_cloud().transform.scale = glm::vec3(2);
 
@@ -300,8 +305,11 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
         frame.ring_count = 16;
 
         frame.samples.resize(point_count / m_points_freq);
-        if (format == ScanPacketFormat::ImuPoseQuat) {
+        if (format == ScanPacketFormat::ImuPoseQuat || format == ScanPacketFormat::ImuAccelQuat) {
             frame.sample_orientations_ros.resize(frame.samples.size());
+        }
+        if (format == ScanPacketFormat::ImuAccelQuat) {
+            frame.sample_linear_accelerations_ros.resize(frame.samples.size());
         }
 
         
@@ -317,6 +325,7 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
             float px, py, pz;
             float roll, pitch, yaw;
             float qx, qy, qz, qw;
+            float ax, ay, az;
 
             const uint8_t* local_p = p;
             std::memcpy(&x,     local_p, 4); local_p += 4;
@@ -341,6 +350,22 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
                 roll = 0.0f;
                 pitch = 0.0f;
                 yaw = 0.0f;
+                frame.sample_orientations_ros[i] = normalized_quat_or_identity(qx, qy, qz, qw);
+            } else if (format == ScanPacketFormat::ImuAccelQuat) {
+                std::memcpy(&ax, local_p, 4); local_p += 4;
+                std::memcpy(&ay, local_p, 4); local_p += 4;
+                std::memcpy(&az, local_p, 4); local_p += 4;
+                std::memcpy(&qx, local_p, 4); local_p += 4;
+                std::memcpy(&qy, local_p, 4); local_p += 4;
+                std::memcpy(&qz, local_p, 4); local_p += 4;
+                std::memcpy(&qw, local_p, 4); local_p += 4;
+                px = 0.0f;
+                py = 0.0f;
+                pz = 0.0f;
+                roll = 0.0f;
+                pitch = 0.0f;
+                yaw = 0.0f;
+                frame.sample_linear_accelerations_ros[i] = glm::vec3(ax, ay, az);
                 frame.sample_orientations_ros[i] = normalized_quat_or_identity(qx, qy, qz, qw);
             } else {
                 std::memcpy(&px, local_p, 4); local_p += 4;

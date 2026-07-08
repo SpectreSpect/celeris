@@ -30,6 +30,7 @@ public:
         uint32_t ring_count = 0;
         std::vector<TimedPointSample> samples;
         std::vector<glm::quat> sample_orientations_ros;
+        std::vector<glm::vec3> sample_linear_accelerations_ros;
         std::vector<PointInstance> points;
 
         FrameData() = default;
@@ -122,6 +123,8 @@ public:
 
     void set_timestamp_ns(uint64_t timestamp_ns);
     uint64_t timestamp_ns() const noexcept;
+    bool has_linear_acceleration_ros() const noexcept;
+    glm::vec3 linear_acceleration_ros() const noexcept;
 
     static glm::mat3 rpy_to_mat3_zyx(float roll, float pitch, float yaw);
     static glm::vec3 ros_pos_to_engine(const glm::vec3& p_ros);
@@ -132,6 +135,8 @@ public:
 
 private:
     uint64_t m_timestamp_ns = 0;
+    bool m_has_linear_acceleration_ros = false;
+    glm::vec3 m_linear_acceleration_ros{0.0f};
     
     std::vector<PointInstance> m_points;
     std::vector<glm::vec4> m_normals;
