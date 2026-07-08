@@ -213,6 +213,8 @@ bool VehicleStateReceiver::read_exact(int socket, void* data, size_t byte_count)
 void VehicleStateReceiver::set_latest_feedback(VehicleFeedback feedback) {
     std::lock_guard lock(m_feedback_mutex);
     m_latest_feedback = feedback;
+
+    // std::cout << feedback.linear_velocity_ros.x << " " << feedback.linear_velocity_ros.y << " " << feedback.linear_velocity_ros.z << std::endl;
     m_has_feedback = true;
 }
 

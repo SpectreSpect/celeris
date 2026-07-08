@@ -165,11 +165,13 @@ int main() {
     std::unique_ptr<LidarScan> network_scan;
     std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
 
-    glm::vec3 voxel_size(1.0f);
-    uint32_t vertical_inflation_size =
-        static_cast<uint32_t>(std::ceil(vehicle_geometry.size.y / voxel_size.y));
-    uint32_t horizontal_inflation_size =
-        static_cast<uint32_t>(std::ceil((vehicle_geometry.size.x / voxel_size.x) / 2.0f));
+    glm::vec3 voxel_size(0.2f);
+    // uint32_t vertical_inflation_size =
+    //     static_cast<uint32_t>(std::ceil(vehicle_geometry.size.y / voxel_size.y));
+    // uint32_t horizontal_inflation_size =
+    //     static_cast<uint32_t>(std::ceil((vehicle_geometry.size.x / voxel_size.x) / 2.0f));
+    uint32_t vertical_inflation_size = 1;
+    uint32_t horizontal_inflation_size = 1;
     glm::ivec3 chunk_size(16);
     VoxelGrid::VoxelGridDesc voxel_grid_desc {
         .chunk_size = chunk_size,
@@ -449,8 +451,8 @@ int main() {
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
     has_end_pos = true;
     // celeris.set_start_lidar_scan_position(start_lidar_scan_position);
-    celeris.load_map(saved_maps_directory / "test4.vpm");
-    celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim_3.wpp");
+    // celeris.load_map(saved_maps_directory / "test4.vpm");
+    // celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim_3.wpp");
     celeris.start(std::move(planner_submit_context));
 
     CelerisVisualizer celeris_visualizer(

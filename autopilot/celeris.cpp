@@ -463,21 +463,21 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         std::chrono::duration<float>(now - m_last_local_planner_update_timestamp).count() >=
             local_planner_update_period;
 
-    // if (should_update_local_planner) {
-    //     VehicleCommand vehicle_command;
-    //     if (!m_waypoint_path_completed || m_waypoint_path.waypoints().empty()) {
-    //         vehicle_command = m_local_planner.step(
-    //             m_vehicle,
-    //             m_path_intersection_detector,
-    //             submit_context
-    //         );
-    //     }
+    if (should_update_local_planner) {
+        VehicleCommand vehicle_command;
+        if (!m_waypoint_path_completed || m_waypoint_path.waypoints().empty()) {
+            vehicle_command = m_local_planner.step(
+                m_vehicle,
+                m_path_intersection_detector,
+                submit_context
+            );
+        }
 
-    //     if (!m_gamepad_commands_enabled)
-    //         m_command_sender.set_command(vehicle_command);
-    //     m_last_local_planner_update_timestamp = now;
-    //     m_has_last_local_planner_update_timestamp = true;
-    // }
+        if (!m_gamepad_commands_enabled)
+            m_command_sender.set_command(vehicle_command);
+        m_last_local_planner_update_timestamp = now;
+        m_has_last_local_planner_update_timestamp = true;
+    }
 }
 
 void Celeris::apply_vehicle_feedback(const VehicleFeedback& feedback) {
