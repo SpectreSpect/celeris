@@ -10,12 +10,46 @@
 #include <cstring>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
+#include <glm/gtc/quaternion.hpp>
+
 namespace {
-constexpr size_t bytes_per_scan_point = 10 * sizeof(float);
+constexpr uint32_t imu_rpy_frame_flag = 1u << 31;
+constexpr uint32_t imu_pose_quat_frame_flag = 1u << 30;
+constexpr uint32_t point_count_mask = ~(imu_rpy_frame_flag | imu_pose_quat_frame_flag);
+constexpr size_t gps_imu_floats_per_scan_point = 10;
+constexpr size_t imu_rpy_floats_per_scan_point = 7;
+constexpr size_t imu_pose_quat_floats_per_scan_point = 11;
 constexpr uint32_t max_points_per_frame = 2'000'000;
+
+enum class ScanPacketFormat {
+    LegacyGpsRpy,
+    ImuRpy,
+    ImuPoseQuat
+};
+
+ScanPacketFormat packet_format(uint32_t count_header) {
+    if ((count_header & imu_pose_quat_frame_flag) != 0u)
+        return ScanPacketFormat::ImuPoseQuat;
+    if ((count_header & imu_rpy_frame_flag) != 0u)
+        return ScanPacketFormat::ImuRpy;
+    return ScanPacketFormat::LegacyGpsRpy;
+}
+
+size_t bytes_per_scan_point(ScanPacketFormat format) {
+    switch (format) {
+    case ScanPacketFormat::ImuPoseQuat:
+        return imu_pose_quat_floats_per_scan_point * sizeof(float);
+    case ScanPacketFormat::ImuRpy:
+        return imu_rpy_floats_per_scan_point * sizeof(float);
+    case ScanPacketFormat::LegacyGpsRpy:
+    default:
+        return gps_imu_floats_per_scan_point * sizeof(float);
+    }
+}
 
 glm::mat3 ros_basis_to_engine_basis() {
     glm::mat3 m(1.0f);
@@ -23,6 +57,44 @@ glm::mat3 ros_basis_to_engine_basis() {
     m[1] = glm::vec3( 0.0f, 0.0f, 1.0f);
     m[2] = glm::vec3( 0.0f, 1.0f, 0.0f);
     return m;
+}
+
+size_t reference_sample_id(const LidarScan::FrameData& frame) {
+    size_t ref_idx = 0;
+    float min_time = std::numeric_limits<float>::infinity();
+
+    for (size_t i = 0; i < frame.samples.size(); ++i) {
+        if (frame.samples[i].time < min_time) {
+            min_time = frame.samples[i].time;
+            ref_idx = i;
+        }
+    }
+
+    return ref_idx;
+}
+
+glm::quat normalized_quat_or_identity(float qx, float qy, float qz, float qw) {
+    glm::quat q(qw, qx, qy, qz);
+    const float len = glm::length(q);
+    if (!std::isfinite(len) || len <= 1e-6f)
+        return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    return glm::normalize(q);
+}
+
+glm::mat3 sample_orientation_matrix_ros(const LidarScan::FrameData& frame, size_t sample_id) {
+    if (frame.sample_orientations_ros.size() == frame.samples.size()) {
+        glm::quat q = frame.sample_orientations_ros[sample_id];
+        const float len = glm::length(q);
+        if (std::isfinite(len) && len > 1e-6f)
+            return glm::mat3_cast(glm::normalize(q));
+    }
+
+    const auto& sample = frame.samples[sample_id];
+    return LidarScan::rpy_to_mat3_zyx(
+        sample.base_rpy_ros.x,
+        sample.base_rpy_ros.y,
+        sample.base_rpy_ros.z
+    );
 }
 }
 
@@ -108,9 +180,12 @@ std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_scan(ManagerBundle& manage
     if (!m_point_cloud_preprocessor)
         return nullptr;
 
-    const auto& sample = frame.samples.front();
+    if (frame.samples.empty())
+        return nullptr;
+
+    const size_t ref_idx = reference_sample_id(frame);
+    const auto& sample = frame.samples[ref_idx];
     const glm::vec3 base_pos_ros = sample.base_pos_ros;
-    const glm::vec3 base_rpy_ros = sample.base_rpy_ros;
 
     std::unique_ptr<LidarScan> scan = std::make_unique<LidarScan>(
         manager_bundle,
@@ -120,11 +195,7 @@ std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_scan(ManagerBundle& manage
 
     scan->point_cloud().transform.position = LidarScan::ros_pos_to_engine(base_pos_ros);
 
-    glm::mat3 rotation_ros = LidarScan::rpy_to_mat3_zyx(
-        base_rpy_ros.x,
-        base_rpy_ros.y,
-        base_rpy_ros.z
-    );
+    glm::mat3 rotation_ros = sample_orientation_matrix_ros(frame, ref_idx);
     glm::mat3 basis = ros_basis_to_engine_basis();
     glm::mat3 rotation_engine = basis * rotation_ros * glm::transpose(basis);
 
@@ -202,22 +273,26 @@ void LidarScanReceiver::receive_loop() {
 bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
     while (m_running.load()) {
         LidarScan::FrameData frame;
-        uint32_t point_count = 0;
+        uint32_t point_count_header = 0;
 
         if (!read_exact(client_socket, &frame.timestamp_ns, sizeof(frame.timestamp_ns))) {
             return false;
         }
 
-        if (!read_exact(client_socket, &point_count, sizeof(point_count))) {
+        if (!read_exact(client_socket, &point_count_header, sizeof(point_count_header))) {
             return false;
         }
+
+        const ScanPacketFormat format = packet_format(point_count_header);
+        const uint32_t point_count = point_count_header & point_count_mask;
 
         if (point_count == 0 || point_count > max_points_per_frame) {
             std::cerr << "LidarScanReceiver: invalid point count " << point_count << "\n";
             return false;
         }
 
-        std::vector<uint8_t> payload(static_cast<size_t>(point_count) * bytes_per_scan_point);
+        const size_t point_stride_bytes = bytes_per_scan_point(format);
+        std::vector<uint8_t> payload(static_cast<size_t>(point_count) * point_stride_bytes);
         if (!read_exact(client_socket, payload.data(), payload.size())) {
             return false;
         }
@@ -225,6 +300,9 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
         frame.ring_count = 16;
 
         frame.samples.resize(point_count / m_points_freq);
+        if (format == ScanPacketFormat::ImuPoseQuat) {
+            frame.sample_orientations_ros.resize(frame.samples.size());
+        }
 
         
         // save_retrieved_scan(payload.data(), payload.size(), "/home/hiber/repositories/celeris/assets/lidar_scans/lslidar_scan.bin");
@@ -238,19 +316,41 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
             float time;
             float px, py, pz;
             float roll, pitch, yaw;
+            float qx, qy, qz, qw;
 
             const uint8_t* local_p = p;
             std::memcpy(&x,     local_p, 4); local_p += 4;
             std::memcpy(&y,     local_p, 4); local_p += 4;
             std::memcpy(&z,     local_p, 4); local_p += 4;
             std::memcpy(&time,  local_p, 4); local_p += 4;
-            std::memcpy(&px,    local_p, 4); local_p += 4;
-            std::memcpy(&py,    local_p, 4); local_p += 4;
-            std::memcpy(&pz,    local_p, 4); local_p += 4;
-            std::memcpy(&roll,  local_p, 4); local_p += 4;
-            std::memcpy(&pitch, local_p, 4); local_p += 4;
-            std::memcpy(&yaw,   local_p, 4); local_p += 4;
-            p += 4 * 10 * m_points_freq;
+            if (format == ScanPacketFormat::ImuRpy) {
+                px = 0.0f;
+                py = 0.0f;
+                pz = 0.0f;
+                std::memcpy(&roll,  local_p, 4); local_p += 4;
+                std::memcpy(&pitch, local_p, 4); local_p += 4;
+                std::memcpy(&yaw,   local_p, 4); local_p += 4;
+            } else if (format == ScanPacketFormat::ImuPoseQuat) {
+                std::memcpy(&px, local_p, 4); local_p += 4;
+                std::memcpy(&py, local_p, 4); local_p += 4;
+                std::memcpy(&pz, local_p, 4); local_p += 4;
+                std::memcpy(&qx, local_p, 4); local_p += 4;
+                std::memcpy(&qy, local_p, 4); local_p += 4;
+                std::memcpy(&qz, local_p, 4); local_p += 4;
+                std::memcpy(&qw, local_p, 4); local_p += 4;
+                roll = 0.0f;
+                pitch = 0.0f;
+                yaw = 0.0f;
+                frame.sample_orientations_ros[i] = normalized_quat_or_identity(qx, qy, qz, qw);
+            } else {
+                std::memcpy(&px, local_p, 4); local_p += 4;
+                std::memcpy(&py, local_p, 4); local_p += 4;
+                std::memcpy(&pz, local_p, 4); local_p += 4;
+                std::memcpy(&roll,  local_p, 4); local_p += 4;
+                std::memcpy(&pitch, local_p, 4); local_p += 4;
+                std::memcpy(&yaw,   local_p, 4); local_p += 4;
+            }
+            p += point_stride_bytes * m_points_freq;
 
             // std::cout << "Point: " << time << std::endl;
 

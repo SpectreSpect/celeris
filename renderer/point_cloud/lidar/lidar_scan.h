@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <glm/gtc/quaternion.hpp>
 
 class ManagerBundle;
 class PointCloudPreprocessor;
@@ -28,6 +29,7 @@ public:
         uint64_t timestamp_ns = 0;
         uint32_t ring_count = 0;
         std::vector<TimedPointSample> samples;
+        std::vector<glm::quat> sample_orientations_ros;
         std::vector<PointInstance> points;
 
         FrameData() = default;

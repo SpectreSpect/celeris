@@ -165,7 +165,7 @@ int main() {
     std::unique_ptr<LidarScan> network_scan;
     std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
 
-    glm::vec3 voxel_size(0.2f);
+    glm::vec3 voxel_size(0.5f);
     // uint32_t vertical_inflation_size =
     //     static_cast<uint32_t>(std::ceil(vehicle_geometry.size.y / voxel_size.y));
     // uint32_t horizontal_inflation_size =
@@ -176,8 +176,8 @@ int main() {
     VoxelGrid::VoxelGridDesc voxel_grid_desc {
         .chunk_size = chunk_size,
         .voxel_size = voxel_size,
-        .count_active_chunks = 15'000,
-        .max_quads = 2'500'000,
+        .count_active_chunks = 30'000,
+        .max_quads = 5'000'000,
         .chunk_hash_table_size_factor = 1.0f,
         .count_evict_buckets = 32,
         .min_free_chunks = 4'500,

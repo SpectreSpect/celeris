@@ -2,13 +2,75 @@
 
 #include <cstring>
 #include <fstream>
+#include <limits>
 #include <numeric>
 #include <random>
 #include <stdexcept>
 
+#include <glm/gtc/quaternion.hpp>
+
 #include "../point_instance.h"
 #include "../../../managers/manager_bundle.h"
 #include "../point_cloud_preprocessor.h"
+
+namespace {
+constexpr uint32_t imu_rpy_frame_flag = 1u << 31;
+constexpr uint32_t imu_pose_quat_frame_flag = 1u << 30;
+constexpr uint32_t point_count_mask = ~(imu_rpy_frame_flag | imu_pose_quat_frame_flag);
+constexpr size_t gps_imu_floats_per_scan_point = 10;
+constexpr size_t imu_rpy_floats_per_scan_point = 7;
+constexpr size_t imu_pose_quat_floats_per_scan_point = 11;
+
+enum class ScanPacketFormat {
+    LegacyGpsRpy,
+    ImuRpy,
+    ImuPoseQuat
+};
+
+ScanPacketFormat packet_format(uint32_t count_header) {
+    if ((count_header & imu_pose_quat_frame_flag) != 0u)
+        return ScanPacketFormat::ImuPoseQuat;
+    if ((count_header & imu_rpy_frame_flag) != 0u)
+        return ScanPacketFormat::ImuRpy;
+    return ScanPacketFormat::LegacyGpsRpy;
+}
+
+size_t bytes_per_scan_point(ScanPacketFormat format) {
+    switch (format) {
+    case ScanPacketFormat::ImuPoseQuat:
+        return imu_pose_quat_floats_per_scan_point * sizeof(float);
+    case ScanPacketFormat::ImuRpy:
+        return imu_rpy_floats_per_scan_point * sizeof(float);
+    case ScanPacketFormat::LegacyGpsRpy:
+    default:
+        return gps_imu_floats_per_scan_point * sizeof(float);
+    }
+}
+
+glm::quat normalized_quat_or_identity(float qx, float qy, float qz, float qw) {
+    glm::quat q(qw, qx, qy, qz);
+    const float len = glm::length(q);
+    if (!std::isfinite(len) || len <= 1e-6f)
+        return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    return glm::normalize(q);
+}
+
+glm::mat3 sample_orientation_matrix_ros(const LidarScan::FrameData& frame, size_t sample_id) {
+    if (frame.sample_orientations_ros.size() == frame.samples.size()) {
+        glm::quat q = frame.sample_orientations_ros[sample_id];
+        const float len = glm::length(q);
+        if (std::isfinite(len) && len > 1e-6f)
+            return glm::mat3_cast(glm::normalize(q));
+    }
+
+    const auto& sample = frame.samples[sample_id];
+    return LidarScan::rpy_to_mat3_zyx(
+        sample.base_rpy_ros.x,
+        sample.base_rpy_ros.y,
+        sample.base_rpy_ros.z
+    );
+}
+}
 
 LidarScan::LidarScan(
     ManagerBundle& manager_bundle, 
@@ -73,19 +135,24 @@ LidarScan::FrameData LidarScan::read_frame_from_file(const std::filesystem::path
     if (!in) throw std::runtime_error("Failed to open: " + path.string());
 
     FrameData frame;
-    uint32_t count = 0;
+    uint32_t count_header = 0;
 
     in.read(reinterpret_cast<char*>(&frame.timestamp_ns), sizeof(uint64_t));
-    in.read(reinterpret_cast<char*>(&count), sizeof(uint32_t));
+    in.read(reinterpret_cast<char*>(&count_header), sizeof(uint32_t));
     if (!in) throw std::runtime_error("Bad header in: " + path.string());
 
-    const size_t bpp = 10 * sizeof(float); // x y z time px py pz roll pitch yaw
+    const ScanPacketFormat format = packet_format(count_header);
+    const uint32_t count = count_header & point_count_mask;
+    const size_t bpp = bytes_per_scan_point(format);
 
     std::vector<uint8_t> buf(size_t(count) * bpp);
     in.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(buf.size()));
     if (!in) throw std::runtime_error("Unexpected EOF in: " + path.string());
 
     frame.samples.resize(count);
+    if (format == ScanPacketFormat::ImuPoseQuat) {
+        frame.sample_orientations_ros.resize(count);
+    }
 
     const uint8_t* p = buf.data();
 
@@ -94,17 +161,39 @@ LidarScan::FrameData LidarScan::read_frame_from_file(const std::filesystem::path
         float time;
         float px, py, pz;
         float roll, pitch, yaw;
+        float qx, qy, qz, qw;
 
         std::memcpy(&x,     p, 4); p += 4;
         std::memcpy(&y,     p, 4); p += 4;
         std::memcpy(&z,     p, 4); p += 4;
         std::memcpy(&time,  p, 4); p += 4;
-        std::memcpy(&px,    p, 4); p += 4;
-        std::memcpy(&py,    p, 4); p += 4;
-        std::memcpy(&pz,    p, 4); p += 4;
-        std::memcpy(&roll,  p, 4); p += 4;
-        std::memcpy(&pitch, p, 4); p += 4;
-        std::memcpy(&yaw,   p, 4); p += 4;
+        if (format == ScanPacketFormat::ImuRpy) {
+            px = 0.0f;
+            py = 0.0f;
+            pz = 0.0f;
+            std::memcpy(&roll,  p, 4); p += 4;
+            std::memcpy(&pitch, p, 4); p += 4;
+            std::memcpy(&yaw,   p, 4); p += 4;
+        } else if (format == ScanPacketFormat::ImuPoseQuat) {
+            std::memcpy(&px, p, 4); p += 4;
+            std::memcpy(&py, p, 4); p += 4;
+            std::memcpy(&pz, p, 4); p += 4;
+            std::memcpy(&qx, p, 4); p += 4;
+            std::memcpy(&qy, p, 4); p += 4;
+            std::memcpy(&qz, p, 4); p += 4;
+            std::memcpy(&qw, p, 4); p += 4;
+            roll = 0.0f;
+            pitch = 0.0f;
+            yaw = 0.0f;
+            frame.sample_orientations_ros[i] = normalized_quat_or_identity(qx, qy, qz, qw);
+        } else {
+            std::memcpy(&px, p, 4); p += 4;
+            std::memcpy(&py, p, 4); p += 4;
+            std::memcpy(&pz, p, 4); p += 4;
+            std::memcpy(&roll,  p, 4); p += 4;
+            std::memcpy(&pitch, p, 4); p += 4;
+            std::memcpy(&yaw,   p, 4); p += 4;
+        }
 
         frame.samples[i].p_local_ros = glm::vec3(x, y, z);
         frame.samples[i].time = time;
@@ -171,11 +260,7 @@ void LidarScan::build_points_for_frame(FrameData& frame) {
 
     const TimedPointSample& ref = frame.samples[ref_idx];
 
-    const glm::mat3 R_wb_ref = rpy_to_mat3_zyx(
-        ref.base_rpy_ros.x,
-        ref.base_rpy_ros.y,
-        ref.base_rpy_ros.z
-    );
+    const glm::mat3 R_wb_ref = sample_orientation_matrix_ros(frame, ref_idx);
     const glm::mat3 R_wl_ref = R_wb_ref * R_bl;
     const glm::vec3 t_wl_ref = ref.base_pos_ros + R_wb_ref * lidar_offset_from_base_ros;
 
@@ -188,11 +273,7 @@ void LidarScan::build_points_for_frame(FrameData& frame) {
             continue;
         }
 
-        const glm::mat3 R_wb = rpy_to_mat3_zyx(
-            s.base_rpy_ros.x,
-            s.base_rpy_ros.y,
-            s.base_rpy_ros.z
-        );
+        const glm::mat3 R_wb = sample_orientation_matrix_ros(frame, i);
         const glm::mat3 R_wl = R_wb * R_bl;
         const glm::vec3 t_wl = s.base_pos_ros + R_wb * lidar_offset_from_base_ros;
 
