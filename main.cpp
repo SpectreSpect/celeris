@@ -77,6 +77,7 @@
 #include "camera/controllers/third_person_camera_controller.h"
 #include "autopilot/vehicle_command_sender.h"
 #include "vulkan_self/vulkan_submit_context.h"
+#include "vulkan_self/keyboard_input_reciever.h"
 
 #include <algorithm>
 #include <exception>
@@ -86,187 +87,6 @@
 #include <vector>
 #include <random>
 #include <string>
-
-class KeyboardInputReciever {
-public:
-    void add_on_key_pressed_callback(int glfw_key_code, std::function<void()> callback) {
-
-        auto it = m_on_key_pressed_callbacks.find(glfw_key_code);
-        if (it == m_on_key_pressed_callbacks.end()) {
-            m_on_key_pressed_callbacks[glfw_key_code] = std::vector<std::function<void()>>();
-        }
-
-        m_on_key_pressed_callbacks[glfw_key_code].push_back(callback);
-
-
-        // auto it = key_press_states.find(glfw_key_code);
-        // if (it == key_press_states.end())
-        //     key_press_states[glfw_key_code] = false;
-
-        // int glfw_key_state = glfwGetKey(window.handle(), glfw_key_code);
-        
-        // if (!key_press_states[glfw_key_code] && glfw_key_state == GLFW_PRESS)
-        //     key_press_states[glfw_key_code] = true;
-
-        // if (key_press_states[glfw_key_code] && glfw_key_state == GLFW_RELEASE)
-        //     key_press_states[glfw_key_code] = false;
-    }
-
-    // GLFW key code example: GLFW_KEY_C
-    void update(Window& window) {
-        for (auto it = m_on_key_pressed_callbacks.begin(); it != m_on_key_pressed_callbacks.end(); it++) {
-            int glfw_key = it->first;
-            int glfw_key_state = glfwGetKey(window.handle(), glfw_key);
-
-            if (!m_key_press_states[glfw_key] && glfw_key_state == GLFW_PRESS) {
-                m_key_press_states[glfw_key] = true;
-
-                auto on_key_pressed_callbacks = it->second;
-                for (auto callback : on_key_pressed_callbacks) {
-                    callback();
-                }
-            }
-
-            if (m_key_press_states[glfw_key] && glfw_key_state == GLFW_RELEASE) {
-                m_key_press_states[glfw_key] = false;
-            }
-        }
-
-        // auto it = m_key_press_states.find(glfw_key_code);
-        // if (it == m_key_press_states.end()) {
-        //     m_key_press_states[glfw_key_code] = false;
-        // }
-
-        // int glfw_key_state = glfwGetKey(window.handle(), glfw_key_code);
-        
-        // if (!m_key_press_states[glfw_key_code] && glfw_key_state == GLFW_PRESS) {
-        //     m_key_press_states[glfw_key_code] = true;
-        //     return true;
-        // }
-
-        // if (m_key_press_states[glfw_key_code] && glfw_key_state == GLFW_RELEASE) {
-        //     m_key_press_states[glfw_key_code] = false;
-        //     return false;
-        // }
-
-        // return false;
-    }
-
-private:
-    std::unordered_map<int, bool> m_key_press_states;
-    std::unordered_map<int, std::vector<std::function<void()>>> m_on_key_pressed_callbacks;
-};
-
-class KeyboardInputReciever2 {
-public:
-
-    KeyboardInputReciever2(Window& window) : m_window(&window) {
-    }
-
-    bool on_key_pressed(int glfw_key_code) {
-        if (!m_window)
-            throw;
-
-        auto it = m_key_press_states.find(glfw_key_code);
-        if (it == m_key_press_states.end())
-            m_key_press_states[glfw_key_code] = false;
-
-        int glfw_key_state = glfwGetKey(m_window->handle(), glfw_key_code);
-        
-        if (!m_key_press_states[glfw_key_code] && glfw_key_state == GLFW_PRESS) {
-            m_key_press_states[glfw_key_code] = true;
-            m_on_key_press_states[glfw_key_code] = true;
-        }
-
-        if (m_on_key_press_states.find(glfw_key_code) == m_on_key_press_states.end()) {
-            m_on_key_press_states[glfw_key_code] = false;
-        }
-
-        return m_on_key_press_states[glfw_key_code];
-    }
-
-    void update() {
-        for (auto it = m_on_key_press_states.begin(); it != m_on_key_press_states.end(); it++) {
-            it->second = false;
-        }
-
-        for (auto it = m_key_press_states.begin(); it != m_key_press_states.end(); it++) {
-            int glfw_key_state = glfwGetKey(m_window->handle(), it->first);
-            if (it->second && glfw_key_state == GLFW_RELEASE)
-                m_key_press_states[it->first] = false;
-        }
-    }
-
-//     void add_on_key_pressed_callback(int glfw_key_code, std::function<void()> callback) {
-
-//         auto it = m_on_key_pressed_callbacks.find(glfw_key_code);
-//         if (it == m_on_key_pressed_callbacks.end()) {
-//             m_on_key_pressed_callbacks[glfw_key_code] = std::vector<std::function<void()>>();
-//         }
-
-//         m_on_key_pressed_callbacks[glfw_key_code].push_back(callback);
-
-
-//         // auto it = key_press_states.find(glfw_key_code);
-//         // if (it == key_press_states.end())
-//         //     key_press_states[glfw_key_code] = false;
-
-//         // int glfw_key_state = glfwGetKey(window.handle(), glfw_key_code);
-        
-//         // if (!key_press_states[glfw_key_code] && glfw_key_state == GLFW_PRESS)
-//         //     key_press_states[glfw_key_code] = true;
-
-//         // if (key_press_states[glfw_key_code] && glfw_key_state == GLFW_RELEASE)
-//         //     key_press_states[glfw_key_code] = false;
-//     }
-
-//     // GLFW key code example: GLFW_KEY_C
-//     void update(Window& window) {
-//         for (auto it = m_on_key_pressed_callbacks.begin(); it != m_on_key_pressed_callbacks.end(); it++) {
-//             int glfw_key = it->first;
-//             int glfw_key_state = glfwGetKey(window.handle(), glfw_key);
-
-//             if (!m_key_press_states[glfw_key] && glfw_key_state == GLFW_PRESS) {
-//                 m_key_press_states[glfw_key] = true;
-
-//                 auto on_key_pressed_callbacks = it->second;
-//                 for (auto callback : on_key_pressed_callbacks) {
-//                     callback();
-//                 }
-//             }
-
-//             if (m_key_press_states[glfw_key] && glfw_key_state == GLFW_RELEASE) {
-//                 m_key_press_states[glfw_key] = false;
-//             }
-//         }
-
-//         // auto it = m_key_press_states.find(glfw_key_code);
-//         // if (it == m_key_press_states.end()) {
-//         //     m_key_press_states[glfw_key_code] = false;
-//         // }
-
-//         // int glfw_key_state = glfwGetKey(window.handle(), glfw_key_code);
-        
-//         // if (!m_key_press_states[glfw_key_code] && glfw_key_state == GLFW_PRESS) {
-//         //     m_key_press_states[glfw_key_code] = true;
-//         //     return true;
-//         // }
-
-//         // if (m_key_press_states[glfw_key_code] && glfw_key_state == GLFW_RELEASE) {
-//         //     m_key_press_states[glfw_key_code] = false;
-//         //     return false;
-//         // }
-
-//         // return false;
-//     }
-
-private:
-    Window* m_window = nullptr;
-    std::unordered_map<int, bool> m_key_press_states;
-    std::unordered_map<int, bool> m_on_key_press_states;
-
-    // std::unordered_map<int, std::vector<std::function<void()>>> m_on_key_pressed_callbacks;
-};
 
 VkClearValue clear_color = {0.05f, 0.05f, 0.05f, 1.0f};
 
@@ -752,18 +572,7 @@ int main() {
     scene.add(voxel_grid.render_object());
 
     skybox.update(scene);
-
-    bool g_pressed = false;
-    bool t_pressed = false;
-    bool l_pressed = false;
-    bool n_pressed = false;
-    bool place_start_pressed = false;
-    bool place_end_pressed = false;
-    bool start_path_planning_pressed = false;
-    bool move_start_to_vehicle_pressed = false;
-    bool place_footprint_pressed = false;
-    bool fps_camera_pressed = false;
-    bool third_person_camera_pressed = false;
+    
     GamepadController gamepad_controller;
 
     int step = 0;
@@ -843,7 +652,7 @@ int main() {
 
     use_fps_camera_controller();
 
-    KeyboardInputReciever2 keyboard_input_reciever2(window);
+    KeyboardInputReciever keyboard_input_reciever(window);
 
     // KeyboardInputReciever keyboard_input_reciever;
     // keyboard_input_reciever.add_on_key_pressed_callback(GLFW_KEY_F, use_fps_camera_controller);
@@ -854,12 +663,13 @@ int main() {
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
-        keyboard_input_reciever2.update();
+        keyboard_input_reciever.update();
         gamepad_controller.update(
             celeris.car_speed(),
             celeris.vehicle_speed(),
             celeris.vehicle_steering_angle()
         );
+        
         celeris.set_gamepad_command(gamepad_controller.command());
 
         if (skybox_environment_update_pending) {
@@ -906,24 +716,13 @@ int main() {
         }
 
         celeris_visualizer.update();
-
-        // if (!fps_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_F) == GLFW_PRESS) {
-        //     fps_camera_pressed = true;
-        //     use_fps_camera_controller();
-        // }
-        // if (fps_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_F) == GLFW_RELEASE)
-        //     fps_camera_pressed = false;
         
-        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_F)) {
+        if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_F)) {
             use_fps_camera_controller();
         }
-
-        // if (!third_person_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_R) == GLFW_PRESS) {
-        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_R)) {
+        if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_R)) {
             use_third_person_camera_controller();
         }
-        // if (third_person_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_R) == GLFW_RELEASE)
-        //     third_person_camera_pressed = false;
 
         third_person_camera_controller.set_target(celeris.vehicle_position().pos);
         if (camera_controller_mode == CameraControllerMode::FPS)
@@ -938,102 +737,24 @@ int main() {
         voxel_grid.render_object().visible = show_voxel_grid;
         voxel_grid.update(window, camera);
 
-        // if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
-        //     place_start_pressed = true;
-        //     place_start();
-        // }
-
-        // if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
-        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_1)) {
-            // place_start_pressed = true;
+        if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_1))
             place_start();
-        }
-
-        // if (place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_RELEASE) {
-        //     place_start_pressed = false;
-        // }
-
-        // if (!place_end_pressed && glfwGetKey(window.handle(), GLFW_KEY_2) == GLFW_PRESS) {
-        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_2)) {
-            // place_end_pressed = true;
+        if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_2))
             place_end();
-        }
-
-        // if (place_end_pressed && glfwGetKey(window.handle(), GLFW_KEY_2) == GLFW_RELEASE) {
-        //     place_end_pressed = false;
-        // }
-
-        // if (!start_path_planning_pressed && glfwGetKey(window.handle(), GLFW_KEY_3) == GLFW_PRESS) {
-        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_3)) {
-            // start_path_planning_pressed = true;
+        if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_3))
             start_path_planning();
-        }
-
-        // if (start_path_planning_pressed && glfwGetKey(window.handle(), GLFW_KEY_3) == GLFW_RELEASE) {
-        //     start_path_planning_pressed = false;
-        // }
-
-        // if (!move_start_to_vehicle_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_PRESS) {
-        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_4)) {
-            // move_start_to_vehicle_pressed = true;
+        if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_4))
             move_start_to_vehicle();
-        }
-
-        // if (move_start_to_vehicle_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_RELEASE) {
-        //     move_start_to_vehicle_pressed = false;
-        // }
-
-        // if (!place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_5) == GLFW_PRESS) {
-        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_5)) {
-            // place_footprint_pressed = true;
+        if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_5))
             place_footprint();
-        }
-
-        // if (place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_5) == GLFW_RELEASE) {
-        //     place_footprint_pressed = false;
-        // }
-
-        // if (!t_pressed && glfwGetKey(window.handle(), GLFW_KEY_T) == GLFW_PRESS) {
-        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_T)) {
-            // t_pressed = true;
+        if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_T))
             add_directional_waypoint();
-        }
-
-        // if (t_pressed && glfwGetKey(window.handle(), GLFW_KEY_T) == GLFW_RELEASE) {
-        //     t_pressed = false;
-        // }
-
-        // if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
-        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_G)) {
-            // g_pressed = true;
+        if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_G))
             add_nondirectional_waypoint();
-        }
-
-        // if (g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_RELEASE) {
-        //     g_pressed = false;
-        // }
-
-        // if (!l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_PRESS) {
-        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_L)) {
-            // l_pressed = true;
+        if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_L))
             delete_last_waypoint();
+        if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_N)) {
         }
-
-        // if (l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_RELEASE) {
-        //     l_pressed = false;
-        // }
-
-        // if (!n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_PRESS) {
-        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_N)) {
-            // n_pressed = true;
-        }
-
-        // if (n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_RELEASE) {
-        //     n_pressed = false;
-        // }
-
-        // keyboard_input_reciever.update(window);
-
         // Запись команд
         {auto command_buffer_scope = command_buffer.begin_scope();
             {auto render_pass_scope = engine.swapchain_resources().render_pass.begin_scope(

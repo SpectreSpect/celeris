@@ -156,6 +156,7 @@ add_executable(app
   a_star/local_planner.cpp
   a_star/pure_pursuit_vehicle.cpp
   a_star/pure_pursuit_local_planner.cpp
+  vulkan_self/keyboard_input_reciever.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
