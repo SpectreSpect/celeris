@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -18,11 +19,73 @@
 #include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "sensor_msgs/msg/point_field.hpp"
-#include "geometry_msgs/msg/point_stamped.hpp"
-#include "tf2/LinearMath/Matrix3x3.h"
 #include "tf2/LinearMath/Quaternion.h"
 
 using std::placeholders::_1;
+
+namespace {
+constexpr uint32_t imu_accel_quat_frame_flag = 1u << 29;
+constexpr uint32_t frame_convention_shift = 27;
+constexpr size_t imu_accel_quat_floats_per_scan_point = 11;
+
+enum class FrameConvention {
+    RealRos,
+    SimWebots,
+    SimWebotsMirrored
+};
+
+std::string normalized_name(std::string value) {
+    std::transform(
+        value.begin(),
+        value.end(),
+        value.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); }
+    );
+    std::replace(value.begin(), value.end(), '-', '_');
+    return value;
+}
+
+FrameConvention parse_frame_convention(const std::string& value, FrameConvention fallback) {
+    const std::string name = normalized_name(value);
+    if (name == "real" || name == "real_ros" || name == "ros")
+        return FrameConvention::RealRos;
+    if (name == "sim" || name == "simulation" || name == "sim_webots" || name == "webots")
+        return FrameConvention::SimWebots;
+    if (name == "sim_webots_mirrored" || name == "webots_mirrored" || name == "sim_mirrored")
+        return FrameConvention::SimWebotsMirrored;
+    return fallback;
+}
+
+uint32_t frame_convention_bits(FrameConvention convention) {
+    uint32_t code = 0u;
+    switch (convention) {
+    case FrameConvention::SimWebots:
+        code = 1u;
+        break;
+    case FrameConvention::SimWebotsMirrored:
+        code = 2u;
+        break;
+    case FrameConvention::RealRos:
+    default:
+        code = 0u;
+        break;
+    }
+
+    return code << frame_convention_shift;
+}
+
+const char* frame_convention_name(FrameConvention convention) {
+    switch (convention) {
+    case FrameConvention::SimWebots:
+        return "sim_webots";
+    case FrameConvention::SimWebotsMirrored:
+        return "sim_webots_mirrored";
+    case FrameConvention::RealRos:
+    default:
+        return "real_ros";
+    }
+}
+}
 
 class PointCloudSocketSender : public rclcpp::Node {
 public:
@@ -31,17 +94,31 @@ public:
         receiver_host_ = declare_parameter<std::string>("receiver_host", "127.0.0.1");
         receiver_port_ = declare_parameter<int>("receiver_port", 5000);
         lidar_topic_ = declare_parameter<std::string>("lidar_topic", "/vehicle/Velodyne_VLP_16/point_cloud");
-        gps_topic_ = declare_parameter<std::string>("gps_topic", "/gps");
         imu_topic_ = declare_parameter<std::string>("imu_topic", "/imu");
+        mode_ = normalized_name(declare_parameter<std::string>("mode", "real"));
+
+        const bool sim_mode = mode_ == "sim" || mode_ == "simulation" || mode_ == "webots";
+        const FrameConvention default_frame_convention =
+            sim_mode ? FrameConvention::SimWebots : FrameConvention::RealRos;
+
+        const std::string frame_convention_param = declare_parameter<std::string>(
+            "frame_convention",
+            frame_convention_name(default_frame_convention)
+        );
+        frame_convention_ = parse_frame_convention(frame_convention_param, default_frame_convention);
 
         lidar_subscription_ = create_subscription<sensor_msgs::msg::PointCloud2>(
             lidar_topic_, rclcpp::SensorDataQoS(), std::bind(&PointCloudSocketSender::lidar_callback, this, _1));
 
-        gps_sub_ = create_subscription<geometry_msgs::msg::PointStamped>(
-            gps_topic_, rclcpp::SensorDataQoS(), std::bind(&PointCloudSocketSender::gps_callback, this, _1));
-
         imu_sub_ = create_subscription<sensor_msgs::msg::Imu>(
             imu_topic_, rclcpp::SensorDataQoS(), std::bind(&PointCloudSocketSender::imu_callback, this, _1));
+
+        RCLCPP_INFO(
+            get_logger(),
+            "LiDAR socket sender mode=%s packet_format=imu_accel_quat frame_convention=%s",
+            mode_.c_str(),
+            frame_convention_name(frame_convention_)
+        );
     }
 
     ~PointCloudSocketSender() override {
@@ -72,21 +149,15 @@ private:
         return std::isfinite(x) && std::isfinite(y) && std::isfinite(z);
     }
 
-    static double lerp(double a, double b, double t) {
-        return a + (b - a) * t;
+    static bool is_finite4(double x, double y, double z, double w) {
+        return std::isfinite(x) && std::isfinite(y) && std::isfinite(z) && std::isfinite(w);
     }
 
     static double clamp01(double v) {
         return std::clamp(v, 0.0, 1.0);
     }
 
-    void gps_callback(const geometry_msgs::msg::PointStamped::SharedPtr msg) {
-        std::lock_guard<std::mutex> lock(gps_mtx_);
-        gps_buf_.push_back(*msg);
-        trim_buffer(gps_buf_);
-    }
-
-    void imu_callback(const sensor_msgs::msg::Imu::SharedPtr msg) {
+    void imu_callback(const sensor_msgs::msg::Imu::ConstSharedPtr msg) {
         std::lock_guard<std::mutex> lock(imu_mtx_);
         imu_buf_.push_back(*msg);
         trim_buffer(imu_buf_);
@@ -136,62 +207,6 @@ private:
 
         if (out_dt_sec) {
             *out_dt_sec = best_dt;
-        }
-
-        return true;
-    }
-
-    bool interp_gps_by_stamp(
-        const std::deque<geometry_msgs::msg::PointStamped>& buffer,
-        const rclcpp::Time& t,
-        geometry_msgs::msg::PointStamped& out,
-        double* out_dt_sec = nullptr) const {
-        if (buffer.empty()) {
-            return false;
-        }
-
-        const int64_t t_ns = t.nanoseconds();
-        bool have_left = false;
-        bool have_right = false;
-        size_t i_left = 0;
-        size_t i_right = 0;
-        int64_t left_ns = 0;
-        int64_t right_ns = 0;
-
-        for (size_t i = 0; i < buffer.size(); ++i) {
-            const rclcpp::Time ti(buffer[i].header.stamp, t.get_clock_type());
-            const int64_t ti_ns = ti.nanoseconds();
-
-            if (ti_ns <= t_ns && (!have_left || ti_ns > left_ns)) {
-                have_left = true;
-                left_ns = ti_ns;
-                i_left = i;
-            }
-
-            if (ti_ns >= t_ns && (!have_right || ti_ns < right_ns)) {
-                have_right = true;
-                right_ns = ti_ns;
-                i_right = i;
-            }
-        }
-
-        if (!have_left || !have_right || left_ns == right_ns) {
-            return get_closest_by_stamp(buffer, t, out, out_dt_sec);
-        }
-
-        const double alpha = double(t_ns - left_ns) / double(right_ns - left_ns);
-        const auto& left = buffer[i_left];
-        const auto& right = buffer[i_right];
-
-        out = left;
-        out.header.stamp = t;
-        out.point.x = lerp(left.point.x, right.point.x, alpha);
-        out.point.y = lerp(left.point.y, right.point.y, alpha);
-        out.point.z = lerp(left.point.z, right.point.z, alpha);
-
-        if (out_dt_sec) {
-            const int64_t dt = std::min(t_ns - left_ns, right_ns - t_ns);
-            *out_dt_sec = double(dt) * 1e-9;
         }
 
         return true;
@@ -357,28 +372,35 @@ private:
         }
 
         {
-            std::lock_guard<std::mutex> gps_lock(gps_mtx_);
             std::lock_guard<std::mutex> imu_lock(imu_mtx_);
 
-            if (gps_buf_.empty() || imu_buf_.empty()) {
-                RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "Waiting for GPS and IMU samples");
+            if (imu_buf_.empty()) {
+                RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "Waiting for IMU samples");
                 return;
             }
         }
 
         const uint32_t point_count = point_cloud->width * point_cloud->height;
+        const uint32_t count_header =
+            point_count |
+            imu_accel_quat_frame_flag |
+            frame_convention_bits(frame_convention_);
         const uint64_t timestamp_ns =
             uint64_t(point_cloud->header.stamp.sec) * 1'000'000'000ull +
             uint64_t(point_cloud->header.stamp.nanosec);
 
         std::vector<uint8_t> frame;
-        frame.reserve(sizeof(timestamp_ns) + sizeof(point_count) + size_t(point_count) * 10 * sizeof(float));
+        frame.reserve(
+            sizeof(timestamp_ns) +
+            sizeof(count_header) +
+            size_t(point_count) * imu_accel_quat_floats_per_scan_point * sizeof(float)
+        );
 
         const uint8_t* timestamp_bytes = reinterpret_cast<const uint8_t*>(&timestamp_ns);
         frame.insert(frame.end(), timestamp_bytes, timestamp_bytes + sizeof(timestamp_ns));
 
-        const uint8_t* count_bytes = reinterpret_cast<const uint8_t*>(&point_count);
-        frame.insert(frame.end(), count_bytes, count_bytes + sizeof(point_count));
+        const uint8_t* count_bytes = reinterpret_cast<const uint8_t*>(&count_header);
+        frame.insert(frame.end(), count_bytes, count_bytes + sizeof(count_header));
 
         const float inf = std::numeric_limits<float>::infinity();
         float min_time = std::numeric_limits<float>::infinity();
@@ -390,20 +412,17 @@ private:
             float x = read_scalar_le<float>(base + fx->offset);
             float y = read_scalar_le<float>(base + fy->offset);
             float z = read_scalar_le<float>(base + fz->offset);
-            float time = ftime ? read_scalar_le<float>(base + ftime->offset) : read_scalar_le<float>(base + 16);
+            float time = 0.0f;
+            if (ftime) {
+                time = read_scalar_le<float>(base + ftime->offset);
+            } else if (point_cloud->point_step >= 20) {
+                time = read_scalar_le<float>(base + 16);
+            }
 
             const rclcpp::Time point_time =
                 rclcpp::Time(point_cloud->header.stamp) + rclcpp::Duration::from_seconds(time);
 
-            geometry_msgs::msg::PointStamped gps;
             sensor_msgs::msg::Imu imu;
-            {
-                std::lock_guard<std::mutex> lock(gps_mtx_);
-                if (!interp_gps_by_stamp(gps_buf_, point_time, gps)) {
-                    get_closest_by_stamp(gps_buf_, point_time, gps);
-                }
-            }
-
             {
                 std::lock_guard<std::mutex> lock(imu_mtx_);
                 if (!interp_imu_by_stamp(imu_buf_, point_time, imu)) {
@@ -417,16 +436,11 @@ private:
                 imu.orientation.z,
                 imu.orientation.w);
 
-            if (q_tf.length2() <= 0.0) {
+            if (!is_finite4(q_tf.x(), q_tf.y(), q_tf.z(), q_tf.w()) || q_tf.length2() <= 0.0) {
                 q_tf = tf2::Quaternion(0.0, 0.0, 0.0, 1.0);
             }
 
             q_tf.normalize();
-
-            double roll = 0.0;
-            double pitch = 0.0;
-            double yaw = 0.0;
-            tf2::Matrix3x3(q_tf).getRPY(roll, pitch, yaw);
 
             if (time < min_time) {
                 min_time = time;
@@ -446,12 +460,23 @@ private:
             append_float(frame, y);
             append_float(frame, z);
             append_float(frame, time);
-            append_float(frame, static_cast<float>(gps.point.x));
-            append_float(frame, static_cast<float>(gps.point.y));
-            append_float(frame, static_cast<float>(gps.point.z));
-            append_float(frame, static_cast<float>(roll));
-            append_float(frame, static_cast<float>(pitch));
-            append_float(frame, static_cast<float>(yaw));
+
+            float ax = static_cast<float>(imu.linear_acceleration.x);
+            float ay = static_cast<float>(imu.linear_acceleration.y);
+            float az = static_cast<float>(imu.linear_acceleration.z);
+            if (!is_finite3(ax, ay, az)) {
+                ax = 0.0f;
+                ay = 0.0f;
+                az = 0.0f;
+            }
+
+            append_float(frame, ax);
+            append_float(frame, ay);
+            append_float(frame, az);
+            append_float(frame, static_cast<float>(q_tf.x()));
+            append_float(frame, static_cast<float>(q_tf.y()));
+            append_float(frame, static_cast<float>(q_tf.z()));
+            append_float(frame, static_cast<float>(q_tf.w()));
         }
 
         if (!ensure_connected()) {
@@ -467,10 +492,11 @@ private:
             get_logger(),
             *get_clock(),
             1000,
-            "Sent frame %lu: %u points, %.2f MB, point time %.6f..%.6f",
+            "Sent frame %lu: %u points, %.2f MB, imu_accel_quat/%s, point time %.6f..%.6f",
             frame_id_,
             point_count,
             static_cast<double>(frame.size()) / (1024.0 * 1024.0),
+            frame_convention_name(frame_convention_),
             min_time,
             max_time);
 
@@ -480,18 +506,16 @@ private:
     std::string receiver_host_;
     int receiver_port_ = 5000;
     std::string lidar_topic_;
-    std::string gps_topic_;
     std::string imu_topic_;
+    std::string mode_;
+    FrameConvention frame_convention_ = FrameConvention::RealRos;
     int socket_ = -1;
     uint64_t frame_id_ = 0;
 
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_subscription_;
-    rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr gps_sub_;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
 
     std::mutex imu_mtx_;
-    std::mutex gps_mtx_;
-    std::deque<geometry_msgs::msg::PointStamped> gps_buf_;
     std::deque<sensor_msgs::msg::Imu> imu_buf_;
     rclcpp::Duration max_buf_age_ = rclcpp::Duration::from_seconds(2.0);
 };

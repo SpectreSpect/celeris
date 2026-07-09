@@ -1,5 +1,7 @@
 #include "celeris.h"
 
+#include "../a_star/local_planner.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -8,6 +10,7 @@
 #include <imgui.h>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <unordered_set>
 #include <utility>
 #include <glm/gtc/quaternion.hpp>
@@ -41,6 +44,20 @@ namespace {
 
     float length_sq(glm::vec3 value) noexcept {
         return glm::dot(value, value);
+    }
+
+    glm::vec3 clamp_length(glm::vec3 value, float max_length) noexcept {
+        if (max_length <= 0.0f)
+            return glm::vec3(0.0f);
+
+        const float len = glm::length(value);
+        if (!std::isfinite(len))
+            return glm::vec3(0.0f);
+
+        if (len <= max_length || len <= 1e-6f)
+            return value;
+
+        return value * (max_length / len);
     }
 
     bool is_finite(float value) noexcept {
@@ -276,11 +293,11 @@ Celeris::Celeris(VulkanEngine& engine,
         m_scan_receiver(m_point_cloud_preprocessor, desc.receiver_port),
         m_command_sender(),
         m_vehicle_state_receiver(desc.vehicle_state_receiver_port),
-        m_vehicle(
+        m_vehicle(std::make_unique<Vehicle>(
             desc.max_vehicle_acceleration,
             desc.max_vehicle_steer_acceleration,
             desc.vehicle_wheel_base
-        ),
+        )),
         m_path_planner(
             engine,
             submit_context,
@@ -297,6 +314,7 @@ Celeris::Celeris(VulkanEngine& engine,
                 .nonholonomic_astar_desc = desc.nonholonomic_astar_desc
             }
         ),
+        m_local_planner(std::make_unique<LocalPlanner>()),
         m_voxel_point_map(engine,
                           desc.voxel_point_map_num_hash_table_slots,
                           desc.voxel_point_map_max_map_point_count),
@@ -316,7 +334,7 @@ Celeris::Celeris(VulkanEngine& engine,
     logger().check(desc.max_write_count > 0, "Max write count must be greater than 0");
     logger().check(desc.waypoint_reach_radius > 0.0f, "Waypoint reach radius must be greater than 0");
 
-    Vehicle::SimulationFollowParams& follow_params = m_vehicle.follow_params();
+    Vehicle::SimulationFollowParams& follow_params = mpc_vehicle().follow_params();
     follow_params.cruise_speed = std::max(0.0f, desc.vehicle_cruise_speed);
     follow_params.min_slowdown_acceleration = std::max(0.0f, desc.vehicle_min_slowdown_acceleration);
     follow_params.min_off_path_speed_factor = std::clamp(
@@ -339,9 +357,41 @@ Celeris::Celeris(VulkanEngine& engine,
     m_waypoint_reach_radius = desc.waypoint_reach_radius;
     m_gamepad_commands_enabled = desc.gamepad_commands_enabled;
     m_gamepad_command = desc.gamepad_command;
-    if (m_gamepad_commands_enabled)
-        m_command_sender.set_command(m_gamepad_command);
+    // if (m_gamepad_commands_enabled)
+    //     m_command_sender.set_command(m_gamepad_command);
     m_voxel_map_reseter.reset(m_voxel_point_map);
+}
+
+VehicleBase& Celeris::vehicle() noexcept {
+    return *m_vehicle;
+}
+
+const VehicleBase& Celeris::vehicle() const noexcept {
+    return *m_vehicle;
+}
+
+LocalPlannerBase& Celeris::local_planner() noexcept {
+    return *m_local_planner;
+}
+
+const LocalPlannerBase& Celeris::local_planner() const noexcept {
+    return *m_local_planner;
+}
+
+Vehicle& Celeris::mpc_vehicle() noexcept {
+    return static_cast<Vehicle&>(*m_vehicle);
+}
+
+const Vehicle& Celeris::mpc_vehicle() const noexcept {
+    return static_cast<const Vehicle&>(*m_vehicle);
+}
+
+LocalPlanner& Celeris::mpc_local_planner() noexcept {
+    return static_cast<LocalPlanner&>(*m_local_planner);
+}
+
+const LocalPlanner& Celeris::mpc_local_planner() const noexcept {
+    return static_cast<const LocalPlanner&>(*m_local_planner);
 }
 
 void Celeris::start_lidar_receiver() {
@@ -350,6 +400,13 @@ void Celeris::start_lidar_receiver() {
     m_scan_receiver.start();
     m_received_scan_count = 0;
     m_has_previous_lidar_pose = false;
+    m_lidar_velocity = glm::vec3(0.0f);
+    m_lidar_gravity_engine = glm::vec3(0.0f);
+    m_has_lidar_gravity_engine = false;
+    m_has_previous_corrected_lidar_pose = false;
+    m_previous_corrected_lidar_position = glm::vec3(0.0f);
+    m_previous_corrected_lidar_rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    m_previous_corrected_lidar_timestamp_ns = 0;
     m_collision_raw_position_history.clear();
     m_has_collision_surface_point = false;
 }
@@ -368,7 +425,7 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
 
     sync_path_planner_result();
 
-    m_local_planner.update_timestamp();
+    local_planner().update_timestamp();
 
     VehicleFeedback vehicle_feedback;
     const bool has_vehicle_feedback =
@@ -378,11 +435,11 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         apply_vehicle_feedback(vehicle_feedback);
     }
     if (m_gamepad_commands_enabled) {
-        const float delta_time = m_local_planner.calculate_delta_time();
+        const float delta_time = local_planner().calculate_delta_time();
         if (delta_time > 0.0f) {
-            m_vehicle.state().m_steering_angle_velocity =
+            vehicle().state().m_steering_angle_velocity =
                 m_gamepad_command.steering_angle_velocity;
-            m_vehicle.simulate_vehicle(
+            vehicle().simulate_vehicle(
                 m_gamepad_command.acceleration,
                 0.0f,
                 delta_time,
@@ -391,12 +448,15 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
             );
         }
     } else {
-        m_local_planner.predict_vehicle_state(m_vehicle);
+        local_planner().predict_vehicle_state(vehicle());
     }
 
     float vehicle_height = m_vehicle_position.pos.y;
 
     if (auto scan = m_scan_receiver.try_pop_scan(*m_manager_bundle)) {
+        const bool has_scan_acceleration = scan->has_linear_acceleration_engine();
+        const glm::vec3 scan_acceleration_engine_local = scan->linear_acceleration_engine();
+        const uint64_t scan_timestamp_ns = scan->timestamp_ns();
         glm::vec3 raw_position = scan->point_cloud().transform.position;
         glm::quat raw_rotation = glm::normalize(scan->point_cloud().transform.rotation);
 
@@ -421,6 +481,36 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         //     scan_index_count
         // );
 
+        // m_network_scan
+
+        float scan_dt = 0.0f;
+        if (m_has_previous_corrected_lidar_pose &&
+            scan_timestamp_ns > m_previous_corrected_lidar_timestamp_ns) {
+            scan_dt = static_cast<float>(
+                static_cast<double>(scan_timestamp_ns - m_previous_corrected_lidar_timestamp_ns) * 1e-9
+            );
+        }
+
+        const bool valid_scan_dt =
+            scan_dt > 0.0f &&
+            scan_dt <= std::max(0.0f, m_desc.lidar_accel_max_dt);
+
+        auto scan_acceleration_engine = [&]() {
+            const glm::vec3 acceleration_engine =
+                glm::normalize(raw_rotation) * scan_acceleration_engine_local;
+
+            if (!m_has_lidar_gravity_engine) {
+                m_lidar_gravity_engine = acceleration_engine;
+                m_has_lidar_gravity_engine = true;
+            }
+
+            return acceleration_engine - m_lidar_gravity_engine;
+        };
+
+        if (has_scan_acceleration && !m_has_lidar_gravity_engine) {
+            (void)scan_acceleration_engine();
+        }
+
         if (!m_has_previous_lidar_pose) {
             if (m_has_start_lidar_scan_position) {
                 m_network_scan->point_cloud().transform.position = m_start_lidar_scan_position;
@@ -440,26 +530,68 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
             glm::vec3 delta_position = raw_position - m_previous_lidar_position;
             glm::quat delta_rotation = glm::normalize(raw_rotation * glm::inverse(m_previous_lidar_rotation));
 
-            glm::vec3 previous_map_position = glm::vec3(0.0f);
-            glm::quat previous_map_rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+            const glm::vec3 previous_map_position = m_has_previous_corrected_lidar_pose
+                ? m_previous_corrected_lidar_position
+                : glm::vec3(0.0f);
+            const glm::quat previous_map_rotation = m_has_previous_corrected_lidar_pose
+                ? glm::normalize(m_previous_corrected_lidar_rotation)
+                : glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
-            if (!m_retired_network_scans.empty()) {
-                PointCloud& previous_point_cloud = m_retired_network_scans.back()->point_cloud();
-                previous_map_position = previous_point_cloud.transform.position;
-                previous_map_rotation = glm::normalize(previous_point_cloud.transform.rotation);
+            bool used_acceleration_prediction = false;
+            if (m_desc.lidar_accel_prediction_enabled &&
+                has_scan_acceleration &&
+                m_has_previous_corrected_lidar_pose &&
+                valid_scan_dt) {
+                glm::vec3 acceleration_engine = scan_acceleration_engine();
+                acceleration_engine = clamp_length(
+                    acceleration_engine,
+                    std::max(0.0f, m_desc.lidar_accel_max_mps2)
+                );
+
+                m_lidar_velocity = clamp_length(
+                    m_lidar_velocity + acceleration_engine * scan_dt,
+                    std::max(0.0f, m_desc.lidar_velocity_max_mps)
+                );
+
+                m_network_scan->point_cloud().transform.position =
+                    previous_map_position + m_lidar_velocity * scan_dt;
+                m_network_scan->point_cloud().transform.rotation =
+                    glm::normalize(delta_rotation * previous_map_rotation);
+                used_acceleration_prediction = true;
             }
 
-            m_network_scan->point_cloud().transform.position = previous_map_position + delta_position;
-            m_network_scan->point_cloud().transform.rotation = glm::normalize(delta_rotation * previous_map_rotation);
+            if (!used_acceleration_prediction) {
+                m_network_scan->point_cloud().transform.position = previous_map_position + delta_position;
+                m_network_scan->point_cloud().transform.rotation = glm::normalize(delta_rotation * previous_map_rotation);
+            }
         }
 
         // if (!m_needs_map_localization && m_voxel_point_map.map_point_count() > 0u) {
         if (m_voxel_point_map.map_point_count() > 0u) {
+            // std::cout << "FIT" << std::endl;
+
             m_gicp_pass.fit(m_voxel_point_map,
                             m_network_scan->point_cloud(),
                             m_network_scan->normal_buffer(),
                             m_desc.max_gicp_iterations);
         }
+
+        const glm::vec3 corrected_lidar_position =
+            m_network_scan->point_cloud().transform.position;
+        const glm::quat corrected_lidar_rotation =
+            glm::normalize(m_network_scan->point_cloud().transform.rotation);
+
+        if (m_has_previous_corrected_lidar_pose && valid_scan_dt) {
+            m_lidar_velocity = clamp_length(
+                (corrected_lidar_position - m_previous_corrected_lidar_position) / scan_dt,
+                std::max(0.0f, m_desc.lidar_velocity_max_mps)
+            );
+        }
+
+        m_previous_corrected_lidar_position = corrected_lidar_position;
+        m_previous_corrected_lidar_rotation = corrected_lidar_rotation;
+        m_previous_corrected_lidar_timestamp_ns = scan_timestamp_ns;
+        m_has_previous_corrected_lidar_pose = true;
         
         m_lidar_transform = m_network_scan->point_cloud().transform;
         const Transform vehicle_transform = rear_axle_transform_from_lidar_transform(m_lidar_transform);
@@ -472,11 +604,11 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         const float vehicle_heading = std::atan2(vehicle_forward.z, vehicle_forward.x);
 
         // Корректируем позу машины по lidar/GICP. Скорость и руль приходят отдельно.
-        m_vehicle.state().m_position = glm::vec2{
+        vehicle().state().m_position = glm::vec2{
             vehicle_transform.position.x,
             vehicle_transform.position.z
         };
-        m_vehicle.state().m_heading = vehicle_heading;
+        vehicle().state().m_heading = vehicle_heading;
 
         // //=====================
         m_voxel_map_inserter.insert(m_voxel_point_map, m_network_scan->point_cloud(), m_network_scan->normal_buffer());
@@ -521,8 +653,8 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
     if (should_update_local_planner) {
         VehicleCommand vehicle_command;
         if (!m_waypoint_path_completed || m_waypoint_path.waypoints().empty()) {
-            vehicle_command = m_local_planner.step(
-                m_vehicle,
+            vehicle_command = local_planner().step(
+                vehicle(),
                 m_path_intersection_detector,
                 submit_context
             );
@@ -536,7 +668,7 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
 }
 
 void Celeris::apply_vehicle_feedback(const VehicleFeedback& feedback) {
-    Vehicle::VehicleTransformState& state = m_vehicle.state();
+    VehicleBase::VehicleTransformState& state = vehicle().state();
 
     if (feedback.has_odometry()) {
         if (!feedback.has_vehicle_state() && is_finite(feedback.linear_velocity_ros)) {
@@ -574,7 +706,7 @@ bool Celeris::is_vehicle_feedback_fresh(const VehicleFeedback& feedback) const {
 }
 
 void Celeris::sync_vehicle_position_from_state(float height) {
-    const Vehicle::VehicleTransformState& state = m_vehicle.state();
+    const VehicleBase::VehicleTransformState& state = vehicle().state();
 
     m_vehicle_position.pos = glm::vec3{
         state.m_position.x,
@@ -622,7 +754,7 @@ void Celeris::set_car_speed(float speed) noexcept {
         return;
 
     m_car_speed = std::max(0.0f, speed);
-    m_vehicle.follow_params().cruise_speed = m_car_speed;
+    mpc_vehicle().follow_params().cruise_speed = m_car_speed;
 }
 
 void Celeris::set_waypoint_reach_radius(float radius) noexcept {
@@ -632,11 +764,11 @@ void Celeris::set_waypoint_reach_radius(float radius) noexcept {
 
 void Celeris::set_gamepad_commands_enabled(bool enabled) noexcept {
     m_gamepad_commands_enabled = enabled;
-    if (enabled) {
-        m_command_sender.set_command(m_gamepad_command);
-    } else {
-        m_gamepad_command = VehicleCommand{};
-    }
+    // if (enabled) {
+    //     m_command_sender.set_command(m_gamepad_command);
+    // } else {
+    //     m_gamepad_command = VehicleCommand{};
+    // }
 }
 
 void Celeris::set_gamepad_command(VehicleCommand command) noexcept {
@@ -644,8 +776,8 @@ void Celeris::set_gamepad_command(VehicleCommand command) noexcept {
         return;
 
     m_gamepad_command = command;
-    if (m_gamepad_commands_enabled)
-        m_command_sender.set_command(m_gamepad_command);
+    // if (m_gamepad_commands_enabled)
+    //     m_command_sender.set_command(m_gamepad_command);
 }
 
 void Celeris::add_waypoint(glm::vec3 position) {
@@ -692,15 +824,15 @@ NonholonomicPos Celeris::goal_position() const noexcept {
 }
 
 float Celeris::car_speed() const noexcept {
-    return m_vehicle.follow_params().cruise_speed;
+    return mpc_vehicle().follow_params().cruise_speed;
 }
 
 float Celeris::vehicle_speed() const noexcept {
-    return m_vehicle.state().m_speed;
+    return vehicle().state().m_speed;
 }
 
 float Celeris::vehicle_steering_angle() const noexcept {
-    return m_vehicle.state().m_steering_angle;
+    return vehicle().state().m_steering_angle;
 }
 
 float Celeris::waypoint_reach_radius() const noexcept {
@@ -754,19 +886,27 @@ VoxelMapPointReseter& Celeris::voxel_map_reseter() {
 const std::vector<Vehicle::SimulationControlCandidate>&
 Celeris::local_planner_candidates() const noexcept
 {
-    return m_local_planner.last_simulation_candidates();
+    return mpc_local_planner().last_simulation_candidates();
 }
 
 float Celeris::local_planner_path_window_min_s() const noexcept {
-    return m_local_planner.path_window_min_s();
+    return local_planner().path_window_min_s();
 }
 
 float Celeris::local_planner_path_window_max_s() const noexcept {
-    return m_local_planner.path_window_max_s();
+    return local_planner().path_window_max_s();
 }
 
 float Celeris::local_planner_segment_switch_radius() const noexcept {
-    return m_vehicle.follow_params().segment_switch_radius;
+    return mpc_vehicle().follow_params().segment_switch_radius;
+}
+
+bool Celeris::has_local_planner_lookahead_point() const noexcept {
+    return false;
+}
+
+glm::vec3 Celeris::local_planner_lookahead_point() const noexcept {
+    return m_vehicle_position.pos;
 }
 
 Footprint& Celeris::footprint() noexcept {
@@ -1111,9 +1251,9 @@ void Celeris::reset_local_planner_tracking() {
     }
 
     if (!current_path.empty())
-        m_local_planner.set_astar_path(current_path);
+        local_planner().set_astar_path(current_path);
 
-    m_local_planner.reset_tracking();
+    local_planner().reset_tracking();
 }
 
 bool Celeris::adjust_to_ground(
@@ -1192,9 +1332,8 @@ std::vector<NonholonomicPos> Celeris::get_nonholonomic_astar_path() const {
 }
 
 void Celeris::display_path_planner_debug_controls() {
-    if (!ImGui::CollapsingHeader("Path planner")) {
+    if (!ImGui::CollapsingHeader("Path planner"))
         return;
-    }
 
     PathPlanner::PathPlannerResult result = path_result_snapshot();
 
@@ -1259,39 +1398,38 @@ void Celeris::display_path_planner_debug_controls() {
             feedback.has_vehicle_state() ? 1 : 0);
     }
 
-    const Vehicle::VehicleTransformState& state = m_vehicle.state();
-    const Vehicle::SimulationFollowParams& follow_params = m_vehicle.follow_params();
+    const VehicleBase::VehicleTransformState& state = vehicle().state();
+    Vehicle::SimulationFollowParams& follow_params = mpc_vehicle().follow_params();
     ImGui::Text("Vehicle speed: %.3f", state.m_speed);
     ImGui::Text("Vehicle cruise speed: %.3f", follow_params.cruise_speed);
     ImGui::Text("Vehicle acceleration: %.3f", state.m_speed_acceleration);
     ImGui::Text("Steering angle: %.3f", state.m_steering_angle);
     ImGui::Text("Steering velocity: %.3f", state.m_steering_angle_velocity);
 
-    const std::vector<Vehicle::SimulationControlCandidate>& candidates =
-        m_local_planner.last_simulation_candidates();
-    ImGui::Text("Local candidates: %zu", candidates.size());
     if (ImGui::DragFloat("Local planner update period", &m_desc.local_planner_update_period, 0.001f, 0.0f, 0.2f, "%.3f")) {
         m_desc.local_planner_update_period = std::max(0.0f, m_desc.local_planner_update_period);
     }
+    ImGui::Text("Local planner: MPC");
     ImGui::Text(
         "Local path progress: %.2f / %.2f",
-        m_local_planner.path_progress_s(),
-        m_local_planner.path_length()
+        local_planner().path_progress_s(),
+        local_planner().path_length()
     );
     ImGui::Text(
         "Local s window: %.2f .. %.2f",
-        m_local_planner.path_window_min_s(),
-        m_local_planner.path_window_max_s()
+        local_planner().path_window_min_s(),
+        local_planner().path_window_max_s()
     );
     ImGui::Text(
         "Local path segment: %zu / %zu",
-        m_local_planner.active_path_segment_index(),
-        m_local_planner.path_segment_count()
+        mpc_local_planner().active_path_segment_index(),
+        mpc_local_planner().path_segment_count()
     );
     ImGui::Text(
         "Local path generation: %llu",
-        static_cast<unsigned long long>(m_local_planner.path_generation())
+        static_cast<unsigned long long>(local_planner().path_generation())
     );
+
     if (ImGui::TreeNode("Active path potential visualization")) {
         if (ImGui::DragFloat("Field radius", &m_path_potential_visualization_radius, 0.5f, 1.0f, 100.0f, "%.2f")) {
             m_path_potential_visualization_radius =
@@ -1305,11 +1443,11 @@ void Celeris::display_path_planner_debug_controls() {
             m_path_potential_visualization_vertical_drop =
                 std::max(0.0f, m_path_potential_visualization_vertical_drop);
         }
-        float distance_exponent = m_vehicle.path_potential_distance_exponent();
+        float distance_exponent = mpc_vehicle().path_potential_distance_exponent();
         if (ImGui::DragFloat("Distance exponent", &distance_exponent, 0.01f, 0.0f, 4.0f, "%.3f")) {
-            m_vehicle.set_path_potential_distance_exponent(distance_exponent);
+            mpc_vehicle().set_path_potential_distance_exponent(distance_exponent);
         }
-        Vehicle::PathPotentialParams& potential_params = m_vehicle.path_potential_params();
+        Vehicle::PathPotentialParams& potential_params = mpc_vehicle().path_potential_params();
         if (ImGui::DragFloat("Additional radius", &potential_params.additional_radius, 0.01f, 0.0f, 50.0f, "%.3f")) {
             potential_params.additional_radius = std::max(0.0f, potential_params.additional_radius);
         }
@@ -1320,7 +1458,7 @@ void Celeris::display_path_planner_debug_controls() {
             potential_params.plane_k = std::max(0.0f, potential_params.plane_k);
         }
         if (ImGui::Button("Reset path potential params")) {
-            m_vehicle.reset_path_potential_params();
+            mpc_vehicle().reset_path_potential_params();
         }
         if (ImGui::Button("Visualize active path potential")) {
             visualize_active_path_potential();
@@ -1331,6 +1469,9 @@ void Celeris::display_path_planner_debug_controls() {
         );
         ImGui::TreePop();
     }
+
+    const std::vector<Vehicle::SimulationControlCandidate>& candidates =
+        mpc_local_planner().last_simulation_candidates();
     if (!candidates.empty()) {
         auto display_candidate_loss_breakdown =
             [](const Vehicle::SimulationLossBreakdown& breakdown) {
@@ -1407,55 +1548,54 @@ void Celeris::display_path_planner_debug_controls() {
 
     ImGui::Separator();
     if (ImGui::TreeNode("Local planner follow params")) {
-        Vehicle::SimulationFollowParams& params = m_vehicle.follow_params();
-
-        float cruise_speed = params.cruise_speed;
+        float cruise_speed = follow_params.cruise_speed;
         if (ImGui::DragFloat("Cruise speed", &cruise_speed, 0.1f, 0.0f, 40.0f, "%.3f")) {
             set_car_speed(cruise_speed);
         }
-        if (ImGui::DragFloat("Min Slowdown acceleration", &params.min_slowdown_acceleration, 0.05f, 0.0f, 50.0f, "%.3f")) {
-            params.min_slowdown_acceleration = std::max(0.0f, params.min_slowdown_acceleration);
+        if (ImGui::DragFloat("Min Slowdown acceleration", &follow_params.min_slowdown_acceleration, 0.05f, 0.0f, 50.0f, "%.3f")) {
+            follow_params.min_slowdown_acceleration = std::max(0.0f, follow_params.min_slowdown_acceleration);
         }
-        if (ImGui::DragFloat("Min off-path speed factor", &params.min_off_path_speed_factor, 0.01f, 0.0f, 1.0f, "%.3f")) {
-            params.min_off_path_speed_factor = std::clamp(params.min_off_path_speed_factor, 0.0f, 1.0f);
+        if (ImGui::DragFloat("Min off-path speed factor", &follow_params.min_off_path_speed_factor, 0.01f, 0.0f, 1.0f, "%.3f")) {
+            follow_params.min_off_path_speed_factor = std::clamp(follow_params.min_off_path_speed_factor, 0.0f, 1.0f);
         }
-        if (ImGui::DragFloat("Projection backtrack window", &params.projection_backtrack_window, 0.05f, 0.0f, 20.0f, "%.3f")) {
-            params.projection_backtrack_window = std::max(0.0f, params.projection_backtrack_window);
+        if (ImGui::DragFloat("Projection backtrack window", &follow_params.projection_backtrack_window, 0.05f, 0.0f, 20.0f, "%.3f")) {
+            follow_params.projection_backtrack_window = std::max(0.0f, follow_params.projection_backtrack_window);
         }
-        if (ImGui::DragFloat("Projection lookahead base", &params.projection_lookahead_base, 0.05f, 0.0f, 50.0f, "%.3f")) {
-            params.projection_lookahead_base = std::max(0.0f, params.projection_lookahead_base);
+        if (ImGui::DragFloat("Projection lookahead base", &follow_params.projection_lookahead_base, 0.05f, 0.0f, 50.0f, "%.3f")) {
+            follow_params.projection_lookahead_base = std::max(0.0f, follow_params.projection_lookahead_base);
         }
-        if (ImGui::DragFloat("Segment switch radius", &params.segment_switch_radius, 0.01f, 0.0f, 10.0f, "%.3f")) {
-            params.segment_switch_radius = std::max(0.0f, params.segment_switch_radius);
+        if (ImGui::DragFloat("Segment switch radius", &follow_params.segment_switch_radius, 0.01f, 0.0f, 10.0f, "%.3f")) {
+            follow_params.segment_switch_radius = std::max(0.0f, follow_params.segment_switch_radius);
         }
-        if (ImGui::DragFloat("Min virtual direction segment length", &params.min_direction_segment_virtual_length, 0.05f, 0.0f, 20.0f, "%.3f")) {
-            params.min_direction_segment_virtual_length = std::max(0.0f, params.min_direction_segment_virtual_length);
+        if (ImGui::DragFloat("Min virtual direction segment length", &follow_params.min_direction_segment_virtual_length, 0.05f, 0.0f, 20.0f, "%.3f")) {
+            follow_params.min_direction_segment_virtual_length = std::max(0.0f, follow_params.min_direction_segment_virtual_length);
         }
-        if (ImGui::DragFloat("Direction switch arrival speed", &params.direction_switch_arrival_speed, 0.01f, 0.0f, 5.0f, "%.3f")) {
-            params.direction_switch_arrival_speed = std::max(0.0f, params.direction_switch_arrival_speed);
+        if (ImGui::DragFloat("Direction switch arrival speed", &follow_params.direction_switch_arrival_speed, 0.01f, 0.0f, 5.0f, "%.3f")) {
+            follow_params.direction_switch_arrival_speed = std::max(0.0f, follow_params.direction_switch_arrival_speed);
         }
-        if (ImGui::DragFloat("Direction switch approach speed", &params.direction_switch_approach_speed, 0.01f, 0.0f, 5.0f, "%.3f")) {
-            params.direction_switch_approach_speed = std::max(0.0f, params.direction_switch_approach_speed);
+        if (ImGui::DragFloat("Direction switch approach speed", &follow_params.direction_switch_approach_speed, 0.01f, 0.0f, 5.0f, "%.3f")) {
+            follow_params.direction_switch_approach_speed = std::max(0.0f, follow_params.direction_switch_approach_speed);
         }
 
         if (ImGui::Button("Reset follow params")) {
-            params.cruise_speed = std::max(0.0f, m_desc.vehicle_cruise_speed);
-            params.min_slowdown_acceleration = std::max(0.0f, m_desc.vehicle_min_slowdown_acceleration);
-            params.min_off_path_speed_factor = std::clamp(
+            follow_params = Vehicle::SimulationFollowParams{};
+            follow_params.cruise_speed = std::max(0.0f, m_desc.vehicle_cruise_speed);
+            follow_params.min_slowdown_acceleration = std::max(0.0f, m_desc.vehicle_min_slowdown_acceleration);
+            follow_params.min_off_path_speed_factor = std::clamp(
                 m_desc.vehicle_min_off_path_speed_factor,
                 0.0f,
                 1.0f
             );
-            params.projection_backtrack_window = std::max(0.0f, m_desc.vehicle_projection_backtrack_window);
-            params.projection_lookahead_base = std::max(0.0f, m_desc.vehicle_projection_lookahead_base);
-            params.segment_switch_radius = std::max(0.0f, m_desc.vehicle_segment_switch_radius);
-            params.min_direction_segment_virtual_length =
+            follow_params.projection_backtrack_window = std::max(0.0f, m_desc.vehicle_projection_backtrack_window);
+            follow_params.projection_lookahead_base = std::max(0.0f, m_desc.vehicle_projection_lookahead_base);
+            follow_params.segment_switch_radius = std::max(0.0f, m_desc.vehicle_segment_switch_radius);
+            follow_params.min_direction_segment_virtual_length =
                 std::max(0.0f, m_desc.vehicle_min_direction_segment_virtual_length);
-            params.direction_switch_arrival_speed =
+            follow_params.direction_switch_arrival_speed =
                 std::max(0.0f, m_desc.vehicle_direction_switch_arrival_speed);
-            params.direction_switch_approach_speed =
+            follow_params.direction_switch_approach_speed =
                 std::max(0.0f, m_desc.vehicle_direction_switch_approach_speed);
-            m_car_speed = params.cruise_speed;
+            m_car_speed = follow_params.cruise_speed;
         }
 
         ImGui::TreePop();
@@ -1463,7 +1603,7 @@ void Celeris::display_path_planner_debug_controls() {
 
     ImGui::Separator();
     if (ImGui::TreeNode("Local planner potential weights")) {
-        Vehicle::SimulationLossWeights& weights = m_vehicle.loss_weights();
+        Vehicle::SimulationLossWeights& weights = mpc_vehicle().loss_weights();
 
         auto drag_non_negative_float = [](const char* label, float& value, float speed, float max_value) {
             if (ImGui::DragFloat(label, &value, speed, 0.0f, max_value, "%.3f")) {
@@ -1474,7 +1614,7 @@ void Celeris::display_path_planner_debug_controls() {
         drag_non_negative_float("Cruise speed", weights.cruise_speed, 0.05f, 100.0f);
         drag_non_negative_float("Slowdown speed", weights.slowdown_speed, 0.01f, 20.0f);
         if (ImGui::Button("Reset loss weights"))
-            m_vehicle.reset_loss_weights();
+            mpc_vehicle().reset_loss_weights();
 
         ImGui::TreePop();
     }
@@ -1497,14 +1637,14 @@ void Celeris::visualize_active_path_potential() {
         float potential = 0.0f;
     };
 
-    const std::vector<VehiclePathPoint>& path = m_local_planner.vehicle_path();
-    const Vehicle::PathArcLengthTable& path_arc_lengths =
-        m_local_planner.vehicle_path_arc_lengths();
-    const float active_segment_min_s = m_local_planner.path_window_min_s();
-    const float active_segment_max_s = m_local_planner.path_window_max_s();
+    const std::vector<VehiclePathPoint>& path = local_planner().vehicle_path();
+    const VehicleBase::PathArcLengthTable& path_arc_lengths =
+        local_planner().vehicle_path_arc_lengths();
+    const float active_segment_min_s = local_planner().path_window_min_s();
+    const float active_segment_max_s = local_planner().path_window_max_s();
 
-    Vehicle::PointProjection vehicle_projection = m_vehicle.find_path_projection(
-        m_vehicle.state(),
+    VehicleBase::PointProjection vehicle_projection = mpc_vehicle().find_path_projection(
+        vehicle().state(),
         path,
         path_arc_lengths,
         active_segment_min_s,
@@ -1533,13 +1673,13 @@ void Celeris::visualize_active_path_potential() {
             static_cast<int>(std::floor((m_vehicle_position.pos.y - vertical_drop) / voxel_size.y));
 
         const std::vector<Vehicle::SimulationControlCandidate>& candidates =
-            m_local_planner.last_simulation_candidates();
+            mpc_local_planner().last_simulation_candidates();
         const Vehicle::VehicleControlCommand visualization_control =
             candidates.empty()
                 ? Vehicle::VehicleControlCommand{}
                 : candidates.front().control_command;
 
-        Vehicle::VehicleTransformState sampled_state = m_vehicle.state();
+        VehicleBase::VehicleTransformState sampled_state = vehicle().state();
         float min_potential = std::numeric_limits<float>::infinity();
         float max_potential = -std::numeric_limits<float>::infinity();
 
@@ -1562,7 +1702,7 @@ void Celeris::visualize_active_path_potential() {
                     continue;
 
                 sampled_state.m_position = glm::vec2{world_pos.x, world_pos.z};
-                const float potential = m_vehicle.evaluate_path_potential(
+                const float potential = mpc_vehicle().evaluate_path_potential(
                     sampled_state,
                     path,
                     path_arc_lengths,
@@ -1852,11 +1992,11 @@ bool Celeris::localize_on_map() {
     const Transform vehicle_transform = rear_axle_transform_from_lidar_transform(m_lidar_transform);
     NonholonomicPos localized_vehicle_pose;
     localized_vehicle_pose.from_transform(vehicle_transform);
-    m_vehicle.state().m_position = glm::vec2{
+    vehicle().state().m_position = glm::vec2{
         localized_vehicle_pose.pos.x,
         localized_vehicle_pose.pos.z
     };
-    m_vehicle.state().m_heading = localized_vehicle_pose.theta;
+    vehicle().state().m_heading = localized_vehicle_pose.theta;
     sync_vehicle_position_from_state(localized_vehicle_pose.pos.y);
     if (!m_has_start_position) {
         m_start_position = m_vehicle_position;
@@ -1877,6 +2017,10 @@ const AABB& Celeris::get_bounding_box() const noexcept {
 
 bool Celeris::has_map_bounding_box() const noexcept {
     return m_has_map_bounding_box;
+}
+
+void Celeris::set_vehicle_command(const VehicleCommand& vehicle_command) {
+    m_command_sender.set_command(vehicle_command);
 }
 
 void Celeris::update_map_bounding_box() {
@@ -2037,9 +2181,9 @@ void Celeris::sync_path_planner_result() {
         m_desc.global_path_direction_cleanup_min_segment_length
     );
     if (cleanup_revision_changed)
-        m_local_planner.set_astar_path(result.nonholonomic_astar_path);
+        local_planner().set_astar_path(result.nonholonomic_astar_path);
     else
-        m_local_planner.set_astar_path(result.nonholonomic_astar_path, result.generation);
+        local_planner().set_astar_path(result.nonholonomic_astar_path, result.generation);
 
     std::lock_guard<std::mutex> lock(m_path_mutex);
     plain_astar_path = std::move(result.plain_astar_path);

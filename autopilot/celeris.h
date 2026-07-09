@@ -23,12 +23,13 @@
 #include "waypoint_path.h"
 #include "../utils/avg_timer.h"
 #include "../a_star/vehicle.h"
-#include "../a_star/local_planner.h"
+#include "../a_star/local_planner_base.h"
 #include "vehicle_state_receiver.h"
 
 #include <chrono>
 #include <cstddef>
 #include <filesystem>
+#include <memory>
 #include <span>
 
 
@@ -37,6 +38,7 @@ class ComputePassManager;
 class VoxelGrid;
 class ManagerBundle;
 class VulkanSubmitContext;
+class LocalPlanner;
 
 class Celeris {
 public:
@@ -50,6 +52,10 @@ public:
         uint32_t voxel_point_map_max_map_point_count = 1500000;
         uint32_t max_write_count = 100000;
         uint32_t max_gicp_iterations = 10;
+        bool lidar_accel_prediction_enabled = true;
+        float lidar_accel_max_dt = 0.5f;
+        float lidar_accel_max_mps2 = 20.0f;
+        float lidar_velocity_max_mps = 25.0f;
         uint32_t unimpended_path_window_size = 64;
         uint32_t unimpended_path_max_astar_points = 4096;
         uint32_t collision_history_size = 8;
@@ -127,6 +133,8 @@ public:
     float local_planner_path_window_min_s() const noexcept;
     float local_planner_path_window_max_s() const noexcept;
     float local_planner_segment_switch_radius() const noexcept;
+    bool has_local_planner_lookahead_point() const noexcept;
+    glm::vec3 local_planner_lookahead_point() const noexcept;
     float waypoint_reach_radius() const noexcept;
     bool gamepad_commands_enabled() const noexcept;
     VehicleCommand gamepad_command() const noexcept;
@@ -188,6 +196,7 @@ public:
     const AABB& get_bounding_box() const noexcept;
     const AABB& get_bouding_box() const noexcept { return get_bounding_box(); }
     bool has_map_bounding_box() const noexcept;
+    void set_vehicle_command(const VehicleCommand& vehicle_command);
 
 private:
     VulkanEngine* m_engine = nullptr;
@@ -210,9 +219,9 @@ private:
 
     VehicleStateReceiver m_vehicle_state_receiver;
 
-    Vehicle m_vehicle;
+    std::unique_ptr<VehicleBase> m_vehicle;
     PathPlanner m_path_planner;
-    LocalPlanner m_local_planner;
+    std::unique_ptr<LocalPlannerBase> m_local_planner;
     
     VoxelPointMap m_voxel_point_map;
     VoxelMapPointInserter m_voxel_map_inserter;
@@ -253,6 +262,13 @@ private:
     glm::quat m_start_lidar_scan_rotation{1.0f, 0.0f, 0.0f, 0.0f};
     glm::vec3 m_previous_lidar_position{0.0f};
     glm::quat m_previous_lidar_rotation{1.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec3 m_lidar_velocity{0.0f};
+    glm::vec3 m_lidar_gravity_engine{0.0f};
+    bool m_has_lidar_gravity_engine = false;
+    bool m_has_previous_corrected_lidar_pose = false;
+    glm::vec3 m_previous_corrected_lidar_position{0.0f};
+    glm::quat m_previous_corrected_lidar_rotation{1.0f, 0.0f, 0.0f, 0.0f};
+    uint64_t m_previous_corrected_lidar_timestamp_ns = 0;
     std::vector<glm::vec3> m_collision_raw_position_history;
     glm::vec3 m_collision_surface_point{0.0f};
     bool m_has_collision_surface_point = false;
@@ -292,6 +308,14 @@ private:
     void apply_vehicle_feedback(const VehicleFeedback& feedback);
     bool is_vehicle_feedback_fresh(const VehicleFeedback& feedback) const;
     void sync_vehicle_position_from_state(float height);
+    VehicleBase& vehicle() noexcept;
+    const VehicleBase& vehicle() const noexcept;
+    LocalPlannerBase& local_planner() noexcept;
+    const LocalPlannerBase& local_planner() const noexcept;
+    Vehicle& mpc_vehicle() noexcept;
+    const Vehicle& mpc_vehicle() const noexcept;
+    LocalPlanner& mpc_local_planner() noexcept;
+    const LocalPlanner& mpc_local_planner() const noexcept;
 
     bool is_path_impended(VulkanSubmitContext& submit_context);
     void reset_waypoint_navigation() noexcept;

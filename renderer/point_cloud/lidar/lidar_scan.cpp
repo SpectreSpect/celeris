@@ -1,14 +1,104 @@
 #include "lidar_scan.h"
 
+#include <cmath>
 #include <cstring>
 #include <fstream>
+#include <limits>
 #include <numeric>
 #include <random>
 #include <stdexcept>
 
+#include <glm/gtc/quaternion.hpp>
+
 #include "../point_instance.h"
 #include "../../../managers/manager_bundle.h"
 #include "../point_cloud_preprocessor.h"
+
+namespace {
+constexpr uint32_t imu_rpy_frame_flag = 1u << 31;
+constexpr uint32_t imu_pose_quat_frame_flag = 1u << 30;
+constexpr uint32_t imu_accel_quat_frame_flag = 1u << 29;
+constexpr uint32_t frame_convention_shift = 27;
+constexpr uint32_t frame_convention_mask = 3u << frame_convention_shift;
+constexpr uint32_t point_count_mask = ~(
+    imu_rpy_frame_flag |
+    imu_pose_quat_frame_flag |
+    imu_accel_quat_frame_flag |
+    frame_convention_mask
+);
+constexpr size_t pose_rpy_floats_per_scan_point = 10;
+constexpr size_t imu_rpy_floats_per_scan_point = 7;
+constexpr size_t imu_pose_quat_floats_per_scan_point = 11;
+constexpr size_t imu_accel_quat_floats_per_scan_point = 11;
+
+enum class ScanPacketFormat {
+    LegacyPoseRpy,
+    ImuRpy,
+    ImuPoseQuat,
+    ImuAccelQuat
+};
+
+ScanPacketFormat packet_format(uint32_t count_header) {
+    if ((count_header & imu_accel_quat_frame_flag) != 0u)
+        return ScanPacketFormat::ImuAccelQuat;
+    if ((count_header & imu_pose_quat_frame_flag) != 0u)
+        return ScanPacketFormat::ImuPoseQuat;
+    if ((count_header & imu_rpy_frame_flag) != 0u)
+        return ScanPacketFormat::ImuRpy;
+    return ScanPacketFormat::LegacyPoseRpy;
+}
+
+LidarScan::FrameConvention frame_convention(uint32_t count_header) {
+    const uint32_t convention_code = (count_header & frame_convention_mask) >> frame_convention_shift;
+    switch (convention_code) {
+    case 1u:
+        return LidarScan::FrameConvention::SimWebots;
+    case 2u:
+        return LidarScan::FrameConvention::SimWebotsMirrored;
+    case 0u:
+    default:
+        return LidarScan::FrameConvention::RealRos;
+    }
+}
+
+size_t bytes_per_scan_point(ScanPacketFormat format) {
+    switch (format) {
+    case ScanPacketFormat::ImuAccelQuat:
+        return imu_accel_quat_floats_per_scan_point * sizeof(float);
+    case ScanPacketFormat::ImuPoseQuat:
+        return imu_pose_quat_floats_per_scan_point * sizeof(float);
+    case ScanPacketFormat::ImuRpy:
+        return imu_rpy_floats_per_scan_point * sizeof(float);
+    case ScanPacketFormat::LegacyPoseRpy:
+    default:
+        return pose_rpy_floats_per_scan_point * sizeof(float);
+    }
+}
+
+glm::quat normalized_quat_or_identity(float qx, float qy, float qz, float qw) {
+    glm::quat q(qw, qx, qy, qz);
+    const float len = glm::length(q);
+    if (!std::isfinite(len) || len <= 1e-6f)
+        return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    return glm::normalize(q);
+}
+
+glm::mat3 sample_orientation_matrix_ros(const LidarScan::FrameData& frame, size_t sample_id) {
+    if (frame.sample_orientations_ros.size() == frame.samples.size()) {
+        glm::quat q = frame.sample_orientations_ros[sample_id];
+        const float len = glm::length(q);
+        if (std::isfinite(len) && len > 1e-6f)
+            return glm::mat3_cast(glm::normalize(q));
+    }
+
+    const auto& sample = frame.samples[sample_id];
+    return LidarScan::rpy_to_mat3_zyx(
+        sample.base_rpy_ros.x,
+        sample.base_rpy_ros.y,
+        sample.base_rpy_ros.z
+    );
+}
+}
 
 LidarScan::LidarScan(
     ManagerBundle& manager_bundle, 
@@ -68,24 +158,49 @@ uint64_t LidarScan::timestamp_ns() const noexcept {
     return m_timestamp_ns;
 }
 
+bool LidarScan::has_linear_acceleration_ros() const noexcept {
+    return m_has_linear_acceleration_ros;
+}
+
+glm::vec3 LidarScan::linear_acceleration_ros() const noexcept {
+    return m_linear_acceleration_ros;
+}
+
+bool LidarScan::has_linear_acceleration_engine() const noexcept {
+    return m_has_linear_acceleration_engine;
+}
+
+glm::vec3 LidarScan::linear_acceleration_engine() const noexcept {
+    return m_linear_acceleration_engine;
+}
+
 LidarScan::FrameData LidarScan::read_frame_from_file(const std::filesystem::path& path) {
     std::ifstream in(path, std::ios::binary);
     if (!in) throw std::runtime_error("Failed to open: " + path.string());
 
     FrameData frame;
-    uint32_t count = 0;
+    uint32_t count_header = 0;
 
     in.read(reinterpret_cast<char*>(&frame.timestamp_ns), sizeof(uint64_t));
-    in.read(reinterpret_cast<char*>(&count), sizeof(uint32_t));
+    in.read(reinterpret_cast<char*>(&count_header), sizeof(uint32_t));
     if (!in) throw std::runtime_error("Bad header in: " + path.string());
 
-    const size_t bpp = 10 * sizeof(float); // x y z time px py pz roll pitch yaw
+    const ScanPacketFormat format = packet_format(count_header);
+    frame.frame_convention = frame_convention(count_header);
+    const uint32_t count = count_header & point_count_mask;
+    const size_t bpp = bytes_per_scan_point(format);
 
     std::vector<uint8_t> buf(size_t(count) * bpp);
     in.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(buf.size()));
     if (!in) throw std::runtime_error("Unexpected EOF in: " + path.string());
 
     frame.samples.resize(count);
+    if (format == ScanPacketFormat::ImuPoseQuat || format == ScanPacketFormat::ImuAccelQuat) {
+        frame.sample_orientations_ros.resize(count);
+    }
+    if (format == ScanPacketFormat::ImuAccelQuat) {
+        frame.sample_linear_accelerations_ros.resize(count);
+    }
 
     const uint8_t* p = buf.data();
 
@@ -94,17 +209,56 @@ LidarScan::FrameData LidarScan::read_frame_from_file(const std::filesystem::path
         float time;
         float px, py, pz;
         float roll, pitch, yaw;
+        float qx, qy, qz, qw;
+        float ax, ay, az;
 
         std::memcpy(&x,     p, 4); p += 4;
         std::memcpy(&y,     p, 4); p += 4;
         std::memcpy(&z,     p, 4); p += 4;
         std::memcpy(&time,  p, 4); p += 4;
-        std::memcpy(&px,    p, 4); p += 4;
-        std::memcpy(&py,    p, 4); p += 4;
-        std::memcpy(&pz,    p, 4); p += 4;
-        std::memcpy(&roll,  p, 4); p += 4;
-        std::memcpy(&pitch, p, 4); p += 4;
-        std::memcpy(&yaw,   p, 4); p += 4;
+        if (format == ScanPacketFormat::ImuRpy) {
+            px = 0.0f;
+            py = 0.0f;
+            pz = 0.0f;
+            std::memcpy(&roll,  p, 4); p += 4;
+            std::memcpy(&pitch, p, 4); p += 4;
+            std::memcpy(&yaw,   p, 4); p += 4;
+        } else if (format == ScanPacketFormat::ImuPoseQuat) {
+            std::memcpy(&px, p, 4); p += 4;
+            std::memcpy(&py, p, 4); p += 4;
+            std::memcpy(&pz, p, 4); p += 4;
+            std::memcpy(&qx, p, 4); p += 4;
+            std::memcpy(&qy, p, 4); p += 4;
+            std::memcpy(&qz, p, 4); p += 4;
+            std::memcpy(&qw, p, 4); p += 4;
+            roll = 0.0f;
+            pitch = 0.0f;
+            yaw = 0.0f;
+            frame.sample_orientations_ros[i] = normalized_quat_or_identity(qx, qy, qz, qw);
+        } else if (format == ScanPacketFormat::ImuAccelQuat) {
+            std::memcpy(&ax, p, 4); p += 4;
+            std::memcpy(&ay, p, 4); p += 4;
+            std::memcpy(&az, p, 4); p += 4;
+            std::memcpy(&qx, p, 4); p += 4;
+            std::memcpy(&qy, p, 4); p += 4;
+            std::memcpy(&qz, p, 4); p += 4;
+            std::memcpy(&qw, p, 4); p += 4;
+            px = 0.0f;
+            py = 0.0f;
+            pz = 0.0f;
+            roll = 0.0f;
+            pitch = 0.0f;
+            yaw = 0.0f;
+            frame.sample_linear_accelerations_ros[i] = glm::vec3(ax, ay, az);
+            frame.sample_orientations_ros[i] = normalized_quat_or_identity(qx, qy, qz, qw);
+        } else {
+            std::memcpy(&px, p, 4); p += 4;
+            std::memcpy(&py, p, 4); p += 4;
+            std::memcpy(&pz, p, 4); p += 4;
+            std::memcpy(&roll,  p, 4); p += 4;
+            std::memcpy(&pitch, p, 4); p += 4;
+            std::memcpy(&yaw,   p, 4); p += 4;
+        }
 
         frame.samples[i].p_local_ros = glm::vec3(x, y, z);
         frame.samples[i].time = time;
@@ -125,6 +279,34 @@ PointCloud LidarScan::load_from_file(ManagerBundle& manager_bundle, const std::f
 
 PointCloud LidarScan::load_from_frame(ManagerBundle& manager_bundle, FrameData&& frame) {
     m_timestamp_ns = frame.timestamp_ns;
+    m_has_linear_acceleration_ros = false;
+    m_linear_acceleration_ros = glm::vec3(0.0f);
+    m_has_linear_acceleration_engine = false;
+    m_linear_acceleration_engine = glm::vec3(0.0f);
+
+    if (!frame.sample_linear_accelerations_ros.empty()) {
+        glm::vec3 sum(0.0f);
+        uint32_t valid_count = 0;
+
+        for (const glm::vec3& acceleration : frame.sample_linear_accelerations_ros) {
+            if (!std::isfinite(acceleration.x) ||
+                !std::isfinite(acceleration.y) ||
+                !std::isfinite(acceleration.z)) {
+                continue;
+            }
+
+            sum += acceleration;
+            valid_count++;
+        }
+
+        if (valid_count > 0u) {
+            m_linear_acceleration_ros = sum / static_cast<float>(valid_count);
+            m_has_linear_acceleration_ros = true;
+            m_linear_acceleration_engine =
+                frame_pos_to_engine(m_linear_acceleration_ros, frame.frame_convention);
+            m_has_linear_acceleration_engine = true;
+        }
+    }
 
     if (frame.points.empty()) {
         throw std::runtime_error("LidarScan frame had no points");
@@ -171,11 +353,7 @@ void LidarScan::build_points_for_frame(FrameData& frame) {
 
     const TimedPointSample& ref = frame.samples[ref_idx];
 
-    const glm::mat3 R_wb_ref = rpy_to_mat3_zyx(
-        ref.base_rpy_ros.x,
-        ref.base_rpy_ros.y,
-        ref.base_rpy_ros.z
-    );
+    const glm::mat3 R_wb_ref = sample_orientation_matrix_ros(frame, ref_idx);
     const glm::mat3 R_wl_ref = R_wb_ref * R_bl;
     const glm::vec3 t_wl_ref = ref.base_pos_ros + R_wb_ref * lidar_offset_from_base_ros;
 
@@ -188,11 +366,7 @@ void LidarScan::build_points_for_frame(FrameData& frame) {
             continue;
         }
 
-        const glm::mat3 R_wb = rpy_to_mat3_zyx(
-            s.base_rpy_ros.x,
-            s.base_rpy_ros.y,
-            s.base_rpy_ros.z
-        );
+        const glm::mat3 R_wb = sample_orientation_matrix_ros(frame, i);
         const glm::mat3 R_wl = R_wb * R_bl;
         const glm::vec3 t_wl = s.base_pos_ros + R_wb * lidar_offset_from_base_ros;
 
@@ -203,7 +377,8 @@ void LidarScan::build_points_for_frame(FrameData& frame) {
         const glm::vec3 p_ref_ros = glm::transpose(R_wl_ref) * (p_world_ros - t_wl_ref);
 
         // Convert reference-frame point to engine coords
-        const glm::vec3 p_ref_eng = ros_pos_to_engine(p_ref_ros);
+        const glm::vec3 p_ref_eng =
+            frame_pos_to_engine(p_ref_ros, frame.frame_convention);
 
         frame.points[i].position = glm::vec4(p_ref_eng, 1.0f);
         frame.points[i].color = glm::vec4(1, 1, 1, 1);
@@ -237,7 +412,48 @@ glm::mat3 LidarScan::rpy_to_mat3_zyx(float roll, float pitch, float yaw)
 
 glm::vec3 LidarScan::ros_pos_to_engine(const glm::vec3& p_ros)
 {
-    return glm::vec3(-p_ros.x, p_ros.z, p_ros.y); // (-x, z, y)
+    return frame_pos_to_engine(p_ros, FrameConvention::RealRos);
+}
+
+glm::mat3 LidarScan::frame_basis_to_engine_basis(FrameConvention convention)
+{
+    glm::mat3 m(1.0f);
+
+    switch (convention) {
+    case FrameConvention::SimWebots:
+        // Webots lidar device convention: X forward, Y up, Z left.
+        m[0] = glm::vec3(-1.0f, 0.0f, 0.0f);
+        m[1] = glm::vec3( 0.0f, 1.0f, 0.0f);
+        m[2] = glm::vec3( 0.0f, 0.0f, 1.0f);
+        return m;
+    case FrameConvention::SimWebotsMirrored:
+        // Same as SimWebots, but with Z treated as right instead of left.
+        m[0] = glm::vec3(-1.0f, 0.0f,  0.0f);
+        m[1] = glm::vec3( 0.0f, 1.0f,  0.0f);
+        m[2] = glm::vec3( 0.0f, 0.0f, -1.0f);
+        return m;
+    case FrameConvention::RealRos:
+    default:
+        m[0] = glm::vec3(-1.0f, 0.0f, 0.0f);
+        m[1] = glm::vec3( 0.0f, 0.0f, 1.0f);
+        m[2] = glm::vec3( 0.0f, 1.0f, 0.0f);
+        return m;
+    }
+}
+
+glm::vec3 LidarScan::frame_pos_to_engine(
+    const glm::vec3& p_frame,
+    FrameConvention convention)
+{
+    return frame_basis_to_engine_basis(convention) * p_frame;
+}
+
+glm::mat3 LidarScan::frame_rotation_to_engine(
+    const glm::mat3& rotation_frame,
+    FrameConvention convention)
+{
+    const glm::mat3 basis = frame_basis_to_engine_basis(convention);
+    return basis * rotation_frame * glm::transpose(basis);
 }
     
 PointCloud& LidarScan::point_cloud() {

@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <glm/gtc/quaternion.hpp>
 
 class ManagerBundle;
 class PointCloudPreprocessor;
@@ -15,6 +16,12 @@ class PointCloudPreprocessor;
 class LidarScan : public SceneObject {
 public:
     _XCHILD_NAME(LidarScan);
+
+    enum class FrameConvention : uint32_t {
+        RealRos = 0,
+        SimWebots = 1,
+        SimWebotsMirrored = 2
+    };
 
     struct TimedPointSample {
         glm::vec3 p_local_ros{0.0f};
@@ -27,8 +34,83 @@ public:
     struct FrameData {
         uint64_t timestamp_ns = 0;
         uint32_t ring_count = 0;
+        FrameConvention frame_convention = FrameConvention::RealRos;
         std::vector<TimedPointSample> samples;
+        std::vector<glm::quat> sample_orientations_ros;
+        std::vector<glm::vec3> sample_linear_accelerations_ros;
         std::vector<PointInstance> points;
+
+        FrameData() = default;
+        FrameData(const std::filesystem::path& path) {
+            load(path);
+        }
+
+        void save(const std::filesystem::path& path) {
+            std::ofstream out(path.string());
+
+            uint32_t sample_count = samples.size();
+            uint32_t point_count = points.size();
+
+            out.write((const char*)&timestamp_ns, sizeof(timestamp_ns));
+            out.write((const char*)&ring_count, sizeof(ring_count));
+            out.write((const char*)&sample_count, sizeof(sample_count));
+            out.write((const char*)&point_count, sizeof(point_count));
+            out.write((const char*)samples.data(), samples.size() * sizeof(LidarScan::TimedPointSample));
+            out.write((const char*)points.data(), points.size() * sizeof(PointInstance));
+
+            out.close();
+        }
+
+        void load(const std::filesystem::path& path) {
+            std::ifstream in(path.string(), std::ios::binary);
+            
+            if (!in) throw std::runtime_error("Failed to open: " + path.string());
+
+            // in.read((const char*)&timestamp_ns, sizeof(timestamp_ns));
+
+            uint32_t sample_count = 0;
+            uint32_t point_count = 0;
+
+            in.read(reinterpret_cast<char*>(&timestamp_ns), sizeof(timestamp_ns));
+            in.read(reinterpret_cast<char*>(&ring_count), sizeof(ring_count));
+
+            in.read(reinterpret_cast<char*>(&sample_count), sizeof(sample_count));
+            in.read(reinterpret_cast<char*>(&point_count), sizeof(point_count));
+
+            samples.resize(sample_count);
+            points.resize(point_count);
+
+            // point_count = 64 * 5;
+
+            for (int i = 1; i < point_count; i++) {
+                float result = point_count / (float)i;
+                
+                if ((int)result == result)
+                    std::cout << i << ": " << result << std::endl;
+            }
+
+            in.read(reinterpret_cast<char*>(samples.data()), sample_count * sizeof(LidarScan::TimedPointSample));
+            in.read(reinterpret_cast<char*>(points.data()), point_count * sizeof(PointInstance));
+
+            for (int i = 0; i < points.size(); i++) {
+                float t = (float)i / (float)(points.size() - 1);
+
+                // float dist = glm::length(points[i].position);
+
+                // if (dist < 4.0)
+                //     std::cout << i << ": " << dist << std::endl;
+
+                if ((i / 1024) % 2 == 0)
+                    points[i].color = glm::vec4(1, 0, 0, 1);
+                else
+                    points[i].color = glm::vec4(0, 1, 0, 1);
+                // points[i].color *= t;
+            }
+            
+            in.close();
+
+            // out.close();
+        }
     };
 
     LidarScan(
@@ -48,8 +130,15 @@ public:
 
     void set_timestamp_ns(uint64_t timestamp_ns);
     uint64_t timestamp_ns() const noexcept;
+    bool has_linear_acceleration_ros() const noexcept;
+    glm::vec3 linear_acceleration_ros() const noexcept;
+    bool has_linear_acceleration_engine() const noexcept;
+    glm::vec3 linear_acceleration_engine() const noexcept;
 
     static glm::mat3 rpy_to_mat3_zyx(float roll, float pitch, float yaw);
+    static glm::mat3 frame_basis_to_engine_basis(FrameConvention convention);
+    static glm::vec3 frame_pos_to_engine(const glm::vec3& p_frame, FrameConvention convention);
+    static glm::mat3 frame_rotation_to_engine(const glm::mat3& rotation_frame, FrameConvention convention);
     static glm::vec3 ros_pos_to_engine(const glm::vec3& p_ros);
     static void build_points_for_frame(FrameData& frame);
 
@@ -58,6 +147,10 @@ public:
 
 private:
     uint64_t m_timestamp_ns = 0;
+    bool m_has_linear_acceleration_ros = false;
+    glm::vec3 m_linear_acceleration_ros{0.0f};
+    bool m_has_linear_acceleration_engine = false;
+    glm::vec3 m_linear_acceleration_engine{0.0f};
     
     std::vector<PointInstance> m_points;
     std::vector<glm::vec4> m_normals;

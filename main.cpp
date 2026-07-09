@@ -76,7 +76,9 @@
 #include "voxel_grid_vulkan/voxel_grid_gpu_debugger.h"
 #include "camera/controllers/third_person_camera_controller.h"
 #include "autopilot/vehicle_command_sender.h"
+#include "autopilot/celeris_user_controller.h"
 #include "vulkan_self/vulkan_submit_context.h"
+#include "vulkan_self/keyboard_input_reciever.h"
 
 #include <algorithm>
 #include <exception>
@@ -99,22 +101,9 @@ int main() {
     queue_request.present_count = 1;
     queue_request.compute_count = 2;
 
-    const std::filesystem::path saved_maps_directory = std::filesystem::path("saved_maps");
-    const std::filesystem::path saved_waypoint_paths_directory =
-        std::filesystem::path("saved_waypoint_paths");
-
     auto vehicle_config_path = []() {
         const std::filesystem::path relative_path =
             std::filesystem::path("configs") / "vehicles" / "gazelle_next_sim.yaml";
-
-#ifdef CELERIS_SOURCE_DIR
-        const std::filesystem::path source_path =
-            std::filesystem::path(CELERIS_SOURCE_DIR) / relative_path;
-        if (std::filesystem::exists(source_path)) {
-            return source_path;
-        }
-#endif
-
         return path_utils::executable_dir() / relative_path;
     }();
 
@@ -159,23 +148,19 @@ int main() {
         compute_pass_manager
     );
 
-    LidarScanReceiver scan_receiver(point_cloud_preprocessor, 5000);
-    // scan_receiver.start();
-
-    std::unique_ptr<LidarScan> network_scan;
-    std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
-
-    glm::vec3 voxel_size(1.0f);
+    glm::vec3 voxel_size(0.5f);
     uint32_t vertical_inflation_size =
         static_cast<uint32_t>(std::ceil(vehicle_geometry.size.y / voxel_size.y));
     uint32_t horizontal_inflation_size =
         static_cast<uint32_t>(std::ceil((vehicle_geometry.size.x / voxel_size.x) / 2.0f));
+    // uint32_t vertical_inflation_size = 1;
+    // uint32_t horizontal_inflation_size = 1;
     glm::ivec3 chunk_size(16);
     VoxelGrid::VoxelGridDesc voxel_grid_desc {
         .chunk_size = chunk_size,
         .voxel_size = voxel_size,
-        .count_active_chunks = 15'000,
-        .max_quads = 2'500'000,
+        .count_active_chunks = 40'000,
+        .max_quads = 8'000'000,
         .chunk_hash_table_size_factor = 1.0f,
         .count_evict_buckets = 32,
         .min_free_chunks = 4'500,
@@ -209,46 +194,6 @@ int main() {
         material_instance_manager,
         voxel_grid_desc,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-    );
-
-    bool display_inflated_voxels = voxel_grid.params().display_inflated_voxels != 0u;
-    bool show_voxel_grid = true;
-    float inflated_voxel_color[4] = {
-        float((voxel_grid.params().inflated_voxel_color >> 24u) & 0xFFu) / 255.0f,
-        float((voxel_grid.params().inflated_voxel_color >> 16u) & 0xFFu) / 255.0f,
-        float((voxel_grid.params().inflated_voxel_color >> 8u) & 0xFFu) / 255.0f,
-        float(voxel_grid.params().inflated_voxel_color & 0xFFu) / 255.0f
-    };
-    float inflated_curvature_limit_exceeded_voxel_color[4] = {
-        float((voxel_grid.params().inflated_curvature_limit_exceeded_voxel_color >> 24u) & 0xFFu) / 255.0f,
-        float((voxel_grid.params().inflated_curvature_limit_exceeded_voxel_color >> 16u) & 0xFFu) / 255.0f,
-        float((voxel_grid.params().inflated_curvature_limit_exceeded_voxel_color >> 8u) & 0xFFu) / 255.0f,
-        float(voxel_grid.params().inflated_curvature_limit_exceeded_voxel_color & 0xFFu) / 255.0f
-    };
-    int negative_x_inflation_size = static_cast<int>(voxel_grid.params().negative_x_inflation_size);
-    int positive_x_inflation_size = static_cast<int>(voxel_grid.params().positive_x_inflation_size);
-    int negative_y_inflation_size = static_cast<int>(voxel_grid.params().negative_y_inflation_size);
-    int positive_y_inflation_size = static_cast<int>(voxel_grid.params().positive_y_inflation_size);
-    int negative_z_inflation_size = static_cast<int>(voxel_grid.params().negative_z_inflation_size);
-    int positive_z_inflation_size = static_cast<int>(voxel_grid.params().positive_z_inflation_size);
-    auto pack_inflated_voxel_color = [](const float color[4]) -> uint32_t {
-        auto pack_channel = [](float value) -> uint32_t {
-            return static_cast<uint32_t>(std::clamp(value, 0.0f, 1.0f) * 255.0f + 0.5f);
-        };
-
-        return (pack_channel(color[0]) << 24u) |
-               (pack_channel(color[1]) << 16u) |
-               (pack_channel(color[2]) << 8u) |
-               pack_channel(color[3]);
-    };
-
-    VoxelGridGPUDebugger debugger(
-        voxel_grid,
-        engine.device(),
-        engine.compute_queue(),
-        window,
-        camera,
-        true
     );
 
     Voxelizator::VoxelizatorDesc voxelizator_desc {
@@ -290,14 +235,6 @@ int main() {
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     );
 
-    VoxelWriteGPU blue_voxelize_prefab;
-    blue_voxelize_prefab.voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, glm::ivec3({0, 98, 255}));
-    blue_voxelize_prefab.set_flags = OVERWRITE_BIT;
-
-    VoxelWriteGPU transparent_voxelize_prefab;
-    transparent_voxelize_prefab.voxel_data = VoxelDataGPU(0, 0, glm::ivec3(255));
-    transparent_voxelize_prefab.set_flags = OVERWRITE_BIT;
-
     PointCloudMesher mesher(
         engine.physical_device(),
         engine.device(),
@@ -305,98 +242,6 @@ int main() {
         compute_pass_manager,
         3600
     );
-
-    LidarScan lidar_scan(manager_bundle, point_cloud_preprocessor, path_utils::executable_dir() / "assets" / "lidar_scans" / "frame_000000.bin");
-    uint32_t scan_index_count = mesher.convert_to_mesh<PBRVertex, PointInstance>(
-        lidar_scan.point_cloud(),
-        scan_vertex_buffer,
-        scan_index_buffer
-    );
-
-    MeshView scan_mesh_view(
-        scan_vertex_buffer.get_view(),
-        scan_index_buffer.get_view(),
-        scan_index_count
-    );
-
-    RenderObject scan_object(scan_mesh_view, material_instance_manager.pbr);
-    // RenderObject scan_object(mesh_manager.cube.get_view(), material_instance_manager.pbr);
-    scan_object.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
-
-    scan_object.transform.scale = glm::vec3(5.0f);
-
-    // voxelizator.voxelize<PBRVertex>(
-    //     blue_voxelize_prefab,
-    //     scan_object.mesh_view(),
-    //     scan_object.transform.get_model_matrix(),
-    //     &voxel_grid.local_voxel_write_list()
-    // );
-
-    glm::ivec2 wall_junction_xz = glm::ivec2(5, 5);
-    std::vector<VoxelWriteGPU> test_voxel_writes;
-    test_voxel_writes.reserve(50);
-
-    auto add_test_wall = [&](glm::ivec3 wall_origin, glm::ivec3 wall_size) {
-        for (int x = 0; x < wall_size.x; x++)
-            for (int y = 0; y < wall_size.y; y++)
-                for (int z = 0; z < wall_size.z; z++) {
-                    glm::ivec3 world_voxel = wall_origin + glm::ivec3(x, y, z);
-
-                    if (glm::ivec2(world_voxel.x, world_voxel.z) == wall_junction_xz) {
-                        continue;
-                    }
-
-                    glm::ivec3 base_color{0, 98, 255};
-                    glm::ivec3 color = glm::vec3(base_color) * glm::vec3(0.5 + math_utils::dist(math_utils::rng) * 0.5);
-
-                    test_voxel_writes.push_back(
-                        VoxelWriteGPU{
-                            .world_voxel = glm::ivec4(world_voxel, 0),
-                            .voxel_data = VoxelDataGPU(1, VOXEL_VISABILITY_FLAG_BIT, color),
-                            .set_flags = OVERWRITE_BIT
-                        }
-                    );
-                }
-    };
-
-    // add_test_wall(glm::ivec3(5, 0, 0), glm::ivec3(1, 5, 5));
-    // add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(1, 5, 5));
-    // add_test_wall(glm::ivec3(5, 0, 0), glm::ivec3(5, 5, 1));
-
-    // add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(1, 5, 5));
-    // add_test_wall(glm::ivec3(15, 0, 0), glm::ivec3(1, 5, 5));
-    // add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(5, 5, 1));
-
-    // VulkanBuffer box_voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + Utils::size_bytes(test_voxel_writes));
-    // box_voxel_write_list.upload_scalar<uint32_t>(test_voxel_writes.size(), 0);
-    // box_voxel_write_list.upload(test_voxel_writes, sizeof(uint32_t) * 4);
-
-    // VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
-    // {
-    //     auto scope = compute_command_buffer.begin_scope();
-    //     voxel_grid.set_voxels(compute_command_buffer, box_voxel_write_list);
-    // }
-    // VulkanFence compute_fence(engine.device());
-    // engine.compute_submit(compute_command_buffer, &compute_fence);
-    // compute_fence.wait();
-
-    // voxel_grid.update(window, camera);
-
-
-    // VoxelGridChunk chunk = voxel_grid.read_chunk(glm::ivec3(0, 0, 0));
-    // glm::uvec3 read_chunk_size = chunk.chunk_size();
-
-    // for (int x = 0; x < read_chunk_size.x; x++)
-    //     for (int y = 0; y < read_chunk_size.y; y++)
-    //         for (int z = 0; z < read_chunk_size.z; z++) {
-    //             VoxelDataGPU voxel = chunk.voxel(glm::uvec3(x, y, z));
-    //             glm::vec4 color = voxel.color_vec4();
-
-    //             if (color.x != 0 || color.y != 0 || color.z != 0)
-    //                 std::cout << "pos: (" << x << ", " << y << ", " << z << ")" << std::endl;
-    //         }
-
-
 
     uint32_t max_write_count = 100000;
     VulkanBuffer voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * max_write_count);
@@ -414,10 +259,6 @@ int main() {
         TextureManager::st_peters_square_night_4k_pbr_map_id,
         skybox_exposure
     );
-
-    bool has_start_pos = false;
-    bool has_end_pos = false;
-    bool has_planned_path = false;
 
     VulkanSubmitContext planner_submit_context(
         engine.device(),
@@ -447,11 +288,15 @@ int main() {
     const NonholonomicPos start_lidar_scan_position{.pos = glm::vec3(0.0f, 0.0f, 0.0f)};
     // celeris.set_start(start_lidar_scan_position);
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
-    has_end_pos = true;
+    // has_end_pos = true;
     // celeris.set_start_lidar_scan_position(start_lidar_scan_position);
-    // celeris.load_map(saved_maps_directory / "robocross_sim_2.vpm");
+    // celeris.load_map(saved_maps_directory / "test4.vpm");
     // celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim_3.wpp");
     celeris.start(std::move(planner_submit_context));
+    celeris.set_vehicle_command(VehicleCommand{
+        .acceleration = 0.5f,
+        .steering_angle_velocity = 0.5f
+    });
 
     CelerisVisualizer celeris_visualizer(
         mesh_manager,
@@ -462,306 +307,15 @@ int main() {
         skybox_exposure
     );
 
-    LidarScan target_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
-    LidarScan source_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
-
-    target_scan.point_cloud().set_color(glm::vec4(0, 0, 1, 1));
-    source_scan.point_cloud().set_color(glm::vec4(1, 0, 0, 1));
-
-    source_scan.point_cloud().transform.position += glm::vec3(-2, 2, -2);
-
-
-    // celeris.voxel_map_point_inserter().insert(
-    //     celeris.voxel_point_map(),
-    //     target_scan.point_cloud(),
-    //     target_scan.normal_buffer()
-    // );
-
-    // celeris.voxel_map_point_inserter().insert(
-    //     celeris.voxel_point_map(),
-    //     source_scan.point_cloud(),
-    //     source_scan.normal_buffer()
-    // );
-
-    // std::vector<PointInstance> point_map_points(
-    //     celeris.voxel_point_map().map_point_count()
-    // );
-
-    // std::vector<glm::vec4> point_map_normals(
-    //     celeris.voxel_point_map().map_point_count()
-    // );
-
-    // celeris.voxel_point_map().map_point_buffer.read(
-    //     point_map_points.data(),
-    //     celeris.voxel_point_map().map_point_count() * sizeof(PointInstance),
-    //     0
-    // );
-
-    // celeris.voxel_point_map().map_normal_buffer.read(
-    //     point_map_normals.data(),
-    //     celeris.voxel_point_map().map_point_count() * sizeof(glm::vec4),
-    //     0
-    // );
-
-
-    char map_save_file_name[128] = "map";
-    std::string map_save_status;
-    bool map_save_failed = false;
-    std::string map_localization_status;
-    bool map_localization_failed = false;
-    char waypoint_path_file_name[128] = "path";
-    std::string waypoint_path_status;
-    bool waypoint_path_failed = false;
-
-
-
-    // std::ofstream saved_file("/home/spectre/Projects/celeris/saved_maps/map.cel");
-
-    // saved_file << celeris.voxel_point_map().map_point_count() << "\n";
-
-    // for (int i = 0; i < celeris.voxel_point_map().map_point_count(); i++) {
-    //     saved_file
-    //         << point_map_points[i].position.x << "\n"
-    //         << point_map_points[i].position.y << "\n"
-    //         << point_map_points[i].position.z << "\n"
-    //         << point_map_points[i].position.w << "\n"
-
-    //         << point_map_points[i].color.r << "\n"
-    //         << point_map_points[i].color.g << "\n"
-    //         << point_map_points[i].color.b << "\n"
-    //         << point_map_points[i].color.a << "\n";
-    // }
-
-    // for (int i = 0; i < celeris.voxel_point_map().map_point_count(); i++) {
-    //     saved_file
-    //         << point_map_normals[i].x << "\n"
-    //         << point_map_normals[i].y << "\n"
-    //         << point_map_normals[i].z << "\n"
-    //         << point_map_normals[i].w << "\n";
-    // }
-
-    // saved_file.close();
-
-
-
-    // celeris.voxel_point_map
-
-    // VoxelPointMap voxel_point_map(
-    //     engine,
-    //     1500000,
-    //     1500000
-    // );
-
-
-
-
-
-    auto use_fps_camera_controller = [&]() {
-        if (camera_controller_mode == CameraControllerMode::FPS)
-            return;
-
-        const glm::vec3 front = glm::normalize(camera.front);
-        fps_camera_controller.yaw = glm::degrees(std::atan2(front.z, front.x));
-        fps_camera_controller.pitch = glm::degrees(std::asin(glm::clamp(front.y, -1.0f, 1.0f)));
-        fps_camera_controller.first_mouse = true;
-        camera_controller_mode = CameraControllerMode::FPS;
-    };
-
-    auto use_third_person_camera_controller = [&]() {
-        camera_controller_mode = CameraControllerMode::ThirdPerson;
-    };
-
-    float car_speed = celeris.car_speed();
-
-    auto start_path_planning = [&]() {
-        const bool already_has_path = celeris.has_planned_path();
-        has_planned_path = celeris.request_path_replan();
-        if (has_planned_path || already_has_path)
-            celeris.reset_local_planner_tracking();
-    };
-
-    auto make_pose_from_camera = [&](NonholonomicPos& out_pose) {
-        glm::vec3 horizontal_front(camera.front.x, 0.0f, camera.front.z);
-        if (glm::dot(horizontal_front, horizontal_front) == 0.0f)
-            return false;
-
-        out_pose.pos = camera.position;
-        out_pose.theta = std::atan2(horizontal_front.z, horizontal_front.x);
-
-        glm::vec3 grounded_position = out_pose.pos;
-        if (celeris.adjust_to_ground(grounded_position))
-            out_pose.pos = grounded_position;
-
-        return true;
-    };
-
-    auto place_start = [&]() {
-        NonholonomicPos pose;
-        if (make_pose_from_camera(pose)) {
-            celeris.set_start(pose);
-            has_start_pos = true;
-            has_planned_path = false;
-        }
-    };
-
-    auto place_end = [&]() {
-        NonholonomicPos pose;
-        if (make_pose_from_camera(pose)) {
-            celeris.set_goal(pose);
-            has_end_pos = true;
-            has_planned_path = false;
-        }
-    };
-
-    auto move_start_to_vehicle = [&]() {
-        celeris.set_start(celeris.vehicle_position());
-        has_start_pos = true;
-        has_planned_path = false;
-    };
-
-    auto add_directional_waypoint = [&]() {
-        NonholonomicPos pose;
-        if (make_pose_from_camera(pose)) {
-            celeris.add_waypoint(pose);
-        }
-    };
-
-    auto add_nondirectional_waypoint = [&]() {
-        glm::vec3 position = camera.position;
-        if (celeris.adjust_to_ground(position)) {
-            celeris.add_waypoint(position);
-        }
-    };
-
-    auto delete_last_waypoint = [&]() {
-        celeris.delete_last_waypoint();
-    };
-
-    // LidarVideo lidar_video(
-    //     manager_bundle,
-    //     point_cloud_preprocessor,
-    //     "/home/spectre/TEMP_lidar_output_mesh/recording_16/index.csv",
-    //     0,
-    //     2
-    // );
-
-    // for (int i = static_cast<int>(lidar_video.get_scan_count()) - 1; i >= 1; --i) {
-    //     glm::vec3 p_prev = lidar_video.get_scan(i - 1).point_cloud().transform.position;
-    //     glm::vec3 p_curr = lidar_video.get_scan(i).point_cloud().transform.position;
-
-    //     glm::quat q_prev = glm::normalize(lidar_video.get_scan(i - 1).point_cloud().transform.rotation);
-    //     glm::quat q_curr = glm::normalize(lidar_video.get_scan(i).point_cloud().transform.rotation);
-
-    //     if (glm::dot(q_prev, q_curr) < 0.0f) {
-    //         q_curr = -q_curr;
-    //     }
-
-    //     glm::vec3 delta_position = p_curr - p_prev;
-    //     glm::quat delta_rotation = glm::normalize(q_curr * glm::inverse(q_prev));
-
-    //     lidar_video.get_scan(i).point_cloud().transform.position = delta_position;
-    //     lidar_video.get_scan(i).point_cloud().transform.rotation = delta_rotation;
-    // }
-
-    // lidar_video.get_scan(0).point_cloud().transform.position = glm::vec3(0.0f);
-    // lidar_video.get_scan(0).point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-
-
-
-    // celeris.voxel_map_reseter().reset(celeris.voxel_point_map());
-    // celeris.voxel_map_point_inserter().insert(
-    //     celeris.voxel_point_map(),
-    //     lidar_video.get_scan(0).point_cloud(),
-    //     lidar_video.get_scan(0).normal_buffer()
-    // );
-
-    PointCloud voxel_point_map(
-        manager_bundle,
-        celeris.voxel_point_map().map_point_buffer,
-        celeris.voxel_point_map().m_map_point_count
-    );
-    voxel_point_map.set_color(glm::vec4(0, 0, 0, 1));
-    uint32_t rendered_celeris_scan_count = celeris.received_scan_count();
-
-    // auto process_current_lidar_frame = [&]() {
-    //     uint32_t current_frame_id = lidar_video.current_frame_id();
-
-    //     if (current_frame_id > 0) {
-    //         LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
-    //         LidarScan& previous_scan = lidar_video.get_scan(current_frame_id - 1);
-
-    //         PointCloud& current_point_cloud = current_scan.point_cloud();
-    //         PointCloud& previous_point_cloud = previous_scan.point_cloud();
-
-    //         current_point_cloud.transform.position =
-    //             previous_point_cloud.transform.position + current_point_cloud.transform.position;
-    //         current_point_cloud.transform.rotation =
-    //             glm::normalize(current_point_cloud.transform.rotation * previous_point_cloud.transform.rotation);
-
-    //         celeris.gicp_pass().fit(
-    //             celeris.voxel_point_map(),
-    //             current_scan.point_cloud(),
-    //             current_scan.normal_buffer(),
-    //             10
-    //         );
-
-    //         celeris.voxel_map_point_inserter().insert(
-    //             celeris.voxel_point_map(),
-    //             current_scan.point_cloud(),
-    //             current_scan.normal_buffer()
-    //         );
-
-    //         voxel_point_map.set_instance_view(celeris.voxel_point_map().get_map_instance_view());
-    //     }
-
-    //     lidar_video.next_frame();
-    // };
-    FootprintVisualizer footprint_visualizer(
-        mesh_manager,
-        material_instance_manager,
-        celeris,
-        celeris.footprint(),
-        skybox_exposure
-    );
-
-    auto place_footprint = [&]() {
-        NonholonomicPos pose;
-        if (make_pose_from_camera(pose)) {
-            footprint_visualizer.update_footprint(pose);
-        }
-    };
-
     Scene scene;
 
     scene.add(skybox);
-
     scene.add(celeris_visualizer);
     scene.add(voxel_grid.render_object());
-    // scene.add(footprint_visualizer);
-    // scene.add(gazelle);
-    // scene.add(target_scan);
-    // scene.add(voxel_point_map);
-    // scene.add(source_scan);
-
-    // scene.add(lidar_video);
 
     skybox.update(scene);
 
-    bool g_pressed = false;
-    bool t_pressed = false;
-    bool l_pressed = false;
-    bool n_pressed = false;
-    bool place_start_pressed = false;
-    bool place_end_pressed = false;
-    bool start_path_planning_pressed = false;
-    bool move_start_to_vehicle_pressed = false;
-    bool place_footprint_pressed = false;
-    bool visualize_path_potential_pressed = false;
-    bool fps_camera_pressed = false;
-    bool third_person_camera_pressed = false;
     GamepadController gamepad_controller;
-
-    int step = 0;
 
     float last_frame_time = 0.0f;
     float start_time = (float)glfwGetTime();
@@ -770,81 +324,21 @@ int main() {
     bool skybox_environment_update_pending = false;
     float angular_speed = glm::half_pi<float>() * 0.5f;
 
-    std::vector<glm::mat4> transform_mem(3);
-    std::vector<NonholonomicPos> car_playback_path;
-    bool car_playback_active = false;
-    bool car_playback_loop = false;
-    float car_playback_distance = 0.0f;
-    float car_playback_total_length = 0.0f;
-    float car_playback_speed = 4.0f;
+    // use_fps_camera_controller();
 
-    auto path_length = [](const std::vector<NonholonomicPos>& path) {
-        float length = 0.0f;
-        for (size_t i = 1; i < path.size(); i++) {
-            length += glm::distance(path[i - 1].pos, path[i].pos);
-        }
+    KeyboardInputReciever keyboard_input_reciever(window);
 
-        return length;
-    };
-
-    auto sample_path_pose = [](const std::vector<NonholonomicPos>& path, float target_distance) {
-        if (path.empty())
-            return NonholonomicPos{};
-
-        if (path.size() == 1)
-            return path.front();
-
-        float traversed_distance = 0.0f;
-        for (size_t i = 1; i < path.size(); i++) {
-            const NonholonomicPos& from = path[i - 1];
-            const NonholonomicPos& to = path[i];
-            const float segment_length = glm::distance(from.pos, to.pos);
-
-            if (segment_length <= 0.0f)
-                continue;
-
-            if (traversed_distance + segment_length >= target_distance) {
-                const float t = glm::clamp(
-                    (target_distance - traversed_distance) / segment_length,
-                    0.0f,
-                    1.0f
-                );
-
-                NonholonomicPos pose = from;
-                pose.pos = glm::mix(from.pos, to.pos, t);
-                pose.theta = from.theta + NonholonomicAStar::angle_diff(from.theta, to.theta) * t;
-                pose.steer = to.steer;
-                pose.dir = to.dir;
-                pose.dubins_segment_id = to.dubins_segment_id;
-                return pose;
-            }
-
-            traversed_distance += segment_length;
-        }
-
-        return path.back();
-    };
-
-    auto start_car_playback = [&]() {
-        car_playback_path = celeris.path_result_snapshot().nonholonomic_astar_path;
-        car_playback_total_length = path_length(car_playback_path);
-        car_playback_distance = 0.0f;
-        car_playback_active = car_playback_path.size() >= 2 && car_playback_total_length > 0.0f;
-
-        if (car_playback_active) {
-            celeris_visualizer.set_car_pose_override(car_playback_path.front());
-        }
-    };
-
-    use_fps_camera_controller();
+    CelerisUserController celeris_user_controller(celeris, celeris_visualizer);
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
+        keyboard_input_reciever.update();
         gamepad_controller.update(
             celeris.car_speed(),
             celeris.vehicle_speed(),
             celeris.vehicle_steering_angle()
         );
+        
         celeris.set_gamepad_command(gamepad_controller.command());
 
         if (skybox_environment_update_pending) {
@@ -859,81 +353,16 @@ int main() {
         last_frame_time = current_frame_time;
         timer += delta_time;
 
-        float angle = angular_speed * delta_time;
-        glm::quat rot_x = glm::angleAxis(angle, glm::vec3(1.0f, 0.0f, 0.0f));
-        glm::quat rot_y = glm::angleAxis(angle, glm::vec3(0.0f, 1.0f, 0.0f));
-
-        // for (const glm::mat4 transform : transform_mem) {
-        //     voxelizator.voxelize_and_submit<PBRVertex>(
-        //         transparent_voxelize_prefab,
-        //         vox_box.mesh_view(),
-        //         transform,
-        //         &voxel_grid.local_voxel_write_list()
-        //     );
-        // }
-
-        // for (size_t i = 0; i < transform_mem.size(); i++) {
-        //     vox_box.transform.rotation = glm::normalize(
-        //         vox_box.transform.rotation * rot_x * rot_y
-        //     );
-
-        //     voxelizator.voxelize_and_submit<PBRVertex>(
-        //         blue_voxelize_prefab,
-        //         vox_box.mesh_view(),
-        //         vox_box.transform.get_model_matrix(),
-        //         &voxel_grid.local_voxel_write_list()
-        //     );
-
-        //     transform_mem[i] = vox_box.transform.get_model_matrix();
-        // }
-
         uint32_t image_index = 0;
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
 
-
-        // celeris.update();
         celeris.update(compute_submit_context);
-        if (rendered_celeris_scan_count != celeris.received_scan_count()) {
-            voxel_point_map.set_instance_view(celeris.voxel_point_map().get_map_instance_view());
-            rendered_celeris_scan_count = celeris.received_scan_count();
-        }
-
-        if (car_playback_active) {
-            car_playback_distance += car_playback_speed * delta_time;
-
-            if (car_playback_distance >= car_playback_total_length) {
-                if (car_playback_loop) {
-                    car_playback_distance = std::fmod(car_playback_distance, car_playback_total_length);
-                } else {
-                    car_playback_distance = car_playback_total_length;
-                    car_playback_active = false;
-                }
-            }
-
-            celeris_visualizer.set_car_pose_override(
-                sample_path_pose(car_playback_path, car_playback_distance)
-            );
-        }
-
+        celeris_user_controller.update(delta_time, camera, keyboard_input_reciever, fps_camera_controller);
         celeris_visualizer.update();
-
-        if (!fps_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_F) == GLFW_PRESS) {
-            fps_camera_pressed = true;
-            use_fps_camera_controller();
-        }
-        if (fps_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_F) == GLFW_RELEASE)
-            fps_camera_pressed = false;
-
-        if (!third_person_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_R) == GLFW_PRESS) {
-            third_person_camera_pressed = true;
-            use_third_person_camera_controller();
-        }
-        if (third_person_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_R) == GLFW_RELEASE)
-            third_person_camera_pressed = false;
-
+        
         third_person_camera_controller.set_target(celeris.vehicle_position().pos);
-        if (camera_controller_mode == CameraControllerMode::FPS)
+        if (celeris_user_controller.camera_controller_mode() == CelerisUserController::CameraControllerMode::FPS)
             fps_camera_controller.update(window, delta_time);
         else
             third_person_camera_controller.update(window, delta_time);
@@ -942,480 +371,21 @@ int main() {
 
         lighting_system.update(engine.current_frame(), window, camera);
 
-        voxel_grid.render_object().visible = show_voxel_grid;
+        voxel_grid.render_object().visible = celeris_user_controller.show_voxel_grid();
         voxel_grid.update(window, camera);
 
-        if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
-            place_start_pressed = true;
-            place_start();
-        }
-
-        if (place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_RELEASE) {
-            place_start_pressed = false;
-        }
-
-        if (!place_end_pressed && glfwGetKey(window.handle(), GLFW_KEY_2) == GLFW_PRESS) {
-            place_end_pressed = true;
-            place_end();
-        }
-
-        if (place_end_pressed && glfwGetKey(window.handle(), GLFW_KEY_2) == GLFW_RELEASE) {
-            place_end_pressed = false;
-        }
-
-        if (!start_path_planning_pressed && glfwGetKey(window.handle(), GLFW_KEY_3) == GLFW_PRESS) {
-            start_path_planning_pressed = true;
-            start_path_planning();
-        }
-
-        if (start_path_planning_pressed && glfwGetKey(window.handle(), GLFW_KEY_3) == GLFW_RELEASE) {
-            start_path_planning_pressed = false;
-        }
-
-        if (!move_start_to_vehicle_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_PRESS) {
-            move_start_to_vehicle_pressed = true;
-            move_start_to_vehicle();
-        }
-
-        if (move_start_to_vehicle_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_RELEASE) {
-            move_start_to_vehicle_pressed = false;
-        }
-
-        if (!place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_5) == GLFW_PRESS) {
-            place_footprint_pressed = true;
-            place_footprint();
-        }
-
-        if (place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_5) == GLFW_RELEASE) {
-            place_footprint_pressed = false;
-        }
-
-        if (!visualize_path_potential_pressed && glfwGetKey(window.handle(), GLFW_KEY_6) == GLFW_PRESS) {
-            visualize_path_potential_pressed = true;
-            celeris.visualize_active_path_potential();
-        }
-
-        if (visualize_path_potential_pressed && glfwGetKey(window.handle(), GLFW_KEY_6) == GLFW_RELEASE) {
-            visualize_path_potential_pressed = false;
-        }
-
-        if (!t_pressed && glfwGetKey(window.handle(), GLFW_KEY_T) == GLFW_PRESS) {
-            t_pressed = true;
-            add_directional_waypoint();
-        }
-
-        if (t_pressed && glfwGetKey(window.handle(), GLFW_KEY_T) == GLFW_RELEASE) {
-            t_pressed = false;
-        }
-
-        if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
-            g_pressed = true;
-            add_nondirectional_waypoint();
-        }
-
-        if (g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_RELEASE) {
-            g_pressed = false;
-        }
-
-        if (!l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_PRESS) {
-            l_pressed = true;
-            delete_last_waypoint();
-        }
-
-        if (l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_RELEASE) {
-            l_pressed = false;
-        }
-
-        if (!n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_PRESS) {
-            n_pressed = true;
-            // process_current_lidar_frame();
-        }
-
-        if (n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_RELEASE) {
-            n_pressed = false;
-        }
         // Запись команд
         {auto command_buffer_scope = command_buffer.begin_scope();
             {auto render_pass_scope = engine.swapchain_resources().render_pass.begin_scope(
                 command_buffer,
                 engine.swapchain_resources().framebuffers[image_index],
-                // engine.swapchain_resources().swapchain, {{0.05f, 0.05f, 0.05f, 1.0f}});
                 engine.swapchain_resources().swapchain, clear_color);
-                // rgba(37, 150, 190)
                 renderer.render(command_buffer, scene);
-
-                // if (network_scan)
-                //     renderer.render(command_buffer, network_scan->point_cloud(), network_scan->point_cloud().transform.get_model_matrix());
-
-                // renderer.render(command_buffer, voxel_grid.render_object());
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
 
-                // {
-                //     VulkanCommandBuffer& debugger_command_buffer = debugger.command_buffer();
-                //     auto scope = debugger_command_buffer.begin_scope();
-                //     debugger.dispay_debug_window(camera);
-                //     debugger.display_build_from_dirty_window(debugger_command_buffer);
-                //     debugger.display_build_cmd_window(debugger_command_buffer, window, camera);
-                //     debugger.display_draw_pipline_window(debugger_command_buffer);
-                //     debugger.display_chunk_eviction_window(debugger_command_buffer, camera);
-                //     debugger.display_stream_chunks_pipeline_window(debugger_command_buffer, camera);
-                //     debugger.display_hash_table_window();
-                // }
-                // debugger.submit_commands();
-
-
-                ImGui::Begin("Debug");
-
-                ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-
-                ImGui::TextUnformatted("Camera position:");
-                ImGui::SameLine();
-                ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "x: %.2f", camera.position.x);
-                ImGui::SameLine();
-                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "y: %.2f", camera.position.y);
-                ImGui::SameLine();
-                ImGui::TextColored(ImVec4(0.0f, 0.35f, 1.0f, 1.0f), "z: %.2f", camera.position.z);
-
-                if (ImGui::CollapsingHeader("Voxel grid debug")) {
-                    ImGui::Checkbox("Show voxel grid", &show_voxel_grid);
-
-                    bool inflated_settings_changed = false;
-                    inflated_settings_changed |= ImGui::Checkbox(
-                        "Display inflated voxels",
-                        &display_inflated_voxels
-                    );
-                    inflated_settings_changed |= ImGui::ColorEdit4(
-                        "Inflated voxel color",
-                        inflated_voxel_color,
-                        ImGuiColorEditFlags_AlphaBar
-                    );
-                    inflated_settings_changed |= ImGui::ColorEdit4(
-                        "Inflated curvature-limit voxel color",
-                        inflated_curvature_limit_exceeded_voxel_color,
-                        ImGuiColorEditFlags_AlphaBar
-                    );
-
-                    inflated_settings_changed |= ImGui::SliderInt(
-                        "Negative X inflation size",
-                        &negative_x_inflation_size,
-                        0,
-                        static_cast<int>(voxel_grid.params().chunk_size.x)
-                    );
-                    inflated_settings_changed |= ImGui::SliderInt(
-                        "Positive X inflation size",
-                        &positive_x_inflation_size,
-                        0,
-                        static_cast<int>(voxel_grid.params().chunk_size.x)
-                    );
-                    inflated_settings_changed |= ImGui::SliderInt(
-                        "Negative Y inflation size",
-                        &negative_y_inflation_size,
-                        0,
-                        static_cast<int>(voxel_grid.params().chunk_size.y)
-                    );
-                    inflated_settings_changed |= ImGui::SliderInt(
-                        "Positive Y inflation size",
-                        &positive_y_inflation_size,
-                        0,
-                        static_cast<int>(voxel_grid.params().chunk_size.y)
-                    );
-                    inflated_settings_changed |= ImGui::SliderInt(
-                        "Negative Z inflation size",
-                        &negative_z_inflation_size,
-                        0,
-                        static_cast<int>(voxel_grid.params().chunk_size.z)
-                    );
-                    inflated_settings_changed |= ImGui::SliderInt(
-                        "Positive Z inflation size",
-                        &positive_z_inflation_size,
-                        0,
-                        static_cast<int>(voxel_grid.params().chunk_size.z)
-                    );
-
-                    if (inflated_settings_changed) {
-                        voxel_grid.set_inflated_voxel_debug_display(
-                            display_inflated_voxels ? 1u : 0u,
-                            pack_inflated_voxel_color(inflated_voxel_color),
-                            pack_inflated_voxel_color(inflated_curvature_limit_exceeded_voxel_color),
-                            static_cast<uint32_t>(negative_x_inflation_size),
-                            static_cast<uint32_t>(positive_x_inflation_size),
-                            static_cast<uint32_t>(negative_y_inflation_size),
-                            static_cast<uint32_t>(positive_y_inflation_size),
-                            static_cast<uint32_t>(negative_z_inflation_size),
-                            static_cast<uint32_t>(positive_z_inflation_size)
-                        );
-                    }
-                }
-
-                if (ImGui::CollapsingHeader("Voxel point map")) {
-                    ImGui::InputText("Save file", map_save_file_name, sizeof(map_save_file_name));
-
-                    if (ImGui::Button("Save map")) {
-                        std::filesystem::path save_file_name =
-                            std::filesystem::path(map_save_file_name).filename();
-
-                        if (save_file_name.empty()) {
-                            map_save_failed = true;
-                            map_save_status = "File name is empty";
-                        } else {
-                            save_file_name.replace_extension(".vpm");
-                            const std::filesystem::path save_path = saved_maps_directory / save_file_name;
-
-                            try {
-                                celeris.save_map(save_path);
-                                map_save_failed = false;
-                                map_save_status = "Saved " + save_path.string();
-                            } catch (const std::exception& error) {
-                                map_save_failed = true;
-                                map_save_status = error.what();
-                            }
-                        }
-                    }
-
-                    if (!map_save_status.empty()) {
-                        const ImVec4 color = map_save_failed
-                            ? ImVec4(1.0f, 0.25f, 0.25f, 1.0f)
-                            : ImVec4(0.35f, 1.0f, 0.45f, 1.0f);
-                        ImGui::TextColored(color, "%s", map_save_status.c_str());
-                    }
-
-                    if (ImGui::Button("Localize on map")) {
-                        try {
-                            const bool localized = celeris.localize_on_map();
-                            map_localization_failed = !localized;
-                            map_localization_status = localized
-                                ? "Localized on map"
-                                : "Localization failed";
-                        } catch (const std::exception& error) {
-                            map_localization_failed = true;
-                            map_localization_status = error.what();
-                        }
-                    }
-
-                    if (!map_localization_status.empty()) {
-                        const ImVec4 color = map_localization_failed
-                            ? ImVec4(1.0f, 0.25f, 0.25f, 1.0f)
-                            : ImVec4(0.35f, 1.0f, 0.45f, 1.0f);
-                        ImGui::TextColored(color, "%s", map_localization_status.c_str());
-                    }
-                }
-
-                celeris_visualizer.display_debug_controls();
-                celeris.display_path_planner_debug_controls();
-
-                // ImGui::TextColored(ImVec4(1.0f, 0.35f, 1.0f, 1.0f), "Current frame id: %d", lidar_video.current_frame_id());
-
-                // if (ImGui::Button("FPS controller")) {
-                //     use_fps_camera_controller();
-                // }
-                // ImGui::SameLine();
-                // ImGui::TextUnformatted("Key: F");
-
-                // if (ImGui::Button("Third person controller")) {
-                //     use_third_person_camera_controller();
-                // }
-                // ImGui::SameLine();
-                // ImGui::TextUnformatted("Key: R");
-
-                if (ImGui::CollapsingHeader("Path planning controls")) {
-                    if (ImGui::Button("Place start")) {
-                        place_start();
-                    }
-                    ImGui::SameLine();
-                    ImGui::TextUnformatted("Key: 1");
-
-                    if (ImGui::Button("Place end")) {
-                        place_end();
-                    }
-
-                    ImGui::SameLine();
-                    ImGui::TextUnformatted("Key: 2");
-
-                    if (ImGui::Button("Start path planning")) {
-                        start_path_planning();
-                    }
-                    ImGui::SameLine();
-                    ImGui::TextUnformatted("Key: 3");
-
-                    if (ImGui::Button("Move start to vehicle")) {
-                        move_start_to_vehicle();
-                    }
-                    ImGui::SameLine();
-                    ImGui::TextUnformatted("Key: 4");
-
-                    if (ImGui::Button("Place footprint")) {
-                        place_footprint();
-                    }
-                    ImGui::SameLine();
-                    ImGui::TextUnformatted("Key: 5");
-
-                    const std::vector<Celeris::Waypoint>& waypoints = celeris.waypoints();
-                    const size_t directional_waypoint_count = std::count_if(
-                        waypoints.begin(),
-                        waypoints.end(),
-                        [](const Celeris::Waypoint& waypoint) {
-                            return waypoint.directional();
-                        }
-                    );
-
-                    ImGui::Separator();
-                    ImGui::Text(
-                        "Waypoints: %zu (%zu directional)",
-                        waypoints.size(),
-                        directional_waypoint_count
-                    );
-                    ImGui::Text(
-                        "Active waypoint: %zu%s",
-                        celeris.active_waypoint_index(),
-                        celeris.waypoint_path_completed() ? " (complete)" : ""
-                    );
-
-                    float waypoint_reach_radius = celeris.waypoint_reach_radius();
-                    if (ImGui::SliderFloat(
-                            "Waypoint reach radius",
-                            &waypoint_reach_radius,
-                            0.1f,
-                            20.0f,
-                            "%.2f m")) {
-                        celeris.set_waypoint_reach_radius(waypoint_reach_radius);
-                    }
-
-                    ImGui::InputText(
-                        "Waypoint path file",
-                        waypoint_path_file_name,
-                        sizeof(waypoint_path_file_name)
-                    );
-
-                    if (ImGui::Button("Save waypoint path")) {
-                        std::filesystem::path save_file_name =
-                            std::filesystem::path(waypoint_path_file_name).filename();
-
-                        if (save_file_name.empty()) {
-                            waypoint_path_failed = true;
-                            waypoint_path_status = "File name is empty";
-                        } else {
-                            save_file_name.replace_extension(".wpp");
-                            const std::filesystem::path save_path =
-                                saved_waypoint_paths_directory / save_file_name;
-
-                            try {
-                                celeris.save_waypoint_path(save_path);
-                                waypoint_path_failed = false;
-                                waypoint_path_status = "Saved " + save_path.string();
-                            } catch (const std::exception& error) {
-                                waypoint_path_failed = true;
-                                waypoint_path_status = error.what();
-                            }
-                        }
-                    }
-
-                    ImGui::SameLine();
-
-                    if (ImGui::Button("Load waypoint path")) {
-                        std::filesystem::path load_file_name =
-                            std::filesystem::path(waypoint_path_file_name).filename();
-
-                        if (load_file_name.empty()) {
-                            waypoint_path_failed = true;
-                            waypoint_path_status = "File name is empty";
-                        } else {
-                            load_file_name.replace_extension(".wpp");
-                            const std::filesystem::path load_path =
-                                saved_waypoint_paths_directory / load_file_name;
-
-                            try {
-                                celeris.load_waypoint_path(load_path);
-                                waypoint_path_failed = false;
-                                waypoint_path_status = "Loaded " + load_path.string();
-                            } catch (const std::exception& error) {
-                                waypoint_path_failed = true;
-                                waypoint_path_status = error.what();
-                            }
-                        }
-                    }
-
-                    if (!waypoint_path_status.empty()) {
-                        const ImVec4 color = waypoint_path_failed
-                            ? ImVec4(1.0f, 0.25f, 0.25f, 1.0f)
-                            : ImVec4(0.35f, 1.0f, 0.45f, 1.0f);
-                        ImGui::TextColored(color, "%s", waypoint_path_status.c_str());
-                    }
-
-                    if (ImGui::Button("Add directional waypoint")) {
-                        add_directional_waypoint();
-                    }
-                    ImGui::SameLine();
-                    ImGui::TextUnformatted("Key: T");
-
-                    if (ImGui::Button("Add nondirectional waypoint")) {
-                        add_nondirectional_waypoint();
-                    }
-                    ImGui::SameLine();
-                    ImGui::TextUnformatted("Key: G");
-
-                    if (ImGui::Button("Delete last waypoint")) {
-                        delete_last_waypoint();
-                    }
-                    ImGui::SameLine();
-                    ImGui::TextUnformatted("Key: L");
-
-                    ImGui::Separator();
-
-                    bool gamepad_commands_enabled = celeris.gamepad_commands_enabled();
-                    if (ImGui::Checkbox("Gamepad driving", &gamepad_commands_enabled)) {
-                        celeris.set_gamepad_commands_enabled(gamepad_commands_enabled);
-                    }
-
-                    bool print_gamepad_input = gamepad_controller.print_input_events();
-                    if (ImGui::Checkbox("Print gamepad input", &print_gamepad_input)) {
-                        gamepad_controller.set_print_input_events(print_gamepad_input);
-                    }
-
-                    const VehicleCommand gamepad_command = celeris.gamepad_command();
-                    ImGui::Text(
-                        "Gamepad: %s%s",
-                        gamepad_controller.gamepad_present() ? "gamepad" :
-                        (gamepad_controller.raw_joystick_present() ? "raw joystick" : "not connected"),
-                        gamepad_controller.brake_pressed() ? " (R1 brake)" : ""
-                    );
-                    ImGui::Text(
-                        "Gamepad command: acceleration %.2f, steering velocity %.2f",
-                        gamepad_command.acceleration,
-                        gamepad_command.steering_angle_velocity
-                    );
-                    ImGui::Text(
-                        "Command sender: %s, %s",
-                        celeris.command_sender_running() ? "running" : "stopped",
-                        celeris.command_sender_connected() ? "connected" : "not connected"
-                    );
-
-                    ImGui::Separator();
-
-                    if (ImGui::Button("Play car path")) {
-                        start_car_playback();
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Stop")) {
-                        car_playback_active = false;
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Reset car")) {
-                        car_playback_active = false;
-                        celeris_visualizer.clear_car_pose_override();
-                    }
-
-                    ImGui::Checkbox("Loop car path", &car_playback_loop);
-                    ImGui::SliderFloat("Car playback speed", &car_playback_speed, 0.1f, 20.0f, "%.1f m/s");
-
-                }
-
-                // if (ImGui::InputFloat("Celeris car speed", &car_speed, 1.0f, 10.0f, "%.1f")) {
-                //     celeris.set_car_speed(car_speed);
-                // }
-
-                ImGui::End();
+                celeris_user_controller.display_interface(camera, gamepad_controller);
 
                 ui.end_frame(command_buffer);
             }

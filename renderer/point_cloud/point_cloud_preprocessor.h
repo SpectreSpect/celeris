@@ -32,12 +32,12 @@ public:
 
     void remove_points_near_origin(VulkanBuffer& point_instance_buffer,
                                    uint32_t point_count,
-                                   float min_distance = 2.7f);
+                                   float min_distance = 4.0f);
 
     void remove_points_near_origin(VulkanCommandBuffer& command_buffer,
                                    VulkanBuffer& point_instance_buffer,
                                    uint32_t point_count,
-                                   float min_distance = 2.7f);
+                                   float min_distance = 4.0f);
 
 private:
     VulkanCommandPool m_command_pool;

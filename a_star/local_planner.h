@@ -9,6 +9,7 @@
 
 #include "../vulkan_self/logger/logger_header.h"
 #include "a_star_structures.h"
+#include "local_planner_base.h"
 #include "vehicle.h"
 
 using Clock = std::chrono::high_resolution_clock;
@@ -17,7 +18,7 @@ class PathIntersectionDetector;
 class VulkanSubmitContext;
 class VehicleCommand;
 
-class LocalPlanner {
+class LocalPlanner : public LocalPlannerBase {
 public:
     _XCLASS_NAME(LocalPlanner);
 
@@ -30,7 +31,7 @@ public:
 
 public:
     LocalPlanner(float step_dt_min = 0.001f, float step_dt_max = 0.05f);
-    ~LocalPlanner() noexcept = default;
+    ~LocalPlanner() noexcept override = default;
 
     LocalPlanner(const LocalPlanner&) = delete;
     LocalPlanner& operator=(const LocalPlanner&) = delete;
@@ -38,19 +39,31 @@ public:
     LocalPlanner(LocalPlanner&&) noexcept = default;
     LocalPlanner& operator=(LocalPlanner&&) noexcept = default;
 
-    void update_timestamp();
-    float calculate_delta_time();
+    void update_timestamp() override;
+    float calculate_delta_time() override;
+    void predict_vehicle_state(VehicleBase& vehicle) override;
     void predict_vehicle_state(Vehicle& vehicle);
-    void reset_tracking();
+    void reset_tracking() override;
 
-    void set_astar_path(const std::vector<NonholonomicPos>& astar_path);
-    void set_astar_path(const std::vector<NonholonomicPos>& astar_path, uint64_t generation);
+    void set_astar_path(const std::vector<NonholonomicPos>& astar_path) override;
+    void set_astar_path(const std::vector<NonholonomicPos>& astar_path, uint64_t generation) override;
+    VehicleCommand predict_vehicle_command(
+        const VehicleBase& vehicle,
+        PathIntersectionDetector& intersection_detector,
+        VulkanSubmitContext& submit_context
+    ) override;
     VehicleCommand predict_vehicle_command(
         const Vehicle& vehicle,
         PathIntersectionDetector& intersection_detector,
         VulkanSubmitContext& submit_context
     );
 
+    VehicleCommand step(
+        const VehicleBase& vehicle,
+        PathIntersectionDetector& intersection_detector,
+        VulkanSubmitContext& submit_context,
+        const std::vector<NonholonomicPos>* astar_path = nullptr
+    ) override;
     VehicleCommand step(
         const Vehicle& vehicle,
         PathIntersectionDetector& intersection_detector,
@@ -59,15 +72,15 @@ public:
     );
 
     const std::vector<Vehicle::SimulationControlCandidate>& last_simulation_candidates() const noexcept;
-    float path_progress_s() const noexcept;
-    float path_length() const noexcept;
-    float path_window_min_s() const noexcept;
-    float path_window_max_s() const noexcept;
+    float path_progress_s() const noexcept override;
+    float path_length() const noexcept override;
+    float path_window_min_s() const noexcept override;
+    float path_window_max_s() const noexcept override;
     size_t active_path_segment_index() const noexcept;
     size_t path_segment_count() const noexcept;
-    uint64_t path_generation() const noexcept;
-    const std::vector<VehiclePathPoint>& vehicle_path() const noexcept;
-    const Vehicle::PathArcLengthTable& vehicle_path_arc_lengths() const noexcept;
+    uint64_t path_generation() const noexcept override;
+    const std::vector<VehiclePathPoint>& vehicle_path() const noexcept override;
+    const VehicleBase::PathArcLengthTable& vehicle_path_arc_lengths() const noexcept override;
 
 private:
     struct AppliedVehicleCommand {

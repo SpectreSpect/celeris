@@ -7,38 +7,16 @@
 #include "../vulkan_self/logger/logger_header.h"
 #include "../renderer/transform.h"
 #include "a_star_structures.h"
+#include "vehicle_base.h"
 
-class Vehicle {
+class Vehicle : public VehicleBase {
 public:
     _XCLASS_NAME(Vehicle);
 
 public:
-    struct PointProjection {
-        float s = 0.0f;
-        float dist = 0.0f;
-        glm::vec2 point = glm::vec2{0.0f};
-        glm::vec2 tangent = glm::vec2{1.0f, 0.0f};
-        float heading = 0.0f;
-        float dir = 1.0f;
-    };
-
-    struct PathArcLengthTable {
-        std::vector<float> point_s;
-        std::vector<float> direction_change_s;
-        float total_length = 0.0f;
-    };
-
-public:
-    struct VehicleTransformState {
-        glm::vec2 m_position = glm::vec2{0.0f}; // p(t). Позиция машины
-        float m_speed = 0.0f; // Скорость движения машины в направлении "взгляда"
-        float m_speed_acceleration = 0.0f; // p''(t). Текущее продольное ускорение
-        float m_heading = 0.0f; // theta(t). Направление кузова машины в плоскости XZ
-
-        float m_steering_angle = 0.0f; // delta(t). Угол поворота передних колес относительно кузова
-        float m_steering_angle_velocity = 0.0f; // delta'(t). Скорость изменения угла поворота колес
-        float m_steering_angle_acceleration = 0.0f; // delta''(t). Ускорение угла поворота колес
-    };
+    using VehicleBase::PathArcLengthTable;
+    using VehicleBase::PointProjection;
+    using VehicleBase::VehicleTransformState;
 
     struct SimulationControlSearchDesc {
         int speed_acceleration_samples = 7;
@@ -136,7 +114,7 @@ public:
         float max_steer_acceleration,
         float wheel_base = 2.5f
     );
-    ~Vehicle() noexcept = default;
+    ~Vehicle() noexcept override = default;
 
     Vehicle(const Vehicle&) = delete;
     Vehicle& operator=(const Vehicle&) = delete;
@@ -144,8 +122,8 @@ public:
     Vehicle(Vehicle&&) noexcept = default;
     Vehicle& operator=(Vehicle&&) noexcept = default;
 
-    VehicleTransformState& state() noexcept;
-    const VehicleTransformState& state() const noexcept;
+    VehicleTransformState& state() noexcept override;
+    const VehicleTransformState& state() const noexcept override;
     SimulationLossWeights& loss_weights() noexcept;
     const SimulationLossWeights& loss_weights() const noexcept;
     void reset_loss_weights() noexcept;
@@ -164,7 +142,7 @@ public:
         float steer_acceleration,
         float dt = 0.05f,
         bool debug = true
-    ) const;
+    ) const override;
 
     VehicleTransformState get_vehicle_simulation_step(
         const VehicleTransformState& state,
@@ -172,21 +150,21 @@ public:
         float steer_acceleration,
         float dt = 0.05f,
         bool debug = true
-    ) const;
+    ) const override;
 
     void vehicle_simulation_step(
         float speed_acceleration,
         float steer_acceleration,
         float dt = 0.05f,
         bool debug = true
-    );
+    ) override;
 
     VehicleTransformState get_vehicle_simulation_step(
         float speed_acceleration,
         float steer_acceleration,
         float dt = 0.05f,
         bool debug = true
-    );
+    ) override;
 
     void simulate_vehicle_with_s(
         VehicleTransformState& state,
@@ -222,7 +200,7 @@ public:
         float simulation_time, 
         float dt = 0.05f,
         bool debug = true
-    );
+    ) override;
 
     PolylineFollowStepResult follow_polyline_step(
         VehicleTransformState& state,

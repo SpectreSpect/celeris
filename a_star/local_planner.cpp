@@ -140,6 +140,12 @@ void LocalPlanner::predict_vehicle_state(Vehicle& vehicle) {
     vehicle.simulate_vehicle(speed_acceleration, 0.0f, delta_time);
 }
 
+void LocalPlanner::predict_vehicle_state(VehicleBase& vehicle) {
+    Vehicle* mpc_vehicle = dynamic_cast<Vehicle*>(&vehicle);
+    logger().check(mpc_vehicle != nullptr, "LocalPlanner requires Vehicle");
+    predict_vehicle_state(*mpc_vehicle);
+}
+
 const std::vector<Vehicle::SimulationControlCandidate>&
 LocalPlanner::last_simulation_candidates() const noexcept
 {
@@ -354,6 +360,16 @@ void LocalPlanner::set_astar_path(
 }
 
 VehicleCommand LocalPlanner::predict_vehicle_command(
+    const VehicleBase& vehicle,
+    PathIntersectionDetector& intersection_detector,
+    VulkanSubmitContext& submit_context)
+{
+    const Vehicle* mpc_vehicle = dynamic_cast<const Vehicle*>(&vehicle);
+    logger().check(mpc_vehicle != nullptr, "LocalPlanner requires Vehicle");
+    return predict_vehicle_command(*mpc_vehicle, intersection_detector, submit_context);
+}
+
+VehicleCommand LocalPlanner::predict_vehicle_command(
     const Vehicle& vehicle,
     PathIntersectionDetector& intersection_detector,
     VulkanSubmitContext& submit_context)
@@ -507,6 +523,17 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
         .acceleration = control.speed_acceleration,
         .steering_angle_velocity = steering_angle_velocity_target
     };
+}
+
+VehicleCommand LocalPlanner::step(
+    const VehicleBase& vehicle,
+    PathIntersectionDetector& intersection_detector,
+    VulkanSubmitContext& submit_context,
+    const std::vector<NonholonomicPos>* astar_path)
+{
+    const Vehicle* mpc_vehicle = dynamic_cast<const Vehicle*>(&vehicle);
+    logger().check(mpc_vehicle != nullptr, "LocalPlanner requires Vehicle");
+    return step(*mpc_vehicle, intersection_detector, submit_context, astar_path);
 }
 
 VehicleCommand LocalPlanner::step(

@@ -154,6 +154,10 @@ add_executable(app
   utils/avg_timer.cpp
   a_star/vehicle.cpp
   a_star/local_planner.cpp
+  a_star/pure_pursuit_vehicle.cpp
+  a_star/pure_pursuit_local_planner.cpp
+  vulkan_self/keyboard_input_reciever.cpp
+  autopilot/celeris_user_controller.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

@@ -67,6 +67,7 @@ private:
     SphericalPoseMarker m_start_marker;
     SphericalPoseMarker m_goal_marker;
     SphericalPoseMarker m_vehicle_marker;
+    SphericalPoseMarker m_lookahead_marker;
     GazelleNext m_gazelle_next;
 
     LineCloud m_path_line_cloud;
@@ -90,6 +91,7 @@ private:
     bool show_start_marker = true;
     bool show_goal_marker = true;
     bool show_vehicle_marker = false;
+    bool show_lookahead_point = false;
     bool show_gazelle_next = true;
     bool show_local_candidates = true;
     bool show_local_s_window = true;
