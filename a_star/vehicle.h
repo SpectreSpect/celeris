@@ -42,7 +42,7 @@ public:
 
     struct SimulationControlSearchDesc {
         int speed_acceleration_samples = 7;
-        int steer_acceleration_samples = 30;
+        int steer_acceleration_samples = 15;
         int max_results = 5;
         float simulation_time = 2.0f;
         float max_simulation_s = 8.0f;

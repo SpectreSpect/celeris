@@ -1256,13 +1256,40 @@ float Vehicle::evaluate_path_potential(
     float steer_acceleration,
     float groove_radius) const
 {
-    const PointProjection projection = find_path_projection(
+    PointProjection projection = find_path_projection(
         state,
         path,
         path_arc_lengths,
         active_segment_min_s,
         active_segment_max_s
     );
+
+    // if (active_segment_max_s - projection.s < 0.1) {
+    // const glm::vec2 r = state.m_position - path.back().position;
+    // const glm::vec2 dir = path.size() >= 2 ?
+    //     path.back().position - path[path.size() - 2].position : 
+    //     glm::vec2(1.0f, 0.0f);
+
+    // const double r_length = glm::length(r);
+    // const double dir_lenght = glm::length(dir);
+    // const double prod = r_length * dir_lenght;
+    // if (std::abs(prod) > Utils::eps) {
+    //     const double cos_alpha = glm::dot(dir, r) / prod;
+    //     const double d_length = cos_alpha * r_length;
+    //     const glm::vec2 d = dir * glm::vec2(d_length);
+    //     const glm::vec2 h = r - d;
+
+    //     const double cross = glm::cross(glm::vec3(h.x, h.y, 0), glm::vec3(r.x, r.y, 0)).z;
+
+    //     if (cos_alpha > 0.0) {
+    //         const float dist = sqrt(1.0 - cos_alpha * cos_alpha) * r_length;
+    //         const float s = std::max(0.0, active_segment_max_s - r_length);
+
+    //         projection.dist = std::min(projection.dist, dist);
+    //         projection.s = std::min(projection.s, s);
+    //     }
+    // }
+    // // }
 
     const float total_segment_s = active_segment_max_s - active_segment_min_s;
     const float projection_segment_s = projection.s - active_segment_min_s;
@@ -1277,11 +1304,11 @@ float Vehicle::evaluate_path_potential(
 
     const double groove_k = std::max(0.0f, m_path_potential_params.groove_k);
     const double plane_k = std::max(0.0f, m_path_potential_params.plane_k);
-    const double loss = projection.dist <= radius ?
+    const double groove_loss = projection.dist <= radius ?
         groove_k * (1.0 - cos(projection.dist * glm::pi<double>() / radius)) / 2.0 : 
         plane_k * (projection.dist - radius) + groove_k;
 
-    return loss + forward_loss;
+    return groove_loss + forward_loss;
 }
 
 float Vehicle::compute_slowdown_loss(
