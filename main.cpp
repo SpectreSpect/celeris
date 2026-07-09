@@ -285,6 +285,11 @@ int main() {
         }
     );
 
+    // celeris.set_vehicle_command(VehicleCommand{
+    //     .acceleration = 0.5f,
+    //     .steering_angle_velocity = 0.5f
+    // });
+
     const NonholonomicPos start_lidar_scan_position{.pos = glm::vec3(0.0f, 0.0f, 0.0f)};
     // celeris.set_start(start_lidar_scan_position);
     celeris.set_goal(NonholonomicPos{.pos = glm::vec3(5, 1, 5)});
@@ -293,10 +298,10 @@ int main() {
     // celeris.load_map(saved_maps_directory / "test4.vpm");
     // celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim_3.wpp");
     celeris.start(std::move(planner_submit_context));
-    celeris.set_vehicle_command(VehicleCommand{
-        .acceleration = 0.5f,
-        .steering_angle_velocity = 0.5f
-    });
+    // celeris.set_vehicle_command(VehicleCommand{
+    //     .acceleration = 0.5f,
+    //     .steering_angle_velocity = 0.5f
+    // });
 
     CelerisVisualizer celeris_visualizer(
         mesh_manager,
