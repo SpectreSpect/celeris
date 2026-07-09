@@ -56,6 +56,10 @@ public:
         m_camera.position -= m_camera.up * speed * dt;
     }
 
+    Camera& camera() {
+        return m_camera;
+    }
+
 private:
     Camera& m_camera;
 };
