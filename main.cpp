@@ -87,6 +87,187 @@
 #include <random>
 #include <string>
 
+class KeyboardInputReciever {
+public:
+    void add_on_key_pressed_callback(int glfw_key_code, std::function<void()> callback) {
+
+        auto it = m_on_key_pressed_callbacks.find(glfw_key_code);
+        if (it == m_on_key_pressed_callbacks.end()) {
+            m_on_key_pressed_callbacks[glfw_key_code] = std::vector<std::function<void()>>();
+        }
+
+        m_on_key_pressed_callbacks[glfw_key_code].push_back(callback);
+
+
+        // auto it = key_press_states.find(glfw_key_code);
+        // if (it == key_press_states.end())
+        //     key_press_states[glfw_key_code] = false;
+
+        // int glfw_key_state = glfwGetKey(window.handle(), glfw_key_code);
+        
+        // if (!key_press_states[glfw_key_code] && glfw_key_state == GLFW_PRESS)
+        //     key_press_states[glfw_key_code] = true;
+
+        // if (key_press_states[glfw_key_code] && glfw_key_state == GLFW_RELEASE)
+        //     key_press_states[glfw_key_code] = false;
+    }
+
+    // GLFW key code example: GLFW_KEY_C
+    void update(Window& window) {
+        for (auto it = m_on_key_pressed_callbacks.begin(); it != m_on_key_pressed_callbacks.end(); it++) {
+            int glfw_key = it->first;
+            int glfw_key_state = glfwGetKey(window.handle(), glfw_key);
+
+            if (!m_key_press_states[glfw_key] && glfw_key_state == GLFW_PRESS) {
+                m_key_press_states[glfw_key] = true;
+
+                auto on_key_pressed_callbacks = it->second;
+                for (auto callback : on_key_pressed_callbacks) {
+                    callback();
+                }
+            }
+
+            if (m_key_press_states[glfw_key] && glfw_key_state == GLFW_RELEASE) {
+                m_key_press_states[glfw_key] = false;
+            }
+        }
+
+        // auto it = m_key_press_states.find(glfw_key_code);
+        // if (it == m_key_press_states.end()) {
+        //     m_key_press_states[glfw_key_code] = false;
+        // }
+
+        // int glfw_key_state = glfwGetKey(window.handle(), glfw_key_code);
+        
+        // if (!m_key_press_states[glfw_key_code] && glfw_key_state == GLFW_PRESS) {
+        //     m_key_press_states[glfw_key_code] = true;
+        //     return true;
+        // }
+
+        // if (m_key_press_states[glfw_key_code] && glfw_key_state == GLFW_RELEASE) {
+        //     m_key_press_states[glfw_key_code] = false;
+        //     return false;
+        // }
+
+        // return false;
+    }
+
+private:
+    std::unordered_map<int, bool> m_key_press_states;
+    std::unordered_map<int, std::vector<std::function<void()>>> m_on_key_pressed_callbacks;
+};
+
+class KeyboardInputReciever2 {
+public:
+
+    KeyboardInputReciever2(Window& window) : m_window(&window) {
+    }
+
+    bool on_key_pressed(int glfw_key_code) {
+        if (!m_window)
+            throw;
+
+        auto it = m_key_press_states.find(glfw_key_code);
+        if (it == m_key_press_states.end())
+            m_key_press_states[glfw_key_code] = false;
+
+        int glfw_key_state = glfwGetKey(m_window->handle(), glfw_key_code);
+        
+        if (!m_key_press_states[glfw_key_code] && glfw_key_state == GLFW_PRESS) {
+            m_key_press_states[glfw_key_code] = true;
+            m_on_key_press_states[glfw_key_code] = true;
+        }
+
+        if (m_on_key_press_states.find(glfw_key_code) == m_on_key_press_states.end()) {
+            m_on_key_press_states[glfw_key_code] = false;
+        }
+
+        return m_on_key_press_states[glfw_key_code];
+    }
+
+    void update() {
+        for (auto it = m_on_key_press_states.begin(); it != m_on_key_press_states.end(); it++) {
+            it->second = false;
+        }
+
+        for (auto it = m_key_press_states.begin(); it != m_key_press_states.end(); it++) {
+            int glfw_key_state = glfwGetKey(m_window->handle(), it->first);
+            if (it->second && glfw_key_state == GLFW_RELEASE)
+                m_key_press_states[it->first] = false;
+        }
+    }
+
+//     void add_on_key_pressed_callback(int glfw_key_code, std::function<void()> callback) {
+
+//         auto it = m_on_key_pressed_callbacks.find(glfw_key_code);
+//         if (it == m_on_key_pressed_callbacks.end()) {
+//             m_on_key_pressed_callbacks[glfw_key_code] = std::vector<std::function<void()>>();
+//         }
+
+//         m_on_key_pressed_callbacks[glfw_key_code].push_back(callback);
+
+
+//         // auto it = key_press_states.find(glfw_key_code);
+//         // if (it == key_press_states.end())
+//         //     key_press_states[glfw_key_code] = false;
+
+//         // int glfw_key_state = glfwGetKey(window.handle(), glfw_key_code);
+        
+//         // if (!key_press_states[glfw_key_code] && glfw_key_state == GLFW_PRESS)
+//         //     key_press_states[glfw_key_code] = true;
+
+//         // if (key_press_states[glfw_key_code] && glfw_key_state == GLFW_RELEASE)
+//         //     key_press_states[glfw_key_code] = false;
+//     }
+
+//     // GLFW key code example: GLFW_KEY_C
+//     void update(Window& window) {
+//         for (auto it = m_on_key_pressed_callbacks.begin(); it != m_on_key_pressed_callbacks.end(); it++) {
+//             int glfw_key = it->first;
+//             int glfw_key_state = glfwGetKey(window.handle(), glfw_key);
+
+//             if (!m_key_press_states[glfw_key] && glfw_key_state == GLFW_PRESS) {
+//                 m_key_press_states[glfw_key] = true;
+
+//                 auto on_key_pressed_callbacks = it->second;
+//                 for (auto callback : on_key_pressed_callbacks) {
+//                     callback();
+//                 }
+//             }
+
+//             if (m_key_press_states[glfw_key] && glfw_key_state == GLFW_RELEASE) {
+//                 m_key_press_states[glfw_key] = false;
+//             }
+//         }
+
+//         // auto it = m_key_press_states.find(glfw_key_code);
+//         // if (it == m_key_press_states.end()) {
+//         //     m_key_press_states[glfw_key_code] = false;
+//         // }
+
+//         // int glfw_key_state = glfwGetKey(window.handle(), glfw_key_code);
+        
+//         // if (!m_key_press_states[glfw_key_code] && glfw_key_state == GLFW_PRESS) {
+//         //     m_key_press_states[glfw_key_code] = true;
+//         //     return true;
+//         // }
+
+//         // if (m_key_press_states[glfw_key_code] && glfw_key_state == GLFW_RELEASE) {
+//         //     m_key_press_states[glfw_key_code] = false;
+//         //     return false;
+//         // }
+
+//         // return false;
+//     }
+
+private:
+    Window* m_window = nullptr;
+    std::unordered_map<int, bool> m_key_press_states;
+    std::unordered_map<int, bool> m_on_key_press_states;
+
+    // std::unordered_map<int, std::vector<std::function<void()>>> m_on_key_pressed_callbacks;
+};
+
 VkClearValue clear_color = {0.05f, 0.05f, 0.05f, 1.0f};
 
 int main() {
@@ -158,9 +339,6 @@ int main() {
         engine.compute_queue(),
         compute_pass_manager
     );
-
-    LidarScanReceiver scan_receiver(point_cloud_preprocessor, 5000);
-    // scan_receiver.start();
 
     std::unique_ptr<LidarScan> network_scan;
     std::deque<std::unique_ptr<LidarScan>> retired_network_scans;
@@ -321,19 +499,6 @@ int main() {
         scan_index_count
     );
 
-    RenderObject scan_object(scan_mesh_view, material_instance_manager.pbr);
-    // RenderObject scan_object(mesh_manager.cube.get_view(), material_instance_manager.pbr);
-    scan_object.set_material_data(PBRMaterialData::create(0.0f, 0.95f, 1.8f, glm::vec4(1.0f), 1.0f));
-
-    scan_object.transform.scale = glm::vec3(5.0f);
-
-    // voxelizator.voxelize<PBRVertex>(
-    //     blue_voxelize_prefab,
-    //     scan_object.mesh_view(),
-    //     scan_object.transform.get_model_matrix(),
-    //     &voxel_grid.local_voxel_write_list()
-    // );
-
     glm::ivec2 wall_junction_xz = glm::ivec2(5, 5);
     std::vector<VoxelWriteGPU> test_voxel_writes;
     test_voxel_writes.reserve(50);
@@ -360,45 +525,6 @@ int main() {
                     );
                 }
     };
-
-    // add_test_wall(glm::ivec3(5, 0, 0), glm::ivec3(1, 5, 5));
-    // add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(1, 5, 5));
-    // add_test_wall(glm::ivec3(5, 0, 0), glm::ivec3(5, 5, 1));
-
-    // add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(1, 5, 5));
-    // add_test_wall(glm::ivec3(15, 0, 0), glm::ivec3(1, 5, 5));
-    // add_test_wall(glm::ivec3(10, 0, 0), glm::ivec3(5, 5, 1));
-
-    // VulkanBuffer box_voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + Utils::size_bytes(test_voxel_writes));
-    // box_voxel_write_list.upload_scalar<uint32_t>(test_voxel_writes.size(), 0);
-    // box_voxel_write_list.upload(test_voxel_writes, sizeof(uint32_t) * 4);
-
-    // VulkanCommandBuffer compute_command_buffer(engine.device(), engine.compute_command_pool());
-    // {
-    //     auto scope = compute_command_buffer.begin_scope();
-    //     voxel_grid.set_voxels(compute_command_buffer, box_voxel_write_list);
-    // }
-    // VulkanFence compute_fence(engine.device());
-    // engine.compute_submit(compute_command_buffer, &compute_fence);
-    // compute_fence.wait();
-
-    // voxel_grid.update(window, camera);
-
-
-    // VoxelGridChunk chunk = voxel_grid.read_chunk(glm::ivec3(0, 0, 0));
-    // glm::uvec3 read_chunk_size = chunk.chunk_size();
-
-    // for (int x = 0; x < read_chunk_size.x; x++)
-    //     for (int y = 0; y < read_chunk_size.y; y++)
-    //         for (int z = 0; z < read_chunk_size.z; z++) {
-    //             VoxelDataGPU voxel = chunk.voxel(glm::uvec3(x, y, z));
-    //             glm::vec4 color = voxel.color_vec4();
-
-    //             if (color.x != 0 || color.y != 0 || color.z != 0)
-    //                 std::cout << "pos: (" << x << ", " << y << ", " << z << ")" << std::endl;
-    //         }
-
-
 
     uint32_t max_write_count = 100000;
     VulkanBuffer voxel_write_list = VulkanBuffer::create_host_visible_storage_buffer(engine, sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * max_write_count);
@@ -473,13 +599,6 @@ int main() {
     std::vector<LineInstance> line_instances;
     const size_t point_count = loaded_frame_data.points.size();
 
-    // auto is_valid_point = [](const PointInstance& point) {
-    //     const glm::vec4& p = point.position;
-    //     return std::isfinite(p.x) &&
-    //            std::isfinite(p.y) &&
-    //            std::isfinite(p.z);
-    // };
-
     line_instances.reserve(point_count);
 
     for (int i = 1; i < point_count; i++) {
@@ -499,21 +618,10 @@ int main() {
     
     loaded_line_cloud.set_lines(line_instances);
 
-    // LineCloud loaded_line_cloud(engine, );
-
     PointCloud loaded_frame_data_point_cloud(manager_bundle, loaded_frame_data.points);
     loaded_frame_data_point_cloud.set_material_data(PointCloudMaterialData{
         .color = glm::vec4(1, 1, 1, 1)
     });
-
-    // SphericalPoseMarker pose_marker(
-    //         mesh_manager,
-    //         material_instance_manager,
-    //         PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(0, 1, 1, 1))
-    // );
-    // pose_marker.transform.scale = glm::vec3(0.2f);
-
-    // LidarScan some_scan(manager_bundle, point_cloud_preprocessor, std::move(loaded_frame_data));
 
     LidarScan target_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
     LidarScan source_scan(manager_bundle, point_cloud_preprocessor, "assets/lidar_scans/frame_000000.bin");
@@ -522,40 +630,6 @@ int main() {
     source_scan.point_cloud().set_color(glm::vec4(1, 0, 0, 1));
 
     source_scan.point_cloud().transform.position += glm::vec3(-2, 2, -2);
-
-
-    // celeris.voxel_map_point_inserter().insert(
-    //     celeris.voxel_point_map(),
-    //     target_scan.point_cloud(),
-    //     target_scan.normal_buffer()
-    // );
-
-    // celeris.voxel_map_point_inserter().insert(
-    //     celeris.voxel_point_map(),
-    //     source_scan.point_cloud(),
-    //     source_scan.normal_buffer()
-    // );
-
-    // std::vector<PointInstance> point_map_points(
-    //     celeris.voxel_point_map().map_point_count()
-    // );
-
-    // std::vector<glm::vec4> point_map_normals(
-    //     celeris.voxel_point_map().map_point_count()
-    // );
-
-    // celeris.voxel_point_map().map_point_buffer.read(
-    //     point_map_points.data(),
-    //     celeris.voxel_point_map().map_point_count() * sizeof(PointInstance),
-    //     0
-    // );
-
-    // celeris.voxel_point_map().map_normal_buffer.read(
-    //     point_map_normals.data(),
-    //     celeris.voxel_point_map().map_point_count() * sizeof(glm::vec4),
-    //     0
-    // );
-
 
     char map_save_file_name[128] = "map";
     std::string map_save_status;
@@ -566,50 +640,7 @@ int main() {
     std::string waypoint_path_status;
     bool waypoint_path_failed = false;
 
-
-
-    // std::ofstream saved_file("/home/spectre/Projects/celeris/saved_maps/map.cel");
-
-    // saved_file << celeris.voxel_point_map().map_point_count() << "\n";
-
-    // for (int i = 0; i < celeris.voxel_point_map().map_point_count(); i++) {
-    //     saved_file
-    //         << point_map_points[i].position.x << "\n"
-    //         << point_map_points[i].position.y << "\n"
-    //         << point_map_points[i].position.z << "\n"
-    //         << point_map_points[i].position.w << "\n"
-
-    //         << point_map_points[i].color.r << "\n"
-    //         << point_map_points[i].color.g << "\n"
-    //         << point_map_points[i].color.b << "\n"
-    //         << point_map_points[i].color.a << "\n";
-    // }
-
-    // for (int i = 0; i < celeris.voxel_point_map().map_point_count(); i++) {
-    //     saved_file
-    //         << point_map_normals[i].x << "\n"
-    //         << point_map_normals[i].y << "\n"
-    //         << point_map_normals[i].z << "\n"
-    //         << point_map_normals[i].w << "\n";
-    // }
-
-    // saved_file.close();
-
-
-
-    // celeris.voxel_point_map
-
-    // VoxelPointMap voxel_point_map(
-    //     engine,
-    //     1500000,
-    //     1500000
-    // );
-
-
-
-
-
-    auto use_fps_camera_controller = [&]() {
+    auto use_fps_camera_controller = [&]() -> void {
         if (camera_controller_mode == CameraControllerMode::FPS)
             return;
 
@@ -649,6 +680,7 @@ int main() {
     };
 
     auto place_start = [&]() {
+        std::cout << "Place start" << std::endl;
         NonholonomicPos pose;
         if (make_pose_from_camera(pose)) {
             celeris.set_start(pose);
@@ -690,44 +722,6 @@ int main() {
         celeris.delete_last_waypoint();
     };
 
-    // LidarVideo lidar_video(
-    //     manager_bundle,
-    //     point_cloud_preprocessor,
-    //     "/home/spectre/TEMP_lidar_output_mesh/recording_16/index.csv",
-    //     0,
-    //     2
-    // );
-
-    // for (int i = static_cast<int>(lidar_video.get_scan_count()) - 1; i >= 1; --i) {
-    //     glm::vec3 p_prev = lidar_video.get_scan(i - 1).point_cloud().transform.position;
-    //     glm::vec3 p_curr = lidar_video.get_scan(i).point_cloud().transform.position;
-
-    //     glm::quat q_prev = glm::normalize(lidar_video.get_scan(i - 1).point_cloud().transform.rotation);
-    //     glm::quat q_curr = glm::normalize(lidar_video.get_scan(i).point_cloud().transform.rotation);
-
-    //     if (glm::dot(q_prev, q_curr) < 0.0f) {
-    //         q_curr = -q_curr;
-    //     }
-
-    //     glm::vec3 delta_position = p_curr - p_prev;
-    //     glm::quat delta_rotation = glm::normalize(q_curr * glm::inverse(q_prev));
-
-    //     lidar_video.get_scan(i).point_cloud().transform.position = delta_position;
-    //     lidar_video.get_scan(i).point_cloud().transform.rotation = delta_rotation;
-    // }
-
-    // lidar_video.get_scan(0).point_cloud().transform.position = glm::vec3(0.0f);
-    // lidar_video.get_scan(0).point_cloud().transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-
-
-
-    // celeris.voxel_map_reseter().reset(celeris.voxel_point_map());
-    // celeris.voxel_map_point_inserter().insert(
-    //     celeris.voxel_point_map(),
-    //     lidar_video.get_scan(0).point_cloud(),
-    //     lidar_video.get_scan(0).normal_buffer()
-    // );
-
     PointCloud voxel_point_map(
         manager_bundle,
         celeris.voxel_point_map().map_point_buffer,
@@ -736,39 +730,6 @@ int main() {
     voxel_point_map.set_color(glm::vec4(0, 0, 0, 1));
     uint32_t rendered_celeris_scan_count = celeris.received_scan_count();
 
-    // auto process_current_lidar_frame = [&]() {
-    //     uint32_t current_frame_id = lidar_video.current_frame_id();
-
-    //     if (current_frame_id > 0) {
-    //         LidarScan& current_scan = lidar_video.get_scan(current_frame_id);
-    //         LidarScan& previous_scan = lidar_video.get_scan(current_frame_id - 1);
-
-    //         PointCloud& current_point_cloud = current_scan.point_cloud();
-    //         PointCloud& previous_point_cloud = previous_scan.point_cloud();
-
-    //         current_point_cloud.transform.position =
-    //             previous_point_cloud.transform.position + current_point_cloud.transform.position;
-    //         current_point_cloud.transform.rotation =
-    //             glm::normalize(current_point_cloud.transform.rotation * previous_point_cloud.transform.rotation);
-
-    //         celeris.gicp_pass().fit(
-    //             celeris.voxel_point_map(),
-    //             current_scan.point_cloud(),
-    //             current_scan.normal_buffer(),
-    //             10
-    //         );
-
-    //         celeris.voxel_map_point_inserter().insert(
-    //             celeris.voxel_point_map(),
-    //             current_scan.point_cloud(),
-    //             current_scan.normal_buffer()
-    //         );
-
-    //         voxel_point_map.set_instance_view(celeris.voxel_point_map().get_map_instance_view());
-    //     }
-
-    //     lidar_video.next_frame();
-    // };
     FootprintVisualizer footprint_visualizer(
         mesh_manager,
         material_instance_manager,
@@ -787,20 +748,8 @@ int main() {
     Scene scene;
 
     scene.add(skybox);
-
     scene.add(celeris_visualizer);
     scene.add(voxel_grid.render_object());
-    // scene.add(loaded_frame_data_point_cloud);
-    // scene.add(loaded_line_cloud);
-    // scene.add(pose_marker);
-
-    // scene.add(footprint_visualizer);
-    // scene.add(gazelle);
-    // scene.add(target_scan);
-    // scene.add(voxel_point_map);
-    // scene.add(source_scan);
-
-    // scene.add(lidar_video);
 
     skybox.update(scene);
 
@@ -894,12 +843,18 @@ int main() {
 
     use_fps_camera_controller();
 
+    KeyboardInputReciever2 keyboard_input_reciever2(window);
+
+    // KeyboardInputReciever keyboard_input_reciever;
+    // keyboard_input_reciever.add_on_key_pressed_callback(GLFW_KEY_F, use_fps_camera_controller);
+    // keyboard_input_reciever.add_on_key_pressed_callback(GLFW_KEY_1, place_start);
+
     int point_id = 0;
     int last_point_id = 0;
-    // pose_marker.transform.position = loaded_frame_data.points[point_id].position;
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
+        keyboard_input_reciever2.update();
         gamepad_controller.update(
             celeris.car_speed(),
             celeris.vehicle_speed(),
@@ -923,36 +878,10 @@ int main() {
         glm::quat rot_x = glm::angleAxis(angle, glm::vec3(1.0f, 0.0f, 0.0f));
         glm::quat rot_y = glm::angleAxis(angle, glm::vec3(0.0f, 1.0f, 0.0f));
 
-        // for (const glm::mat4 transform : transform_mem) {
-        //     voxelizator.voxelize_and_submit<PBRVertex>(
-        //         transparent_voxelize_prefab,
-        //         vox_box.mesh_view(),
-        //         transform,
-        //         &voxel_grid.local_voxel_write_list()
-        //     );
-        // }
-
-        // for (size_t i = 0; i < transform_mem.size(); i++) {
-        //     vox_box.transform.rotation = glm::normalize(
-        //         vox_box.transform.rotation * rot_x * rot_y
-        //     );
-
-        //     voxelizator.voxelize_and_submit<PBRVertex>(
-        //         blue_voxelize_prefab,
-        //         vox_box.mesh_view(),
-        //         vox_box.transform.get_model_matrix(),
-        //         &voxel_grid.local_voxel_write_list()
-        //     );
-
-        //     transform_mem[i] = vox_box.transform.get_model_matrix();
-        // }
-
         uint32_t image_index = 0;
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
 
-
-        // celeris.update();
         celeris.update(compute_submit_context);
         if (rendered_celeris_scan_count != celeris.received_scan_count()) {
             voxel_point_map.set_instance_view(celeris.voxel_point_map().get_map_instance_view());
@@ -978,19 +907,23 @@ int main() {
 
         celeris_visualizer.update();
 
-        if (!fps_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_F) == GLFW_PRESS) {
-            fps_camera_pressed = true;
+        // if (!fps_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_F) == GLFW_PRESS) {
+        //     fps_camera_pressed = true;
+        //     use_fps_camera_controller();
+        // }
+        // if (fps_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_F) == GLFW_RELEASE)
+        //     fps_camera_pressed = false;
+        
+        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_F)) {
             use_fps_camera_controller();
         }
-        if (fps_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_F) == GLFW_RELEASE)
-            fps_camera_pressed = false;
 
-        if (!third_person_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_R) == GLFW_PRESS) {
-            third_person_camera_pressed = true;
+        // if (!third_person_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_R) == GLFW_PRESS) {
+        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_R)) {
             use_third_person_camera_controller();
         }
-        if (third_person_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_R) == GLFW_RELEASE)
-            third_person_camera_pressed = false;
+        // if (third_person_camera_pressed && glfwGetKey(window.handle(), GLFW_KEY_R) == GLFW_RELEASE)
+        //     third_person_camera_pressed = false;
 
         third_person_camera_controller.set_target(celeris.vehicle_position().pos);
         if (camera_controller_mode == CameraControllerMode::FPS)
@@ -1005,122 +938,112 @@ int main() {
         voxel_grid.render_object().visible = show_voxel_grid;
         voxel_grid.update(window, camera);
 
-        if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
-            place_start_pressed = true;
+        // if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
+        //     place_start_pressed = true;
+        //     place_start();
+        // }
+
+        // if (!place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_PRESS) {
+        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_1)) {
+            // place_start_pressed = true;
             place_start();
         }
 
-        if (place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_RELEASE) {
-            place_start_pressed = false;
-        }
+        // if (place_start_pressed && glfwGetKey(window.handle(), GLFW_KEY_1) == GLFW_RELEASE) {
+        //     place_start_pressed = false;
+        // }
 
-        if (!place_end_pressed && glfwGetKey(window.handle(), GLFW_KEY_2) == GLFW_PRESS) {
-            place_end_pressed = true;
+        // if (!place_end_pressed && glfwGetKey(window.handle(), GLFW_KEY_2) == GLFW_PRESS) {
+        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_2)) {
+            // place_end_pressed = true;
             place_end();
         }
 
-        if (place_end_pressed && glfwGetKey(window.handle(), GLFW_KEY_2) == GLFW_RELEASE) {
-            place_end_pressed = false;
-        }
+        // if (place_end_pressed && glfwGetKey(window.handle(), GLFW_KEY_2) == GLFW_RELEASE) {
+        //     place_end_pressed = false;
+        // }
 
-        if (!start_path_planning_pressed && glfwGetKey(window.handle(), GLFW_KEY_3) == GLFW_PRESS) {
-            start_path_planning_pressed = true;
+        // if (!start_path_planning_pressed && glfwGetKey(window.handle(), GLFW_KEY_3) == GLFW_PRESS) {
+        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_3)) {
+            // start_path_planning_pressed = true;
             start_path_planning();
         }
 
-        if (start_path_planning_pressed && glfwGetKey(window.handle(), GLFW_KEY_3) == GLFW_RELEASE) {
-            start_path_planning_pressed = false;
-        }
+        // if (start_path_planning_pressed && glfwGetKey(window.handle(), GLFW_KEY_3) == GLFW_RELEASE) {
+        //     start_path_planning_pressed = false;
+        // }
 
-        if (!move_start_to_vehicle_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_PRESS) {
-            move_start_to_vehicle_pressed = true;
+        // if (!move_start_to_vehicle_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_PRESS) {
+        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_4)) {
+            // move_start_to_vehicle_pressed = true;
             move_start_to_vehicle();
         }
 
-        if (move_start_to_vehicle_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_RELEASE) {
-            move_start_to_vehicle_pressed = false;
-        }
+        // if (move_start_to_vehicle_pressed && glfwGetKey(window.handle(), GLFW_KEY_4) == GLFW_RELEASE) {
+        //     move_start_to_vehicle_pressed = false;
+        // }
 
-        if (!place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_5) == GLFW_PRESS) {
-            place_footprint_pressed = true;
+        // if (!place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_5) == GLFW_PRESS) {
+        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_5)) {
+            // place_footprint_pressed = true;
             place_footprint();
         }
 
-        if (place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_5) == GLFW_RELEASE) {
-            place_footprint_pressed = false;
-        }
+        // if (place_footprint_pressed && glfwGetKey(window.handle(), GLFW_KEY_5) == GLFW_RELEASE) {
+        //     place_footprint_pressed = false;
+        // }
 
-        if (!t_pressed && glfwGetKey(window.handle(), GLFW_KEY_T) == GLFW_PRESS) {
-            t_pressed = true;
+        // if (!t_pressed && glfwGetKey(window.handle(), GLFW_KEY_T) == GLFW_PRESS) {
+        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_T)) {
+            // t_pressed = true;
             add_directional_waypoint();
         }
 
-        if (t_pressed && glfwGetKey(window.handle(), GLFW_KEY_T) == GLFW_RELEASE) {
-            t_pressed = false;
-        }
+        // if (t_pressed && glfwGetKey(window.handle(), GLFW_KEY_T) == GLFW_RELEASE) {
+        //     t_pressed = false;
+        // }
 
-        if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
-            g_pressed = true;
+        // if (!g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_PRESS) {
+        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_G)) {
+            // g_pressed = true;
             add_nondirectional_waypoint();
         }
 
-        if (g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_RELEASE) {
-            g_pressed = false;
-        }
+        // if (g_pressed && glfwGetKey(window.handle(), GLFW_KEY_G) == GLFW_RELEASE) {
+        //     g_pressed = false;
+        // }
 
-        if (!l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_PRESS) {
-            l_pressed = true;
+        // if (!l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_PRESS) {
+        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_L)) {
+            // l_pressed = true;
             delete_last_waypoint();
-            // std::cout << "Point id: " << point_id << "  diff: " << point_id - last_point_id << std::endl;
-            // last_point_id = point_id;
         }
 
-        if (l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_RELEASE) {
-            l_pressed = false;
+        // if (l_pressed && glfwGetKey(window.handle(), GLFW_KEY_L) == GLFW_RELEASE) {
+        //     l_pressed = false;
+        // }
+
+        // if (!n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_PRESS) {
+        if (keyboard_input_reciever2.on_key_pressed(GLFW_KEY_N)) {
+            // n_pressed = true;
         }
 
-        if (!n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_PRESS) {
-            n_pressed = true;
-            // process_current_lidar_frame();
-        }
+        // if (n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_RELEASE) {
+        //     n_pressed = false;
+        // }
 
-        if (n_pressed && glfwGetKey(window.handle(), GLFW_KEY_N) == GLFW_RELEASE) {
-            n_pressed = false;
+        // keyboard_input_reciever.update(window);
 
-            // point_id = (point_id + 1) % loaded_frame_data.points.size(); 
-            // pose_marker.transform.position = loaded_frame_data.points[point_id].position;
-        }
         // Запись команд
         {auto command_buffer_scope = command_buffer.begin_scope();
             {auto render_pass_scope = engine.swapchain_resources().render_pass.begin_scope(
                 command_buffer,
                 engine.swapchain_resources().framebuffers[image_index],
-                // engine.swapchain_resources().swapchain, {{0.05f, 0.05f, 0.05f, 1.0f}});
                 engine.swapchain_resources().swapchain, clear_color);
-                // rgba(37, 150, 190)
                 renderer.render(command_buffer, scene);
-
-                // if (network_scan)
-                //     renderer.render(command_buffer, network_scan->point_cloud(), network_scan->point_cloud().transform.get_model_matrix());
-
-                // renderer.render(command_buffer, voxel_grid.render_object());
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
-
-                // {
-                //     VulkanCommandBuffer& debugger_command_buffer = debugger.command_buffer();
-                //     auto scope = debugger_command_buffer.begin_scope();
-                //     debugger.dispay_debug_window(camera);
-                //     debugger.display_build_from_dirty_window(debugger_command_buffer);
-                //     debugger.display_build_cmd_window(debugger_command_buffer, window, camera);
-                //     debugger.display_draw_pipline_window(debugger_command_buffer);
-                //     debugger.display_chunk_eviction_window(debugger_command_buffer, camera);
-                //     debugger.display_stream_chunks_pipeline_window(debugger_command_buffer, camera);
-                //     debugger.display_hash_table_window();
-                // }
-                // debugger.submit_commands();
-
 
                 ImGui::Begin("Debug");
 
@@ -1260,20 +1183,6 @@ int main() {
 
                 celeris_visualizer.display_debug_controls();
                 celeris.display_path_planner_debug_controls();
-
-                // ImGui::TextColored(ImVec4(1.0f, 0.35f, 1.0f, 1.0f), "Current frame id: %d", lidar_video.current_frame_id());
-
-                // if (ImGui::Button("FPS controller")) {
-                //     use_fps_camera_controller();
-                // }
-                // ImGui::SameLine();
-                // ImGui::TextUnformatted("Key: F");
-
-                // if (ImGui::Button("Third person controller")) {
-                //     use_third_person_camera_controller();
-                // }
-                // ImGui::SameLine();
-                // ImGui::TextUnformatted("Key: R");
 
                 if (ImGui::CollapsingHeader("Path planning controls")) {
                     if (ImGui::Button("Place start")) {
@@ -1466,10 +1375,6 @@ int main() {
                     ImGui::SliderFloat("Car playback speed", &car_playback_speed, 0.1f, 20.0f, "%.1f m/s");
 
                 }
-
-                // if (ImGui::InputFloat("Celeris car speed", &car_speed, 1.0f, 10.0f, "%.1f")) {
-                //     celeris.set_car_speed(car_speed);
-                // }
 
                 ImGui::End();
 
