@@ -45,6 +45,7 @@ public:
         int steer_acceleration_samples = 30;
         int max_results = 5;
         float simulation_time = 2.0f;
+        float max_simulation_s = 8.0f;
         float dt = 0.05f;
         float initial_projection_min_s = 0.0f;
         float initial_projection_max_s = std::numeric_limits<float>::infinity();
@@ -54,20 +55,13 @@ public:
     };
 
     struct SimulationLossWeights {
-        float position = 4.0f;
-        float heading = 0.6f;
-        float speed = 0.25f;
-        float progress_tracking = 1.0f;
-        float forward_progress = 0.25f;
-        float backward_progress = 3.0f;
-        float steering = 0.8f;
-        float control = 0.04f;
-        float steering_rate = 0.2f;
+        float cruise_speed = 1.0f;
+        float slowdown_speed = 1.0f;
     };
 
     struct SimulationFollowParams {
         float cruise_speed = 3.0f;
-        float slowdown_distance_from_path = 2.5f;
+        float min_slowdown_acceleration = 2.0f;
         float min_off_path_speed_factor = 0.25f;
         float projection_backtrack_window = 0.75f;
         float projection_lookahead_base = 3.0f;
@@ -75,6 +69,12 @@ public:
         float min_direction_segment_virtual_length = 3.0f;
         float direction_switch_arrival_speed = 0.9f;
         float direction_switch_approach_speed = 0.75f;
+    };
+
+    struct PathPotentialParams {
+        float additional_radius = 2.0f;
+        float groove_k = 1.0f;
+        float plane_k = 0.025f;
     };
 
     struct VehicleControlCommand {
@@ -154,6 +154,9 @@ public:
     void reset_follow_params() noexcept;
     float path_potential_distance_exponent() const noexcept;
     void set_path_potential_distance_exponent(float exponent) noexcept;
+    PathPotentialParams& path_potential_params() noexcept;
+    const PathPotentialParams& path_potential_params() const noexcept;
+    void reset_path_potential_params() noexcept;
 
     void vehicle_simulation_step(
         VehicleTransformState& state,
@@ -184,6 +187,34 @@ public:
         float dt = 0.05f,
         bool debug = true
     );
+
+    void simulate_vehicle_with_s(
+        VehicleTransformState& state,
+        float speed_acceleration,
+        float steer_acceleration,
+        float max_simulation_time,
+        float max_simulation_s, 
+        float dt = 0.05f,
+        bool debug = true
+    ) const;
+
+    void simulate_vehicle_with_s(
+        float speed_acceleration,
+        float steer_acceleration,
+        float max_simulation_time,
+        float max_simulation_s, 
+        float dt = 0.05f,
+        bool debug = true
+    );
+
+    void simulate_vehicle(
+        VehicleTransformState& state,
+        float speed_acceleration,
+        float steer_acceleration,
+        float simulation_time, 
+        float dt = 0.05f,
+        bool debug = true
+    ) const;
 
     void simulate_vehicle(
         float speed_acceleration,
@@ -312,14 +343,6 @@ public:
         float s
     );
 
-    PointProjection find_path_projection(
-        const VehicleTransformState& state,
-        const std::vector<VehiclePathPoint>& path,
-        const PathArcLengthTable& path_arc_lengths,
-        float min_s = 0.0f,
-        float max_s = std::numeric_limits<float>::infinity()
-    ) const;
-
     static PathArcLengthTable build_path_arc_length_table(
         const std::vector<VehiclePathPoint>& path
     );
@@ -344,7 +367,28 @@ public:
         float active_segment_min_s,
         float active_segment_max_s,
         float speed_acceleration,
+        float steer_acceleration,
+        float groove_radius
+    ) const;
+
+    float compute_slowdown_loss(
+        const Vehicle::VehicleTransformState& state,
+        const std::vector<VehiclePathPoint>& path,
+        const Vehicle::PathArcLengthTable& path_arc_lengths,
+        float active_segment_min_s,
+        float active_segment_max_s,
+        float speed_acceleration,
         float steer_acceleration
+    ) const;
+
+    float compute_cruise_speed_loss(const Vehicle::VehicleTransformState& state) const;
+
+    PointProjection find_path_projection(
+        const VehicleTransformState& state,
+        const std::vector<VehiclePathPoint>& path,
+        const PathArcLengthTable& path_arc_lengths,
+        float min_s = 0.0f,
+        float max_s = std::numeric_limits<float>::infinity()
     ) const;
 
 private:
@@ -355,6 +399,7 @@ private:
     float m_wheel_base; // L. Расстояние между передней и задней осями
     SimulationLossWeights m_loss_weights;
     SimulationFollowParams m_follow_params;
+    PathPotentialParams m_path_potential_params;
     float m_path_potential_distance_exponent = 0.5f;
 
 private:
@@ -384,15 +429,6 @@ private:
         float speed_acceleration,
         float steer_acceleration,
         float dt
-    ) const;
-
-    void simulate_vehicle(
-        VehicleTransformState& state,
-        float speed_acceleration,
-        float steer_acceleration,
-        float simulation_time, 
-        float dt = 0.05f,
-        bool debug = true
     ) const;
 
     static float angle_diff(float from, float to);
@@ -501,7 +537,8 @@ private:
         float total_polyline_length,
         float speed_acceleration,
         float steer_acceleration,
-        float simulation_time, 
+        float max_simulation_time,
+        float max_simulation_s,
         float dt = 0.05f,
         bool debug = true,
         float initial_projection_min_s = 0.0f,

@@ -318,7 +318,7 @@ Celeris::Celeris(VulkanEngine& engine,
 
     Vehicle::SimulationFollowParams& follow_params = m_vehicle.follow_params();
     follow_params.cruise_speed = std::max(0.0f, desc.vehicle_cruise_speed);
-    follow_params.slowdown_distance_from_path = std::max(0.0f, desc.vehicle_slowdown_distance_from_path);
+    follow_params.min_slowdown_acceleration = std::max(0.0f, desc.vehicle_min_slowdown_acceleration);
     follow_params.min_off_path_speed_factor = std::clamp(
         desc.vehicle_min_off_path_speed_factor,
         0.0f,
@@ -357,7 +357,7 @@ void Celeris::start_lidar_receiver() {
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     start_lidar_receiver();
     m_vehicle_state_receiver.start();
-    // m_command_sender.start();
+    m_command_sender.start();
     m_path_planner.start(std::move(planner_submit_context));
 }
 
@@ -1309,6 +1309,19 @@ void Celeris::display_path_planner_debug_controls() {
         if (ImGui::DragFloat("Distance exponent", &distance_exponent, 0.01f, 0.0f, 4.0f, "%.3f")) {
             m_vehicle.set_path_potential_distance_exponent(distance_exponent);
         }
+        Vehicle::PathPotentialParams& potential_params = m_vehicle.path_potential_params();
+        if (ImGui::DragFloat("Additional radius", &potential_params.additional_radius, 0.01f, 0.0f, 50.0f, "%.3f")) {
+            potential_params.additional_radius = std::max(0.0f, potential_params.additional_radius);
+        }
+        if (ImGui::DragFloat("Groove k", &potential_params.groove_k, 0.01f, 0.0f, 100.0f, "%.3f")) {
+            potential_params.groove_k = std::max(0.0f, potential_params.groove_k);
+        }
+        if (ImGui::DragFloat("Plane k", &potential_params.plane_k, 0.001f, 0.0f, 10.0f, "%.3f")) {
+            potential_params.plane_k = std::max(0.0f, potential_params.plane_k);
+        }
+        if (ImGui::Button("Reset path potential params")) {
+            m_vehicle.reset_path_potential_params();
+        }
         if (ImGui::Button("Visualize active path potential")) {
             visualize_active_path_potential();
         }
@@ -1400,8 +1413,8 @@ void Celeris::display_path_planner_debug_controls() {
         if (ImGui::DragFloat("Cruise speed", &cruise_speed, 0.1f, 0.0f, 40.0f, "%.3f")) {
             set_car_speed(cruise_speed);
         }
-        if (ImGui::DragFloat("Slowdown distance from path", &params.slowdown_distance_from_path, 0.05f, 0.0f, 50.0f, "%.3f")) {
-            params.slowdown_distance_from_path = std::max(0.0f, params.slowdown_distance_from_path);
+        if (ImGui::DragFloat("Min Slowdown acceleration", &params.min_slowdown_acceleration, 0.05f, 0.0f, 50.0f, "%.3f")) {
+            params.min_slowdown_acceleration = std::max(0.0f, params.min_slowdown_acceleration);
         }
         if (ImGui::DragFloat("Min off-path speed factor", &params.min_off_path_speed_factor, 0.01f, 0.0f, 1.0f, "%.3f")) {
             params.min_off_path_speed_factor = std::clamp(params.min_off_path_speed_factor, 0.0f, 1.0f);
@@ -1427,7 +1440,7 @@ void Celeris::display_path_planner_debug_controls() {
 
         if (ImGui::Button("Reset follow params")) {
             params.cruise_speed = std::max(0.0f, m_desc.vehicle_cruise_speed);
-            params.slowdown_distance_from_path = std::max(0.0f, m_desc.vehicle_slowdown_distance_from_path);
+            params.min_slowdown_acceleration = std::max(0.0f, m_desc.vehicle_min_slowdown_acceleration);
             params.min_off_path_speed_factor = std::clamp(
                 m_desc.vehicle_min_off_path_speed_factor,
                 0.0f,
@@ -1458,14 +1471,8 @@ void Celeris::display_path_planner_debug_controls() {
             }
         };
 
-        drag_non_negative_float("Attach position", weights.position, 0.05f, 100.0f);
-        drag_non_negative_float("Attach heading", weights.heading, 0.01f, 20.0f);
-        drag_non_negative_float("Speed recovery", weights.speed, 0.01f, 20.0f);
-        drag_non_negative_float("Remaining path", weights.progress_tracking, 0.01f, 50.0f);
-        drag_non_negative_float("Steering state", weights.steering, 0.01f, 20.0f);
-        drag_non_negative_float("Control effort", weights.control, 0.001f, 5.0f);
-        drag_non_negative_float("Steering rate", weights.steering_rate, 0.01f, 20.0f);
-
+        drag_non_negative_float("Cruise speed", weights.cruise_speed, 0.05f, 100.0f);
+        drag_non_negative_float("Slowdown speed", weights.slowdown_speed, 0.01f, 20.0f);
         if (ImGui::Button("Reset loss weights"))
             m_vehicle.reset_loss_weights();
 
@@ -1495,6 +1502,15 @@ void Celeris::visualize_active_path_potential() {
         m_local_planner.vehicle_path_arc_lengths();
     const float active_segment_min_s = m_local_planner.path_window_min_s();
     const float active_segment_max_s = m_local_planner.path_window_max_s();
+
+    Vehicle::PointProjection vehicle_projection = m_vehicle.find_path_projection(
+        m_vehicle.state(),
+        path,
+        path_arc_lengths,
+        active_segment_min_s,
+        active_segment_max_s
+    );
+    
 
     const size_t max_write_count = static_cast<size_t>(m_desc.max_write_count);
     const size_t max_sample_count = std::max<size_t>(1u, max_write_count / 2u);
@@ -1553,7 +1569,8 @@ void Celeris::visualize_active_path_potential() {
                     active_segment_min_s,
                     active_segment_max_s,
                     visualization_control.speed_acceleration,
-                    visualization_control.steer_acceleration
+                    visualization_control.steer_acceleration,
+                    vehicle_projection.dist
                 );
                 if (!std::isfinite(potential))
                     continue;

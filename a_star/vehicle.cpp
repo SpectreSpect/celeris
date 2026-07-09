@@ -77,16 +77,6 @@ Vehicle::Vehicle(float max_acceleration, float max_steer_acceleration, float whe
             wheel_base
         ) {}
 
-void Vehicle::simulate_vehicle(
-    float speed_acceleration,
-    float steer_acceleration,
-    float simulation_time, 
-    float dt,
-    bool debug) 
-{
-    simulate_vehicle(m_vehicle_state, speed_acceleration, steer_acceleration, simulation_time, dt, debug);
-}
-
 Vehicle::SimulationLossWeights& Vehicle::loss_weights() noexcept {
     return m_loss_weights;
 }
@@ -118,6 +108,18 @@ float Vehicle::path_potential_distance_exponent() const noexcept {
 void Vehicle::set_path_potential_distance_exponent(float exponent) noexcept {
     m_path_potential_distance_exponent =
         std::isfinite(exponent) ? std::max(0.0f, exponent) : 0.5f;
+}
+
+Vehicle::PathPotentialParams& Vehicle::path_potential_params() noexcept {
+    return m_path_potential_params;
+}
+
+const Vehicle::PathPotentialParams& Vehicle::path_potential_params() const noexcept {
+    return m_path_potential_params;
+}
+
+void Vehicle::reset_path_potential_params() noexcept {
+    m_path_potential_params = PathPotentialParams{};
 }
 
 Vehicle::PolylineFollowStepResult Vehicle::follow_polyline_step(
@@ -276,6 +278,7 @@ std::vector<Vehicle::SimulationControlCandidate> Vehicle::find_best_simulation_c
                 speed_acceleration,
                 steer_acceleration,
                 desc.simulation_time,
+                desc.max_simulation_s,
                 desc.dt,
                 desc.debug,
                 desc.initial_projection_min_s,
@@ -464,6 +467,53 @@ Vehicle::VehicleTransformState Vehicle::get_vehicle_simulation_step(
     return get_vehicle_simulation_step(m_vehicle_state, speed_acceleration, steer_acceleration, dt, debug);
 }
 
+
+void Vehicle::simulate_vehicle_with_s(
+    VehicleTransformState& state,
+    float speed_acceleration,
+    float steer_acceleration,
+    float max_simulation_time,
+    float max_simulation_s, 
+    float dt,
+    bool debug) const
+{
+    LOG_METHOD();
+
+    if (debug) {
+        logger().check(max_simulation_time > 0.0f, "simulation_time must be greater than zero");
+        check_simulation_step(speed_acceleration, steer_acceleration, dt);
+    }
+
+    float current_s = 0.0f;
+    glm::vec2 previous_position = state.m_position;
+    for (float time = 0.0f; time < max_simulation_time && current_s < max_simulation_s;) {
+        const float step_dt = std::min(dt, max_simulation_time - time);
+        vehicle_simulation_step(state, speed_acceleration, steer_acceleration, step_dt, false);
+
+        current_s += glm::length(state.m_position - previous_position);
+        time += step_dt;
+    }
+}
+
+void Vehicle::simulate_vehicle_with_s(
+    float speed_acceleration,
+    float steer_acceleration,
+    float max_simulation_time,
+    float max_simulation_s, 
+    float dt,
+    bool debug)
+{
+    simulate_vehicle_with_s(
+        m_vehicle_state,
+        speed_acceleration,
+        steer_acceleration,
+        max_simulation_time,
+        max_simulation_s, 
+        dt,
+        debug
+    );
+}
+
 void Vehicle::simulate_vehicle(
     VehicleTransformState& state,
     float speed_acceleration,
@@ -472,16 +522,27 @@ void Vehicle::simulate_vehicle(
     float dt,
     bool debug) const
 {
-    if (debug) {
-        logger().check(simulation_time > 0.0f, "simulation_time must be greater than zero");
-        check_simulation_step(speed_acceleration, steer_acceleration, dt);
-    }
+    LOG_METHOD();
 
-    for (float time = 0.0f; time < simulation_time;) {
-        const float step_dt = std::min(dt, simulation_time - time);
-        vehicle_simulation_step(state, speed_acceleration, steer_acceleration, step_dt, false);
-        time += step_dt;
-    }
+    simulate_vehicle_with_s(
+        state,
+        speed_acceleration,
+        steer_acceleration,
+        simulation_time,
+        std::numeric_limits<float>::max(),
+        dt,
+        debug
+    );
+}
+
+void Vehicle::simulate_vehicle(
+    float speed_acceleration,
+    float steer_acceleration,
+    float simulation_time, 
+    float dt,
+    bool debug) 
+{
+    simulate_vehicle(m_vehicle_state, speed_acceleration, steer_acceleration, simulation_time, dt, debug);
 }
 
 Vehicle::PointProjection Vehicle::find_polyline_projection(
@@ -947,241 +1008,243 @@ float Vehicle::compute_reference_progress(
         cruise_speed * cruise_time;
 }
 
-float Vehicle::compute_position_loss_coefficient(
-    const VehicleTransformState& state,
-    const PointProjection& target_projection) const
-{
-    const glm::vec2 diff = state.m_position - target_projection.point;
-    return m_loss_weights.position * glm::dot(diff, diff);
-}
+// float Vehicle::compute_position_loss_coefficient(
+//     const VehicleTransformState& state,
+//     const PointProjection& target_projection) const
+// {
+//     const glm::vec2 diff = state.m_position - target_projection.point;
+//     return m_loss_weights.position * glm::dot(diff, diff);
+// }
 
-float Vehicle::compute_heading_loss_coefficient(
-    const VehicleTransformState& state,
-    const PointProjection& target_projection) const
-{
-    const float heading_error = angle_diff(state.m_heading, target_projection.heading);
-    const float cruise_speed = std::max(m_follow_params.cruise_speed, Utils::eps);
-    const float speed_factor = std::clamp(std::abs(state.m_speed) / cruise_speed, 0.25f, 1.0f);
+// float Vehicle::compute_heading_loss_coefficient(
+//     const VehicleTransformState& state,
+//     const PointProjection& target_projection) const
+// {
+//     const float heading_error = angle_diff(state.m_heading, target_projection.heading);
+//     const float cruise_speed = std::max(m_follow_params.cruise_speed, Utils::eps);
+//     const float speed_factor = std::clamp(std::abs(state.m_speed) / cruise_speed, 0.25f, 1.0f);
 
-    return m_loss_weights.heading * speed_factor * heading_error * heading_error;
-}
+//     return m_loss_weights.heading * speed_factor * heading_error * heading_error;
+// }
 
-float Vehicle::compute_speed_loss_coefficient(
-    const VehicleTransformState& state,
-    const PointProjection& projection,
-    const PathArcLengthTable& path_arc_lengths,
-    float total_polyline_length,
-    float current_next_direction_change_s) const
-{
-    float remaining_s = std::max(0.0f, total_polyline_length - projection.s);
-    const bool has_direction_switch = std::isfinite(current_next_direction_change_s);
-    if (has_direction_switch) {
-        remaining_s = compute_virtual_remaining_s(
-            path_arc_lengths,
-            projection.s,
-            current_next_direction_change_s,
-            m_follow_params.min_direction_segment_virtual_length
-        );
-    }
+// float Vehicle::compute_speed_loss_coefficient(
+//     const VehicleTransformState& state,
+//     const PointProjection& projection,
+//     const PathArcLengthTable& path_arc_lengths,
+//     float total_polyline_length,
+//     float current_next_direction_change_s) const
+// {
+//     // float remaining_s = std::max(0.0f, total_polyline_length - projection.s);
+//     // const bool has_direction_switch = std::isfinite(current_next_direction_change_s);
+//     // if (has_direction_switch) {
+//     //     remaining_s = compute_virtual_remaining_s(
+//     //         path_arc_lengths,
+//     //         projection.s,
+//     //         current_next_direction_change_s,
+//     //         m_follow_params.min_direction_segment_virtual_length
+//     //     );
+//     // }
 
-    const float braking_speed = std::sqrt(std::max(0.0f, 2.0f * m_max_acceleration * remaining_s));
-    const float cruise_speed = std::max(0.0f, m_follow_params.cruise_speed);
-    float target_speed_abs = std::min(cruise_speed, braking_speed);
-    if (has_direction_switch) {
-        target_speed_abs = std::max(
-            target_speed_abs,
-            std::min(cruise_speed, std::max(0.0f, m_follow_params.direction_switch_approach_speed))
-        );
-    }
+//     // const float braking_speed = std::sqrt(std::max(0.0f, 2.0f * m_max_acceleration * remaining_s));
+//     // const float cruise_speed = std::max(0.0f, m_follow_params.cruise_speed);
+//     // float target_speed_abs = std::min(cruise_speed, braking_speed);
+//     // if (has_direction_switch) {
+//     //     target_speed_abs = std::max(
+//     //         target_speed_abs,
+//     //         std::min(cruise_speed, std::max(0.0f, m_follow_params.direction_switch_approach_speed))
+//     //     );
+//     // }
 
-    float off_path_speed_factor = 1.0f;
-    if (m_follow_params.slowdown_distance_from_path > Utils::eps) {
-        off_path_speed_factor = std::clamp(
-            1.0f - projection.dist / m_follow_params.slowdown_distance_from_path,
-            std::clamp(m_follow_params.min_off_path_speed_factor, 0.0f, 1.0f),
-            1.0f
-        );
-    }
-    target_speed_abs *= off_path_speed_factor;
+//     // float off_path_speed_factor = 1.0f;
+//     // if (m_follow_params.slowdown_distance_from_path > Utils::eps) {
+//     //     off_path_speed_factor = std::clamp(
+//     //         1.0f - projection.dist / m_follow_params.slowdown_distance_from_path,
+//     //         std::clamp(m_follow_params.min_off_path_speed_factor, 0.0f, 1.0f),
+//     //         1.0f
+//     //     );
+//     // }
+//     // target_speed_abs *= off_path_speed_factor;
 
-    const float target_speed = target_speed_abs * projection.dir;
-    const float speed_error = state.m_speed - target_speed;
+//     // const float target_speed = target_speed_abs * projection.dir;
+//     // const float speed_error = state.m_speed - target_speed;
 
-    return m_loss_weights.speed * speed_error * speed_error;
-}
+//     // return m_loss_weights.speed * speed_error * speed_error;
+//     return 0.0f;
+// }
 
-float Vehicle::compute_progress_loss_coefficient(
-    const VehicleTransformState& state,
-    const PointProjection& projection,
-    const PointProjection& target_projection,
-    float progress_reference_s) const
-{
-    const float path_speed = glm::dot(forward_vector(state) * state.m_speed, projection.tangent);
-    const float backwards_speed = std::max(0.0f, -path_speed);
-    const float forward_progress = std::max(0.0f, projection.s - progress_reference_s);
-    const float progress_error = projection.s - target_projection.s;
+// float Vehicle::compute_progress_loss_coefficient(
+//     const VehicleTransformState& state,
+//     const PointProjection& projection,
+//     const PointProjection& target_projection,
+//     float progress_reference_s) const
+// {
+//     const float path_speed = glm::dot(forward_vector(state) * state.m_speed, projection.tangent);
+//     const float backwards_speed = std::max(0.0f, -path_speed);
+//     const float forward_progress = std::max(0.0f, projection.s - progress_reference_s);
+//     const float progress_error = projection.s - target_projection.s;
 
-    return
-        m_loss_weights.progress_tracking * progress_error * progress_error +
-        m_loss_weights.backward_progress * backwards_speed * backwards_speed -
-        m_loss_weights.forward_progress * forward_progress;
-}
+//     return
+//         m_loss_weights.progress_tracking * progress_error * progress_error +
+//         m_loss_weights.backward_progress * backwards_speed * backwards_speed -
+//         m_loss_weights.forward_progress * forward_progress;
+// }
 
-float Vehicle::compute_steering_loss_coefficient(
-    const VehicleTransformState& state,
-    const PointProjection& target_projection) const
-{
-    const glm::vec2 to_target = target_projection.point - state.m_position;
-    const float target_distance = glm::length(to_target);
-    if (target_distance <= Utils::eps) {
-        return m_loss_weights.steering *
-            kSteeringVelocityLossFactor *
-            state.m_steering_angle_velocity *
-            state.m_steering_angle_velocity;
-    }
+// float Vehicle::compute_steering_loss_coefficient(
+//     const VehicleTransformState& state,
+//     const PointProjection& target_projection) const
+// {
+//     const glm::vec2 to_target = target_projection.point - state.m_position;
+//     const float target_distance = glm::length(to_target);
+//     if (target_distance <= Utils::eps) {
+//         return m_loss_weights.steering *
+//             kSteeringVelocityLossFactor *
+//             state.m_steering_angle_velocity *
+//             state.m_steering_angle_velocity;
+//     }
 
-    const float target_heading = std::atan2(to_target.y, to_target.x);
-    const float motion_heading = target_projection.dir < 0.0f
-        ? state.m_heading + 3.14159265358979323846f
-        : state.m_heading;
-    const float heading_error = angle_diff(motion_heading, target_heading);
+//     const float target_heading = std::atan2(to_target.y, to_target.x);
+//     const float motion_heading = target_projection.dir < 0.0f
+//         ? state.m_heading + 3.14159265358979323846f
+//         : state.m_heading;
+//     const float heading_error = angle_diff(motion_heading, target_heading);
 
-    const float target_steering_angle = std::clamp(
-        std::atan2(2.0f * m_wheel_base * std::sin(heading_error), target_distance) *
-            target_projection.dir,
-        -kMaxSteeringAngle,
-        kMaxSteeringAngle
-    );
-    const float steering_error = angle_diff(state.m_steering_angle, target_steering_angle);
+//     const float target_steering_angle = std::clamp(
+//         std::atan2(2.0f * m_wheel_base * std::sin(heading_error), target_distance) *
+//             target_projection.dir,
+//         -kMaxSteeringAngle,
+//         kMaxSteeringAngle
+//     );
+//     const float steering_error = angle_diff(state.m_steering_angle, target_steering_angle);
 
-    return m_loss_weights.steering * (
-        steering_error * steering_error +
-        kSteeringVelocityLossFactor *
-            state.m_steering_angle_velocity *
-            state.m_steering_angle_velocity
-    );
-}
+//     return m_loss_weights.steering * (
+//         steering_error * steering_error +
+//         kSteeringVelocityLossFactor *
+//             state.m_steering_angle_velocity *
+//             state.m_steering_angle_velocity
+//     );
+// }
 
-float Vehicle::compute_control_loss_coefficient(
-    const VehicleTransformState& state,
-    float speed_acceleration,
-    float steer_acceleration) const
-{
-    const float speed_acceleration_scale = std::max(m_max_acceleration, Utils::eps);
-    const float steer_acceleration_scale = std::max(m_max_steer_acceleration, Utils::eps);
-    const float normalized_speed_acceleration = speed_acceleration / speed_acceleration_scale;
-    const float normalized_steer_acceleration = steer_acceleration / steer_acceleration_scale;
+// float Vehicle::compute_control_loss_coefficient(
+//     const VehicleTransformState& state,
+//     float speed_acceleration,
+//     float steer_acceleration) const
+// {
+//     const float speed_acceleration_scale = std::max(m_max_acceleration, Utils::eps);
+//     const float steer_acceleration_scale = std::max(m_max_steer_acceleration, Utils::eps);
+//     const float normalized_speed_acceleration = speed_acceleration / speed_acceleration_scale;
+//     const float normalized_steer_acceleration = steer_acceleration / steer_acceleration_scale;
 
-    return m_loss_weights.control * (
-        normalized_speed_acceleration * normalized_speed_acceleration +
-        normalized_steer_acceleration * normalized_steer_acceleration +
-        m_loss_weights.steering_rate * state.m_steering_angle_velocity * state.m_steering_angle_velocity
-    );
-}
+//     return m_loss_weights.control * (
+//         normalized_speed_acceleration * normalized_speed_acceleration +
+//         normalized_steer_acceleration * normalized_steer_acceleration +
+//         m_loss_weights.steering_rate * state.m_steering_angle_velocity * state.m_steering_angle_velocity
+//     );
+// }
 
-float Vehicle::compute_potential_control_regularization(
-    const VehicleTransformState& state,
-    float speed_acceleration,
-    float steer_acceleration) const
-{
-    return compute_control_loss_coefficient(state, speed_acceleration, steer_acceleration);
-}
+// float Vehicle::compute_potential_control_regularization(
+//     const VehicleTransformState& state,
+//     float speed_acceleration,
+//     float steer_acceleration) const
+// {
+//     return compute_control_loss_coefficient(state, speed_acceleration, steer_acceleration);
+// }
 
-float Vehicle::compute_path_target_speed(
-    const PointProjection& projection,
-    float active_segment_end_s,
-    bool slow_down_at_projection_max,
-    float projection_max_target_speed_abs) const
-{
-    const float cruise_speed = std::max(0.0f, m_follow_params.cruise_speed);
-    float target_speed_abs = cruise_speed;
+// float Vehicle::compute_path_target_speed(
+//     const PointProjection& projection,
+//     float active_segment_end_s,
+//     bool slow_down_at_projection_max,
+//     float projection_max_target_speed_abs) const
+// {
+//     // const float cruise_speed = std::max(0.0f, m_follow_params.cruise_speed);
+//     // float target_speed_abs = cruise_speed;
 
-    if (slow_down_at_projection_max) {
-        const float remaining_s = std::max(0.0f, active_segment_end_s - projection.s);
-        const float target_at_end =
-            std::max(0.0f, projection_max_target_speed_abs);
-        const float reachable_speed =
-            std::sqrt(
-                target_at_end * target_at_end +
-                2.0f * std::max(m_max_acceleration, Utils::eps) * remaining_s
-            );
-        target_speed_abs = std::min(target_speed_abs, reachable_speed);
-    }
+//     // if (slow_down_at_projection_max) {
+//     //     const float remaining_s = std::max(0.0f, active_segment_end_s - projection.s);
+//     //     const float target_at_end =
+//     //         std::max(0.0f, projection_max_target_speed_abs);
+//     //     const float reachable_speed =
+//     //         std::sqrt(
+//     //             target_at_end * target_at_end +
+//     //             2.0f * std::max(m_max_acceleration, Utils::eps) * remaining_s
+//     //         );
+//     //     target_speed_abs = std::min(target_speed_abs, reachable_speed);
+//     // }
 
-    float off_path_speed_factor = 1.0f;
-    if (m_follow_params.slowdown_distance_from_path > Utils::eps) {
-        off_path_speed_factor = std::clamp(
-            1.0f - projection.dist / m_follow_params.slowdown_distance_from_path,
-            std::clamp(m_follow_params.min_off_path_speed_factor, 0.0f, 1.0f),
-            1.0f
-        );
-    }
-    target_speed_abs *= off_path_speed_factor;
+//     // float off_path_speed_factor = 1.0f;
+//     // if (m_follow_params.slowdown_distance_from_path > Utils::eps) {
+//     //     off_path_speed_factor = std::clamp(
+//     //         1.0f - projection.dist / m_follow_params.slowdown_distance_from_path,
+//     //         std::clamp(m_follow_params.min_off_path_speed_factor, 0.0f, 1.0f),
+//     //         1.0f
+//     //     );
+//     // }
+//     // target_speed_abs *= off_path_speed_factor;
 
-    return target_speed_abs * projection.dir;
-}
+//     // return target_speed_abs * projection.dir;
+//     return 0.0f;
+// }
 
-Vehicle::PathPotentialEvaluation Vehicle::evaluate_path_potential(
-    const VehicleTransformState& state,
-    const std::vector<VehiclePathPoint>& path,
-    const PathArcLengthTable& path_arc_lengths,
-    float active_segment_min_s,
-    float active_segment_max_s,
-    bool slow_down_at_projection_max,
-    float projection_max_target_speed_abs,
-    float speed_acceleration,
-    float steer_acceleration) const
-{
-    PointProjection projection = find_path_projection(
-        state,
-        path,
-        path_arc_lengths,
-        active_segment_min_s,
-        active_segment_max_s
-    );
+// Vehicle::PathPotentialEvaluation Vehicle::evaluate_path_potential(
+//     const VehicleTransformState& state,
+//     const std::vector<VehiclePathPoint>& path,
+//     const PathArcLengthTable& path_arc_lengths,
+//     float active_segment_min_s,
+//     float active_segment_max_s,
+//     bool slow_down_at_projection_max,
+//     float projection_max_target_speed_abs,
+//     float speed_acceleration,
+//     float steer_acceleration) const
+// {
+//     PointProjection projection = find_path_projection(
+//         state,
+//         path,
+//         path_arc_lengths,
+//         active_segment_min_s,
+//         active_segment_max_s
+//     );
 
-    const float active_end_s =
-        std::clamp(
-            active_segment_max_s,
-            active_segment_min_s,
-            std::max(active_segment_min_s, path_arc_lengths.total_length)
-        );
-    const float remaining_s = std::max(0.0f, active_end_s - projection.s);
-    const float heading_error = angle_diff(state.m_heading, projection.heading);
-    const float heading_distance =
-        std::max(m_wheel_base, 1.0f) * std::abs(heading_error);
-    const float target_speed = compute_path_target_speed(
-        projection,
-        active_end_s,
-        slow_down_at_projection_max,
-        projection_max_target_speed_abs
-    );
-    const float speed_error = state.m_speed - target_speed;
-    const float speed_recovery_distance =
-        speed_error * speed_error /
-        (2.0f * std::max(m_max_acceleration, Utils::eps));
+//     const float active_end_s =
+//         std::clamp(
+//             active_segment_max_s,
+//             active_segment_min_s,
+//             std::max(active_segment_min_s, path_arc_lengths.total_length)
+//         );
+//     const float remaining_s = std::max(0.0f, active_end_s - projection.s);
+//     const float heading_error = angle_diff(state.m_heading, projection.heading);
+//     const float heading_distance =
+//         std::max(m_wheel_base, 1.0f) * std::abs(heading_error);
+//     const float target_speed = compute_path_target_speed(
+//         projection,
+//         active_end_s,
+//         slow_down_at_projection_max,
+//         projection_max_target_speed_abs
+//     );
+//     const float speed_error = state.m_speed - target_speed;
+//     const float speed_recovery_distance =
+//         speed_error * speed_error /
+//         (2.0f * std::max(m_max_acceleration, Utils::eps));
 
-    return PathPotentialEvaluation{
-        .projection = projection,
-        .components = SimulationLossBreakdown{
-            .position = m_loss_weights.position * projection.dist,
-            .heading = m_loss_weights.heading * heading_distance,
-            .speed = m_loss_weights.speed * speed_recovery_distance,
-            .progress = m_loss_weights.progress_tracking * remaining_s,
-            .steering = m_loss_weights.steering * (
-                state.m_steering_angle * state.m_steering_angle +
-                kSteeringVelocityLossFactor *
-                    state.m_steering_angle_velocity *
-                    state.m_steering_angle_velocity
-            ),
-            .control = compute_potential_control_regularization(
-                state,
-                speed_acceleration,
-                steer_acceleration
-            )
-        }
-    };
-}
+//     return PathPotentialEvaluation{
+//         .projection = projection,
+//         .components = SimulationLossBreakdown{
+//             .position = m_loss_weights.position * projection.dist,
+//             .heading = m_loss_weights.heading * heading_distance,
+//             .speed = m_loss_weights.slowdown_speed * speed_recovery_distance,
+//             .progress = m_loss_weights.progress_tracking * remaining_s,
+//             .steering = m_loss_weights.steering * (
+//                 state.m_steering_angle * state.m_steering_angle +
+//                 kSteeringVelocityLossFactor *
+//                     state.m_steering_angle_velocity *
+//                     state.m_steering_angle_velocity
+//             ),
+//             .control = compute_potential_control_regularization(
+//                 state,
+//                 speed_acceleration,
+//                 steer_acceleration
+//             )
+//         }
+//     };
+// }
 
 float Vehicle::evaluate_path_potential(
     const Vehicle::VehicleTransformState& state,
@@ -1190,18 +1253,11 @@ float Vehicle::evaluate_path_potential(
     float active_segment_min_s,
     float active_segment_max_s,
     float speed_acceleration,
-    float steer_acceleration) const
+    float steer_acceleration,
+    float groove_radius) const
 {
     const PointProjection projection = find_path_projection(
         state,
-        path,
-        path_arc_lengths,
-        active_segment_min_s,
-        active_segment_max_s
-    );
-
-    const PointProjection vehicle_projection = find_path_projection(
-        m_vehicle_state,
         path,
         path_arc_lengths,
         active_segment_min_s,
@@ -1212,165 +1268,185 @@ float Vehicle::evaluate_path_potential(
     const float projection_segment_s = projection.s - active_segment_min_s;
     const float t = projection_segment_s / total_segment_s;
 
-    const double norm_d = projection.dist / total_segment_s;
+    const double radius = std::max(
+        static_cast<double>(Utils::eps),
+        static_cast<double>(groove_radius)
+    );
 
-    const double radius = vehicle_projection.dist;
-    // const double der_threshold = 1.0;
-    // const double x0 = 1.0f;
+    const double forward_loss = projection.dist <= radius ? -t : 0.0f;
 
-    // const double ln_r = log(radius) / log(glm::e<double>());
-
-    // auto grad = [&](double a) {
-    //     return 2 * (a * pow(radius, a - 1) - der_threshold) * pow(radius, a - 1) * (1 + a * ln_r);
-    // };
-
-    // auto hess = [&](double a) {
-    //     return 2 * (
-    //         pow(radius, 2 * a - 2) * pow(1 + a * ln_r, 2) +
-    //         (a * pow(radius, a - 1) - der_threshold) * pow(radius, a - 1) * (2 * ln_r + a * ln_r * ln_r)
-    //     );
-    // };
-
-    // const double a = Utils::newton_minimize(grad, hess, x0);
-    // const double a = log(der_threshold) / log(radius);
-
-    //
-
-    const double groove_k = 1.0;
-    const double plane_k = 0.025;
+    const double groove_k = std::max(0.0f, m_path_potential_params.groove_k);
+    const double plane_k = std::max(0.0f, m_path_potential_params.plane_k);
     const double loss = projection.dist <= radius ?
         groove_k * (1.0 - cos(projection.dist * glm::pi<double>() / radius)) / 2.0 : 
         plane_k * (projection.dist - radius) + groove_k;
 
-    return loss;
+    return loss + forward_loss;
 }
 
-Vehicle::SimulationLossCoefficients Vehicle::compute_simulation_loss_coefficients(
-    const VehicleTransformState& state,
-    const PointProjection& projection,
-    const PointProjection& target_projection,
-    const PathArcLengthTable& path_arc_lengths,
-    float total_polyline_length,
-    float progress_reference_s,
-    float current_next_direction_change_s,
+float Vehicle::compute_slowdown_loss(
+    const Vehicle::VehicleTransformState& state,
+    const std::vector<VehiclePathPoint>& path,
+    const Vehicle::PathArcLengthTable& path_arc_lengths,
+    float active_segment_min_s,
+    float active_segment_max_s,
     float speed_acceleration,
     float steer_acceleration) const
 {
-    return SimulationLossCoefficients{
-        .position = compute_position_loss_coefficient(state, target_projection),
-        .heading = compute_heading_loss_coefficient(state, target_projection),
-        .speed = compute_speed_loss_coefficient(
-            state,
-            projection,
-            path_arc_lengths,
-            total_polyline_length,
-            current_next_direction_change_s
-        ),
-        .progress = compute_progress_loss_coefficient(state, projection, target_projection, progress_reference_s),
-        .steering = compute_steering_loss_coefficient(state, target_projection),
-        .control = compute_control_loss_coefficient(state, speed_acceleration, steer_acceleration)
-    };
-}
+    LOG_METHOD();
 
-float Vehicle::compute_simulation_loss(
-    VehicleTransformState& state,
-    const std::vector<VehiclePathPoint>& path,
-    const PathArcLengthTable& path_arc_lengths,
-    float total_polyline_length,
-    float speed_acceleration,
-    float steer_acceleration,
-    float simulation_time, 
-    float dt,
-    bool debug,
-    float initial_projection_min_s,
-    float initial_projection_max_s,
-    bool slow_down_at_projection_max,
-    float projection_max_target_speed_abs,
-    std::vector<glm::vec2>* trajectory,
-    SimulationControlCandidateDebug* candidate_debug) const
-{
-    if (debug) {
-        logger().check(simulation_time > 0.0f, "simulation_time must be greater than zero");
-        logger().check(path.size() >= 2, "path must contain at least two points");
-        check_simulation_step(speed_acceleration, steer_acceleration, dt);
-    }
-
-    logger().check(total_polyline_length > Utils::eps, "path length must be greater than zero");
-
-    const glm::vec2 start_position = state.m_position;
-    float trajectory_length = 0.0f;
-    glm::vec2 previous_trajectory_position = state.m_position;
-
-    if (trajectory) {
-        trajectory->clear();
-        trajectory->reserve(static_cast<size_t>(std::ceil(simulation_time / dt)) + 1u);
-        trajectory->push_back(state.m_position);
-    }
-
-    const PathPotentialEvaluation start_potential = evaluate_path_potential(
+    const PointProjection projection = find_path_projection(
         state,
         path,
         path_arc_lengths,
-        initial_projection_min_s,
-        initial_projection_max_s,
-        slow_down_at_projection_max,
-        projection_max_target_speed_abs,
-        speed_acceleration,
-        steer_acceleration
+        active_segment_min_s,
+        active_segment_max_s
     );
-    const PointProjection start_projection = start_potential.projection;
-    const float progress_reference_dist = start_projection.dist;
-    const float reference_initial_path_speed = std::max(
-        0.0f,
-        glm::dot(forward_vector(state) * state.m_speed, start_projection.tangent)
-    );
-    const float progress_reference_s = start_projection.s;
 
-    for (float time = 0.0f; time < simulation_time;) {
-        const float step_dt = std::min(dt, simulation_time - time);
-        vehicle_simulation_step(state, speed_acceleration, steer_acceleration, step_dt, false);
-        trajectory_length += glm::length(state.m_position - previous_trajectory_position);
-        previous_trajectory_position = state.m_position;
-        if (trajectory) {
-            trajectory->push_back(state.m_position);
-        }
-        time += step_dt;
-    }
+    const double v0 = state.m_speed;
+    const double v_target = 0.0;
+    const double slowdown_acceleration = (v_target*v_target - v0*v0) / (2 * (path_arc_lengths.total_length - projection.s));
 
-    const PathPotentialEvaluation end_potential = evaluate_path_potential(
-        state,
-        path,
-        path_arc_lengths,
-        initial_projection_min_s,
-        initial_projection_max_s,
-        slow_down_at_projection_max,
-        projection_max_target_speed_abs,
-        speed_acceleration,
-        steer_acceleration
-    );
-    const PointProjection last_projection = end_potential.projection;
-    const PointProjection last_target_projection =
-        sample_polyline_at_s(path, path_arc_lengths, last_projection.s);
-    const SimulationLossBreakdown loss_breakdown = end_potential.components;
-    const float loss = end_potential.total();
+    const double acceleration_diff = slowdown_acceleration - speed_acceleration;
+    const double slowdown_loss = slowdown_acceleration >= m_follow_params.min_slowdown_acceleration ?
+        acceleration_diff * acceleration_diff : 0.0;
 
-    if (candidate_debug) {
-        candidate_debug->start_s = progress_reference_s;
-        candidate_debug->end_s = last_projection.s;
-        candidate_debug->target_end_s = last_target_projection.s;
-        candidate_debug->start_dist = progress_reference_dist;
-        candidate_debug->end_dist = last_projection.dist;
-        candidate_debug->target_end_dist = glm::length(state.m_position - last_target_projection.point);
-        candidate_debug->reference_initial_path_speed = reference_initial_path_speed;
-        candidate_debug->trajectory_length = trajectory_length;
-        candidate_debug->loss_breakdown = loss_breakdown;
-        candidate_debug->start_position = start_position;
-        candidate_debug->end_position = state.m_position;
-        candidate_debug->target_end_point = last_target_projection.point;
-    }
-
-    return loss;
+    return slowdown_loss;
 }
+
+float Vehicle::compute_cruise_speed_loss(const Vehicle::VehicleTransformState& state) const {
+    LOG_METHOD();
+
+    const float speed_diff = m_follow_params.cruise_speed - state.m_speed;
+    return state.m_speed > m_follow_params.cruise_speed ? speed_diff*speed_diff : 0.0f;
+}
+
+// Vehicle::SimulationLossCoefficients Vehicle::compute_simulation_loss_coefficients(
+//     const VehicleTransformState& state,
+//     const PointProjection& projection,
+//     const PointProjection& target_projection,
+//     const PathArcLengthTable& path_arc_lengths,
+//     float total_polyline_length,
+//     float progress_reference_s,
+//     float current_next_direction_change_s,
+//     float speed_acceleration,
+//     float steer_acceleration) const
+// {
+//     return SimulationLossCoefficients{
+//         .position = compute_position_loss_coefficient(state, target_projection),
+//         .heading = compute_heading_loss_coefficient(state, target_projection),
+//         .speed = compute_speed_loss_coefficient(
+//             state,
+//             projection,
+//             path_arc_lengths,
+//             total_polyline_length,
+//             current_next_direction_change_s
+//         ),
+//         .progress = compute_progress_loss_coefficient(state, projection, target_projection, progress_reference_s),
+//         .steering = compute_steering_loss_coefficient(state, target_projection),
+//         .control = compute_control_loss_coefficient(state, speed_acceleration, steer_acceleration)
+//     };
+// }
+
+// float Vehicle::compute_simulation_loss(
+//     VehicleTransformState& state,
+//     const std::vector<VehiclePathPoint>& path,
+//     const PathArcLengthTable& path_arc_lengths,
+//     float total_polyline_length,
+//     float speed_acceleration,
+//     float steer_acceleration,
+//     float simulation_time, 
+//     float dt,
+//     bool debug,
+//     float initial_projection_min_s,
+//     float initial_projection_max_s,
+//     bool slow_down_at_projection_max,
+//     float projection_max_target_speed_abs,
+//     std::vector<glm::vec2>* trajectory,
+//     SimulationControlCandidateDebug* candidate_debug) const
+// {
+//     if (debug) {
+//         logger().check(simulation_time > 0.0f, "simulation_time must be greater than zero");
+//         logger().check(path.size() >= 2, "path must contain at least two points");
+//         check_simulation_step(speed_acceleration, steer_acceleration, dt);
+//     }
+
+//     logger().check(total_polyline_length > Utils::eps, "path length must be greater than zero");
+
+//     const glm::vec2 start_position = state.m_position;
+//     float trajectory_length = 0.0f;
+//     glm::vec2 previous_trajectory_position = state.m_position;
+
+//     if (trajectory) {
+//         trajectory->clear();
+//         trajectory->reserve(static_cast<size_t>(std::ceil(simulation_time / dt)) + 1u);
+//         trajectory->push_back(state.m_position);
+//     }
+
+//     const PathPotentialEvaluation start_potential = evaluate_path_potential(
+//         state,
+//         path,
+//         path_arc_lengths,
+//         initial_projection_min_s,
+//         initial_projection_max_s,
+//         slow_down_at_projection_max,
+//         projection_max_target_speed_abs,
+//         speed_acceleration,
+//         steer_acceleration
+//     );
+//     const PointProjection start_projection = start_potential.projection;
+//     const float progress_reference_dist = start_projection.dist;
+//     const float reference_initial_path_speed = std::max(
+//         0.0f,
+//         glm::dot(forward_vector(state) * state.m_speed, start_projection.tangent)
+//     );
+//     const float progress_reference_s = start_projection.s;
+
+//     for (float time = 0.0f; time < simulation_time;) {
+//         const float step_dt = std::min(dt, simulation_time - time);
+//         vehicle_simulation_step(state, speed_acceleration, steer_acceleration, step_dt, false);
+//         trajectory_length += glm::length(state.m_position - previous_trajectory_position);
+//         previous_trajectory_position = state.m_position;
+//         if (trajectory) {
+//             trajectory->push_back(state.m_position);
+//         }
+//         time += step_dt;
+//     }
+
+//     const PathPotentialEvaluation end_potential = evaluate_path_potential(
+//         state,
+//         path,
+//         path_arc_lengths,
+//         initial_projection_min_s,
+//         initial_projection_max_s,
+//         slow_down_at_projection_max,
+//         projection_max_target_speed_abs,
+//         speed_acceleration,
+//         steer_acceleration
+//     );
+//     const PointProjection last_projection = end_potential.projection;
+//     const PointProjection last_target_projection =
+//         sample_polyline_at_s(path, path_arc_lengths, last_projection.s);
+//     const SimulationLossBreakdown loss_breakdown = end_potential.components;
+//     const float loss = end_potential.total();
+
+//     if (candidate_debug) {
+//         candidate_debug->start_s = progress_reference_s;
+//         candidate_debug->end_s = last_projection.s;
+//         candidate_debug->target_end_s = last_target_projection.s;
+//         candidate_debug->start_dist = progress_reference_dist;
+//         candidate_debug->end_dist = last_projection.dist;
+//         candidate_debug->target_end_dist = glm::length(state.m_position - last_target_projection.point);
+//         candidate_debug->reference_initial_path_speed = reference_initial_path_speed;
+//         candidate_debug->trajectory_length = trajectory_length;
+//         candidate_debug->loss_breakdown = loss_breakdown;
+//         candidate_debug->start_position = start_position;
+//         candidate_debug->end_position = state.m_position;
+//         candidate_debug->target_end_point = last_target_projection.point;
+//     }
+
+//     return loss;
+// }
 
 float Vehicle::compute_simulation_loss_test(
     VehicleTransformState& state,
@@ -1379,7 +1455,8 @@ float Vehicle::compute_simulation_loss_test(
     float total_polyline_length,
     float speed_acceleration,
     float steer_acceleration,
-    float simulation_time, 
+    float max_simulation_time,
+    float max_simulation_s,
     float dt,
     bool debug,
     float initial_projection_min_s,
@@ -1392,7 +1469,7 @@ float Vehicle::compute_simulation_loss_test(
     LOG_METHOD();
 
     if (debug) {
-        logger().check(simulation_time > 0.0f, "simulation_time must be greater than zero");
+        logger().check(max_simulation_time > 0.0f, "simulation_time must be greater than zero");
         logger().check(path.size() >= 2, "path must contain at least two points");
         check_simulation_step(speed_acceleration, steer_acceleration, dt);
     }
@@ -1401,11 +1478,22 @@ float Vehicle::compute_simulation_loss_test(
 
     if (trajectory) {
         trajectory->clear();
-        trajectory->reserve(static_cast<size_t>(std::ceil(simulation_time / dt)) + 1u);
+        trajectory->reserve(static_cast<size_t>(std::ceil(max_simulation_time / dt)) + 1u);
         trajectory->push_back(state.m_position);
     }
 
-    float start_potential = evaluate_path_potential(
+    const PointProjection vehicle_projection = find_path_projection(
+        m_vehicle_state,
+        path,
+        path_arc_lengths,
+        initial_projection_min_s,
+        initial_projection_max_s
+    );
+
+    double total_slowdown_loss = 0.0f;
+    double total_cruise_speed_loss = 0.0f;
+
+    double previous_slowdown_loss = compute_slowdown_loss(
         state,
         path,
         path_arc_lengths,
@@ -1414,13 +1502,43 @@ float Vehicle::compute_simulation_loss_test(
         speed_acceleration,
         steer_acceleration
     );
+    double previous_cruise_speed_loss = compute_cruise_speed_loss(state);
+
+    float start_potential = evaluate_path_potential(
+        state,
+        path,
+        path_arc_lengths,
+        initial_projection_min_s,
+        initial_projection_max_s,
+        speed_acceleration,
+        steer_acceleration,
+        vehicle_projection.dist + m_path_potential_params.additional_radius
+    );
 
     float trajectory_length = 0.0f;
     glm::vec2 previous_trajectory_position = state.m_position;
 
-    for (float time = 0.0f; time < simulation_time;) {
-        const float step_dt = std::min(dt, simulation_time - time);
+    for (float time = 0.0f; time < max_simulation_time && trajectory_length < max_simulation_s;) {
+        const float step_dt = std::min(dt, max_simulation_time - time);
         vehicle_simulation_step(state, speed_acceleration, steer_acceleration, step_dt, false);
+
+        const double speed_loss = compute_slowdown_loss(
+            state,
+            path,
+            path_arc_lengths,
+            initial_projection_min_s,
+            initial_projection_max_s,
+            speed_acceleration,
+            steer_acceleration
+        );
+        const double cruise_speed_loss = compute_cruise_speed_loss(state);
+
+        total_slowdown_loss += (previous_slowdown_loss + speed_loss) * step_dt / 2.0;
+        total_cruise_speed_loss += (previous_cruise_speed_loss + cruise_speed_loss) * step_dt / 2.0;
+
+        previous_slowdown_loss = speed_loss;
+        previous_cruise_speed_loss = cruise_speed_loss;
+
         trajectory_length += glm::length(state.m_position - previous_trajectory_position);
         previous_trajectory_position = state.m_position;
         if (trajectory) {
@@ -1436,8 +1554,15 @@ float Vehicle::compute_simulation_loss_test(
         initial_projection_min_s,
         initial_projection_max_s,
         speed_acceleration,
-        steer_acceleration
+        steer_acceleration,
+        vehicle_projection.dist + m_path_potential_params.additional_radius
     );
 
-    return end_potential - start_potential;
+    const double potential_loss = end_potential - start_potential;
+    const float loss = 
+        potential_loss + 
+        total_slowdown_loss * m_loss_weights.slowdown_speed +
+        total_cruise_speed_loss * m_loss_weights.cruise_speed;
+
+    return loss;
 }

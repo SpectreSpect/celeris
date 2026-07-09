@@ -60,7 +60,7 @@ public:
         float max_vehicle_steer_acceleration = 5;
         float vehicle_wheel_base = 4.29f;
         float vehicle_cruise_speed = 20.0f;
-        float vehicle_slowdown_distance_from_path = 2.5f;
+        float vehicle_min_slowdown_acceleration = 2.0f;
         float vehicle_min_off_path_speed_factor = 0.25f;
         float vehicle_projection_backtrack_window = 0.75f;
         float vehicle_projection_lookahead_base = 3.0f;
