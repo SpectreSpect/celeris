@@ -263,8 +263,8 @@ private:
     glm::vec3 m_previous_lidar_position{0.0f};
     glm::quat m_previous_lidar_rotation{1.0f, 0.0f, 0.0f, 0.0f};
     glm::vec3 m_lidar_velocity{0.0f};
-    glm::vec3 m_lidar_gravity_engine{0.0f};
-    bool m_has_lidar_gravity_engine = false;
+    glm::vec3 m_lidar_gravity{0.0f};
+    bool m_has_lidar_gravity = false;
     bool m_has_previous_corrected_lidar_pose = false;
     glm::vec3 m_previous_corrected_lidar_position{0.0f};
     glm::quat m_previous_corrected_lidar_rotation{1.0f, 0.0f, 0.0f, 0.0f};

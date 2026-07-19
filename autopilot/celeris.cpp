@@ -401,8 +401,8 @@ void Celeris::start_lidar_receiver() {
     m_received_scan_count = 0;
     m_has_previous_lidar_pose = false;
     m_lidar_velocity = glm::vec3(0.0f);
-    m_lidar_gravity_engine = glm::vec3(0.0f);
-    m_has_lidar_gravity_engine = false;
+    m_lidar_gravity = glm::vec3(0.0f);
+    m_has_lidar_gravity = false;
     m_has_previous_corrected_lidar_pose = false;
     m_previous_corrected_lidar_position = glm::vec3(0.0f);
     m_previous_corrected_lidar_rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
@@ -457,9 +457,9 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
     // float vehicle_height = m_vehicle_position.pos.y;
 
     if (auto scan = m_scan_receiver.try_pop_scan(*m_manager_bundle)) {
-        const glm::vec3 scan_acceleration_engine_local = scan->linear_acceleration_engine();
-        const glm::vec3 scan_angular_velocity_engine_local = scan->angular_velocity_engine();
-        const glm::quat scan_orientation_engine = scan->orientation_engine();
+        const glm::vec3 scan_acceleration = scan->linear_acceleration();
+        const glm::vec3 scan_angular_velocity = scan->angular_velocity();
+        const glm::quat scan_orientation = scan->orientation();
         const uint64_t scan_timestamp_ns = scan->timestamp_ns();
         glm::vec3 raw_position = scan->point_cloud().transform.position;
         glm::quat raw_rotation = glm::normalize(scan->point_cloud().transform.rotation);
@@ -496,20 +496,20 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         //     scan_dt > 0.0f &&
         //     scan_dt <= std::max(0.0f, m_desc.lidar_accel_max_dt);
 
-        // auto scan_acceleration_engine = [&]() {
-        //     const glm::vec3 acceleration_engine =
-        //         glm::normalize(raw_rotation) * scan_acceleration_engine_local;
+        // auto scan_acceleration_world = [&]() {
+        //     const glm::vec3 acceleration_world =
+        //         glm::normalize(raw_rotation) * scan_acceleration;
 
-        //     if (!m_has_lidar_gravity_engine) {
-        //         m_lidar_gravity_engine = acceleration_engine;
-        //         m_has_lidar_gravity_engine = true;
+        //     if (!m_has_lidar_gravity) {
+        //         m_lidar_gravity = acceleration_world;
+        //         m_has_lidar_gravity = true;
         //     }
 
-        //     return acceleration_engine - m_lidar_gravity_engine;
+        //     return acceleration_world - m_lidar_gravity;
         // };
 
-        // if (!m_has_lidar_gravity_engine) {
-        //     (void)scan_acceleration_engine();
+        // if (!m_has_lidar_gravity) {
+        //     (void)scan_acceleration_world();
         // }
 
         if (!m_has_previous_lidar_pose) {
@@ -547,14 +547,14 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
             // if (m_desc.lidar_accel_prediction_enabled &&
             //     m_has_previous_corrected_lidar_pose &&
             //     valid_scan_dt) {
-            //     glm::vec3 acceleration_engine = scan_acceleration_engine();
-            //     acceleration_engine = clamp_length(
-            //         acceleration_engine,
+            //     glm::vec3 acceleration_world = scan_acceleration_world();
+            //     acceleration_world = clamp_length(
+            //         acceleration_world,
             //         std::max(0.0f, m_desc.lidar_accel_max_mps2)
             //     );
 
             //     m_lidar_velocity = clamp_length(
-            //         m_lidar_velocity + acceleration_engine * scan_dt,
+            //         m_lidar_velocity + acceleration_world * scan_dt,
             //         std::max(0.0f, m_desc.lidar_velocity_max_mps)
             //     );
 

@@ -25,9 +25,9 @@ glm::quat normalized_quat_or_identity(float qx, float qy, float qz, float qw) {
     return glm::normalize(q);
 }
 
-glm::mat3 sample_orientation_matrix_ros(const LidarScan::FrameData& frame, size_t sample_id) {
-    if (frame.sample_orientations_ros.size() == frame.samples.size()) {
-        glm::quat q = frame.sample_orientations_ros[sample_id];
+glm::mat3 sample_orientation_matrix(const LidarScan::FrameData& frame, size_t sample_id) {
+    if (frame.sample_orientations.size() == frame.samples.size()) {
+        glm::quat q = frame.sample_orientations[sample_id];
         const float len = glm::length(q);
         if (std::isfinite(len) && len > 1e-6f)
             return glm::mat3_cast(glm::normalize(q));
@@ -95,28 +95,16 @@ uint64_t LidarScan::timestamp_ns() const noexcept {
     return m_timestamp_ns;
 }
 
-glm::vec3 LidarScan::linear_acceleration_ros() const noexcept {
-    return m_linear_acceleration_ros;
+glm::vec3 LidarScan::linear_acceleration() const noexcept {
+    return m_linear_acceleration;
 }
 
-glm::vec3 LidarScan::linear_acceleration_engine() const noexcept {
-    return m_linear_acceleration_engine;
+glm::vec3 LidarScan::angular_velocity() const noexcept {
+    return m_angular_velocity;
 }
 
-glm::vec3 LidarScan::angular_velocity_ros() const noexcept {
-    return m_angular_velocity_ros;
-}
-
-glm::vec3 LidarScan::angular_velocity_engine() const noexcept {
-    return m_angular_velocity_engine;
-}
-
-glm::quat LidarScan::orientation_ros() const noexcept {
-    return m_orientation_ros;
-}
-
-glm::quat LidarScan::orientation_engine() const noexcept {
-    return m_orientation_engine;
+glm::quat LidarScan::orientation() const noexcept {
+    return m_orientation;
 }
 
 LidarScan::FrameData LidarScan::read_frame_from_file(const std::filesystem::path& path) {
@@ -137,9 +125,9 @@ LidarScan::FrameData LidarScan::read_frame_from_file(const std::filesystem::path
     if (!in) throw std::runtime_error("Unexpected EOF in: " + path.string());
 
     frame.samples.resize(count);
-    frame.sample_orientations_ros.resize(count);
-    frame.sample_linear_accelerations_ros.resize(count);
-    frame.sample_angular_velocities_ros.resize(count);
+    frame.sample_orientations.resize(count);
+    frame.sample_linear_accelerations.resize(count);
+    frame.sample_angular_velocities.resize(count);
 
     const uint8_t* p = buf.data();
 
@@ -165,11 +153,11 @@ LidarScan::FrameData LidarScan::read_frame_from_file(const std::filesystem::path
         std::memcpy(&qz, p, 4); p += 4;
         std::memcpy(&qw, p, 4); p += 4;
 
-        frame.sample_linear_accelerations_ros[i] = glm::vec3(ax, ay, az);
-        frame.sample_angular_velocities_ros[i] = glm::vec3(wx, wy, wz);
-        frame.sample_orientations_ros[i] = normalized_quat_or_identity(qx, qy, qz, qw);
+        frame.sample_linear_accelerations[i] = glm::vec3(ax, ay, az);
+        frame.sample_angular_velocities[i] = glm::vec3(wx, wy, wz);
+        frame.sample_orientations[i] = normalized_quat_or_identity(qx, qy, qz, qw);
 
-        frame.samples[i].p_local_ros = glm::vec3(x, y, z);
+        frame.samples[i].p_local = glm::vec3(x, y, z);
         frame.samples[i].time = time;
         frame.samples[i].valid = std::isfinite(x) && std::isfinite(y) && std::isfinite(z);
     }
@@ -186,18 +174,15 @@ PointCloud LidarScan::load_from_file(ManagerBundle& manager_bundle, const std::f
 
 PointCloud LidarScan::load_from_frame(ManagerBundle& manager_bundle, FrameData&& frame) {
     m_timestamp_ns = frame.timestamp_ns;
-    m_linear_acceleration_ros = glm::vec3(0.0f);
-    m_linear_acceleration_engine = glm::vec3(0.0f);
-    m_angular_velocity_ros = glm::vec3(0.0f);
-    m_angular_velocity_engine = glm::vec3(0.0f);
-    m_orientation_ros = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-    m_orientation_engine = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    m_linear_acceleration = glm::vec3(0.0f);
+    m_angular_velocity = glm::vec3(0.0f);
+    m_orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
-    if (!frame.sample_linear_accelerations_ros.empty()) {
+    if (!frame.sample_linear_accelerations.empty()) {
         glm::vec3 sum(0.0f);
         uint32_t valid_count = 0;
 
-        for (const glm::vec3& acceleration : frame.sample_linear_accelerations_ros) {
+        for (const glm::vec3& acceleration : frame.sample_linear_accelerations) {
             if (!std::isfinite(acceleration.x) ||
                 !std::isfinite(acceleration.y) ||
                 !std::isfinite(acceleration.z)) {
@@ -209,15 +194,14 @@ PointCloud LidarScan::load_from_frame(ManagerBundle& manager_bundle, FrameData&&
         }
 
         if (valid_count > 0u) {
-            m_linear_acceleration_ros = sum / static_cast<float>(valid_count);
-            m_linear_acceleration_engine = ros_pos_to_engine(m_linear_acceleration_ros);
+            m_linear_acceleration = sum / static_cast<float>(valid_count);
         }
     }
 
-    if (!frame.sample_angular_velocities_ros.empty()) {
+    if (!frame.sample_angular_velocities.empty()) {
         glm::vec3 sum(0.0f);
         uint32_t valid_count = 0;
-        for (const glm::vec3& velocity : frame.sample_angular_velocities_ros) {
+        for (const glm::vec3& velocity : frame.sample_angular_velocities) {
             if (std::isfinite(velocity.x) &&
                 std::isfinite(velocity.y) &&
                 std::isfinite(velocity.z)) {
@@ -226,22 +210,18 @@ PointCloud LidarScan::load_from_frame(ManagerBundle& manager_bundle, FrameData&&
             }
         }
         if (valid_count > 0u) {
-            m_angular_velocity_ros = sum / static_cast<float>(valid_count);
-            m_angular_velocity_engine = ros_pos_to_engine(m_angular_velocity_ros);
+            m_angular_velocity = sum / static_cast<float>(valid_count);
         }
     }
 
-    if (!frame.sample_orientations_ros.empty()) {
+    if (!frame.sample_orientations.empty()) {
         size_t reference_index = 0;
         for (size_t i = 1; i < frame.samples.size(); ++i) {
             if (frame.samples[i].time < frame.samples[reference_index].time) {
                 reference_index = i;
             }
         }
-        m_orientation_ros = glm::normalize(frame.sample_orientations_ros[reference_index]);
-        m_orientation_engine = glm::quat_cast(
-            ros_rotation_to_engine(glm::mat3_cast(m_orientation_ros))
-        );
+        m_orientation = glm::normalize(frame.sample_orientations[reference_index]);
     }
 
     if (frame.points.empty()) {
@@ -275,7 +255,7 @@ void LidarScan::build_points_for_frame(FrameData& frame) {
 
     const float INF = std::numeric_limits<float>::infinity();
 
-    const glm::mat3 R_wb_ref = sample_orientation_matrix_ros(frame, ref_idx);
+    const glm::mat3 R_wb_ref = sample_orientation_matrix(frame, ref_idx);
 
     for (uint32_t i = 0; i < count; ++i) {
         const TimedPointSample& s = frame.samples[i];
@@ -286,12 +266,11 @@ void LidarScan::build_points_for_frame(FrameData& frame) {
             continue;
         }
 
-        const glm::mat3 R_wb = sample_orientation_matrix_ros(frame, i);
-        const glm::vec3 p_ref_ros =
-            glm::transpose(R_wb_ref) * (R_wb * s.p_local_ros);
-        const glm::vec3 p_ref_eng = ros_pos_to_engine(p_ref_ros);
+        const glm::mat3 R_wb = sample_orientation_matrix(frame, i);
+        const glm::vec3 p_ref =
+            glm::transpose(R_wb_ref) * (R_wb * s.p_local);
 
-        frame.points[i].position = glm::vec4(p_ref_eng, 1.0f);
+        frame.points[i].position = glm::vec4(p_ref, 1.0f);
         frame.points[i].color = glm::vec4(1, 1, 1, 1);
     }
 }

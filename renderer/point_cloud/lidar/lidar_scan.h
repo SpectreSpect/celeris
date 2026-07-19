@@ -18,7 +18,7 @@ public:
     _XCHILD_NAME(LidarScan);
 
     struct TimedPointSample {
-        glm::vec3 p_local_ros{0.0f};
+        glm::vec3 p_local{0.0f};
         float time = 0.0f;
         bool valid = true;
     };
@@ -27,9 +27,9 @@ public:
         uint64_t timestamp_ns = 0;
         uint32_t ring_count = 0;
         std::vector<TimedPointSample> samples;
-        std::vector<glm::quat> sample_orientations_ros;
-        std::vector<glm::vec3> sample_linear_accelerations_ros;
-        std::vector<glm::vec3> sample_angular_velocities_ros;
+        std::vector<glm::quat> sample_orientations;
+        std::vector<glm::vec3> sample_linear_accelerations;
+        std::vector<glm::vec3> sample_angular_velocities;
         std::vector<PointInstance> points;
 
         FrameData() = default;
@@ -122,12 +122,9 @@ public:
 
     void set_timestamp_ns(uint64_t timestamp_ns);
     uint64_t timestamp_ns() const noexcept;
-    glm::vec3 linear_acceleration_ros() const noexcept;
-    glm::vec3 linear_acceleration_engine() const noexcept;
-    glm::vec3 angular_velocity_ros() const noexcept;
-    glm::vec3 angular_velocity_engine() const noexcept;
-    glm::quat orientation_ros() const noexcept;
-    glm::quat orientation_engine() const noexcept;
+    glm::vec3 linear_acceleration() const noexcept;
+    glm::vec3 angular_velocity() const noexcept;
+    glm::quat orientation() const noexcept;
 
     static glm::vec3 ros_pos_to_engine(const glm::vec3& p_ros);
     static glm::mat3 ros_rotation_to_engine(const glm::mat3& rotation_ros);
@@ -138,12 +135,9 @@ public:
 
 private:
     uint64_t m_timestamp_ns = 0;
-    glm::vec3 m_linear_acceleration_ros{0.0f};
-    glm::vec3 m_linear_acceleration_engine{0.0f};
-    glm::vec3 m_angular_velocity_ros{0.0f};
-    glm::vec3 m_angular_velocity_engine{0.0f};
-    glm::quat m_orientation_ros{1.0f, 0.0f, 0.0f, 0.0f};
-    glm::quat m_orientation_engine{1.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec3 m_linear_acceleration{0.0f};
+    glm::vec3 m_angular_velocity{0.0f};
+    glm::quat m_orientation{1.0f, 0.0f, 0.0f, 0.0f};
     
     std::vector<PointInstance> m_points;
     std::vector<glm::vec4> m_normals;

@@ -42,9 +42,9 @@ glm::quat normalized_quat_or_identity(float qx, float qy, float qz, float qw) {
     return glm::normalize(q);
 }
 
-glm::mat3 sample_orientation_matrix_ros(const LidarScan::FrameData& frame, size_t sample_id) {
-    if (frame.sample_orientations_ros.size() == frame.samples.size()) {
-        glm::quat q = frame.sample_orientations_ros[sample_id];
+glm::mat3 sample_orientation_matrix(const LidarScan::FrameData& frame, size_t sample_id) {
+    if (frame.sample_orientations.size() == frame.samples.size()) {
+        glm::quat q = frame.sample_orientations[sample_id];
         const float len = glm::length(q);
         if (std::isfinite(len) && len > 1e-6f)
             return glm::mat3_cast(glm::normalize(q));
@@ -140,8 +140,7 @@ std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_scan(ManagerBundle& manage
         return nullptr;
 
     const size_t ref_idx = reference_sample_id(frame);
-    const glm::mat3 rotation_ros = sample_orientation_matrix_ros(frame, ref_idx);
-    const glm::mat3 rotation_engine = LidarScan::ros_rotation_to_engine(rotation_ros);
+    const glm::mat3 rotation = sample_orientation_matrix(frame, ref_idx);
 
     std::unique_ptr<LidarScan> scan = std::make_unique<LidarScan>(
         manager_bundle,
@@ -150,7 +149,7 @@ std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_scan(ManagerBundle& manage
     );
 
     scan->point_cloud().transform.position = glm::vec3(0.0f);
-    scan->point_cloud().transform.rotation = glm::quat_cast(rotation_engine);
+    scan->point_cloud().transform.rotation = glm::quat_cast(rotation);
     // scan->point_cloud().transform.scale = glm::vec3(2);
 
     return scan;
@@ -250,9 +249,9 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
         frame.ring_count = 16;
 
         frame.samples.resize(point_count / m_points_freq);
-        frame.sample_orientations_ros.resize(frame.samples.size());
-        frame.sample_linear_accelerations_ros.resize(frame.samples.size());
-        frame.sample_angular_velocities_ros.resize(frame.samples.size());
+        frame.sample_orientations.resize(frame.samples.size());
+        frame.sample_linear_accelerations.resize(frame.samples.size());
+        frame.sample_angular_velocities.resize(frame.samples.size());
 
         
         // save_retrieved_scan(payload.data(), payload.size(), "/home/hiber/repositories/celeris/assets/lidar_scans/lslidar_scan.bin");
@@ -285,13 +284,13 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
             std::memcpy(&qw, local_p, 4); local_p += 4;
             p += point_stride_bytes * m_points_freq;
 
-            frame.sample_linear_accelerations_ros[i] = glm::vec3(ax, ay, az);
-            frame.sample_angular_velocities_ros[i] = glm::vec3(wx, wy, wz);
-            frame.sample_orientations_ros[i] = normalized_quat_or_identity(qx, qy, qz, qw);
+            frame.sample_linear_accelerations[i] = glm::vec3(ax, ay, az);
+            frame.sample_angular_velocities[i] = glm::vec3(wx, wy, wz);
+            frame.sample_orientations[i] = normalized_quat_or_identity(qx, qy, qz, qw);
 
             // std::cout << "Point: " << time << std::endl;
 
-            frame.samples[i].p_local_ros = glm::vec3(x, y, z);
+            frame.samples[i].p_local = glm::vec3(x, y, z);
             frame.samples[i].time = time;
             frame.samples[i].valid = std::isfinite(x) && std::isfinite(y) && std::isfinite(z);
 
