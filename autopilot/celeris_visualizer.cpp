@@ -46,6 +46,11 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
             PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(1.0f, 0.0f, 0.9f, 1.0f))
         ),
         m_gazelle_next(mesh_manager, material_instance_manager, vehicle_geometry, skybox_exposure),
+        linear_acceleration_arrow(
+            *m_celeris->engine(),
+            mesh_manager,
+            material_instance_manager
+        ),
         m_path_line_cloud(*m_celeris->engine(),
                    mesh_manager.line_quad,
                    material_instance_manager.line,

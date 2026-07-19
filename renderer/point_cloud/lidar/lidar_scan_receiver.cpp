@@ -17,66 +17,8 @@
 #include <glm/gtc/quaternion.hpp>
 
 namespace {
-constexpr uint32_t imu_rpy_frame_flag = 1u << 31;
-constexpr uint32_t imu_pose_quat_frame_flag = 1u << 30;
-constexpr uint32_t imu_accel_quat_frame_flag = 1u << 29;
-constexpr uint32_t frame_convention_shift = 27;
-constexpr uint32_t frame_convention_mask = 3u << frame_convention_shift;
-constexpr uint32_t point_count_mask = ~(
-    imu_rpy_frame_flag |
-    imu_pose_quat_frame_flag |
-    imu_accel_quat_frame_flag |
-    frame_convention_mask
-);
-constexpr size_t pose_rpy_floats_per_scan_point = 10;
-constexpr size_t imu_rpy_floats_per_scan_point = 7;
-constexpr size_t imu_pose_quat_floats_per_scan_point = 11;
-constexpr size_t imu_accel_quat_floats_per_scan_point = 11;
+constexpr size_t imu_floats_per_scan_point = 14;
 constexpr uint32_t max_points_per_frame = 2'000'000;
-
-enum class ScanPacketFormat {
-    LegacyPoseRpy,
-    ImuRpy,
-    ImuPoseQuat,
-    ImuAccelQuat
-};
-
-ScanPacketFormat packet_format(uint32_t count_header) {
-    if ((count_header & imu_accel_quat_frame_flag) != 0u)
-        return ScanPacketFormat::ImuAccelQuat;
-    if ((count_header & imu_pose_quat_frame_flag) != 0u)
-        return ScanPacketFormat::ImuPoseQuat;
-    if ((count_header & imu_rpy_frame_flag) != 0u)
-        return ScanPacketFormat::ImuRpy;
-    return ScanPacketFormat::LegacyPoseRpy;
-}
-
-LidarScan::FrameConvention frame_convention(uint32_t count_header) {
-    const uint32_t convention_code = (count_header & frame_convention_mask) >> frame_convention_shift;
-    switch (convention_code) {
-    case 1u:
-        return LidarScan::FrameConvention::SimWebots;
-    case 2u:
-        return LidarScan::FrameConvention::SimWebotsMirrored;
-    case 0u:
-    default:
-        return LidarScan::FrameConvention::RealRos;
-    }
-}
-
-size_t bytes_per_scan_point(ScanPacketFormat format) {
-    switch (format) {
-    case ScanPacketFormat::ImuAccelQuat:
-        return imu_accel_quat_floats_per_scan_point * sizeof(float);
-    case ScanPacketFormat::ImuPoseQuat:
-        return imu_pose_quat_floats_per_scan_point * sizeof(float);
-    case ScanPacketFormat::ImuRpy:
-        return imu_rpy_floats_per_scan_point * sizeof(float);
-    case ScanPacketFormat::LegacyPoseRpy:
-    default:
-        return pose_rpy_floats_per_scan_point * sizeof(float);
-    }
-}
 
 size_t reference_sample_id(const LidarScan::FrameData& frame) {
     size_t ref_idx = 0;
@@ -108,12 +50,7 @@ glm::mat3 sample_orientation_matrix_ros(const LidarScan::FrameData& frame, size_
             return glm::mat3_cast(glm::normalize(q));
     }
 
-    const auto& sample = frame.samples[sample_id];
-    return LidarScan::rpy_to_mat3_zyx(
-        sample.base_rpy_ros.x,
-        sample.base_rpy_ros.y,
-        sample.base_rpy_ros.z
-    );
+    return glm::mat3(1.0f);
 }
 }
 
@@ -203,12 +140,8 @@ std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_scan(ManagerBundle& manage
         return nullptr;
 
     const size_t ref_idx = reference_sample_id(frame);
-    const auto& sample = frame.samples[ref_idx];
-    const glm::vec3 base_pos_ros = sample.base_pos_ros;
-    const LidarScan::FrameConvention frame_convention = frame.frame_convention;
     const glm::mat3 rotation_ros = sample_orientation_matrix_ros(frame, ref_idx);
-    const glm::mat3 rotation_engine =
-        LidarScan::frame_rotation_to_engine(rotation_ros, frame_convention);
+    const glm::mat3 rotation_engine = LidarScan::ros_rotation_to_engine(rotation_ros);
 
     std::unique_ptr<LidarScan> scan = std::make_unique<LidarScan>(
         manager_bundle,
@@ -216,8 +149,7 @@ std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_scan(ManagerBundle& manage
         std::move(frame)
     );
 
-    scan->point_cloud().transform.position =
-        LidarScan::frame_pos_to_engine(base_pos_ros, frame_convention);
+    scan->point_cloud().transform.position = glm::vec3(0.0f);
     scan->point_cloud().transform.rotation = glm::quat_cast(rotation_engine);
     // scan->point_cloud().transform.scale = glm::vec3(2);
 
@@ -302,16 +234,14 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
             return false;
         }
 
-        const ScanPacketFormat format = packet_format(point_count_header);
-        frame.frame_convention = frame_convention(point_count_header);
-        const uint32_t point_count = point_count_header & point_count_mask;
+        const uint32_t point_count = point_count_header;
 
         if (point_count == 0 || point_count > max_points_per_frame) {
             std::cerr << "LidarScanReceiver: invalid point count " << point_count << "\n";
             return false;
         }
 
-        const size_t point_stride_bytes = bytes_per_scan_point(format);
+        const size_t point_stride_bytes = imu_floats_per_scan_point * sizeof(float);
         std::vector<uint8_t> payload(static_cast<size_t>(point_count) * point_stride_bytes);
         if (!read_exact(client_socket, payload.data(), payload.size())) {
             return false;
@@ -320,12 +250,9 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
         frame.ring_count = 16;
 
         frame.samples.resize(point_count / m_points_freq);
-        if (format == ScanPacketFormat::ImuPoseQuat || format == ScanPacketFormat::ImuAccelQuat) {
-            frame.sample_orientations_ros.resize(frame.samples.size());
-        }
-        if (format == ScanPacketFormat::ImuAccelQuat) {
-            frame.sample_linear_accelerations_ros.resize(frame.samples.size());
-        }
+        frame.sample_orientations_ros.resize(frame.samples.size());
+        frame.sample_linear_accelerations_ros.resize(frame.samples.size());
+        frame.sample_angular_velocities_ros.resize(frame.samples.size());
 
         
         // save_retrieved_scan(payload.data(), payload.size(), "/home/hiber/repositories/celeris/assets/lidar_scans/lslidar_scan.bin");
@@ -337,67 +264,35 @@ bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
         for (uint32_t i = 0; i < point_count / m_points_freq; ++i) {
             float x, y, z;
             float time;
-            float px, py, pz;
-            float roll, pitch, yaw;
             float qx, qy, qz, qw;
             float ax, ay, az;
+            float wx, wy, wz;
 
             const uint8_t* local_p = p;
             std::memcpy(&x,     local_p, 4); local_p += 4;
             std::memcpy(&y,     local_p, 4); local_p += 4;
             std::memcpy(&z,     local_p, 4); local_p += 4;
             std::memcpy(&time,  local_p, 4); local_p += 4;
-            if (format == ScanPacketFormat::ImuRpy) {
-                px = 0.0f;
-                py = 0.0f;
-                pz = 0.0f;
-                std::memcpy(&roll,  local_p, 4); local_p += 4;
-                std::memcpy(&pitch, local_p, 4); local_p += 4;
-                std::memcpy(&yaw,   local_p, 4); local_p += 4;
-            } else if (format == ScanPacketFormat::ImuPoseQuat) {
-                std::memcpy(&px, local_p, 4); local_p += 4;
-                std::memcpy(&py, local_p, 4); local_p += 4;
-                std::memcpy(&pz, local_p, 4); local_p += 4;
-                std::memcpy(&qx, local_p, 4); local_p += 4;
-                std::memcpy(&qy, local_p, 4); local_p += 4;
-                std::memcpy(&qz, local_p, 4); local_p += 4;
-                std::memcpy(&qw, local_p, 4); local_p += 4;
-                roll = 0.0f;
-                pitch = 0.0f;
-                yaw = 0.0f;
-                frame.sample_orientations_ros[i] = normalized_quat_or_identity(qx, qy, qz, qw);
-            } else if (format == ScanPacketFormat::ImuAccelQuat) {
-                std::memcpy(&ax, local_p, 4); local_p += 4;
-                std::memcpy(&ay, local_p, 4); local_p += 4;
-                std::memcpy(&az, local_p, 4); local_p += 4;
-                std::memcpy(&qx, local_p, 4); local_p += 4;
-                std::memcpy(&qy, local_p, 4); local_p += 4;
-                std::memcpy(&qz, local_p, 4); local_p += 4;
-                std::memcpy(&qw, local_p, 4); local_p += 4;
-                px = 0.0f;
-                py = 0.0f;
-                pz = 0.0f;
-                roll = 0.0f;
-                pitch = 0.0f;
-                yaw = 0.0f;
-                frame.sample_linear_accelerations_ros[i] = glm::vec3(ax, ay, az);
-                frame.sample_orientations_ros[i] = normalized_quat_or_identity(qx, qy, qz, qw);
-            } else {
-                std::memcpy(&px, local_p, 4); local_p += 4;
-                std::memcpy(&py, local_p, 4); local_p += 4;
-                std::memcpy(&pz, local_p, 4); local_p += 4;
-                std::memcpy(&roll,  local_p, 4); local_p += 4;
-                std::memcpy(&pitch, local_p, 4); local_p += 4;
-                std::memcpy(&yaw,   local_p, 4); local_p += 4;
-            }
+            std::memcpy(&ax, local_p, 4); local_p += 4;
+            std::memcpy(&ay, local_p, 4); local_p += 4;
+            std::memcpy(&az, local_p, 4); local_p += 4;
+            std::memcpy(&wx, local_p, 4); local_p += 4;
+            std::memcpy(&wy, local_p, 4); local_p += 4;
+            std::memcpy(&wz, local_p, 4); local_p += 4;
+            std::memcpy(&qx, local_p, 4); local_p += 4;
+            std::memcpy(&qy, local_p, 4); local_p += 4;
+            std::memcpy(&qz, local_p, 4); local_p += 4;
+            std::memcpy(&qw, local_p, 4); local_p += 4;
             p += point_stride_bytes * m_points_freq;
+
+            frame.sample_linear_accelerations_ros[i] = glm::vec3(ax, ay, az);
+            frame.sample_angular_velocities_ros[i] = glm::vec3(wx, wy, wz);
+            frame.sample_orientations_ros[i] = normalized_quat_or_identity(qx, qy, qz, qw);
 
             // std::cout << "Point: " << time << std::endl;
 
             frame.samples[i].p_local_ros = glm::vec3(x, y, z);
             frame.samples[i].time = time;
-            frame.samples[i].base_pos_ros = glm::vec3(px, py, pz);
-            frame.samples[i].base_rpy_ros = glm::vec3(roll, pitch, yaw);
             frame.samples[i].valid = std::isfinite(x) && std::isfinite(y) && std::isfinite(z);
 
             if (frame.samples[i].valid)

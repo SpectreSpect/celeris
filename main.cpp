@@ -330,8 +330,8 @@ int main() {
     Scene scene;
 
     scene.add(skybox);
-    // scene.add(celeris_visualizer);
-    // scene.add(voxel_grid.render_object());
+    scene.add(celeris_visualizer);
+    scene.add(voxel_grid.render_object());
     scene.add(test_arrow);
 
     skybox.update(scene);

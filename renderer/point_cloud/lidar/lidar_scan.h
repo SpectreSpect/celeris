@@ -17,27 +17,19 @@ class LidarScan : public SceneObject {
 public:
     _XCHILD_NAME(LidarScan);
 
-    enum class FrameConvention : uint32_t {
-        RealRos = 0,
-        SimWebots = 1,
-        SimWebotsMirrored = 2
-    };
-
     struct TimedPointSample {
         glm::vec3 p_local_ros{0.0f};
         float time = 0.0f;
-        glm::vec3 base_pos_ros{0.0f};
-        glm::vec3 base_rpy_ros{0.0f};
         bool valid = true;
     };
 
     struct FrameData {
         uint64_t timestamp_ns = 0;
         uint32_t ring_count = 0;
-        FrameConvention frame_convention = FrameConvention::RealRos;
         std::vector<TimedPointSample> samples;
         std::vector<glm::quat> sample_orientations_ros;
         std::vector<glm::vec3> sample_linear_accelerations_ros;
+        std::vector<glm::vec3> sample_angular_velocities_ros;
         std::vector<PointInstance> points;
 
         FrameData() = default;
@@ -134,12 +126,17 @@ public:
     glm::vec3 linear_acceleration_ros() const noexcept;
     bool has_linear_acceleration_engine() const noexcept;
     glm::vec3 linear_acceleration_engine() const noexcept;
+    bool has_angular_velocity_ros() const noexcept;
+    glm::vec3 angular_velocity_ros() const noexcept;
+    bool has_angular_velocity_engine() const noexcept;
+    glm::vec3 angular_velocity_engine() const noexcept;
+    bool has_orientation_ros() const noexcept;
+    glm::quat orientation_ros() const noexcept;
+    bool has_orientation_engine() const noexcept;
+    glm::quat orientation_engine() const noexcept;
 
-    static glm::mat3 rpy_to_mat3_zyx(float roll, float pitch, float yaw);
-    static glm::mat3 frame_basis_to_engine_basis(FrameConvention convention);
-    static glm::vec3 frame_pos_to_engine(const glm::vec3& p_frame, FrameConvention convention);
-    static glm::mat3 frame_rotation_to_engine(const glm::mat3& rotation_frame, FrameConvention convention);
     static glm::vec3 ros_pos_to_engine(const glm::vec3& p_ros);
+    static glm::mat3 ros_rotation_to_engine(const glm::mat3& rotation_ros);
     static void build_points_for_frame(FrameData& frame);
 
     PointCloud& point_cloud();
@@ -151,6 +148,14 @@ private:
     glm::vec3 m_linear_acceleration_ros{0.0f};
     bool m_has_linear_acceleration_engine = false;
     glm::vec3 m_linear_acceleration_engine{0.0f};
+    bool m_has_angular_velocity_ros = false;
+    glm::vec3 m_angular_velocity_ros{0.0f};
+    bool m_has_angular_velocity_engine = false;
+    glm::vec3 m_angular_velocity_engine{0.0f};
+    bool m_has_orientation_ros = false;
+    glm::quat m_orientation_ros{1.0f, 0.0f, 0.0f, 0.0f};
+    bool m_has_orientation_engine = false;
+    glm::quat m_orientation_engine{1.0f, 0.0f, 0.0f, 0.0f};
     
     std::vector<PointInstance> m_points;
     std::vector<glm::vec4> m_normals;
