@@ -9,6 +9,7 @@
 #include "../renderer/lines/line_cloud.h"
 #include "../a_star/vehicle.h"
 #include "../renderer/point_cloud/point_cloud.h"
+#include "arrow.h"
 
 #include "../vulkan_self/logger/logger_header.h"
 
@@ -69,6 +70,8 @@ private:
     SphericalPoseMarker m_vehicle_marker;
     SphericalPoseMarker m_lookahead_marker;
     GazelleNext m_gazelle_next;
+
+    Arrow linear_acceleration_arrow;
 
     LineCloud m_path_line_cloud;
     LineCloud m_guide_path_line_cloud;

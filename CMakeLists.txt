@@ -138,6 +138,7 @@ add_executable(app
   a_star/footprint/footprint.cpp
   a_star/footprint/footprint_visualizer.cpp
   autopilot/spherical_pose_marker.cpp
+  autopilot/arrow.cpp
   autopilot/gazelle_next.cpp
   autopilot/vehicle_command_sender.cpp
   autopilot/gamepad_controller.cpp

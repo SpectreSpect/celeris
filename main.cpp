@@ -79,6 +79,7 @@
 #include "autopilot/celeris_user_controller.h"
 #include "vulkan_self/vulkan_submit_context.h"
 #include "vulkan_self/keyboard_input_reciever.h"
+#include "autopilot/arrow.h"
 
 #include <algorithm>
 #include <exception>
@@ -313,11 +314,25 @@ int main() {
         skybox_exposure
     );
 
+    Arrow test_arrow(
+        engine,
+        mesh_manager,
+        material_instance_manager,
+        glm::vec4(1, 0, 0, 1),
+        10.0f,                          // length
+        5.0f,                           // line width in pixels
+        glm::vec3(0.0f, 3.0f, 0.0f),  // position above ground
+        glm::vec3(1.0f, 0.0f, 0.0f),  // direction
+        2.5f,                           // wing length
+        glm::radians(30.0f)             // wing angle to the main line
+    );
+
     Scene scene;
 
     scene.add(skybox);
-    scene.add(celeris_visualizer);
-    scene.add(voxel_grid.render_object());
+    // scene.add(celeris_visualizer);
+    // scene.add(voxel_grid.render_object());
+    scene.add(test_arrow);
 
     skybox.update(scene);
 
