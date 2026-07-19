@@ -253,19 +253,27 @@ std::vector<Vehicle::SimulationControlCandidate> Vehicle::find_best_simulation_c
         static_cast<size_t>(desc.steer_acceleration_samples)
     );
 
-    for (int speed_id = 0; speed_id < desc.speed_acceleration_samples; speed_id++) {
-        const float speed_acceleration = Utils::sample_symmetric_range(
-            m_max_acceleration,
-            speed_id,
-            desc.speed_acceleration_samples
-        );
+    for (int speed_id = 0; speed_id < desc.speed_acceleration_samples + 1; speed_id++) {
+        float speed_acceleration = 0.0f;
 
-        for (int steer_id = 0; steer_id < desc.steer_acceleration_samples; steer_id++) {
-            const float steer_acceleration = Utils::sample_symmetric_range(
-                m_max_steer_acceleration,
-                steer_id,
-                desc.steer_acceleration_samples
+        if (speed_id < desc.speed_acceleration_samples && desc.speed_acceleration_samples % 2 != 0) {
+            speed_acceleration = Utils::sample_symmetric_range(
+                m_max_acceleration,
+                speed_id,
+                desc.speed_acceleration_samples
             );
+        }
+
+        for (int steer_id = 0; steer_id < desc.steer_acceleration_samples + 1; steer_id++) {
+            float steer_acceleration = 0.0f;
+
+            if (steer_id < desc.steer_acceleration_samples && desc.steer_acceleration_samples % 2 != 0) {
+                steer_acceleration = Utils::sample_symmetric_range(
+                    m_max_steer_acceleration,
+                    steer_id,
+                    desc.steer_acceleration_samples
+                );
+            }
 
             VehicleTransformState predicted_state = state;
             std::vector<glm::vec2> trajectory;
@@ -1519,6 +1527,7 @@ float Vehicle::compute_simulation_loss_test(
 
     double total_slowdown_loss = 0.0f;
     double total_cruise_speed_loss = 0.0f;
+    double total_potental_grad_loss = 0.0f;
 
     double previous_slowdown_loss = compute_slowdown_loss(
         state,
@@ -1542,6 +1551,9 @@ float Vehicle::compute_simulation_loss_test(
         vehicle_projection.dist + m_path_potential_params.additional_radius
     );
 
+    float previous_potential = start_potential;
+    float end_potential = 0.0f;
+
     float trajectory_length = 0.0f;
     glm::vec2 previous_trajectory_position = state.m_position;
 
@@ -1560,6 +1572,20 @@ float Vehicle::compute_simulation_loss_test(
         );
         const double cruise_speed_loss = compute_cruise_speed_loss(state);
 
+        end_potential = evaluate_path_potential(
+            state,
+            path,
+            path_arc_lengths,
+            initial_projection_min_s,
+            initial_projection_max_s,
+            speed_acceleration,
+            steer_acceleration,
+            vehicle_projection.dist + m_path_potential_params.additional_radius
+        );
+
+        total_potental_grad_loss += (end_potential - previous_potential) * step_dt;
+        previous_potential = end_potential;
+
         total_slowdown_loss += (previous_slowdown_loss + speed_loss) * step_dt / 2.0;
         total_cruise_speed_loss += (previous_cruise_speed_loss + cruise_speed_loss) * step_dt / 2.0;
 
@@ -1571,23 +1597,21 @@ float Vehicle::compute_simulation_loss_test(
         if (trajectory) {
             trajectory->push_back(state.m_position);
         }
+
+        const PointProjection state_projection = find_path_projection(
+            state,
+            path,
+            path_arc_lengths,
+            initial_projection_min_s,
+            initial_projection_max_s
+        );
+
         time += step_dt;
     }
 
-    float end_potential = evaluate_path_potential(
-        state,
-        path,
-        path_arc_lengths,
-        initial_projection_min_s,
-        initial_projection_max_s,
-        speed_acceleration,
-        steer_acceleration,
-        vehicle_projection.dist + m_path_potential_params.additional_radius
-    );
-
     const double potential_loss = end_potential - start_potential;
     const float loss = 
-        potential_loss + 
+        (potential_loss - total_potental_grad_loss) +
         total_slowdown_loss * m_loss_weights.slowdown_speed +
         total_cruise_speed_loss * m_loss_weights.cruise_speed;
 

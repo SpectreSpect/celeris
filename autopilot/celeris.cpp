@@ -1710,7 +1710,7 @@ void Celeris::visualize_active_path_potential() {
                     active_segment_max_s,
                     visualization_control.speed_acceleration,
                     visualization_control.steer_acceleration,
-                    vehicle_projection.dist
+                    vehicle_projection.dist + mpc_vehicle().path_potential_params().additional_radius
                 );
                 if (!std::isfinite(potential))
                     continue;

@@ -338,7 +338,7 @@ namespace Utils {
         if (sample_count <= 1 || max_abs_value <= eps) {
             return 0.0f;
         }
-
+        
         const float t = static_cast<float>(sample_id) / static_cast<float>(sample_count - 1);
         return -max_abs_value + 2.0f * max_abs_value * t;
     }

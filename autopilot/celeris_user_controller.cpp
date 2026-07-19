@@ -68,6 +68,8 @@ void CelerisUserController::update(
         start_path_planning();
     if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_4))
         move_start_to_vehicle();
+    if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_5))
+        m_celeris->visualize_active_path_potential();
     if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_T))
         add_directional_waypoint(camera);
     if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_G))

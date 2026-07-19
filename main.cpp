@@ -148,7 +148,7 @@ int main() {
         compute_pass_manager
     );
 
-    glm::vec3 voxel_size(0.5f);
+    glm::vec3 voxel_size(1.0f);
     uint32_t vertical_inflation_size =
         static_cast<uint32_t>(std::ceil(vehicle_geometry.size.y / voxel_size.y));
     uint32_t horizontal_inflation_size =
