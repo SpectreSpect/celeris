@@ -171,13 +171,18 @@ double GICPPass::fit(
     VulkanBuffer& source_normal_buffer,
     uint32_t max_steps,
     bool log_failures) {
+    double prev_rmse = 0;
     double rmse = 0;
     for (int i = 0; i < max_steps; i++) {
         rmse = step(voxel_point_map, source_point_cloud, source_normal_buffer, log_failures);
-        if (rmse < 0.5) {
+
+        float rmse_diff = std::abs(prev_rmse - rmse);
+
+        // std::cout << "Step: " << i << "     rmse: " << rmse << std::endl;
+        if (rmse < 0.5 || rmse_diff < rmse_min_diff) {
             break;
         }
-            
+        prev_rmse = rmse;
     }
 
     return rmse;

@@ -20,7 +20,7 @@ public:
         PointCloudPreprocessor& point_cloud_preprocessor,
         uint16_t port = 5000,
         size_t max_queued_frames = 3,
-        uint32_t points_freq = 1
+        uint32_t points_freq = 10
     );
     ~LidarScanReceiver();
 

@@ -211,11 +211,11 @@ bool VehicleCommandSender::send_command(
     int socket,
     const VehicleCommand& command) const
 {
-    std::cout << "Command sent.    acceleration: " 
-        << command.acceleration 
-        << "     steering_angle_velocity: " 
-        << command.steering_angle_velocity 
-        << std::endl;
+    // std::cout << "Command sent.    acceleration: " 
+    //     << command.acceleration 
+    //     << "     steering_angle_velocity: " 
+    //     << command.steering_angle_velocity 
+    //     << std::endl;
     // Wire format: two IEEE-754 float32 values in little-endian order:
     // acceleration followed by steering_angle_velocity.
     std::array<uint8_t, 8> packet{};

@@ -60,8 +60,12 @@ public:
         bool log_failures = true
     );
 
+    double rmse_min_diff = 0.01f;
+
 private:
     uint32_t max_partial_count = 1000000;
+
+    
 
     VulkanEngine& engine;
 

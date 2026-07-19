@@ -425,33 +425,36 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
 
     sync_path_planner_result();
 
-    local_planner().update_timestamp();
+    // // local_planner().update_timestamp();
 
-    VehicleFeedback vehicle_feedback;
-    const bool has_vehicle_feedback =
-        m_vehicle_state_receiver.latest_feedback(vehicle_feedback) &&
-        is_vehicle_feedback_fresh(vehicle_feedback);
-    if (has_vehicle_feedback) {
-        apply_vehicle_feedback(vehicle_feedback);
-    }
-    if (m_gamepad_commands_enabled) {
-        const float delta_time = local_planner().calculate_delta_time();
-        if (delta_time > 0.0f) {
-            vehicle().state().m_steering_angle_velocity =
-                m_gamepad_command.steering_angle_velocity;
-            vehicle().simulate_vehicle(
-                m_gamepad_command.acceleration,
-                0.0f,
-                delta_time,
-                std::min(delta_time, 0.05f),
-                false
-            );
-        }
-    } else {
-        local_planner().predict_vehicle_state(vehicle());
-    }
+    // // VehicleFeedback vehicle_feedback;
+    // // const bool has_vehicle_feedback =
+    // //     m_vehicle_state_receiver.latest_feedback(vehicle_feedback) &&
+    // //     is_vehicle_feedback_fresh(vehicle_feedback);
+    // // if (has_vehicle_feedback) {
+    // //     apply_vehicle_feedback(vehicle_feedback);
+    // // }
 
-    float vehicle_height = m_vehicle_position.pos.y;
+
+
+    // // if (m_gamepad_commands_enabled) {
+    // //     const float delta_time = local_planner().calculate_delta_time();
+    // //     if (delta_time > 0.0f) {
+    // //         vehicle().state().m_steering_angle_velocity =
+    // //             m_gamepad_command.steering_angle_velocity;
+    // //         vehicle().simulate_vehicle(
+    // //             m_gamepad_command.acceleration,
+    // //             0.0f,
+    // //             delta_time,
+    // //             std::min(delta_time, 0.05f),
+    // //             false
+    // //         );
+    // //     }
+    // // } else {
+    // //     local_planner().predict_vehicle_state(vehicle());
+    // // }
+
+    // float vehicle_height = m_vehicle_position.pos.y;
 
     if (auto scan = m_scan_receiver.try_pop_scan(*m_manager_bundle)) {
         const bool has_scan_acceleration = scan->has_linear_acceleration_engine();
@@ -464,7 +467,6 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
             m_retired_network_scans.push_back(std::move(m_network_scan));
 
         m_network_scan = std::move(scan);
-        // std::cout << "Received scan #" << m_received_scan_count << std::endl;
 
         while (m_retired_network_scans.size() > m_engine->num_frames_in_flight())
             m_retired_network_scans.pop_front();
@@ -481,35 +483,33 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         //     scan_index_count
         // );
 
-        // m_network_scan
+        // float scan_dt = 0.0f;
+        // if (m_has_previous_corrected_lidar_pose &&
+        //     scan_timestamp_ns > m_previous_corrected_lidar_timestamp_ns) {
+        //     scan_dt = static_cast<float>(
+        //         static_cast<double>(scan_timestamp_ns - m_previous_corrected_lidar_timestamp_ns) * 1e-9
+        //     );
+        // }
 
-        float scan_dt = 0.0f;
-        if (m_has_previous_corrected_lidar_pose &&
-            scan_timestamp_ns > m_previous_corrected_lidar_timestamp_ns) {
-            scan_dt = static_cast<float>(
-                static_cast<double>(scan_timestamp_ns - m_previous_corrected_lidar_timestamp_ns) * 1e-9
-            );
-        }
+        // const bool valid_scan_dt =
+        //     scan_dt > 0.0f &&
+        //     scan_dt <= std::max(0.0f, m_desc.lidar_accel_max_dt);
 
-        const bool valid_scan_dt =
-            scan_dt > 0.0f &&
-            scan_dt <= std::max(0.0f, m_desc.lidar_accel_max_dt);
+        // auto scan_acceleration_engine = [&]() {
+        //     const glm::vec3 acceleration_engine =
+        //         glm::normalize(raw_rotation) * scan_acceleration_engine_local;
 
-        auto scan_acceleration_engine = [&]() {
-            const glm::vec3 acceleration_engine =
-                glm::normalize(raw_rotation) * scan_acceleration_engine_local;
+        //     if (!m_has_lidar_gravity_engine) {
+        //         m_lidar_gravity_engine = acceleration_engine;
+        //         m_has_lidar_gravity_engine = true;
+        //     }
 
-            if (!m_has_lidar_gravity_engine) {
-                m_lidar_gravity_engine = acceleration_engine;
-                m_has_lidar_gravity_engine = true;
-            }
+        //     return acceleration_engine - m_lidar_gravity_engine;
+        // };
 
-            return acceleration_engine - m_lidar_gravity_engine;
-        };
-
-        if (has_scan_acceleration && !m_has_lidar_gravity_engine) {
-            (void)scan_acceleration_engine();
-        }
+        // if (has_scan_acceleration && !m_has_lidar_gravity_engine) {
+        //     (void)scan_acceleration_engine();
+        // }
 
         if (!m_has_previous_lidar_pose) {
             if (m_has_start_lidar_scan_position) {
@@ -524,91 +524,93 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
 
             m_has_previous_lidar_pose = true;
         } else {
-            if (glm::dot(m_previous_lidar_rotation, raw_rotation) < 0.0f)
-                raw_rotation = -raw_rotation;
 
-            glm::vec3 delta_position = raw_position - m_previous_lidar_position;
-            glm::quat delta_rotation = glm::normalize(raw_rotation * glm::inverse(m_previous_lidar_rotation));
+            m_network_scan->point_cloud().transform.position = m_previous_lidar_position;
+            m_network_scan->point_cloud().transform.rotation = m_previous_lidar_rotation;
+            
 
-            const glm::vec3 previous_map_position = m_has_previous_corrected_lidar_pose
-                ? m_previous_corrected_lidar_position
-                : glm::vec3(0.0f);
-            const glm::quat previous_map_rotation = m_has_previous_corrected_lidar_pose
-                ? glm::normalize(m_previous_corrected_lidar_rotation)
-                : glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+            // if (glm::dot(m_previous_lidar_rotation, raw_rotation) < 0.0f)
+            //     raw_rotation = -raw_rotation;
 
-            bool used_acceleration_prediction = false;
-            if (m_desc.lidar_accel_prediction_enabled &&
-                has_scan_acceleration &&
-                m_has_previous_corrected_lidar_pose &&
-                valid_scan_dt) {
-                glm::vec3 acceleration_engine = scan_acceleration_engine();
-                acceleration_engine = clamp_length(
-                    acceleration_engine,
-                    std::max(0.0f, m_desc.lidar_accel_max_mps2)
-                );
+            // glm::vec3 delta_position = raw_position - m_previous_lidar_position;
+            // glm::quat delta_rotation = glm::normalize(raw_rotation * glm::inverse(m_previous_lidar_rotation));
 
-                m_lidar_velocity = clamp_length(
-                    m_lidar_velocity + acceleration_engine * scan_dt,
-                    std::max(0.0f, m_desc.lidar_velocity_max_mps)
-                );
+            // const glm::vec3 previous_map_position = m_has_previous_corrected_lidar_pose
+            //     ? m_previous_corrected_lidar_position
+            //     : glm::vec3(0.0f);
+            // const glm::quat previous_map_rotation = m_has_previous_corrected_lidar_pose
+            //     ? glm::normalize(m_previous_corrected_lidar_rotation)
+            //     : glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
-                m_network_scan->point_cloud().transform.position =
-                    previous_map_position + m_lidar_velocity * scan_dt;
-                m_network_scan->point_cloud().transform.rotation =
-                    glm::normalize(delta_rotation * previous_map_rotation);
-                used_acceleration_prediction = true;
-            }
+            // bool used_acceleration_prediction = false;
+            // if (m_desc.lidar_accel_prediction_enabled &&
+            //     has_scan_acceleration &&
+            //     m_has_previous_corrected_lidar_pose &&
+            //     valid_scan_dt) {
+            //     glm::vec3 acceleration_engine = scan_acceleration_engine();
+            //     acceleration_engine = clamp_length(
+            //         acceleration_engine,
+            //         std::max(0.0f, m_desc.lidar_accel_max_mps2)
+            //     );
 
-            if (!used_acceleration_prediction) {
-                m_network_scan->point_cloud().transform.position = previous_map_position + delta_position;
-                m_network_scan->point_cloud().transform.rotation = glm::normalize(delta_rotation * previous_map_rotation);
-            }
+            //     m_lidar_velocity = clamp_length(
+            //         m_lidar_velocity + acceleration_engine * scan_dt,
+            //         std::max(0.0f, m_desc.lidar_velocity_max_mps)
+            //     );
+
+            //     m_network_scan->point_cloud().transform.position =
+            //         previous_map_position + m_lidar_velocity * scan_dt;
+            //     m_network_scan->point_cloud().transform.rotation =
+            //         glm::normalize(delta_rotation * previous_map_rotation);
+            //     used_acceleration_prediction = true;
+            // }
+
+            // if (!used_acceleration_prediction) {
+            //     m_network_scan->point_cloud().transform.position = previous_map_position + delta_position;
+            //     m_network_scan->point_cloud().transform.rotation = glm::normalize(delta_rotation * previous_map_rotation);
+            // }
         }
 
-        // if (!m_needs_map_localization && m_voxel_point_map.map_point_count() > 0u) {
         if (m_voxel_point_map.map_point_count() > 0u) {
-            // std::cout << "FIT" << std::endl;
-
             m_gicp_pass.fit(m_voxel_point_map,
                             m_network_scan->point_cloud(),
                             m_network_scan->normal_buffer(),
                             m_desc.max_gicp_iterations);
         }
 
-        const glm::vec3 corrected_lidar_position =
-            m_network_scan->point_cloud().transform.position;
-        const glm::quat corrected_lidar_rotation =
-            glm::normalize(m_network_scan->point_cloud().transform.rotation);
+        // const glm::vec3 corrected_lidar_position =
+        //     m_network_scan->point_cloud().transform.position;
+        // const glm::quat corrected_lidar_rotation =
+        //     glm::normalize(m_network_scan->point_cloud().transform.rotation);
 
-        if (m_has_previous_corrected_lidar_pose && valid_scan_dt) {
-            m_lidar_velocity = clamp_length(
-                (corrected_lidar_position - m_previous_corrected_lidar_position) / scan_dt,
-                std::max(0.0f, m_desc.lidar_velocity_max_mps)
-            );
-        }
+        // if (m_has_previous_corrected_lidar_pose && valid_scan_dt) {
+        //     m_lidar_velocity = clamp_length(
+        //         (corrected_lidar_position - m_previous_corrected_lidar_position) / scan_dt,
+        //         std::max(0.0f, m_desc.lidar_velocity_max_mps)
+        //     );
+        // }
 
-        m_previous_corrected_lidar_position = corrected_lidar_position;
-        m_previous_corrected_lidar_rotation = corrected_lidar_rotation;
-        m_previous_corrected_lidar_timestamp_ns = scan_timestamp_ns;
-        m_has_previous_corrected_lidar_pose = true;
+        // m_previous_corrected_lidar_position = corrected_lidar_position;
+        // m_previous_corrected_lidar_rotation = corrected_lidar_rotation;
+        // m_previous_corrected_lidar_timestamp_ns = scan_timestamp_ns;
+        // m_has_previous_corrected_lidar_pose = true;
         
         m_lidar_transform = m_network_scan->point_cloud().transform;
-        const Transform vehicle_transform = rear_axle_transform_from_lidar_transform(m_lidar_transform);
-        NonholonomicPos vehicle_pose;
-        vehicle_pose.from_transform(vehicle_transform);
-        vehicle_height = vehicle_transform.position.y;
+        // const Transform vehicle_transform = rear_axle_transform_from_lidar_transform(m_lidar_transform);
+        // NonholonomicPos vehicle_pose;
+        // vehicle_pose.from_transform(vehicle_transform);
+        // vehicle_height = vehicle_transform.position.y;
 
-        const glm::quat vehicle_rotation = glm::normalize(vehicle_transform.rotation);
-        const glm::vec3 vehicle_forward = vehicle_rotation * glm::vec3(-1.0f, 0.0f, 0.0f);
-        const float vehicle_heading = std::atan2(vehicle_forward.z, vehicle_forward.x);
+        // const glm::quat vehicle_rotation = glm::normalize(vehicle_transform.rotation);
+        // const glm::vec3 vehicle_forward = vehicle_rotation * glm::vec3(-1.0f, 0.0f, 0.0f);
+        // const float vehicle_heading = std::atan2(vehicle_forward.z, vehicle_forward.x);
 
-        // Корректируем позу машины по lidar/GICP. Скорость и руль приходят отдельно.
-        vehicle().state().m_position = glm::vec2{
-            vehicle_transform.position.x,
-            vehicle_transform.position.z
-        };
-        vehicle().state().m_heading = vehicle_heading;
+        // // Корректируем позу машины по lidar/GICP. Скорость и руль приходят отдельно.
+        // vehicle().state().m_position = glm::vec2{
+        //     vehicle_transform.position.x,
+        //     vehicle_transform.position.z
+        // };
+        // vehicle().state().m_heading = vehicle_heading;
 
         // //=====================
         m_voxel_map_inserter.insert(m_voxel_point_map, m_network_scan->point_cloud(), m_network_scan->normal_buffer());
@@ -621,50 +623,51 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
         );
         // //=====================
 
-        const glm::vec3 collision_raw_position = vehicle_pose.pos;
+        // const glm::vec3 collision_raw_position = vehicle_pose.pos;
 
-        collision(
-            m_collision_raw_position_history,
-            vehicle_pose.pos
-        );
-        remember_collision_raw_position(collision_raw_position);
+        // collision(
+        //     m_collision_raw_position_history,
+        //     vehicle_pose.pos
+        // );
+        // remember_collision_raw_position(collision_raw_position);
 
-        sync_vehicle_position_from_state(vehicle_height);
-        update_waypoint_navigation();
+        // sync_vehicle_position_from_state(vehicle_height);
+        // update_waypoint_navigation();
 
-        if (!m_waypoint_path_completed && has_planned_path() && is_path_impended(submit_context))
-            request_path_replan();
+        // if (!m_waypoint_path_completed && has_planned_path() && is_path_impended(submit_context))
+        //     request_path_replan();
 
-        m_previous_lidar_position = raw_position;
-        m_previous_lidar_rotation = raw_rotation;
+        m_previous_lidar_position = m_network_scan->point_cloud().transform.position;
+        m_previous_lidar_rotation = m_network_scan->point_cloud().transform.rotation;
+
         m_received_scan_count++;
     }
 
-    sync_vehicle_position_from_state(vehicle_height);
+    // sync_vehicle_position_from_state(vehicle_height);
 
-    const auto now = std::chrono::steady_clock::now();
-    const float local_planner_update_period = std::max(0.0f, m_desc.local_planner_update_period);
-    const bool should_update_local_planner =
-        !m_has_last_local_planner_update_timestamp ||
-        local_planner_update_period <= 0.0f ||
-        std::chrono::duration<float>(now - m_last_local_planner_update_timestamp).count() >=
-            local_planner_update_period;
+    // const auto now = std::chrono::steady_clock::now();
+    // const float local_planner_update_period = std::max(0.0f, m_desc.local_planner_update_period);
+    // const bool should_update_local_planner =
+    //     !m_has_last_local_planner_update_timestamp ||
+    //     local_planner_update_period <= 0.0f ||
+    //     std::chrono::duration<float>(now - m_last_local_planner_update_timestamp).count() >=
+    //         local_planner_update_period;
 
-    if (should_update_local_planner) {
-        VehicleCommand vehicle_command;
-        if (!m_waypoint_path_completed || m_waypoint_path.waypoints().empty()) {
-            vehicle_command = local_planner().step(
-                vehicle(),
-                m_path_intersection_detector,
-                submit_context
-            );
-        }
+    // if (should_update_local_planner) {
+    //     VehicleCommand vehicle_command;
+    //     if (!m_waypoint_path_completed || m_waypoint_path.waypoints().empty()) {
+    //         vehicle_command = local_planner().step(
+    //             vehicle(),
+    //             m_path_intersection_detector,
+    //             submit_context
+    //         );
+    //     }
 
-        if (!m_gamepad_commands_enabled)
-            m_command_sender.set_command(vehicle_command);
-        m_last_local_planner_update_timestamp = now;
-        m_has_last_local_planner_update_timestamp = true;
-    }
+    //     if (!m_gamepad_commands_enabled)
+    //         m_command_sender.set_command(vehicle_command);
+    //     m_last_local_planner_update_timestamp = now;
+    //     m_has_last_local_planner_update_timestamp = true;
+    // }
 }
 
 void Celeris::apply_vehicle_feedback(const VehicleFeedback& feedback) {

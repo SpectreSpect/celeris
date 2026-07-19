@@ -401,7 +401,8 @@ void CelerisVisualizer::set_gazelle_pose(const NonholonomicPos& nonholonomic_pos
 void CelerisVisualizer::set_gazelle_lidar_transform(const Transform& lidar_transform) {
     Transform visual_lidar_transform = lidar_transform;
     visual_lidar_transform.position += marker_vertical_offset();
-    m_gazelle_next.transform = visual_lidar_transform;
+    m_gazelle_next.set_lidar_transform(visual_lidar_transform);
+    // m_gazelle_next.transform = visual_lidar_transform;
 }
 
 void CelerisVisualizer::reset_marker_interpolation(
