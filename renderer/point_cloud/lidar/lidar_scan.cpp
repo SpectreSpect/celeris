@@ -95,48 +95,24 @@ uint64_t LidarScan::timestamp_ns() const noexcept {
     return m_timestamp_ns;
 }
 
-bool LidarScan::has_linear_acceleration_ros() const noexcept {
-    return m_has_linear_acceleration_ros;
-}
-
 glm::vec3 LidarScan::linear_acceleration_ros() const noexcept {
     return m_linear_acceleration_ros;
-}
-
-bool LidarScan::has_linear_acceleration_engine() const noexcept {
-    return m_has_linear_acceleration_engine;
 }
 
 glm::vec3 LidarScan::linear_acceleration_engine() const noexcept {
     return m_linear_acceleration_engine;
 }
 
-bool LidarScan::has_angular_velocity_ros() const noexcept {
-    return m_has_angular_velocity_ros;
-}
-
 glm::vec3 LidarScan::angular_velocity_ros() const noexcept {
     return m_angular_velocity_ros;
-}
-
-bool LidarScan::has_angular_velocity_engine() const noexcept {
-    return m_has_angular_velocity_engine;
 }
 
 glm::vec3 LidarScan::angular_velocity_engine() const noexcept {
     return m_angular_velocity_engine;
 }
 
-bool LidarScan::has_orientation_ros() const noexcept {
-    return m_has_orientation_ros;
-}
-
 glm::quat LidarScan::orientation_ros() const noexcept {
     return m_orientation_ros;
-}
-
-bool LidarScan::has_orientation_engine() const noexcept {
-    return m_has_orientation_engine;
 }
 
 glm::quat LidarScan::orientation_engine() const noexcept {
@@ -210,17 +186,11 @@ PointCloud LidarScan::load_from_file(ManagerBundle& manager_bundle, const std::f
 
 PointCloud LidarScan::load_from_frame(ManagerBundle& manager_bundle, FrameData&& frame) {
     m_timestamp_ns = frame.timestamp_ns;
-    m_has_linear_acceleration_ros = false;
     m_linear_acceleration_ros = glm::vec3(0.0f);
-    m_has_linear_acceleration_engine = false;
     m_linear_acceleration_engine = glm::vec3(0.0f);
-    m_has_angular_velocity_ros = false;
     m_angular_velocity_ros = glm::vec3(0.0f);
-    m_has_angular_velocity_engine = false;
     m_angular_velocity_engine = glm::vec3(0.0f);
-    m_has_orientation_ros = false;
     m_orientation_ros = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-    m_has_orientation_engine = false;
     m_orientation_engine = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
     if (!frame.sample_linear_accelerations_ros.empty()) {
@@ -240,9 +210,7 @@ PointCloud LidarScan::load_from_frame(ManagerBundle& manager_bundle, FrameData&&
 
         if (valid_count > 0u) {
             m_linear_acceleration_ros = sum / static_cast<float>(valid_count);
-            m_has_linear_acceleration_ros = true;
             m_linear_acceleration_engine = ros_pos_to_engine(m_linear_acceleration_ros);
-            m_has_linear_acceleration_engine = true;
         }
     }
 
@@ -259,9 +227,7 @@ PointCloud LidarScan::load_from_frame(ManagerBundle& manager_bundle, FrameData&&
         }
         if (valid_count > 0u) {
             m_angular_velocity_ros = sum / static_cast<float>(valid_count);
-            m_has_angular_velocity_ros = true;
             m_angular_velocity_engine = ros_pos_to_engine(m_angular_velocity_ros);
-            m_has_angular_velocity_engine = true;
         }
     }
 
@@ -273,11 +239,9 @@ PointCloud LidarScan::load_from_frame(ManagerBundle& manager_bundle, FrameData&&
             }
         }
         m_orientation_ros = glm::normalize(frame.sample_orientations_ros[reference_index]);
-        m_has_orientation_ros = true;
         m_orientation_engine = glm::quat_cast(
             ros_rotation_to_engine(glm::mat3_cast(m_orientation_ros))
         );
-        m_has_orientation_engine = true;
     }
 
     if (frame.points.empty()) {

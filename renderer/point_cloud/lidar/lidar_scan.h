@@ -122,17 +122,11 @@ public:
 
     void set_timestamp_ns(uint64_t timestamp_ns);
     uint64_t timestamp_ns() const noexcept;
-    bool has_linear_acceleration_ros() const noexcept;
     glm::vec3 linear_acceleration_ros() const noexcept;
-    bool has_linear_acceleration_engine() const noexcept;
     glm::vec3 linear_acceleration_engine() const noexcept;
-    bool has_angular_velocity_ros() const noexcept;
     glm::vec3 angular_velocity_ros() const noexcept;
-    bool has_angular_velocity_engine() const noexcept;
     glm::vec3 angular_velocity_engine() const noexcept;
-    bool has_orientation_ros() const noexcept;
     glm::quat orientation_ros() const noexcept;
-    bool has_orientation_engine() const noexcept;
     glm::quat orientation_engine() const noexcept;
 
     static glm::vec3 ros_pos_to_engine(const glm::vec3& p_ros);
@@ -144,17 +138,11 @@ public:
 
 private:
     uint64_t m_timestamp_ns = 0;
-    bool m_has_linear_acceleration_ros = false;
     glm::vec3 m_linear_acceleration_ros{0.0f};
-    bool m_has_linear_acceleration_engine = false;
     glm::vec3 m_linear_acceleration_engine{0.0f};
-    bool m_has_angular_velocity_ros = false;
     glm::vec3 m_angular_velocity_ros{0.0f};
-    bool m_has_angular_velocity_engine = false;
     glm::vec3 m_angular_velocity_engine{0.0f};
-    bool m_has_orientation_ros = false;
     glm::quat m_orientation_ros{1.0f, 0.0f, 0.0f, 0.0f};
-    bool m_has_orientation_engine = false;
     glm::quat m_orientation_engine{1.0f, 0.0f, 0.0f, 0.0f};
     
     std::vector<PointInstance> m_points;
