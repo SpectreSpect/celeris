@@ -221,78 +221,60 @@ void LidarScanReceiver::receive_loop() {
 }
 
 bool LidarScanReceiver::receive_frames_from_client(int client_socket) {
+    LOG_METHOD();
+
     while (m_running.load()) {
         LidarScan::FrameData frame;
-        uint32_t point_count_header = 0;
 
-        if (!read_exact(client_socket, &frame.timestamp_ns, sizeof(frame.timestamp_ns))) {
+        LidarScanMessageHeader header;
+
+        if (!read_exact(client_socket, &header, sizeof(LidarScanMessageHeader)))
             return false;
-        }
+        
+        frame.timestamp_ns = header.timestamp_ns;
 
-        if (!read_exact(client_socket, &point_count_header, sizeof(point_count_header))) {
-            return false;
-        }
-
-        const uint32_t point_count = point_count_header;
+        const uint32_t point_count = header.point_count;
 
         if (point_count == 0 || point_count > max_points_per_frame) {
-            std::cerr << "LidarScanReceiver: invalid point count " << point_count << "\n";
+            logger().log_error("invalid point count");
             return false;
         }
 
-        const size_t point_stride_bytes = imu_floats_per_scan_point * sizeof(float);
-        std::vector<uint8_t> payload(static_cast<size_t>(point_count) * point_stride_bytes);
-        if (!read_exact(client_socket, payload.data(), payload.size())) {
+        std::vector<PointData> message_points(point_count);
+        if (!read_exact(
+            client_socket, 
+            message_points.data(), 
+            message_points.size() * sizeof(PointData))) {
             return false;
         }
 
-        frame.ring_count = 16;
+        frame.ring_count = m_ring_count;
 
         frame.samples.resize(point_count / m_points_freq);
         frame.sample_orientations.resize(frame.samples.size());
         frame.sample_linear_accelerations.resize(frame.samples.size());
         frame.sample_angular_velocities.resize(frame.samples.size());
-
         
-        // save_retrieved_scan(payload.data(), payload.size(), "/home/hiber/repositories/celeris/assets/lidar_scans/lslidar_scan.bin");
-
-        const uint8_t* p = payload.data();
-
         uint32_t valid_count = 0;
 
         for (uint32_t i = 0; i < point_count / m_points_freq; ++i) {
-            float x, y, z;
-            float time;
-            float qx, qy, qz, qw;
-            float ax, ay, az;
-            float wx, wy, wz;
+            uint32_t point_id = i * m_points_freq;
+            PointData& point_data = message_points[point_id];
 
-            const uint8_t* local_p = p;
-            std::memcpy(&x,     local_p, 4); local_p += 4;
-            std::memcpy(&y,     local_p, 4); local_p += 4;
-            std::memcpy(&z,     local_p, 4); local_p += 4;
-            std::memcpy(&time,  local_p, 4); local_p += 4;
-            std::memcpy(&ax, local_p, 4); local_p += 4;
-            std::memcpy(&ay, local_p, 4); local_p += 4;
-            std::memcpy(&az, local_p, 4); local_p += 4;
-            std::memcpy(&wx, local_p, 4); local_p += 4;
-            std::memcpy(&wy, local_p, 4); local_p += 4;
-            std::memcpy(&wz, local_p, 4); local_p += 4;
-            std::memcpy(&qx, local_p, 4); local_p += 4;
-            std::memcpy(&qy, local_p, 4); local_p += 4;
-            std::memcpy(&qz, local_p, 4); local_p += 4;
-            std::memcpy(&qw, local_p, 4); local_p += 4;
-            p += point_stride_bytes * m_points_freq;
-
-            frame.sample_linear_accelerations[i] = glm::vec3(ax, ay, az);
-            frame.sample_angular_velocities[i] = glm::vec3(wx, wy, wz);
-            frame.sample_orientations[i] = normalized_quat_or_identity(qx, qy, qz, qw);
-
-            // std::cout << "Point: " << time << std::endl;
-
-            frame.samples[i].p_local = glm::vec3(x, y, z);
-            frame.samples[i].time = time;
-            frame.samples[i].valid = std::isfinite(x) && std::isfinite(y) && std::isfinite(z);
+            frame.sample_linear_accelerations[i] = point_data.linear_acceleration;
+            frame.sample_angular_velocities[i] = point_data.angular_velocity;
+            frame.sample_orientations[i] = normalized_quat_or_identity(
+                point_data.orientation.x,
+                point_data.orientation.y,
+                point_data.orientation.z,
+                point_data.orientation.w
+            );
+            frame.samples[i].p_local = point_data.position;
+            frame.samples[i].time = point_data.point_time;
+            frame.samples[i].valid = 
+                std::isfinite(point_data.position.x) && 
+                std::isfinite(point_data.position.y) && 
+                std::isfinite(point_data.position.z);
 
             if (frame.samples[i].valid)
                 valid_count++;

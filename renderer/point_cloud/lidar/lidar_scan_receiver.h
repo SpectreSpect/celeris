@@ -11,11 +11,30 @@
 #include <thread>
 #include <iostream>
 
+#include "../../../vulkan_self/logger/logger_header.h"
+
 class ManagerBundle;
 class PointCloudPreprocessor;
 
 class LidarScanReceiver {
 public:
+    _XCLASS_NAME(LidarScanReceiver);
+
+    struct LidarScanMessageHeader {
+        uint64_t timestamp_ns;
+        uint32_t point_count;      
+    };
+
+    struct PointData
+    {
+        glm::vec3 position;
+        float point_time;
+
+        glm::vec3 linear_acceleration;
+        glm::vec3 angular_velocity;
+        glm::vec4 orientation;
+    };
+
     explicit LidarScanReceiver(
         PointCloudPreprocessor& point_cloud_preprocessor,
         uint16_t port = 5000,
@@ -42,6 +61,7 @@ private:
     uint16_t m_port = 0;
     size_t m_max_queued_frames = 0;
     uint32_t m_points_freq = 1;
+    uint32_t m_ring_count = 16;
     PointCloudPreprocessor* m_point_cloud_preprocessor = nullptr;
     std::atomic<bool> m_running{false};
     int m_listen_socket = -1;
