@@ -80,6 +80,7 @@
 #include "vulkan_self/vulkan_submit_context.h"
 #include "vulkan_self/keyboard_input_reciever.h"
 #include "autopilot/arrow.h"
+#include "autopilot/sensors/imu/imu_receiver.h"
 
 #include <algorithm>
 #include <exception>
@@ -287,6 +288,10 @@ int main() {
         }
     );
 
+    ImuReceiver imu_receiver(5003, 1);
+    imu_receiver.start();
+
+
     // celeris.set_vehicle_command(VehicleCommand{
     //     .acceleration = 0.5f,
     //     .steering_angle_velocity = 0.5f
@@ -367,6 +372,11 @@ int main() {
             skybox.set_environment_map_id(pending_skybox_environment_map_id);
             skybox.update(scene);
             skybox_environment_update_pending = false;
+        }
+
+        ImuReceiver::ImuMessage imu_message{};
+        if (imu_receiver.try_pop_back_imu_message(imu_message)) {
+            std::cout << "Received IMU message!" << std::endl;
         }
 
         float current_frame_time = (float)glfwGetTime() - start_time;

@@ -159,6 +159,7 @@ add_executable(app
   a_star/pure_pursuit_local_planner.cpp
   vulkan_self/keyboard_input_reciever.cpp
   autopilot/celeris_user_controller.cpp
+  autopilot/sensors/imu/imu_receiver.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
