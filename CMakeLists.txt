@@ -160,6 +160,7 @@ add_executable(app
   vulkan_self/keyboard_input_reciever.cpp
   autopilot/celeris_user_controller.cpp
   autopilot/sensors/imu/imu_receiver.cpp
+  autopilot/odometry/odometry_estimator.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

@@ -11,16 +11,17 @@
 #include <glm/vec4.hpp>
 
 #include "../../../vulkan_self/logger/logger_header.h"
+#include "imu_measurement.h"
 
 class ImuReceiver {
 public:
     _XCLASS_NAME(ImuReceiver);
 
-    struct ImuMessage {
-        glm::vec3 linear_acceleration;
-        glm::vec3 angular_velocity;
-        std::int64_t timestamp;
-    };
+    // struct ImuMessage {
+    //     glm::vec3 linear_acceleration;
+    //     glm::vec3 angular_velocity;
+    //     std::int64_t timestamp;
+    // };
 
     ImuReceiver(
         uint16_t port = 5003,
@@ -28,7 +29,7 @@ public:
     );
 
     void start();
-    bool try_pop_back_imu_message(ImuMessage& message);
+    bool try_pop_back_imu_message(ImuMeasurement& message);
     
 public:
     uint16_t m_port = 5003;
@@ -42,12 +43,12 @@ public:
     int m_listen_socket = -1;
     std::atomic<int> m_client_socket{-1};
 
-    std::deque<ImuMessage> m_imu_message_queue;
+    std::deque<ImuMeasurement> m_imu_message_queue;
     std::mutex m_imu_message_queue_mtx;
 
     void close_listen_socket();
     bool read_exact(int socket, void* data, size_t byte_count);
-    void push_back_imu_message(ImuMessage& message);
+    void push_back_imu_message(ImuMeasurement& message);
     bool receive_imu_from_client(int client_socket);
     void receiver_loop();
 };

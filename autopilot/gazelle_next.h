@@ -2,6 +2,7 @@
 
 #include "vehicle_geometry.h"
 
+#include "odometry/odometry.h"
 #include "../renderer/scene_object.h"
 #include "../renderer/render_object.h"
 #include "../renderer/transform.h"
@@ -43,6 +44,7 @@ public:
     void set_lidar_position(const glm::vec3& position);
     void set_lidar_rotation(const glm::quat& rotation);
     void set_lidar_transform(const Transform& lidar_transform);
+    void set_lidar_transform(const Odometry& odometry);
 
 private:
     glm::vec3 rear_axle_bottom_offset() const;

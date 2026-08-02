@@ -81,6 +81,8 @@
 #include "vulkan_self/keyboard_input_reciever.h"
 #include "autopilot/arrow.h"
 #include "autopilot/sensors/imu/imu_receiver.h"
+#include "autopilot/sensors/imu/imu_measurement.h"
+#include "autopilot/odometry/odometry_estimator.h"
 
 #include <algorithm>
 #include <exception>
@@ -288,6 +290,7 @@ int main() {
         }
     );
 
+    OdometryEstimator odometry_estimator;
     ImuReceiver imu_receiver(5003, 1);
     imu_receiver.start();
 
@@ -332,11 +335,14 @@ int main() {
         glm::radians(30.0f)             // wing angle to the main line
     );
 
+    GazelleNext test_gazelle_next(mesh_manager, material_instance_manager, vehicle_geometry, skybox_exposure);
+
     Scene scene;
 
     scene.add(skybox);
-    scene.add(celeris_visualizer);
-    scene.add(voxel_grid.render_object());
+    // scene.add(celeris_visualizer);
+    scene.add(test_gazelle_next);
+    // scene.add(voxel_grid.render_object());
     scene.add(test_arrow);
 
     skybox.update(scene);
@@ -374,9 +380,12 @@ int main() {
             skybox_environment_update_pending = false;
         }
 
-        ImuReceiver::ImuMessage imu_message{};
+        ImuMeasurement imu_message{};
         if (imu_receiver.try_pop_back_imu_message(imu_message)) {
-            std::cout << "Received IMU message!" << std::endl;
+            odometry_estimator.submit_imu(imu_message);
+
+            test_gazelle_next.set_lidar_transform(odometry_estimator.get_latest_odometry());
+            // std::cout << "Received IMU message!" << std::endl;
         }
 
         float current_frame_time = (float)glfwGetTime() - start_time;

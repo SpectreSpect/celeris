@@ -1,0 +1,20 @@
+#pragma once
+
+#include <deque>
+
+#include "../sensors/imu/imu_measurement.h"
+#include "odometry.h"
+
+class OdometryEstimator {
+public:
+    OdometryEstimator();
+
+    Odometry get_latest_odometry();
+
+    void submit_imu(const ImuMeasurement& imu_measurement);
+    void submit_lidar_scan();
+
+private:
+    std::deque<Odometry> m_history;
+    glm::vec3 m_gravity_world;
+};

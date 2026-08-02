@@ -190,6 +190,11 @@ void GazelleNext::set_lidar_transform(const Transform& lidar_transform) {
     set_lidar_position(lidar_transform.position);
 }
 
+void GazelleNext::set_lidar_transform(const Odometry& odometry) {
+    transform.rotation = odometry.orientation;
+    set_lidar_position(odometry.position);
+}
+
 glm::vec3 GazelleNext::rear_axle_world_offset() const {
     return glm::normalize(transform.rotation) * (rear_axle_bottom_offset() * transform.scale);
 }

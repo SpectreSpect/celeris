@@ -16,7 +16,7 @@ void ImuReceiver::start() {
     m_receiver_thread = std::thread(&ImuReceiver::receiver_loop, this);
 }
 
-bool ImuReceiver::try_pop_back_imu_message(ImuMessage& message) {
+bool ImuReceiver::try_pop_back_imu_message(ImuMeasurement& message) {
     {
         std::unique_lock<std::mutex> lock(m_imu_message_queue_mtx);
 
@@ -54,7 +54,7 @@ bool ImuReceiver::read_exact(int socket, void* data, size_t byte_count) {
     return bytes_read == byte_count;
 }
 
-void ImuReceiver::push_back_imu_message(ImuMessage& message) {
+void ImuReceiver::push_back_imu_message(ImuMeasurement& message) {
     {
         std::unique_lock<std::mutex> lock(m_imu_message_queue_mtx);
 
@@ -68,9 +68,9 @@ bool ImuReceiver::receive_imu_from_client(int client_socket) {
     LOG_METHOD();
 
     while (m_running.load()) {
-        ImuMessage imu_message{};
+        ImuMeasurement imu_message{};
 
-        if (!read_exact(client_socket, &imu_message, sizeof(ImuMessage)))
+        if (!read_exact(client_socket, &imu_message, sizeof(ImuMeasurement)))
             return false;
 
         push_back_imu_message(imu_message);
