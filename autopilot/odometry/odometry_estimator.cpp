@@ -1,5 +1,7 @@
 #include "odometry_estimator.h"
 
+#include <iostream>
+
 OdometryEstimator::OdometryEstimator() {
 }
 
@@ -34,6 +36,7 @@ void OdometryEstimator::submit_imu(const ImuMeasurement& imu_measurement) {
 
         if (angle > 1e-6f) {
             const glm::vec3 axis = rotation / angle;
+            // std::cout << "Angle: " << angle << std::endl;
             const glm::quat delta_rotation = glm::angleAxis(angle, axis);
 
             last_odometry.orientation =
