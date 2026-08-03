@@ -468,13 +468,6 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
     ImuMeasurement imu_message{};
     if (m_imu_receiver.try_pop_back_imu_message(imu_message)) {
         m_odometry_estimator.submit_imu(imu_message);
-
-        // Odometry last_odometry = m_odometry_estimator.get_latest_odometry();
-
-        // m_lidar_transform.position = last_odometry.position;
-        // m_lidar_transform.rotation = last_odometry.orientation;
-        // test_gazelle_next.set_lidar_transform(odometry_estimator.get_latest_odometry());
-        // std::cout << "Received IMU message!" << std::endl;
     }
 
     if (auto scan = m_new_lidar_scan_receiver.try_pop_front_lidar_scan()) {
@@ -500,39 +493,8 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
                             m_new_network_scan->normal_buffer(),
                             m_desc.max_gicp_iterations);
         }
-
-        Odometry new_odometry{};
-
-        new_odometry.position = m_new_network_scan->point_cloud().transform.position;
-        new_odometry.orientation = m_new_network_scan->point_cloud().transform.rotation;
-        new_odometry.timestamp_ns = m_new_network_scan->timestamp();
-
-        const float dt =
-            static_cast<float>(m_new_network_scan->timestamp() - last_odometry.timestamp_ns)
-            * 1e-9f;
-
-        if (dt > 1e-6f) {
-            new_odometry.linear_velocity =
-                (new_odometry.position - last_odometry.position) / dt;
-
-            glm::quat delta_rotation = glm::normalize(
-                new_odometry.orientation * glm::inverse(last_odometry.orientation)
-            );
-
-            // Select the shortest equivalent rotation.
-            if (delta_rotation.w < 0.0f)
-                delta_rotation = -delta_rotation;
-
-            const float angle = glm::angle(delta_rotation);
-            const glm::vec3 axis = glm::axis(delta_rotation);
-
-            new_odometry.angular_velocity =
-                angle > 1e-6f ? axis * (angle / dt) : glm::vec3(0.0f);
-            
-            new_odometry.linear_acceleration = (new_odometry.linear_velocity - last_odometry.linear_velocity) / dt;
-        }
-
-        m_odometry_estimator.submit_odometry(new_odometry);
+        
+        m_odometry_estimator.submit_lidar_scan(*m_new_network_scan, last_odometry);
 
         m_lidar_transform = m_new_network_scan->point_cloud().transform;
         

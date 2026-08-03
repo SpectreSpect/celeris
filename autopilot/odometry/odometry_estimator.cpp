@@ -2,6 +2,8 @@
 
 #include <iostream>
 
+#include "../sensors/lidar/new_lidar_scan.h"
+
 OdometryEstimator::OdometryEstimator() {
 }
 
@@ -62,6 +64,43 @@ void OdometryEstimator::submit_imu(const ImuMeasurement& imu_measurement) {
     }
 
     m_history.push_back(new_odometry);
+}
+
+void OdometryEstimator::submit_lidar_scan(NewLidarScan& lidar_scan, const Odometry& closest_prev_odometry) {
+    Odometry new_odometry{};
+
+    new_odometry.position = lidar_scan.point_cloud().transform.position;
+    new_odometry.orientation = lidar_scan.point_cloud().transform.rotation;
+    new_odometry.timestamp_ns = lidar_scan.timestamp();
+
+    const float dt =
+        static_cast<float>(new_odometry.timestamp_ns - closest_prev_odometry.timestamp_ns)
+        * 1e-9f;
+
+    if (dt > 1e-6f) {
+        new_odometry.linear_velocity =
+            (new_odometry.position - closest_prev_odometry.position) / dt;
+
+        glm::quat delta_rotation = glm::normalize(
+            new_odometry.orientation * glm::inverse(closest_prev_odometry.orientation)
+        );
+
+        // Select the shortest equivalent rotation.
+        if (delta_rotation.w < 0.0f)
+            delta_rotation = -delta_rotation;
+
+        const float angle = glm::angle(delta_rotation);
+        const glm::vec3 axis = glm::axis(delta_rotation);
+
+        new_odometry.angular_velocity =
+            angle > 1e-6f ? axis * (angle / dt) : glm::vec3(0.0f);
+        
+        new_odometry.linear_acceleration = (
+            new_odometry.linear_velocity - 
+            closest_prev_odometry.linear_velocity) / dt;
+    }
+
+    submit_odometry(new_odometry);
 }
 
 void OdometryEstimator::submit_odometry(const Odometry& odometry) {
