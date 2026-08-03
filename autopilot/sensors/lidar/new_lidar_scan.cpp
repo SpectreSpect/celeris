@@ -17,6 +17,7 @@ NewLidarScan::NewLidarScan(
            )
         ) 
 {
+    LOG_METHOD();
     point_cloud_preprocessor.remove_points_near_origin(
         m_point_cloud.instance_buffer(),
         m_point_cloud.point_count()
@@ -27,6 +28,14 @@ NewLidarScan::NewLidarScan(
         m_point_cloud.point_count(),
         16
     );
+
+    logger().check(
+        message.latest_point_id >= 0 &&
+        message.latest_point_id < message.timestamps.size(),
+        "Latest point index was out of bounds"
+    );
+
+    m_timestamp = message.timestamps[message.latest_point_id];
     
     add_child(m_point_cloud);
 }
@@ -46,4 +55,8 @@ PointCloud& NewLidarScan::point_cloud() noexcept {
 
 VulkanBuffer& NewLidarScan::normal_buffer() noexcept {
     return m_normal_buffer;
+}
+
+uint64_t NewLidarScan::timestamp() const noexcept {
+    return m_timestamp;
 }

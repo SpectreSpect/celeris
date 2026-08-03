@@ -127,12 +127,19 @@ bool NewLidarScanReceiver::receive_lidar_msg_from_client(int client_socket) {
         lidar_message.points.reserve(header.point_count);
         lidar_message.timestamps.reserve(header.point_count);
 
+        uint64_t latest_timestamp = points[0].timestamp;
+        // for (LidarMessagePointData& point_data : points) {
         for (LidarMessagePointData& point_data : points) {
             lidar_message.points.push_back(PointInstance{
                 .position = glm::vec4(point_data.position, 1.0f),
                 .color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)
             });
             lidar_message.timestamps.push_back(point_data.timestamp);
+
+            if (latest_timestamp <= point_data.timestamp) {
+                latest_timestamp = point_data.timestamp;
+                lidar_message.latest_point_id = lidar_message.points.size() - 1;
+            }
         }
 
 

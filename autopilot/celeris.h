@@ -28,6 +28,8 @@
 #include "sensors/imu/imu_measurement.h"
 #include "sensors/imu/imu_receiver.h"
 #include "odometry/odometry_estimator.h"
+#include "sensors/lidar/new_lidar_scan_receiver.h"
+#include "sensors/lidar/new_lidar_scan.h"
 
 #include <chrono>
 #include <cstddef>
@@ -219,6 +221,7 @@ private:
 
     PointCloudPreprocessor m_point_cloud_preprocessor;
     LidarScanReceiver m_scan_receiver;
+    NewLidarScanReceiver m_new_lidar_scan_receiver;
     VehicleCommandSender m_command_sender;
 
     VehicleStateReceiver m_vehicle_state_receiver;
@@ -261,6 +264,8 @@ private:
 
     std::unique_ptr<LidarScan> m_network_scan;
     std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;
+    std::unique_ptr<NewLidarScan> m_new_network_scan;
+    std::deque<std::unique_ptr<NewLidarScan>> m_new_retired_network_scans;
     uint32_t m_received_scan_count = 0;
     std::chrono::steady_clock::time_point m_last_local_planner_update_timestamp{};
     bool m_has_last_local_planner_update_timestamp = false;

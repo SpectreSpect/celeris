@@ -294,7 +294,7 @@ int main() {
 
     OdometryEstimator odometry_estimator;
     ImuReceiver imu_receiver(5003, 1);
-    imu_receiver.start();
+    // imu_receiver.start();
 
     NewLidarScanReceiver new_lidar_scan_receiver(
         manager_bundle, 
@@ -302,7 +302,7 @@ int main() {
         5000,
         3
     );
-    new_lidar_scan_receiver.start();
+    // new_lidar_scan_receiver.start();
 
 
     // celeris.set_vehicle_command(VehicleCommand{
@@ -353,9 +353,9 @@ int main() {
     Scene scene;
 
     scene.add(skybox);
-    // scene.add(celeris_visualizer);
+    scene.add(celeris_visualizer);
     // scene.add(test_gazelle_next);
-    // scene.add(voxel_grid.render_object());
+    scene.add(voxel_grid.render_object());
     scene.add(test_arrow);
 
     skybox.update(scene);
@@ -393,15 +393,15 @@ int main() {
             skybox_environment_update_pending = false;
         }
 
-         if (auto scan = new_lidar_scan_receiver.try_pop_front_lidar_scan()) {
-            if (m_network_scan)
-                m_retired_network_scans.push_back(std::move(m_network_scan));
+        // if (auto scan = new_lidar_scan_receiver.try_pop_front_lidar_scan()) {
+        //     if (m_network_scan)
+        //         m_retired_network_scans.push_back(std::move(m_network_scan));
 
-            m_network_scan = std::move(scan);
+        //     m_network_scan = std::move(scan);
 
-            while (m_retired_network_scans.size() > engine.num_frames_in_flight())
-                m_retired_network_scans.pop_front();
-         }
+        //     while (m_retired_network_scans.size() > engine.num_frames_in_flight())
+        //         m_retired_network_scans.pop_front();
+        // }
 
         // ImuMeasurement imu_message{};
         // if (imu_receiver.try_pop_back_imu_message(imu_message)) {
@@ -445,13 +445,13 @@ int main() {
                 engine.swapchain_resources().swapchain, clear_color);
                 renderer.render(command_buffer, scene);
 
-                if (m_network_scan) {
-                    renderer.render(
-                        command_buffer,
-                        m_network_scan->children,
-                        m_network_scan->transform.get_model_matrix()
-                    );
-                }
+                // if (m_network_scan) {
+                //     renderer.render(
+                //         command_buffer,
+                //         m_network_scan->children,
+                //         m_network_scan->transform.get_model_matrix()
+                //     );
+                // }
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);

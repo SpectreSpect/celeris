@@ -291,6 +291,12 @@ Celeris::Celeris(VulkanEngine& engine,
         ),
         m_point_cloud_preprocessor(engine.device(), compute_queue, manager_bundle.compute_pass_manager()),
         m_scan_receiver(m_point_cloud_preprocessor, desc.receiver_port),
+        m_new_lidar_scan_receiver(
+            manager_bundle, 
+            m_point_cloud_preprocessor, 
+            desc.receiver_port, 
+            engine.num_frames_in_flight()
+        ),
         m_command_sender(),
         m_vehicle_state_receiver(desc.vehicle_state_receiver_port),
         m_imu_receiver(desc.imu_receiver_port, 1),
@@ -414,6 +420,7 @@ void Celeris::start_lidar_receiver() {
 
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     // start_lidar_receiver();
+    m_new_lidar_scan_receiver.start();
     m_vehicle_state_receiver.start();
     m_imu_receiver.start();
     m_command_sender.start();
@@ -461,9 +468,86 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
     ImuMeasurement imu_message{};
     if (m_imu_receiver.try_pop_back_imu_message(imu_message)) {
         m_odometry_estimator.submit_imu(imu_message);
+
+        // Odometry last_odometry = m_odometry_estimator.get_latest_odometry();
+
+        // m_lidar_transform.position = last_odometry.position;
+        // m_lidar_transform.rotation = last_odometry.orientation;
         // test_gazelle_next.set_lidar_transform(odometry_estimator.get_latest_odometry());
         // std::cout << "Received IMU message!" << std::endl;
     }
+
+    if (auto scan = m_new_lidar_scan_receiver.try_pop_front_lidar_scan()) {
+        if (m_new_network_scan)
+            m_new_retired_network_scans.push_back(std::move(m_new_network_scan));
+
+        m_new_network_scan = std::move(scan);
+
+        while (m_retired_network_scans.size() > m_engine->num_frames_in_flight())
+            m_new_retired_network_scans.pop_front();
+        
+        // Odometry last_odometry = m_odometry_estimator.get_latest_odometry();
+        Odometry last_odometry{};
+        if (!m_odometry_estimator.get_closest_prev_odometry(m_new_network_scan->timestamp(), last_odometry))
+            last_odometry.timestamp_ns = m_new_network_scan->timestamp();
+
+        m_new_network_scan->point_cloud().transform.position = last_odometry.position;
+        m_new_network_scan->point_cloud().transform.rotation = last_odometry.orientation;
+
+        if (m_voxel_point_map.map_point_count() > 0u) {
+            m_gicp_pass.fit(m_voxel_point_map,
+                            m_new_network_scan->point_cloud(),
+                            m_new_network_scan->normal_buffer(),
+                            m_desc.max_gicp_iterations);
+        }
+
+        Odometry new_odometry{};
+
+        new_odometry.position = m_new_network_scan->point_cloud().transform.position;
+        new_odometry.orientation = m_new_network_scan->point_cloud().transform.rotation;
+        new_odometry.timestamp_ns = m_new_network_scan->timestamp();
+
+        const float dt =
+            static_cast<float>(m_new_network_scan->timestamp() - last_odometry.timestamp_ns)
+            * 1e-9f;
+
+        if (dt > 1e-6f) {
+            new_odometry.linear_velocity =
+                (new_odometry.position - last_odometry.position) / dt;
+
+            glm::quat delta_rotation = glm::normalize(
+                new_odometry.orientation * glm::inverse(last_odometry.orientation)
+            );
+
+            // Select the shortest equivalent rotation.
+            if (delta_rotation.w < 0.0f)
+                delta_rotation = -delta_rotation;
+
+            const float angle = glm::angle(delta_rotation);
+            const glm::vec3 axis = glm::axis(delta_rotation);
+
+            new_odometry.angular_velocity =
+                angle > 1e-6f ? axis * (angle / dt) : glm::vec3(0.0f);
+            
+            new_odometry.linear_acceleration = (new_odometry.linear_velocity - last_odometry.linear_velocity) / dt;
+        }
+
+        m_odometry_estimator.submit_odometry(new_odometry);
+
+        m_lidar_transform = m_new_network_scan->point_cloud().transform;
+        
+        
+        // std::cout << "Inserted" << std::endl;
+        m_voxel_map_inserter.insert(m_voxel_point_map, m_new_network_scan->point_cloud(), m_new_network_scan->normal_buffer());
+        m_voxel_grid->voxelize_point_cloud(
+            *m_engine,
+            m_new_network_scan->point_cloud(),
+            m_new_network_scan->normal_buffer(),
+            voxel_write_list,
+            m_desc.max_write_count
+        );
+    }
+
 
     if (auto scan = m_scan_receiver.try_pop_scan(*m_manager_bundle)) {
         const glm::vec3 scan_acceleration = scan->linear_acceleration();

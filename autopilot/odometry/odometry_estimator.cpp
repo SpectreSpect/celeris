@@ -12,6 +12,11 @@ Odometry OdometryEstimator::get_latest_odometry() {
 }
 
 void OdometryEstimator::submit_imu(const ImuMeasurement& imu_measurement) {
+    if (!m_history.empty() &&
+        imu_measurement.timestamp <= m_history.back().timestamp_ns) {
+        return;
+    }
+
     Odometry new_odometry{};
     if (m_history.empty()) {
         new_odometry.timestamp_ns = imu_measurement.timestamp;
@@ -57,4 +62,24 @@ void OdometryEstimator::submit_imu(const ImuMeasurement& imu_measurement) {
     }
 
     m_history.push_back(new_odometry);
+}
+
+void OdometryEstimator::submit_odometry(const Odometry& odometry) {
+    while (!m_history.empty() &&
+           m_history.back().timestamp_ns >= odometry.timestamp_ns) {
+        m_history.pop_back();
+    }
+
+    m_history.push_back(odometry);
+}
+
+bool OdometryEstimator::get_closest_prev_odometry(uint64_t timestamp, Odometry& output) {
+    for (int i = m_history.size() - 1; i >= 0; i--) {
+        
+        if (m_history[i].timestamp_ns < timestamp) {
+            output = m_history[i];
+            return true;
+        }
+    }
+    return false;
 }

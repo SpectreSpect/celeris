@@ -23,10 +23,13 @@ public:
 
     PointCloud& point_cloud() noexcept;
     VulkanBuffer& normal_buffer() noexcept;
+    uint64_t timestamp() const noexcept;
 
 private:
     ManagerBundle* m_manager_bundle = nullptr;
 
     PointCloud m_point_cloud;
     VulkanBuffer m_normal_buffer;
+
+    uint64_t m_timestamp = 0;
 };
