@@ -93,7 +93,8 @@ void LidarVideo::load_from_file(ManagerBundle& manager_bundle,
         m_scans.back().set_timestamp_ns(e.timestamp_ns);
         m_frame_timestamps_ns.push_back(e.timestamp_ns);
 
-        glm::vec3 car_pos_eng = LidarScan::ros_pos_to_engine(e.position);
+        // glm::vec3 car_pos_eng = LidarScan::ros_pos_to_engine(e.position);
+        glm::vec3 car_pos_eng = e.position;
         glm::vec3 car_rpy_eng = ros_rpy_to_engine_rpy(e.rotation_rpy);
 
         // frames.back().car_pos = car_pos_eng;

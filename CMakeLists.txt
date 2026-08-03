@@ -161,6 +161,8 @@ add_executable(app
   autopilot/celeris_user_controller.cpp
   autopilot/sensors/imu/imu_receiver.cpp
   autopilot/odometry/odometry_estimator.cpp
+  autopilot/sensors/lidar/new_lidar_scan.cpp
+  autopilot/sensors/lidar/new_lidar_scan_receiver.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

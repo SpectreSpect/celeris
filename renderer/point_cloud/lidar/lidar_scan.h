@@ -126,8 +126,8 @@ public:
     glm::vec3 angular_velocity() const noexcept;
     glm::quat orientation() const noexcept;
 
-    static glm::vec3 ros_pos_to_engine(const glm::vec3& p_ros);
-    static glm::mat3 ros_rotation_to_engine(const glm::mat3& rotation_ros);
+    // static glm::vec3 ros_pos_to_engine(const glm::vec3& p_ros);
+    // static glm::mat3 ros_rotation_to_engine(const glm::mat3& rotation_ros);
     static void build_points_for_frame(FrameData& frame);
 
     PointCloud& point_cloud();

@@ -83,6 +83,8 @@
 #include "autopilot/sensors/imu/imu_receiver.h"
 #include "autopilot/sensors/imu/imu_measurement.h"
 #include "autopilot/odometry/odometry_estimator.h"
+#include "autopilot/sensors/lidar/new_lidar_scan.h"
+#include "autopilot/sensors/lidar/new_lidar_scan_receiver.h"
 
 #include <algorithm>
 #include <exception>
@@ -294,6 +296,14 @@ int main() {
     ImuReceiver imu_receiver(5003, 1);
     imu_receiver.start();
 
+    NewLidarScanReceiver new_lidar_scan_receiver(
+        manager_bundle, 
+        point_cloud_preprocessor,
+        5000,
+        3
+    );
+    new_lidar_scan_receiver.start();
+
 
     // celeris.set_vehicle_command(VehicleCommand{
     //     .acceleration = 0.5f,
@@ -335,13 +345,16 @@ int main() {
         glm::radians(30.0f)             // wing angle to the main line
     );
 
-    GazelleNext test_gazelle_next(mesh_manager, material_instance_manager, vehicle_geometry, skybox_exposure);
+    std::unique_ptr<NewLidarScan> m_network_scan;
+    std::deque<std::unique_ptr<NewLidarScan>> m_retired_network_scans;
+
+    // GazelleNext test_gazelle_next(mesh_manager, material_instance_manager, vehicle_geometry, skybox_exposure);
 
     Scene scene;
 
     scene.add(skybox);
     // scene.add(celeris_visualizer);
-    scene.add(test_gazelle_next);
+    // scene.add(test_gazelle_next);
     // scene.add(voxel_grid.render_object());
     scene.add(test_arrow);
 
@@ -380,13 +393,23 @@ int main() {
             skybox_environment_update_pending = false;
         }
 
-        ImuMeasurement imu_message{};
-        if (imu_receiver.try_pop_back_imu_message(imu_message)) {
-            odometry_estimator.submit_imu(imu_message);
+         if (auto scan = new_lidar_scan_receiver.try_pop_front_lidar_scan()) {
+            if (m_network_scan)
+                m_retired_network_scans.push_back(std::move(m_network_scan));
 
-            test_gazelle_next.set_lidar_transform(odometry_estimator.get_latest_odometry());
-            // std::cout << "Received IMU message!" << std::endl;
-        }
+            m_network_scan = std::move(scan);
+
+            while (m_retired_network_scans.size() > engine.num_frames_in_flight())
+                m_retired_network_scans.pop_front();
+         }
+
+        // ImuMeasurement imu_message{};
+        // if (imu_receiver.try_pop_back_imu_message(imu_message)) {
+        //     odometry_estimator.submit_imu(imu_message);
+
+        //     test_gazelle_next.set_lidar_transform(odometry_estimator.get_latest_odometry());
+        //     // std::cout << "Received IMU message!" << std::endl;
+        // }
 
         float current_frame_time = (float)glfwGetTime() - start_time;
         float delta_time = current_frame_time - last_frame_time;
@@ -396,7 +419,7 @@ int main() {
         uint32_t image_index = 0;
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
-
+        
         celeris.update(compute_submit_context);
         celeris_user_controller.update(delta_time, camera, keyboard_input_reciever, fps_camera_controller);
         celeris_visualizer.update();
@@ -421,6 +444,14 @@ int main() {
                 engine.swapchain_resources().framebuffers[image_index],
                 engine.swapchain_resources().swapchain, clear_color);
                 renderer.render(command_buffer, scene);
+
+                if (m_network_scan) {
+                    renderer.render(
+                        command_buffer,
+                        m_network_scan->children,
+                        m_network_scan->transform.get_model_matrix()
+                    );
+                }
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);

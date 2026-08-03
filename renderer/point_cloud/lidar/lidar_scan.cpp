@@ -275,19 +275,19 @@ void LidarScan::build_points_for_frame(FrameData& frame) {
     }
 }
 
-glm::vec3 LidarScan::ros_pos_to_engine(const glm::vec3& p_ros)
-{
-    return glm::vec3(-p_ros.x, p_ros.z, p_ros.y);
-}
+// glm::vec3 LidarScan::ros_pos_to_engine(const glm::vec3& p_ros)
+// {
+//     return glm::vec3(-p_ros.x, p_ros.z, p_ros.y);
+// }
 
-glm::mat3 LidarScan::ros_rotation_to_engine(const glm::mat3& rotation_ros)
-{
-    glm::mat3 basis(1.0f);
-    basis[0] = glm::vec3(-1.0f, 0.0f, 0.0f);
-    basis[1] = glm::vec3(0.0f, 0.0f, 1.0f);
-    basis[2] = glm::vec3(0.0f, 1.0f, 0.0f);
-    return basis * rotation_ros * glm::transpose(basis);
-}
+// glm::mat3 LidarScan::ros_rotation_to_engine(const glm::mat3& rotation_ros)
+// {
+//     glm::mat3 basis(1.0f);
+//     basis[0] = glm::vec3(-1.0f, 0.0f, 0.0f);
+//     basis[1] = glm::vec3(0.0f, 0.0f, 1.0f);
+//     basis[2] = glm::vec3(0.0f, 1.0f, 0.0f);
+//     return basis * rotation_ros * glm::transpose(basis);
+// }
     
 PointCloud& LidarScan::point_cloud() {
     return m_point_cloud;

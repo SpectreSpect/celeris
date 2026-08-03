@@ -17,7 +17,6 @@
 #include <glm/gtc/quaternion.hpp>
 
 namespace {
-constexpr size_t imu_floats_per_scan_point = 14;
 constexpr uint32_t max_points_per_frame = 2'000'000;
 
 size_t reference_sample_id(const LidarScan::FrameData& frame) {

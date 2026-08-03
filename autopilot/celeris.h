@@ -25,6 +25,9 @@
 #include "../a_star/vehicle.h"
 #include "../a_star/local_planner_base.h"
 #include "vehicle_state_receiver.h"
+#include "sensors/imu/imu_measurement.h"
+#include "sensors/imu/imu_receiver.h"
+#include "odometry/odometry_estimator.h"
 
 #include <chrono>
 #include <cstddef>
@@ -61,6 +64,7 @@ public:
         uint32_t collision_history_size = 8;
         uint32_t collision_escape_search_radius_voxels = 8;
         uint16_t vehicle_state_receiver_port = 5002;
+        uint16_t imu_receiver_port = 5003;
         float vehicle_state_timeout = 0.25f;
         float max_vehicle_acceleration = 3;
         float max_vehicle_steer_acceleration = 5;
@@ -218,6 +222,11 @@ private:
     VehicleCommandSender m_command_sender;
 
     VehicleStateReceiver m_vehicle_state_receiver;
+    // ImuReceiver imu_receiver(5003, 1);
+    ImuReceiver m_imu_receiver;
+
+    OdometryEstimator m_odometry_estimator;
+    
 
     std::unique_ptr<VehicleBase> m_vehicle;
     PathPlanner m_path_planner;

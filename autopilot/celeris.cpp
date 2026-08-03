@@ -293,6 +293,7 @@ Celeris::Celeris(VulkanEngine& engine,
         m_scan_receiver(m_point_cloud_preprocessor, desc.receiver_port),
         m_command_sender(),
         m_vehicle_state_receiver(desc.vehicle_state_receiver_port),
+        m_imu_receiver(desc.imu_receiver_port, 1),
         m_vehicle(std::make_unique<Vehicle>(
             desc.max_vehicle_acceleration,
             desc.max_vehicle_steer_acceleration,
@@ -412,8 +413,9 @@ void Celeris::start_lidar_receiver() {
 }
 
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
-    start_lidar_receiver();
+    // start_lidar_receiver();
     m_vehicle_state_receiver.start();
+    m_imu_receiver.start();
     m_command_sender.start();
     m_path_planner.start(std::move(planner_submit_context));
 }
@@ -455,6 +457,13 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
     // // }
 
     // float vehicle_height = m_vehicle_position.pos.y;
+
+    ImuMeasurement imu_message{};
+    if (m_imu_receiver.try_pop_back_imu_message(imu_message)) {
+        m_odometry_estimator.submit_imu(imu_message);
+        // test_gazelle_next.set_lidar_transform(odometry_estimator.get_latest_odometry());
+        // std::cout << "Received IMU message!" << std::endl;
+    }
 
     if (auto scan = m_scan_receiver.try_pop_scan(*m_manager_bundle)) {
         const glm::vec3 scan_acceleration = scan->linear_acceleration();
@@ -675,8 +684,9 @@ void Celeris::apply_vehicle_feedback(const VehicleFeedback& feedback) {
 
     if (feedback.has_odometry()) {
         if (!feedback.has_vehicle_state() && is_finite(feedback.linear_velocity_ros)) {
-            const glm::vec3 linear_velocity_engine =
-                LidarScan::ros_pos_to_engine(feedback.linear_velocity_ros);
+            // const glm::vec3 linear_velocity_engine =
+            //     LidarScan::ros_pos_to_engine(feedback.linear_velocity_ros);
+            const glm::vec3 linear_velocity_engine = feedback.linear_velocity_ros;
             const glm::vec2 forward{
                 std::cos(state.m_heading),
                 std::sin(state.m_heading)
