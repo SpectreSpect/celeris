@@ -8,6 +8,7 @@
 
 #include <glm/vec3.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 class MeshManager;
 class MaterialInstanceManager;
@@ -44,10 +45,16 @@ public:
     void set_lidar_rotation(const glm::quat& rotation);
     void set_lidar_transform(const Transform& lidar_transform);
 
-private:
-    glm::vec3 rear_axle_bottom_offset() const;
     glm::vec3 rear_axle_world_offset() const;
     glm::vec3 lidar_world_offset() const;
+
+    const SceneObject& lidar_mount() const noexcept;
+
+    glm::mat4 zero_lidar_transform() const;
+    glm::mat4 mid_rear_axes_to_lidar_transform() const; 
+
+private:
+    glm::vec3 rear_axle_bottom_offset() const;
     glm::quat parent_rotation_from_lidar_mount_rotation(const glm::quat& lidar_rotation) const;
 
     VehicleGeometry m_vehicle_geometry;

@@ -244,14 +244,14 @@ VehicleCommand PurePursuitLocalPlanner::predict_vehicle_command(
             m_path_length,
             m_path_progress_s +
                 params.projection_lookahead_base +
-                std::abs(vehicle.state().m_speed) * command_delta_time
+                std::abs(vehicle.state().speed) * command_delta_time
         );
     }
 
     Vehicle::PointProjection current_projection = Vehicle::find_polyline_projection(
         m_global_astar_path,
         m_global_astar_path_arc_lengths,
-        vehicle.state().m_position,
+        vehicle.state().position,
         projection_min_s,
         projection_max_s
     );
@@ -267,7 +267,7 @@ VehicleCommand PurePursuitLocalPlanner::predict_vehicle_command(
             switch_distance_s >= -Utils::eps &&
             switch_distance_s <= std::max(0.0f, params.direction_switch_arrival_distance);
         const bool almost_stopped =
-            std::abs(vehicle.state().m_speed) <=
+            std::abs(vehicle.state().speed) <=
             std::max(0.0f, params.direction_switch_arrival_speed);
         const bool close_to_path =
             current_projection.dist <=
@@ -281,7 +281,7 @@ VehicleCommand PurePursuitLocalPlanner::predict_vehicle_command(
             current_projection = Vehicle::find_polyline_projection(
                 m_global_astar_path,
                 m_global_astar_path_arc_lengths,
-                vehicle.state().m_position,
+                vehicle.state().position,
                 m_path_progress_floor_s,
                 std::min(
                     m_path_length,
@@ -302,7 +302,7 @@ VehicleCommand PurePursuitLocalPlanner::predict_vehicle_command(
         m_path_length,
         current_projection.s +
             params.projection_lookahead_base +
-            std::abs(vehicle.state().m_speed) * command_delta_time
+            std::abs(vehicle.state().speed) * command_delta_time
     );
 
     Vehicle::PointProjection control_current_projection;

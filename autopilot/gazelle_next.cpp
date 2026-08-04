@@ -198,6 +198,35 @@ glm::vec3 GazelleNext::lidar_world_offset() const {
     return glm::normalize(transform.rotation) * (m_lidar_mount.transform.position * transform.scale);
 }
 
+glm::mat4 GazelleNext::zero_lidar_transform() const {
+    glm::vec3 ground_lidar_pos = lidar_mount().transform.position;
+    ground_lidar_pos.y = 0;
+
+    glm::vec3 target_lidar_dir = glm::vec3(-1, 0, 0);
+    glm::vec3 lidar_dir = glm::normalize(ground_lidar_pos);
+    glm::mat4 target_rotation = glm::mat4_cast(glm::rotation(lidar_dir, target_lidar_dir));
+
+    glm::mat4 zero_lidar_transform = 
+        target_rotation * 
+        glm::translate(glm::identity<glm::mat4>(), -lidar_mount().transform.position);
+
+    return zero_lidar_transform;
+}
+
+glm::mat4 GazelleNext::mid_rear_axes_to_lidar_transform() const {
+    glm::mat4 mid_rear_axes_to_lidar_transform = glm::translate(
+        glm::identity<glm::mat4>(),
+        lidar_mount().transform.position - rear_axle_bottom_offset()
+    );
+
+    return mid_rear_axes_to_lidar_transform;
+}
+
+//glm::rotate(glm::identity<glm::mat4>(), glm::pi<float>(), glm::vec3(0, 1, 0))
+const SceneObject& GazelleNext::lidar_mount() const noexcept {
+    return m_lidar_mount;
+}
+
 glm::quat GazelleNext::parent_rotation_from_lidar_mount_rotation(const glm::quat& lidar_rotation) const {
     return glm::normalize(lidar_rotation * glm::inverse(glm::normalize(m_lidar_mount.transform.rotation)));
 }

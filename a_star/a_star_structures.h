@@ -47,12 +47,14 @@ struct NonholonomicPos {
     float steer = 0;
     float dir = 1;
 
-    void from_transform(const Transform& transform) {
+    static NonholonomicPos from_transform(const Transform& transform) {
         glm::quat q = glm::normalize(transform.rotation);
-        glm::vec3 forward = q * glm::vec3(-1.0f, 0.0f, 0.0f);
+        glm::vec3 forward = q * glm::vec3(1.0f, 0.0f, 0.0f);
         
-        pos = transform.position;
-        theta = std::atan2(forward.z, forward.x);
+        NonholonomicPos p;
+        p.pos = transform.position;
+        p.theta = std::atan2(forward.z, forward.x);
+        return p;
     }
 };
 

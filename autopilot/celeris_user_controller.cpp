@@ -194,18 +194,18 @@ void CelerisUserController::display_interface(Camera& camera, GamepadController&
             ImGui::TextColored(color, "%s", m_map_save_status.c_str());
         }
 
-        if (ImGui::Button("Localize on map")) {
-            try {
-                const bool localized = m_celeris->localize_on_map();
-                m_map_localization_failed = !localized;
-                m_map_localization_status = localized
-                    ? "Localized on map"
-                    : "Localization failed";
-            } catch (const std::exception& error) {
-                m_map_localization_failed = true;
-                m_map_localization_status = error.what();
-            }
-        }
+        // if (ImGui::Button("Localize on map")) {
+        //     try {
+        //         const bool localized = m_celeris->localize_on_map();
+        //         m_map_localization_failed = !localized;
+        //         m_map_localization_status = localized
+        //             ? "Localized on map"
+        //             : "Localization failed";
+        //     } catch (const std::exception& error) {
+        //         m_map_localization_failed = true;
+        //         m_map_localization_status = error.what();
+        //     }
+        // }
 
         if (!m_map_localization_status.empty()) {
             const ImVec4 color = m_map_localization_failed

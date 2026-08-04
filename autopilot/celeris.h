@@ -1,5 +1,14 @@
 #pragma once
 
+#include <chrono>
+#include <cstddef>
+#include <filesystem>
+#include <memory>
+#include <span>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
+
 #include "../managers/material_instance_manager.h"
 #include "../managers/material_manager.h"
 #include "../renderer/point_cloud/lidar/lidar_scan_receiver.h"
@@ -26,19 +35,13 @@
 #include "../a_star/local_planner_base.h"
 #include "vehicle_state_receiver.h"
 
-#include <chrono>
-#include <cstddef>
-#include <filesystem>
-#include <memory>
-#include <span>
-
-
 class VulkanQueue;
 class ComputePassManager;
 class VoxelGrid;
 class ManagerBundle;
 class VulkanSubmitContext;
 class LocalPlanner;
+class GazelleNext;
 
 class Celeris {
 public:
@@ -100,6 +103,7 @@ public:
         VulkanBuffer& scan_vertex_buffer,
         VulkanBuffer& scan_index_buffer,
         PointCloudMesher& mesher,
+        GazelleNext& gazelle,
         const CelerisDesc& desc
     );
             
@@ -119,12 +123,12 @@ public:
     void add_waypoint(const NonholonomicPos& position);
     void delete_last_waypoint();
 
+    const Transform& vehicle_transform() const noexcept;
+    Transform vehicle_lidar_transform() const noexcept;
     LidarScan* network_scan();
-    const Transform& lidar_transform() const noexcept;
     bool has_start_position() const noexcept;
     bool has_goal_position() const noexcept;
     NonholonomicPos start_position() const noexcept;
-    NonholonomicPos vehicle_position() const noexcept;
     NonholonomicPos goal_position() const noexcept;
     float car_speed() const noexcept;
     float vehicle_speed() const noexcept;
@@ -133,8 +137,6 @@ public:
     float local_planner_path_window_min_s() const noexcept;
     float local_planner_path_window_max_s() const noexcept;
     float local_planner_segment_switch_radius() const noexcept;
-    bool has_local_planner_lookahead_point() const noexcept;
-    glm::vec3 local_planner_lookahead_point() const noexcept;
     float waypoint_reach_radius() const noexcept;
     bool gamepad_commands_enabled() const noexcept;
     VehicleCommand gamepad_command() const noexcept;
@@ -186,13 +188,13 @@ public:
     void display_path_planner_debug_controls();
     glm::vec3 voxel_size();
     glm::vec3 voxel_center_world_pos(const glm::ivec3& voxel_pos);
-    void visualize_active_path_potential();
+    // void visualize_active_path_potential();
     void sync_point_map_and_voxel_grid();
     void save_map(const std::filesystem::path& path);
     void load_map(const std::filesystem::path& path);
     void save_waypoint_path(const std::filesystem::path& path);
     void load_waypoint_path(const std::filesystem::path& path);
-    bool localize_on_map();
+    // bool localize_on_map();
     const AABB& get_bounding_box() const noexcept;
     const AABB& get_bouding_box() const noexcept { return get_bounding_box(); }
     bool has_map_bounding_box() const noexcept;
@@ -207,6 +209,7 @@ private:
     VulkanBuffer* m_scan_vertex_buffer = nullptr;
     VulkanBuffer* m_scan_index_buffer = nullptr;
     PointCloudMesher* m_mesher = nullptr;
+    GazelleNext* m_gazelle = nullptr;
     CelerisDesc m_desc;
 
     WaypointPath m_waypoint_path;
@@ -238,11 +241,11 @@ private:
     bool m_needs_map_localization = false;
 
     NonholonomicPos m_start_position;
-    NonholonomicPos m_vehicle_position;
+    // NonholonomicPos m_vehicle_position;
     NonholonomicPos m_goal_position;
     bool m_has_start_position = false;
     bool m_has_goal_position = false;
-    Transform m_lidar_transform;
+    Transform m_vehicle_transform;
     float m_car_speed = 10.0f;
     float m_waypoint_reach_radius = 2.0f;
     bool m_gamepad_commands_enabled = false;
@@ -307,7 +310,7 @@ private:
 
     void apply_vehicle_feedback(const VehicleFeedback& feedback);
     bool is_vehicle_feedback_fresh(const VehicleFeedback& feedback) const;
-    void sync_vehicle_position_from_state(float height);
+    // void sync_vehicle_position_from_state(float height);
     VehicleBase& vehicle() noexcept;
     const VehicleBase& vehicle() const noexcept;
     LocalPlannerBase& local_planner() noexcept;
