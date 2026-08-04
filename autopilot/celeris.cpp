@@ -928,10 +928,10 @@ void Celeris::try_receive_and_process_imu() {
     if (m_imu_receiver.try_pop_back_imu_message(imu_message)) {
         m_odometry_estimator.submit_imu(imu_message);
 
-        // Odometry latest_odometry = m_odometry_estimator.get_latest_odometry();
+        Odometry latest_odometry = m_odometry_estimator.get_latest_odometry();
 
-        // m_lidar_transform.position = latest_odometry.position;
-        // m_lidar_transform.rotation = latest_odometry.orientation;
+        m_lidar_transform.position = latest_odometry.position;
+        m_lidar_transform.rotation = latest_odometry.orientation;
     }
 }
 

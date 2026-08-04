@@ -42,6 +42,7 @@ void OdometryEstimator::submit_imu(const ImuMeasurement& imu_measurement) {
     //         mean_gravity.y << ", " <<
     //         mean_gravity.z << ")" << std::endl;
         
+    std::cout << "Imu timestamp: " << imu_measurement.timestamp * 1e-9 << std::endl;
 
     Odometry new_odometry{};
     if (m_history.empty()) {
@@ -110,6 +111,8 @@ void OdometryEstimator::submit_lidar_scan(LidarScan& lidar_scan, const Odometry&
     new_odometry.position = lidar_scan.point_cloud().transform.position;
     new_odometry.orientation = lidar_scan.point_cloud().transform.rotation;
     new_odometry.timestamp_ns = lidar_scan.timestamp();
+
+    std::cout << "Lidar timestamp: " << new_odometry.timestamp_ns * 1e-9 << std::endl;
 
     const float dt =
         static_cast<float>(new_odometry.timestamp_ns - closest_prev_odometry.timestamp_ns)
