@@ -927,6 +927,11 @@ void Celeris::try_receive_and_process_imu() {
     ImuMeasurement imu_message{};
     if (m_imu_receiver.try_pop_back_imu_message(imu_message)) {
         m_odometry_estimator.submit_imu(imu_message);
+
+        // Odometry latest_odometry = m_odometry_estimator.get_latest_odometry();
+
+        // m_lidar_transform.position = latest_odometry.position;
+        // m_lidar_transform.rotation = latest_odometry.orientation;
     }
 }
 
@@ -939,10 +944,14 @@ void Celeris::try_receive_and_process_lidar_scan() {
 
         while (m_retired_network_scans.size() > m_engine->num_frames_in_flight())
             m_retired_network_scans.pop_front();
-        
+
         Odometry closest_odometry{};
         if (!m_odometry_estimator.get_closest_prev_odometry(m_network_scan->timestamp(), closest_odometry))
             closest_odometry.timestamp_ns = m_network_scan->timestamp();
+
+        // Odometry closest_odometry = m_odometry_estimator.get_latest_odometry();
+        
+        // std::cout << "(" << closest_odometry.position.x << ", " << closest_odometry.position.y << ", " << closest_odometry.position.z << "),    timestamp: " << m_network_scan->timestamp() << std::endl;
 
         m_network_scan->point_cloud().transform.position = closest_odometry.position;
         m_network_scan->point_cloud().transform.rotation = closest_odometry.orientation;

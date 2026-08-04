@@ -35,7 +35,7 @@ LidarScan::LidarScan(
         "Latest point index was out of bounds"
     );
 
-    m_timestamp = message.timestamps[message.latest_point_id];
+    m_timestamp = message.timestamps[0];
     
     add_child(m_point_cloud);
 }

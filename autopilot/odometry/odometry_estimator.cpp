@@ -19,12 +19,37 @@ void OdometryEstimator::submit_imu(const ImuMeasurement& imu_measurement) {
         return;
     }
 
+    // if (calibration_step < max_calibration_steps) {
+    //     m_gravity_total += imu_measurement.linear_acceleration;
+    //     calibration_step++;
+    //     std::cout << "Calibration step: " << calibration_step << std::endl;
+    //     return;
+    // } else if (calibration_step == max_calibration_steps) {
+    //     m_gravity_world = m_gravity_total / static_cast<float>(calibration_step);
+    // }
+
+
+    // std::cout << "Linear acceleration: (" << 
+    //     imu_measurement.linear_acceleration.x << ", " <<
+    //     imu_measurement.linear_acceleration.y << ", " <<
+    //     imu_measurement.linear_acceleration.z << ")" << std::endl;
+
+    // m_gravity_total += imu_measurement.linear_acceleration;
+    // gravity_count += 1;
+    // glm::vec3 mean_gravity = m_gravity_total / static_cast<float>(gravity_count);
+    // std::cout << "Mean gravity: (" << 
+    //         mean_gravity.x << ", " <<
+    //         mean_gravity.y << ", " <<
+    //         mean_gravity.z << ")" << std::endl;
+        
+
     Odometry new_odometry{};
     if (m_history.empty()) {
         new_odometry.timestamp_ns = imu_measurement.timestamp;
         new_odometry.angular_velocity = imu_measurement.angular_velocity;
         new_odometry.linear_acceleration = glm::vec3(0.0f);
 
+        // m_gravity_world = glm::vec3(-0.202349f, 10.0953f, -0.240715f);
         m_gravity_world = imu_measurement.linear_acceleration;
     } else {
         Odometry last_odometry = m_history.back();
@@ -52,6 +77,19 @@ void OdometryEstimator::submit_imu(const ImuMeasurement& imu_measurement) {
 
         glm::vec3 acceleration_world = last_odometry.orientation * imu_measurement.linear_acceleration - m_gravity_world;
         last_odometry.linear_acceleration = acceleration_world;
+
+        // if (glm::length(acceleration_world) <= m_max_gravity_length)
+        //     return;
+
+        // if (m_max_gravity_length < glm::length(acceleration_world)) {
+        //     m_max_gravity_length = glm::length(acceleration_world);
+        //     std::cout << "Max gravity length: " << m_max_gravity_length << std::endl;
+        // }
+
+        // std::cout << "Linear acceleration: (" << 
+        //     acceleration_world.x << ", " <<
+        //     acceleration_world.y << ", " <<
+        //     acceleration_world.z << ")" << std::endl;
 
         // last_odometry.position += last_odometry.linear_velocity * dt;
         last_odometry.position += last_odometry.linear_velocity * dt + 0.5f * acceleration_world * dt * dt;
