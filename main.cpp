@@ -289,19 +289,6 @@ int main() {
         }
     );
 
-    OdometryEstimator odometry_estimator;
-    ImuReceiver imu_receiver(5003, 1);
-    // imu_receiver.start();
-
-    LidarScanReceiver new_lidar_scan_receiver(
-        manager_bundle, 
-        point_cloud_preprocessor,
-        5000,
-        3
-    );
-    // new_lidar_scan_receiver.start();
-
-
     // celeris.set_vehicle_command(VehicleCommand{
     //     .acceleration = 0.5f,
     //     .steering_angle_velocity = 0.5f
@@ -390,24 +377,6 @@ int main() {
             skybox_environment_update_pending = false;
         }
 
-        // if (auto scan = new_lidar_scan_receiver.try_pop_front_lidar_scan()) {
-        //     if (m_network_scan)
-        //         m_retired_network_scans.push_back(std::move(m_network_scan));
-
-        //     m_network_scan = std::move(scan);
-
-        //     while (m_retired_network_scans.size() > engine.num_frames_in_flight())
-        //         m_retired_network_scans.pop_front();
-        // }
-
-        // ImuMeasurement imu_message{};
-        // if (imu_receiver.try_pop_back_imu_message(imu_message)) {
-        //     odometry_estimator.submit_imu(imu_message);
-
-        //     test_gazelle_next.set_lidar_transform(odometry_estimator.get_latest_odometry());
-        //     // std::cout << "Received IMU message!" << std::endl;
-        // }
-
         float current_frame_time = (float)glfwGetTime() - start_time;
         float delta_time = current_frame_time - last_frame_time;
         last_frame_time = current_frame_time;
@@ -441,14 +410,6 @@ int main() {
                 engine.swapchain_resources().framebuffers[image_index],
                 engine.swapchain_resources().swapchain, clear_color);
                 renderer.render(command_buffer, scene);
-
-                // if (m_network_scan) {
-                //     renderer.render(
-                //         command_buffer,
-                //         m_network_scan->children,
-                //         m_network_scan->transform.get_model_matrix()
-                //     );
-                // }
 
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
