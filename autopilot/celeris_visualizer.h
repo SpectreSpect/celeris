@@ -107,9 +107,12 @@ private:
     glm::vec3 voxel_size() noexcept;
     glm::vec3 marker_vertical_offset() noexcept;
 
+    glm::mat4 corrected_zero_lidar_transform();
+
     void set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position);
     void set_gazelle_pose(const NonholonomicPos& nonholonomic_position);
     void set_gazelle_lidar_transform(const Transform& lidar_transform);
+    void set_gazelle_mid_rear_axes_transform(const Transform& mid_rear_axes_transform);
     void reset_marker_interpolation(
         SphericalPoseMarker& marker,
         MarkerInterpolationState& state

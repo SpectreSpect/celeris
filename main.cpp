@@ -280,6 +280,7 @@ int main() {
         scan_vertex_buffer,
         scan_index_buffer,
         mesher,
+        gazelle,
         Celeris::CelerisDesc{
             .vehicle_geometry = vehicle_geometry,
             .footprint_sample_count = 5,
@@ -390,7 +391,7 @@ int main() {
         celeris_user_controller.update(delta_time, camera, keyboard_input_reciever, fps_camera_controller);
         celeris_visualizer.update();
         
-        third_person_camera_controller.set_target(celeris.vehicle_position().pos);
+        third_person_camera_controller.set_target(celeris.vehicle_transform().position);
         if (celeris_user_controller.camera_controller_mode() == CelerisUserController::CameraControllerMode::FPS)
             fps_camera_controller.update(window, delta_time);
         else

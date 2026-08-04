@@ -82,7 +82,8 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
             material_instance_manager,
             m_celeris->voxel_point_map().map_point_buffer,
             celeris.voxel_point_map().m_map_point_count
-        ) {
+        )
+{
     m_path_line_cloud.set_material_data(LineMaterialData{
         .color = glm::vec4(1, 1, 1, 1),
         .line_width_pixels = 5
@@ -148,8 +149,7 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
 
     if (m_celeris->has_start_position())
         set_start(m_celeris->start_position());
-    set_vehicle(m_celeris->vehicle_position());
-    set_gazelle_lidar_transform(m_celeris->lidar_transform());
+    set_gazelle_mid_rear_axes_transform(m_celeris->vehicle_transform());
     if (m_celeris->has_goal_position())
         set_goal(m_celeris->goal_position());
 
@@ -163,14 +163,14 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
 
 void CelerisVisualizer::set_start(const NonholonomicPos& nonholonomic_position) {
     set_marker_pose(m_start_marker, nonholonomic_position);
-    set_gazelle_lidar_transform(m_celeris->lidar_transform());
+    set_gazelle_mid_rear_axes_transform(m_celeris->vehicle_transform());
     reset_marker_interpolation(m_start_marker, m_start_marker_interpolation);
 }
 
 void CelerisVisualizer::set_start(const Transform& transform) {
     m_start_marker.transform = transform;
     m_start_marker.transform.position += marker_vertical_offset();
-    set_gazelle_lidar_transform(m_celeris->lidar_transform());
+    set_gazelle_mid_rear_axes_transform(m_celeris->vehicle_transform());
     reset_marker_interpolation(m_start_marker, m_start_marker_interpolation);
 }
 
@@ -232,8 +232,10 @@ void CelerisVisualizer::update() {
 
     if (m_has_car_pose_override)
         set_gazelle_pose(m_car_pose_override);
-    else
-        set_gazelle_lidar_transform(m_celeris->lidar_transform());
+    else {
+        set_gazelle_mid_rear_axes_transform(m_celeris->vehicle_transform());
+    }
+    
 
     m_start_marker.visible = show_start_marker && m_celeris->has_start_position();
     m_goal_marker.visible = show_goal_marker && m_celeris->has_goal_position();
@@ -281,8 +283,7 @@ void CelerisVisualizer::update() {
                 segment_switch_radius
             )
         );
-        m_segment_switch_rear_axle_point.transform.position =
-            m_celeris->vehicle_position().pos + marker_vertical_offset();
+        m_segment_switch_rear_axle_point.transform.position = m_celeris->vehicle_transform().position;
     } else {
         m_segment_switch_sphere_line_cloud.set_lines(hidden_lines);
     }
@@ -317,41 +318,41 @@ void CelerisVisualizer::update() {
     interpolate_marker_pose(
         m_vehicle_marker,
         m_vehicle_marker_interpolation,
-        m_celeris->vehicle_position(),
+        NonholonomicPos::from_transform(m_celeris->vehicle_transform()),
         now,
         received_new_scan
     );
     m_vehicle_marker.visible = show_vehicle_marker;
 
-    const bool has_lookahead_point = m_celeris->has_local_planner_lookahead_point();
-    m_lookahead_marker.visible = show_lookahead_point && has_lookahead_point;
-    if (has_lookahead_point) {
-        glm::vec3 lookahead_position = m_celeris->local_planner_lookahead_point();
-        float best_dist2 = std::numeric_limits<float>::infinity();
-        for (const NonholonomicPos& path_point : path_result.nonholonomic_astar_path) {
-            const glm::vec2 diff{
-                path_point.pos.x - lookahead_position.x,
-                path_point.pos.z - lookahead_position.z
-            };
-            const float dist2 = glm::dot(diff, diff);
-            if (dist2 < best_dist2) {
-                best_dist2 = dist2;
-                lookahead_position.y = path_point.pos.y;
-            }
-        }
+    // const bool has_lookahead_point = m_celeris->has_local_planner_lookahead_point();
+    // m_lookahead_marker.visible = show_lookahead_point && has_lookahead_point;
+    // if (has_lookahead_point) {
+    //     glm::vec3 lookahead_position = m_celeris->local_planner_lookahead_point();
+    //     float best_dist2 = std::numeric_limits<float>::infinity();
+    //     for (const NonholonomicPos& path_point : path_result.nonholonomic_astar_path) {
+    //         const glm::vec2 diff{
+    //             path_point.pos.x - lookahead_position.x,
+    //             path_point.pos.z - lookahead_position.z
+    //         };
+    //         const float dist2 = glm::dot(diff, diff);
+    //         if (dist2 < best_dist2) {
+    //             best_dist2 = dist2;
+    //             lookahead_position.y = path_point.pos.y;
+    //         }
+    //     }
 
-        m_lookahead_marker.transform.position =
-            lookahead_position +
-            glm::vec3(0.0f, 0.2f + 0.8f * voxel_size().y, 0.0f);
-        m_lookahead_marker.transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-        m_lookahead_marker.transform.scale = glm::vec3(0.45f);
-    }
+    //     m_lookahead_marker.transform.position =
+    //         lookahead_position +
+    //         glm::vec3(0.0f, 0.2f + 0.8f * voxel_size().y, 0.0f);
+    //     m_lookahead_marker.transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    //     m_lookahead_marker.transform.scale = glm::vec3(0.45f);
+    // }
 
     m_local_candidate_line_cloud.set_lines(
         show_local_candidates
             ? make_local_candidate_lines(
                 m_celeris->local_planner_candidates(),
-                m_celeris->lidar_transform().position.y
+                m_celeris->vehicle_lidar_transform().position.y
             )
             : hidden_lines
     );
@@ -384,6 +385,10 @@ glm::vec3 CelerisVisualizer::marker_vertical_offset() noexcept {
     return glm::vec3(0.0f, 0.5f * voxel_size().y, 0.0f);
 }
 
+glm::mat4 CelerisVisualizer::corrected_zero_lidar_transform() {
+    return glm::translate(m_gazelle_next.zero_lidar_transform(), glm::vec3(0, voxel_size().y / 2.0f, 0));
+}
+
 void CelerisVisualizer::set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position) {
     marker.transform.position = nonholonomic_position.pos + marker_vertical_offset();
     marker.transform.rotation = glm::angleAxis(
@@ -408,6 +413,13 @@ void CelerisVisualizer::set_gazelle_lidar_transform(const Transform& lidar_trans
     visual_lidar_transform.position += marker_vertical_offset();
     m_gazelle_next.set_lidar_transform(visual_lidar_transform);
     // m_gazelle_next.transform = visual_lidar_transform;
+}
+
+void CelerisVisualizer::set_gazelle_mid_rear_axes_transform(const Transform& mid_rear_axes_transform) {
+    glm::mat4 vehicle_transform = m_celeris->vehicle_transform().get_model_matrix();
+    glm::mat4 lidar_transform = vehicle_transform * m_gazelle_next.mid_rear_axes_to_lidar_transform();
+    glm::mat4 zero_lidar_transform = lidar_transform * corrected_zero_lidar_transform();
+    m_gazelle_next.transform = Transform::from_matrix(zero_lidar_transform);
 }
 
 void CelerisVisualizer::reset_marker_interpolation(
