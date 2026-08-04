@@ -1,4 +1,4 @@
-#include "new_lidar_scan_receiver.h"
+#include "lidar_scan_receiver.h"
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -10,10 +10,10 @@
 #include "../../../managers/manager_bundle.h"
 #include "lidar_message_point_data.h"
 #include "lidar_message_header.h"
-#include "new_lidar_scan.h"
+#include "lidar_scan.h"
 
 
-NewLidarScanReceiver::NewLidarScanReceiver(
+LidarScanReceiver::LidarScanReceiver(
     ManagerBundle& manager_bundle,
     PointCloudPreprocessor& point_cloud_preprocessor,
     uint16_t port,
@@ -23,14 +23,14 @@ NewLidarScanReceiver::NewLidarScanReceiver(
         m_port(port),
         m_max_queued_messages(max_queued_message) {}
 
-void NewLidarScanReceiver::start() {
+void LidarScanReceiver::start() {
     if (m_running.exchange(true))
         return;
 
-    m_receiver_thread = std::thread(&NewLidarScanReceiver::receiver_loop, this);
+    m_receiver_thread = std::thread(&LidarScanReceiver::receiver_loop, this);
 }
 
-bool NewLidarScanReceiver::try_pop_front_lidar_msg(LidarMessage& message) {
+bool LidarScanReceiver::try_pop_front_lidar_msg(LidarMessage& message) {
     {
         std::unique_lock<std::mutex> lock(m_pending_lidar_msg_mtx);
         
@@ -44,7 +44,7 @@ bool NewLidarScanReceiver::try_pop_front_lidar_msg(LidarMessage& message) {
     return true;
 }
 
-std::unique_ptr<NewLidarScan> NewLidarScanReceiver::try_pop_front_lidar_scan() {
+std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_front_lidar_scan() {
     LOG_METHOD();
 
     logger().check(m_manager_bundle, "Manager bundle was null");
@@ -60,7 +60,7 @@ std::unique_ptr<NewLidarScan> NewLidarScanReceiver::try_pop_front_lidar_scan() {
     
     
     
-    std::unique_ptr<NewLidarScan> scan = std::make_unique<NewLidarScan>(
+    std::unique_ptr<LidarScan> scan = std::make_unique<LidarScan>(
         *m_manager_bundle,
         *m_point_cloud_preprocessor,
         std::move(message)
@@ -69,14 +69,14 @@ std::unique_ptr<NewLidarScan> NewLidarScanReceiver::try_pop_front_lidar_scan() {
     return scan;
 }
 
-void NewLidarScanReceiver::close_listen_socket() {
+void LidarScanReceiver::close_listen_socket() {
     if (m_listen_socket > 0) {
         close(m_listen_socket);
         m_listen_socket = -1;
     }
 }
 
-bool NewLidarScanReceiver::read_exact(int socket, void* data, size_t byte_count) {
+bool LidarScanReceiver::read_exact(int socket, void* data, size_t byte_count) {
     auto* bytes = static_cast<uint8_t*>(data);
     size_t bytes_read = 0;
 
@@ -93,7 +93,7 @@ bool NewLidarScanReceiver::read_exact(int socket, void* data, size_t byte_count)
     return bytes_read == byte_count;
 }
 
-void NewLidarScanReceiver::push_back_lidar_msg(LidarMessage& message) {
+void LidarScanReceiver::push_back_lidar_msg(LidarMessage& message) {
     LOG_METHOD();
     {
         std::unique_lock<std::mutex> lock(m_pending_lidar_msg_mtx);
@@ -104,7 +104,7 @@ void NewLidarScanReceiver::push_back_lidar_msg(LidarMessage& message) {
     }
 }
 
-bool NewLidarScanReceiver::receive_lidar_msg_from_client(int client_socket) {
+bool LidarScanReceiver::receive_lidar_msg_from_client(int client_socket) {
     LOG_METHOD();
 
     while (m_running.load()) {
@@ -155,7 +155,7 @@ bool NewLidarScanReceiver::receive_lidar_msg_from_client(int client_socket) {
     return true;
 }
 
-void NewLidarScanReceiver::receiver_loop() {
+void LidarScanReceiver::receiver_loop() {
     LOG_METHOD();
 
     m_listen_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -188,7 +188,7 @@ void NewLidarScanReceiver::receiver_loop() {
         return;
     }
 
-    logger().log() << "NewLidarScanReceiver: Listening on port " << std::to_string(m_port) << "\n";
+    logger().log() << "LidarScanReceiver: Listening on port " << std::to_string(m_port) << "\n";
 
     while (m_running.load()) {
         sockaddr_in client_address{};

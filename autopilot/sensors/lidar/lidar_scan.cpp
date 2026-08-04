@@ -1,10 +1,10 @@
-#include "new_lidar_scan.h"
+#include "lidar_scan.h"
 
 #include "../../../renderer/point_cloud/point_cloud_preprocessor.h"
 #include "../../../managers/manager_bundle.h"
 
 
-NewLidarScan::NewLidarScan(
+LidarScan::LidarScan(
     ManagerBundle& manager_bundle, 
     PointCloudPreprocessor& point_cloud_preprocessor, 
     LidarMessage&& message)   
@@ -40,7 +40,7 @@ NewLidarScan::NewLidarScan(
     add_child(m_point_cloud);
 }
 
-PointCloud NewLidarScan::point_cloud_from_lidar_msg(LidarMessage&& message) {
+PointCloud LidarScan::point_cloud_from_lidar_msg(LidarMessage&& message) {
     LOG_METHOD();
 
     logger().check(m_manager_bundle, "Manager bundle was null");
@@ -49,14 +49,14 @@ PointCloud NewLidarScan::point_cloud_from_lidar_msg(LidarMessage&& message) {
     return PointCloud(*m_manager_bundle, std::move(message.points));
 }
 
-PointCloud& NewLidarScan::point_cloud() noexcept {
+PointCloud& LidarScan::point_cloud() noexcept {
     return m_point_cloud;
 }
 
-VulkanBuffer& NewLidarScan::normal_buffer() noexcept {
+VulkanBuffer& LidarScan::normal_buffer() noexcept {
     return m_normal_buffer;
 }
 
-uint64_t NewLidarScan::timestamp() const noexcept {
+uint64_t LidarScan::timestamp() const noexcept {
     return m_timestamp;
 }

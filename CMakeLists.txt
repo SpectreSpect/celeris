@@ -103,9 +103,6 @@ add_executable(app
   renderer/scene.cpp
   renderer/scene_object.cpp
   renderer/skybox.cpp
-  renderer/point_cloud/lidar/lidar_scan.cpp
-  renderer/point_cloud/lidar/lidar_scan_receiver.cpp
-  renderer/point_cloud/lidar/lidar_video.cpp
   renderer/point_cloud/gicp/gicp_pass.cpp
   renderer/point_cloud/gicp/voxel_point_map.cpp
   renderer/point_cloud/gicp/voxel_map_point_inserter.cpp
@@ -161,8 +158,8 @@ add_executable(app
   autopilot/celeris_user_controller.cpp
   autopilot/sensors/imu/imu_receiver.cpp
   autopilot/odometry/odometry_estimator.cpp
-  autopilot/sensors/lidar/new_lidar_scan.cpp
-  autopilot/sensors/lidar/new_lidar_scan_receiver.cpp
+  autopilot/sensors/lidar/lidar_scan.cpp
+  autopilot/sensors/lidar/lidar_scan_receiver.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

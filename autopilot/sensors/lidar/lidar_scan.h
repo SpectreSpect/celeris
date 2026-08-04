@@ -9,11 +9,11 @@
 class ManagerBundle;
 class PointCloudPreprocessor;
 
-class NewLidarScan : public SceneObject {
+class LidarScan : public SceneObject {
 public:
-    _XCLASS_NAME(NewLidarScan);
+    _XCLASS_NAME(LidarScan);
 
-    NewLidarScan(
+    LidarScan(
         ManagerBundle& manager_bundle, 
         PointCloudPreprocessor& point_cloud_preprocessor, 
         LidarMessage&& message

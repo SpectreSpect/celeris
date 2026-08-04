@@ -2,7 +2,6 @@
 
 #include "../managers/material_instance_manager.h"
 #include "../managers/material_manager.h"
-#include "../renderer/point_cloud/lidar/lidar_scan_receiver.h"
 #include "../renderer/point_cloud/point_cloud_preprocessor.h"
 #include "../renderer/point_cloud/gicp/voxel_point_map.h"
 #include "../renderer/point_cloud/gicp/voxel_map_point_reseter.h"
@@ -28,8 +27,8 @@
 #include "sensors/imu/imu_measurement.h"
 #include "sensors/imu/imu_receiver.h"
 #include "odometry/odometry_estimator.h"
-#include "sensors/lidar/new_lidar_scan_receiver.h"
-#include "sensors/lidar/new_lidar_scan.h"
+#include "sensors/lidar/lidar_scan_receiver.h"
+#include "sensors/lidar/lidar_scan.h"
 
 #include <chrono>
 #include <cstddef>
@@ -198,7 +197,6 @@ public:
     void load_map(const std::filesystem::path& path);
     void save_waypoint_path(const std::filesystem::path& path);
     void load_waypoint_path(const std::filesystem::path& path);
-    bool localize_on_map();
     const AABB& get_bounding_box() const noexcept;
     const AABB& get_bouding_box() const noexcept { return get_bounding_box(); }
     bool has_map_bounding_box() const noexcept;
@@ -220,8 +218,7 @@ private:
     PathIntersectionDetector m_path_intersection_detector;
 
     PointCloudPreprocessor m_point_cloud_preprocessor;
-    LidarScanReceiver m_scan_receiver;
-    NewLidarScanReceiver m_new_lidar_scan_receiver;
+    LidarScanReceiver m_lidar_scan_receiver;
     VehicleCommandSender m_command_sender;
 
     VehicleStateReceiver m_vehicle_state_receiver;
@@ -264,8 +261,6 @@ private:
 
     std::unique_ptr<LidarScan> m_network_scan;
     std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;
-    std::unique_ptr<NewLidarScan> m_new_network_scan;
-    std::deque<std::unique_ptr<NewLidarScan>> m_new_retired_network_scans;
     uint32_t m_received_scan_count = 0;
     std::chrono::steady_clock::time_point m_last_local_planner_update_timestamp{};
     bool m_has_last_local_planner_update_timestamp = false;
@@ -302,6 +297,9 @@ private:
     bool is_stop_waiting = false;
     double stop_waiting_time = 2;
     std::chrono::steady_clock::time_point stop_waiting_start_timestamp{};
+
+    void try_receive_and_process_imu();
+    void try_receive_and_process_lidar_scan();
 
     void collision(
         std::span<const glm::vec3> previous_free_raw_points,

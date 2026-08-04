@@ -15,11 +15,11 @@
 
 class PointCloudPreprocessor;
 class ManagerBundle;
-class NewLidarScan;
+class LidarScan;
 
-class NewLidarScanReceiver {
+class LidarScanReceiver {
 public:
-    _XCLASS_NAME(NewLidarScanReceiver);
+    _XCLASS_NAME(LidarScanReceiver);
 
     // struct ImuMessage {
     //     glm::vec3 linear_acceleration;
@@ -27,7 +27,7 @@ public:
     //     std::int64_t timestamp;
     // };
 
-    NewLidarScanReceiver(
+    LidarScanReceiver(
         ManagerBundle& manager_bundle,
         PointCloudPreprocessor& point_cloud_preprocessor,
         uint16_t port = 5000,
@@ -36,7 +36,7 @@ public:
 
     void start();
     bool try_pop_front_lidar_msg(LidarMessage& message);
-    std::unique_ptr<NewLidarScan> try_pop_front_lidar_scan();
+    std::unique_ptr<LidarScan> try_pop_front_lidar_scan();
     
 public:
     ManagerBundle* m_manager_bundle = nullptr;

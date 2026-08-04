@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-#include "../sensors/lidar/new_lidar_scan.h"
+#include "../sensors/lidar/lidar_scan.h"
 
 OdometryEstimator::OdometryEstimator() {
 }
@@ -66,7 +66,7 @@ void OdometryEstimator::submit_imu(const ImuMeasurement& imu_measurement) {
     m_history.push_back(new_odometry);
 }
 
-void OdometryEstimator::submit_lidar_scan(NewLidarScan& lidar_scan, const Odometry& closest_prev_odometry) {
+void OdometryEstimator::submit_lidar_scan(LidarScan& lidar_scan, const Odometry& closest_prev_odometry) {
     Odometry new_odometry{};
 
     new_odometry.position = lidar_scan.point_cloud().transform.position;
