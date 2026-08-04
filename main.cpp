@@ -38,13 +38,10 @@
 #include "renderer/point_cloud/point_cloud.h"
 #include "renderer/scene.h"
 #include "renderer/skybox.h"
-#include "renderer/point_cloud/lidar/lidar_scan.h"
-#include "renderer/point_cloud/lidar/lidar_video.h"
 #include "renderer/point_cloud/gicp/gicp_pass.h"
 #include "renderer/point_cloud/gicp/voxel_point_map.h"
 #include "renderer/point_cloud/gicp/voxel_map_point_inserter.h"
 #include "renderer/point_cloud/gicp/voxel_map_point_reseter.h"
-#include "renderer/point_cloud/lidar/lidar_scan_receiver.h"
 #include "imgui_layer.h"
 #include "renderer/lighting_system/lighting_system.h"
 #include "renderer/pbr/equirect_to_cubemap_pass.h"
@@ -80,6 +77,11 @@
 #include "vulkan_self/vulkan_submit_context.h"
 #include "vulkan_self/keyboard_input_reciever.h"
 #include "autopilot/arrow.h"
+#include "autopilot/sensors/imu/imu_receiver.h"
+#include "autopilot/sensors/imu/imu_measurement.h"
+#include "autopilot/odometry/odometry_estimator.h"
+#include "autopilot/sensors/lidar/lidar_scan.h"
+#include "autopilot/sensors/lidar/lidar_scan_receiver.h"
 
 #include <algorithm>
 #include <exception>
@@ -328,10 +330,16 @@ int main() {
         glm::radians(30.0f)             // wing angle to the main line
     );
 
+    std::unique_ptr<LidarScan> m_network_scan;
+    std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;
+
+    // GazelleNext test_gazelle_next(mesh_manager, material_instance_manager, vehicle_geometry, skybox_exposure);
+
     Scene scene;
 
     scene.add(skybox);
     scene.add(celeris_visualizer);
+    // scene.add(test_gazelle_next);
     scene.add(voxel_grid.render_object());
     scene.add(test_arrow);
 
@@ -378,7 +386,7 @@ int main() {
         uint32_t image_index = 0;
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
-
+        
         celeris.update(compute_submit_context);
         celeris_user_controller.update(delta_time, camera, keyboard_input_reciever, fps_camera_controller);
         celeris_visualizer.update();

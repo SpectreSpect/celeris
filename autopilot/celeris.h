@@ -11,7 +11,6 @@
 
 #include "../managers/material_instance_manager.h"
 #include "../managers/material_manager.h"
-#include "../renderer/point_cloud/lidar/lidar_scan_receiver.h"
 #include "../renderer/point_cloud/point_cloud_preprocessor.h"
 #include "../renderer/point_cloud/gicp/voxel_point_map.h"
 #include "../renderer/point_cloud/gicp/voxel_map_point_reseter.h"
@@ -34,6 +33,11 @@
 #include "../a_star/vehicle.h"
 #include "../a_star/local_planner_base.h"
 #include "vehicle_state_receiver.h"
+#include "sensors/imu/imu_measurement.h"
+#include "sensors/imu/imu_receiver.h"
+#include "odometry/odometry_estimator.h"
+#include "sensors/lidar/lidar_scan_receiver.h"
+#include "sensors/lidar/lidar_scan.h"
 
 class VulkanQueue;
 class ComputePassManager;
@@ -64,6 +68,7 @@ public:
         uint32_t collision_history_size = 8;
         uint32_t collision_escape_search_radius_voxels = 8;
         uint16_t vehicle_state_receiver_port = 5002;
+        uint16_t imu_receiver_port = 5003;
         float vehicle_state_timeout = 0.25f;
         float max_vehicle_acceleration = 3;
         float max_vehicle_steer_acceleration = 5;
@@ -194,7 +199,6 @@ public:
     void load_map(const std::filesystem::path& path);
     void save_waypoint_path(const std::filesystem::path& path);
     void load_waypoint_path(const std::filesystem::path& path);
-    // bool localize_on_map();
     const AABB& get_bounding_box() const noexcept;
     const AABB& get_bouding_box() const noexcept { return get_bounding_box(); }
     bool has_map_bounding_box() const noexcept;
@@ -217,10 +221,15 @@ private:
     PathIntersectionDetector m_path_intersection_detector;
 
     PointCloudPreprocessor m_point_cloud_preprocessor;
-    LidarScanReceiver m_scan_receiver;
+    LidarScanReceiver m_lidar_scan_receiver;
     VehicleCommandSender m_command_sender;
 
     VehicleStateReceiver m_vehicle_state_receiver;
+    // ImuReceiver imu_receiver(5003, 1);
+    ImuReceiver m_imu_receiver;
+
+    OdometryEstimator m_odometry_estimator;
+    
 
     std::unique_ptr<VehicleBase> m_vehicle;
     PathPlanner m_path_planner;
@@ -291,6 +300,9 @@ private:
     bool is_stop_waiting = false;
     double stop_waiting_time = 2;
     std::chrono::steady_clock::time_point stop_waiting_start_timestamp{};
+
+    void try_receive_and_process_imu();
+    void try_receive_and_process_lidar_scan();
 
     void collision(
         std::span<const glm::vec3> previous_free_raw_points,

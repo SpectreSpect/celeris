@@ -147,10 +147,11 @@ void GazelleNext::update_layout() {
     const float lidar_z = m_vehicle_geometry.lidar_from_left - car_width / 2.0f;
 
     m_lidar_mount.transform.position = glm::vec3(lidar_x, lidar_y + lidar_scale.y / 2.0f, lidar_z);
-    m_lidar_mount.transform.rotation = glm::angleAxis(
-        glm::pi<float>(),
-        glm::vec3(0.0f, 1.0f, 0.0f)
-    );
+    // m_lidar_mount.transform.rotation = glm::angleAxis(
+    //     glm::pi<float>(),
+    //     glm::vec3(0.0f, 1.0f, 0.0f)
+    // );
+    m_lidar_mount.transform.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     m_lidar_mount.transform.scale = glm::vec3(1.0f);
 
     m_lidar.transform.position = glm::vec3(0.0f);
@@ -190,6 +191,11 @@ void GazelleNext::set_lidar_transform(const Transform& lidar_transform) {
     set_lidar_position(lidar_transform.position);
 }
 
+void GazelleNext::set_lidar_transform(const Odometry& odometry) {
+    transform.rotation = odometry.orientation;
+    set_lidar_position(odometry.position);
+}
+
 glm::vec3 GazelleNext::rear_axle_world_offset() const {
     return glm::normalize(transform.rotation) * (rear_axle_bottom_offset() * transform.scale);
 }
@@ -202,7 +208,7 @@ glm::mat4 GazelleNext::zero_lidar_transform() const {
     glm::vec3 ground_lidar_pos = lidar_mount().transform.position;
     ground_lidar_pos.y = 0;
 
-    glm::vec3 target_lidar_dir = glm::vec3(-1, 0, 0);
+    glm::vec3 target_lidar_dir = glm::vec3(1, 0, 0);
     glm::vec3 lidar_dir = glm::normalize(ground_lidar_pos);
     glm::mat4 target_rotation = glm::mat4_cast(glm::rotation(lidar_dir, target_lidar_dir));
 
