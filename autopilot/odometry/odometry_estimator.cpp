@@ -42,7 +42,7 @@ void OdometryEstimator::submit_imu(const ImuMeasurement& imu_measurement) {
     //         mean_gravity.y << ", " <<
     //         mean_gravity.z << ")" << std::endl;
         
-    std::cout << "Imu timestamp: " << imu_measurement.timestamp * 1e-9 << std::endl;
+    // std::cout << "Imu timestamp: " << imu_measurement.timestamp * 1e-9 << std::endl;
 
     Odometry new_odometry{};
     if (m_history.empty()) {
@@ -112,7 +112,7 @@ void OdometryEstimator::submit_lidar_scan(LidarScan& lidar_scan, const Odometry&
     new_odometry.orientation = lidar_scan.point_cloud().transform.rotation;
     new_odometry.timestamp_ns = lidar_scan.timestamp();
 
-    std::cout << "Lidar timestamp: " << new_odometry.timestamp_ns * 1e-9 << std::endl;
+    // std::cout << "Lidar timestamp: " << new_odometry.timestamp_ns * 1e-9 << std::endl;
 
     const float dt =
         static_cast<float>(new_odometry.timestamp_ns - closest_prev_odometry.timestamp_ns)
@@ -121,6 +121,18 @@ void OdometryEstimator::submit_lidar_scan(LidarScan& lidar_scan, const Odometry&
     if (dt > 1e-6f) {
         new_odometry.linear_velocity =
             (new_odometry.position - closest_prev_odometry.position) / dt;
+        
+        std::cout << "new_domotery.position: (" << 
+            new_odometry.position.x << ", " << 
+            new_odometry.position.y << ", " << 
+            new_odometry.position.z << ")   closest_prev_odometry.position: (" << 
+            closest_prev_odometry.position.x << ", " << 
+            closest_prev_odometry.position.y << ", " <<
+            closest_prev_odometry.position.z << ")  dt: " <<
+            dt << "     new_linear_velocity: (" <<
+            new_odometry.linear_velocity.x << ", " <<
+            new_odometry.linear_velocity.y << ", " << 
+            new_odometry.linear_velocity.z << ")" << std::endl;
 
         glm::quat delta_rotation = glm::normalize(
             new_odometry.orientation * glm::inverse(closest_prev_odometry.orientation)
@@ -140,6 +152,8 @@ void OdometryEstimator::submit_lidar_scan(LidarScan& lidar_scan, const Odometry&
             new_odometry.linear_velocity - 
             closest_prev_odometry.linear_velocity) / dt;
     }
+
+    // std::cout << "Lidar odometry position: " << new_odometry.position.x << ", " << new_odometry.position.y << ", " << new_odometry.position.z << ")" << std::endl;
 
     submit_odometry(new_odometry);
 }

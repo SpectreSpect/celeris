@@ -23,10 +23,10 @@ private:
     std::deque<Odometry> m_history;
     glm::vec3 m_gravity_world;
 
-    uint32_t calibration_step = 0;
-    uint32_t max_calibration_steps = 100;
+    // uint32_t calibration_step = 0;
+    // uint32_t max_calibration_steps = 100;
 
-    glm::vec3 m_gravity_total;
-    float m_max_gravity_length = 0.422485f;
-    uint32_t gravity_count = 0;
+    // glm::vec3 m_gravity_total;
+    // float m_max_gravity_length = 0.422485f;
+    // uint32_t gravity_count = 0;
 };
