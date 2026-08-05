@@ -102,6 +102,8 @@ void OdometryEstimator::submit_imu(const ImuMeasurement& imu_measurement) {
         new_odometry = last_odometry;
     }
 
+    new_odometry.sensor_type = TYPE_IMU;
+
     m_history.push_back(new_odometry);
 }
 
@@ -153,9 +155,53 @@ void OdometryEstimator::submit_lidar_scan(LidarScan& lidar_scan, const Odometry&
             closest_prev_odometry.linear_velocity) / dt;
     }
 
+    new_odometry.sensor_type = TYPE_LIDAR;
+
     // std::cout << "Lidar odometry position: " << new_odometry.position.x << ", " << new_odometry.position.y << ", " << new_odometry.position.z << ")" << std::endl;
 
     submit_odometry(new_odometry);
+}
+
+void OdometryEstimator::submit_lidar_imu_fusion(
+        LidarScan& lidar_scan, 
+        const Odometry& closest_prev_imu_odometry, 
+        const Odometry& last_lidar_odometry
+) {
+    constexpr float alpha = 0.5f;
+    constexpr float beta = 0.05f;
+
+    const std::int64_t lidar_timestamp_ns =
+        static_cast<std::int64_t>(lidar_scan.timestamp());
+
+    Odometry fused_odometry = closest_prev_imu_odometry;
+    fused_odometry.timestamp_ns = lidar_timestamp_ns;
+    fused_odometry.sensor_type = TYPE_LIDAR;
+
+    const glm::vec3 lidar_position =
+        lidar_scan.point_cloud().transform.position;
+    const glm::vec3 position_innovation =
+        lidar_position - closest_prev_imu_odometry.position;
+
+    fused_odometry.position =
+        closest_prev_imu_odometry.position + alpha * position_innovation;
+
+    if (last_lidar_odometry.timestamp_ns > 0 &&
+        lidar_timestamp_ns > last_lidar_odometry.timestamp_ns) {
+        const float lidar_dt = static_cast<float>(
+            lidar_timestamp_ns - last_lidar_odometry.timestamp_ns
+        ) * 1e-9f;
+
+        if (lidar_dt > 1e-6f) {
+            fused_odometry.linear_velocity =
+                closest_prev_imu_odometry.linear_velocity +
+                beta * position_innovation / lidar_dt;
+        }
+    }
+
+    fused_odometry.orientation =
+        lidar_scan.point_cloud().transform.rotation;
+
+    submit_odometry(fused_odometry);
 }
 
 void OdometryEstimator::submit_odometry(const Odometry& odometry) {
@@ -176,4 +222,34 @@ bool OdometryEstimator::get_closest_prev_odometry(uint64_t timestamp, Odometry& 
         }
     }
     return false;
+}
+
+bool OdometryEstimator::get_last_lidar_odometry(Odometry& output) {
+    for (int i = m_history.size() - 1; i >= 0; i--) {
+        
+        if (m_history[i].sensor_type == TYPE_LIDAR) {
+            output = m_history[i];
+            return true;
+        }
+    }
+    return false;
+}
+
+bool OdometryEstimator::get_last_imu_odometry(Odometry& output) {
+    for (int i = m_history.size() - 1; i >= 0; i--) {
+        
+        if (m_history[i].sensor_type == TYPE_IMU) {
+            output = m_history[i];
+            return true;
+        }
+    }
+    return false;
+}
+
+size_t OdometryEstimator::history_size() {
+    return m_history.size();
+}
+
+Odometry OdometryEstimator::get_odometry(uint32_t id) {
+    return m_history[id];
 }

@@ -937,11 +937,12 @@ void Celeris::try_receive_and_process_imu() {
 
 void Celeris::try_receive_and_process_lidar_scan() {
     if (auto scan = m_lidar_scan_receiver.try_pop_front_lidar_scan()) {
-        if (m_network_scan)
+        if (m_network_scan) {
             m_retired_network_scans.push_back(std::move(m_network_scan));
+        }
 
         m_network_scan = std::move(scan);
-
+        
         while (m_retired_network_scans.size() > m_engine->num_frames_in_flight())
             m_retired_network_scans.pop_front();
 
@@ -962,8 +963,21 @@ void Celeris::try_receive_and_process_lidar_scan() {
                             m_network_scan->normal_buffer(),
                             m_desc.max_gicp_iterations);
         }
-        
-        m_odometry_estimator.submit_lidar_scan(*m_network_scan, closest_odometry);
+
+        Odometry last_lidar_odometry{};
+        if (m_odometry_estimator.get_last_lidar_odometry(last_lidar_odometry))
+            last_lidar_odometry.timestamp_ns = m_network_scan->timestamp();
+
+        // last_lidar_odometry.timestamp_ns = m_network_scan->timestamp();
+        // if (last_lidar_odometry_id >= 0)
+        //     last_lidar_odometry = m_odometry_estimator.get_odometry(last_lidar_odometry_id);
+
+        m_odometry_estimator.submit_lidar_imu_fusion(*m_network_scan, closest_odometry, last_lidar_odometry);
+        // m_odometry_estimator.submit_lidar_scan(*m_network_scan, last_lidar_odometry);
+
+        // m_odometry_estimator.submit_lidar_scan(*m_network_scan, closest_odometry);
+
+        // last_lidar_odometry_id = m_odometry_estimator.history_size() - 1;
 
         m_lidar_transform = m_network_scan->point_cloud().transform;
         

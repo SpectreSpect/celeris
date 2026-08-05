@@ -298,6 +298,8 @@ private:
     double stop_waiting_time = 2;
     std::chrono::steady_clock::time_point stop_waiting_start_timestamp{};
 
+    // int last_lidar_odometry_id = -1;
+
     void try_receive_and_process_imu();
     void try_receive_and_process_lidar_scan();
 
