@@ -151,8 +151,8 @@ int main() {
         compute_pass_manager
     );
 
-    // glm::vec3 voxel_size(0.2f);
-    glm::vec3 voxel_size(1.0f);
+    glm::vec3 voxel_size(0.2f);
+    // glm::vec3 voxel_size(1.0f);
     uint32_t vertical_inflation_size =
         static_cast<uint32_t>(std::ceil(vehicle_geometry.size.y / voxel_size.y));
     uint32_t horizontal_inflation_size =
@@ -288,6 +288,9 @@ int main() {
             .gamepad_commands_enabled = false
         }
     );
+    // celeris.odometry_estimator().set_gravity(glm::vec3(-0.203579f, 10.0965f, -0.240282f)); // ros bag 2
+    // celeris.odometry_estimator().set_gravity(glm::vec3(-0.123099f, 9.78485f, -0.69118f)); // simulator
+    celeris.odometry_estimator().start_gravity_calibration(100);
 
     // celeris.set_vehicle_command(VehicleCommand{
     //     .acceleration = 0.5f,

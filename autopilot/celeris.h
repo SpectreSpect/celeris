@@ -160,6 +160,7 @@ public:
     VoxelGrid* voxel_grid() noexcept;
     WaypointPath& waypoint_path() noexcept;
     const WaypointPath& waypoint_path() const noexcept;
+    OdometryEstimator& odometry_estimator() noexcept;
 
     bool request_path_replan();
     void reset_local_planner_tracking();
@@ -226,7 +227,6 @@ private:
     ImuReceiver m_imu_receiver;
 
     OdometryEstimator m_odometry_estimator;
-    
 
     std::unique_ptr<VehicleBase> m_vehicle;
     PathPlanner m_path_planner;

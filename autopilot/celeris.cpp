@@ -433,65 +433,9 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
 
     sync_path_planner_result();
 
-    // // local_planner().update_timestamp();
-
-    // // VehicleFeedback vehicle_feedback;
-    // // const bool has_vehicle_feedback =
-    // //     m_vehicle_state_receiver.latest_feedback(vehicle_feedback) &&
-    // //     is_vehicle_feedback_fresh(vehicle_feedback);
-    // // if (has_vehicle_feedback) {
-    // //     apply_vehicle_feedback(vehicle_feedback);
-    // // }
-
-
-
-    // // if (m_gamepad_commands_enabled) {
-    // //     const float delta_time = local_planner().calculate_delta_time();
-    // //     if (delta_time > 0.0f) {
-    // //         vehicle().state().m_steering_angle_velocity =
-    // //             m_gamepad_command.steering_angle_velocity;
-    // //         vehicle().simulate_vehicle(
-    // //             m_gamepad_command.acceleration,
-    // //             0.0f,
-    // //             delta_time,
-    // //             std::min(delta_time, 0.05f),
-    // //             false
-    // //         );
-    // //     }
-    // // } else {
-    // //     local_planner().predict_vehicle_state(vehicle());
-    // // }
-
-    // float vehicle_height = m_vehicle_position.pos.y;
-
     try_receive_and_process_imu();
-    try_receive_and_process_lidar_scan();
-
-    // sync_vehicle_position_from_state(vehicle_height);
-
-    // const auto now = std::chrono::steady_clock::now();
-    // const float local_planner_update_period = std::max(0.0f, m_desc.local_planner_update_period);
-    // const bool should_update_local_planner =
-    //     !m_has_last_local_planner_update_timestamp ||
-    //     local_planner_update_period <= 0.0f ||
-    //     std::chrono::duration<float>(now - m_last_local_planner_update_timestamp).count() >=
-    //         local_planner_update_period;
-
-    // if (should_update_local_planner) {
-    //     VehicleCommand vehicle_command;
-    //     if (!m_waypoint_path_completed || m_waypoint_path.waypoints().empty()) {
-    //         vehicle_command = local_planner().step(
-    //             vehicle(),
-    //             m_path_intersection_detector,
-    //             submit_context
-    //         );
-    //     }
-
-    //     if (!m_gamepad_commands_enabled)
-    //         m_command_sender.set_command(vehicle_command);
-    //     m_last_local_planner_update_timestamp = now;
-    //     m_has_last_local_planner_update_timestamp = true;
-    // }
+    if (!odometry_estimator().is_gravity_calibration_underway())
+        try_receive_and_process_lidar_scan();
 }
 
 void Celeris::apply_vehicle_feedback(const VehicleFeedback& feedback) {
@@ -747,6 +691,10 @@ VoxelGrid* Celeris::voxel_grid() noexcept {
 
 WaypointPath& Celeris::waypoint_path() noexcept {
     return m_waypoint_path;
+}
+
+OdometryEstimator& Celeris::odometry_estimator() noexcept {
+    return m_odometry_estimator;
 }
 
 const WaypointPath& Celeris::waypoint_path() const noexcept {

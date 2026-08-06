@@ -2,6 +2,7 @@
 
 #include <deque>
 
+#include "../../vulkan_self/logger/logger_header.h"
 #include "../sensors/imu/imu_measurement.h"
 #include "odometry.h"
 
@@ -9,7 +10,14 @@ class LidarScan;
 
 class OdometryEstimator {
 public:
+    _XCLASS_NAME(OdometryEstimator);
+
     OdometryEstimator();
+
+    void start_gravity_calibration(uint32_t calibration_step_count);
+    bool is_gravity_calibration_underway();
+    void gravity_calibration_step(const ImuMeasurement& imu_measurement);
+    void set_gravity(glm::vec3 gravity);
 
     Odometry get_latest_odometry();
 
@@ -32,12 +40,9 @@ public:
 
 private:
     std::deque<Odometry> m_history;
-    glm::vec3 m_gravity_world;
+    glm::vec3 m_gravity;
 
-    // uint32_t calibration_step = 0;
-    // uint32_t max_calibration_steps = 100;
-
-    // glm::vec3 m_gravity_total;
-    // float m_max_gravity_length = 0.422485f;
-    // uint32_t gravity_count = 0;
+    uint32_t m_gravity_calibration_step = 1;
+    uint32_t m_gravity_calibration_step_count = 0;
+    glm::vec3 m_gravity_total;
 };
