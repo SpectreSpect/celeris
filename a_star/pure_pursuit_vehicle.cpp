@@ -22,7 +22,7 @@ namespace {
 
     glm::vec2 forward_vector(const Vehicle::VehicleTransformState& state)
     {
-        return glm::vec2{std::cos(state.m_heading), std::sin(state.m_heading)};
+        return glm::vec2{std::cos(state.heading), std::sin(state.heading)};
     }
 }
 
@@ -97,10 +97,10 @@ void PurePursuitVehicle::vehicle_simulation_step(
         check_simulation_step(speed_acceleration, steering_angle_velocity, dt);
     }
 
-    const float speed0 = state.m_speed;
-    const float heading0 = state.m_heading;
+    const float speed0 = state.speed;
+    const float heading0 = state.heading;
     const float steering_angle0 = std::clamp(
-        state.m_steering_angle,
+        state.steering_angle,
         -kMaxSteeringAngle,
         kMaxSteeringAngle
     );
@@ -130,13 +130,13 @@ void PurePursuitVehicle::vehicle_simulation_step(
     const float heading1 = heading0 + 0.5f * (heading_velocity0 + heading_velocity1) * dt;
     const glm::vec2 velocity1 = glm::vec2{std::cos(heading1), std::sin(heading1)} * speed1;
 
-    state.m_position += 0.5f * (velocity0 + velocity1) * dt;
-    state.m_speed = speed1;
-    state.m_speed_acceleration = speed_acceleration;
-    state.m_heading = heading1;
-    state.m_steering_angle = steering_angle1;
-    state.m_steering_angle_velocity = steering_angle_velocity0;
-    state.m_steering_angle_acceleration = 0.0f;
+    state.position += 0.5f * (velocity0 + velocity1) * dt;
+    state.speed = speed1;
+    state.speed_acceleration = speed_acceleration;
+    state.heading = heading1;
+    state.steering_angle = steering_angle1;
+    state.steering_angle_velocity = steering_angle_velocity0;
+    state.steering_angle_acceleration = 0.0f;
 }
 
 PurePursuitVehicle::VehicleTransformState PurePursuitVehicle::get_vehicle_simulation_step(
@@ -221,13 +221,13 @@ PurePursuitVehicle::PurePursuitControlCommand PurePursuitVehicle::compute_contro
     PointProjection current_projection = Vehicle::find_polyline_projection(
         path,
         path_arc_lengths,
-        state.m_position,
+        state.position,
         projection_min_s,
         projection_max_s
     );
 
     const float lookahead_distance = std::clamp(
-        m_params.lookahead_distance + std::abs(state.m_speed) * m_params.lookahead_speed_gain,
+        m_params.lookahead_distance + std::abs(state.speed) * m_params.lookahead_speed_gain,
         std::max(0.0f, m_params.min_lookahead_distance),
         std::max(m_params.min_lookahead_distance, m_params.max_lookahead_distance)
     );
@@ -247,14 +247,14 @@ PurePursuitVehicle::PurePursuitControlCommand PurePursuitVehicle::compute_contro
         remaining_s = std::max(0.0f, next_switch_s - current_projection.s);
     }
 
-    const glm::vec2 to_target = target_projection.point - state.m_position;
+    const glm::vec2 to_target = target_projection.point - state.position;
     const float target_distance = glm::length(to_target);
     float target_steering_angle = 0.0f;
     if (target_distance > Utils::eps) {
         const float target_heading = std::atan2(to_target.y, to_target.x);
         const float motion_heading = target_projection.dir < 0.0f
-            ? state.m_heading + kPi
-            : state.m_heading;
+            ? state.heading + kPi
+            : state.heading;
         const float heading_error = angle_diff(motion_heading, target_heading);
         const float steering_lookahead_distance = std::max(
             target_distance,
@@ -277,7 +277,7 @@ PurePursuitVehicle::PurePursuitControlCommand PurePursuitVehicle::compute_contro
             }
 
             if (remaining_s <= std::max(0.0f, m_params.goal_steering_release_distance) &&
-                std::abs(state.m_speed) <= std::max(0.0f, m_params.goal_steering_release_speed))
+                std::abs(state.speed) <= std::max(0.0f, m_params.goal_steering_release_speed))
             {
                 target_steering_angle = 0.0f;
             }
@@ -306,12 +306,12 @@ PurePursuitVehicle::PurePursuitControlCommand PurePursuitVehicle::compute_contro
 
     const float target_speed = target_speed_abs * current_projection.dir;
     const float speed_acceleration = std::clamp(
-        (target_speed - state.m_speed) * m_params.speed_p_gain,
+        (target_speed - state.speed) * m_params.speed_p_gain,
         -m_max_acceleration,
         m_max_acceleration
     );
     const float steering_angle_velocity = std::clamp(
-        angle_diff(state.m_steering_angle, target_steering_angle) * m_params.steering_p_gain,
+        angle_diff(state.steering_angle, target_steering_angle) * m_params.steering_p_gain,
         -m_max_steering_angle_velocity,
         m_max_steering_angle_velocity
     );

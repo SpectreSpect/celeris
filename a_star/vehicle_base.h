@@ -21,14 +21,14 @@ public:
     };
 
     struct VehicleTransformState {
-        glm::vec2 m_position = glm::vec2{0.0f};
-        float m_speed = 0.0f;
-        float m_speed_acceleration = 0.0f;
-        float m_heading = 0.0f;
+        glm::vec2 position = glm::vec2{0.0f};
+        float speed = 0.0f;
+        float speed_acceleration = 0.0f;
+        float heading = 0.0f;
 
-        float m_steering_angle = 0.0f;
-        float m_steering_angle_velocity = 0.0f;
-        float m_steering_angle_acceleration = 0.0f;
+        float steering_angle = 0.0f;
+        float steering_angle_velocity = 0.0f;
+        float steering_angle_acceleration = 0.0f;
     };
 
 public:

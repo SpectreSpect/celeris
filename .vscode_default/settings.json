@@ -4,5 +4,5 @@
     "C_Cpp.default.cppStandard": "c++20",
     "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
 
-    "cmake.buildDirectory": "${workspaceFolder}/build"
+    "cmake.useCMakePresets": "always"
 }

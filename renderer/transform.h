@@ -21,8 +21,11 @@ public:
 
     Transform() = default;
     Transform(glm::vec3 position, glm::vec3 scale, glm::quat rotation);
+    static Transform from_matrix(const glm::mat4& matrix);
 
-    Transform& operator*(Transform& other);
+    Transform operator*(const Transform& other) const;
+    Transform inverse() const;
 
     glm::mat4 get_model_matrix() const;
+    glm::mat4 get_inverse_model_matrix() const;
 };

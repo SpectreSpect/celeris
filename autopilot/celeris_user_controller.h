@@ -98,7 +98,7 @@ public:
 
         logger().check(m_celeris, "Celeris was null");
 
-        m_celeris->set_start(m_celeris->vehicle_position());
+        m_celeris->set_start(NonholonomicPos::from_transform(m_celeris->vehicle_transform()));
         m_has_start_pos = true;
         m_has_planned_path = false;
     };
