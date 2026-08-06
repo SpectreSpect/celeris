@@ -458,6 +458,8 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
 
         vehicle_scan_generation = m_received_scan_count;
     }
+
+    Odometry odometry = m_odometry_estimator.get_latest_odometry();
     
     /*
         Получение фидбека динамики машины (позиции и руля).
