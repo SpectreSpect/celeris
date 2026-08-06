@@ -9,6 +9,7 @@
 #include "../renderer/lines/line_cloud.h"
 #include "../a_star/vehicle.h"
 #include "../renderer/point_cloud/point_cloud.h"
+#include "arrow.h"
 
 #include "../vulkan_self/logger/logger_header.h"
 
@@ -70,6 +71,8 @@ private:
     SphericalPoseMarker m_lookahead_marker;
     GazelleNext m_gazelle_next;
 
+    Arrow linear_acceleration_arrow;
+
     LineCloud m_path_line_cloud;
     LineCloud m_guide_path_line_cloud;
     LineCloud m_explored_paths_line_cloud;
@@ -104,9 +107,12 @@ private:
     glm::vec3 voxel_size() noexcept;
     glm::vec3 marker_vertical_offset() noexcept;
 
+    glm::mat4 corrected_zero_lidar_transform();
+
     void set_marker_pose(SphericalPoseMarker& marker, NonholonomicPos nonholonomic_position);
     void set_gazelle_pose(const NonholonomicPos& nonholonomic_position);
     void set_gazelle_lidar_transform(const Transform& lidar_transform);
+    void set_gazelle_mid_rear_axes_transform(const Transform& mid_rear_axes_transform);
     void reset_marker_interpolation(
         SphericalPoseMarker& marker,
         MarkerInterpolationState& state

@@ -5,14 +5,14 @@
       "label": "cmake-configure-debug",
       "type": "shell",
       "command": "cmake",
-      "args": ["-S", ".", "-B", "build", "-DCMAKE_BUILD_TYPE=Debug"],
+      "args": ["--preset", "debug"],
       "problemMatcher": []
     },
     {
       "label": "cmake-build-debug",
       "type": "shell",
       "command": "cmake",
-      "args": ["--build", "build", "--parallel", "4"],
+      "args": ["--build", "--preset", "debug"],
       "dependsOn": ["cmake-configure-debug"],
       "group": { "kind": "build", "isDefault": true },
       "problemMatcher": ["$gcc"]

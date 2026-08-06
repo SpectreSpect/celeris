@@ -98,7 +98,7 @@ public:
 
         logger().check(m_celeris, "Celeris was null");
 
-        m_celeris->set_start(m_celeris->vehicle_position());
+        m_celeris->set_start(NonholonomicPos::from_transform(m_celeris->vehicle_transform()));
         m_has_start_pos = true;
         m_has_planned_path = false;
     };
@@ -229,13 +229,13 @@ private:
     Celeris* m_celeris = nullptr;
     CelerisVisualizer* m_celeris_visualizer = nullptr;
 
-    CameraControllerMode m_camera_controller_mode = CameraControllerMode::ThirdPerson;
+    CameraControllerMode m_camera_controller_mode = CameraControllerMode::FPS;
     
     bool m_has_start_pos = false;
     bool m_has_end_pos = false;
     bool m_has_planned_path = false;
 
-    bool m_show_voxel_grid = false;
+    bool m_show_voxel_grid = true;
     bool m_display_inflated_voxels = false;
     float m_inflated_voxel_color[4];
     float m_inflated_curvature_limit_exceeded_voxel_color[4];

@@ -103,9 +103,6 @@ add_executable(app
   renderer/scene.cpp
   renderer/scene_object.cpp
   renderer/skybox.cpp
-  renderer/point_cloud/lidar/lidar_scan.cpp
-  renderer/point_cloud/lidar/lidar_scan_receiver.cpp
-  renderer/point_cloud/lidar/lidar_video.cpp
   renderer/point_cloud/gicp/gicp_pass.cpp
   renderer/point_cloud/gicp/voxel_point_map.cpp
   renderer/point_cloud/gicp/voxel_map_point_inserter.cpp
@@ -138,6 +135,7 @@ add_executable(app
   a_star/footprint/footprint.cpp
   a_star/footprint/footprint_visualizer.cpp
   autopilot/spherical_pose_marker.cpp
+  autopilot/arrow.cpp
   autopilot/gazelle_next.cpp
   autopilot/vehicle_command_sender.cpp
   autopilot/gamepad_controller.cpp
@@ -158,6 +156,10 @@ add_executable(app
   a_star/pure_pursuit_local_planner.cpp
   vulkan_self/keyboard_input_reciever.cpp
   autopilot/celeris_user_controller.cpp
+  autopilot/sensors/imu/imu_receiver.cpp
+  autopilot/odometry/odometry_estimator.cpp
+  autopilot/sensors/lidar/lidar_scan.cpp
+  autopilot/sensors/lidar/lidar_scan_receiver.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

@@ -38,13 +38,10 @@
 #include "renderer/point_cloud/point_cloud.h"
 #include "renderer/scene.h"
 #include "renderer/skybox.h"
-#include "renderer/point_cloud/lidar/lidar_scan.h"
-#include "renderer/point_cloud/lidar/lidar_video.h"
 #include "renderer/point_cloud/gicp/gicp_pass.h"
 #include "renderer/point_cloud/gicp/voxel_point_map.h"
 #include "renderer/point_cloud/gicp/voxel_map_point_inserter.h"
 #include "renderer/point_cloud/gicp/voxel_map_point_reseter.h"
-#include "renderer/point_cloud/lidar/lidar_scan_receiver.h"
 #include "imgui_layer.h"
 #include "renderer/lighting_system/lighting_system.h"
 #include "renderer/pbr/equirect_to_cubemap_pass.h"
@@ -79,6 +76,12 @@
 #include "autopilot/celeris_user_controller.h"
 #include "vulkan_self/vulkan_submit_context.h"
 #include "vulkan_self/keyboard_input_reciever.h"
+#include "autopilot/arrow.h"
+#include "autopilot/sensors/imu/imu_receiver.h"
+#include "autopilot/sensors/imu/imu_measurement.h"
+#include "autopilot/odometry/odometry_estimator.h"
+#include "autopilot/sensors/lidar/lidar_scan.h"
+#include "autopilot/sensors/lidar/lidar_scan_receiver.h"
 
 #include <algorithm>
 #include <exception>
@@ -148,7 +151,8 @@ int main() {
         compute_pass_manager
     );
 
-    glm::vec3 voxel_size(0.5f);
+    glm::vec3 voxel_size(0.2f);
+    // glm::vec3 voxel_size(1.0f);
     uint32_t vertical_inflation_size =
         static_cast<uint32_t>(std::ceil(vehicle_geometry.size.y / voxel_size.y));
     uint32_t horizontal_inflation_size =
@@ -276,6 +280,7 @@ int main() {
         scan_vertex_buffer,
         scan_index_buffer,
         mesher,
+        gazelle,
         Celeris::CelerisDesc{
             .vehicle_geometry = vehicle_geometry,
             .footprint_sample_count = 5,
@@ -284,6 +289,9 @@ int main() {
             .gamepad_commands_enabled = false
         }
     );
+    // celeris.odometry_estimator().set_gravity(glm::vec3(-0.203579f, 10.0965f, -0.240282f)); // ros bag 2
+    // celeris.odometry_estimator().set_gravity(glm::vec3(-0.123099f, 9.78485f, -0.69118f)); // simulator
+    celeris.odometry_estimator().start_gravity_calibration(100);
 
     // celeris.set_vehicle_command(VehicleCommand{
     //     .acceleration = 0.5f,
@@ -312,11 +320,31 @@ int main() {
         skybox_exposure
     );
 
+    Arrow test_arrow(
+        engine,
+        mesh_manager,
+        material_instance_manager,
+        glm::vec4(1, 0, 0, 1),
+        10.0f,                          // length
+        5.0f,                           // line width in pixels
+        glm::vec3(0.0f, 3.0f, 0.0f),  // position above ground
+        glm::vec3(1.0f, 0.0f, 0.0f),  // direction
+        2.5f,                           // wing length
+        glm::radians(30.0f)             // wing angle to the main line
+    );
+
+    std::unique_ptr<LidarScan> m_network_scan;
+    std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;
+
+    // GazelleNext test_gazelle_next(mesh_manager, material_instance_manager, vehicle_geometry, skybox_exposure);
+
     Scene scene;
 
     scene.add(skybox);
     scene.add(celeris_visualizer);
+    // scene.add(test_gazelle_next);
     scene.add(voxel_grid.render_object());
+    scene.add(test_arrow);
 
     skybox.update(scene);
 
@@ -361,12 +389,12 @@ int main() {
         uint32_t image_index = 0;
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
-
+        
         celeris.update(compute_submit_context);
         celeris_user_controller.update(delta_time, camera, keyboard_input_reciever, fps_camera_controller);
         celeris_visualizer.update();
         
-        third_person_camera_controller.set_target(celeris.vehicle_position().pos);
+        third_person_camera_controller.set_target(celeris.vehicle_transform().position);
         if (celeris_user_controller.camera_controller_mode() == CelerisUserController::CameraControllerMode::FPS)
             fps_camera_controller.update(window, delta_time);
         else

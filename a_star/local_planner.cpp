@@ -129,7 +129,7 @@ void LocalPlanner::predict_vehicle_state(Vehicle& vehicle) {
         m_last_applied_command.has_value() ? m_last_applied_command->speed_acceleration : 0.0f;
 
     if (m_last_applied_command.has_value())
-        vehicle.state().m_steering_angle_velocity = m_last_applied_command->steering_angle_velocity;
+        vehicle.state().steering_angle_velocity = m_last_applied_command->steering_angle_velocity;
 
     const float delta_time = calculate_delta_time();
 
@@ -443,7 +443,7 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
                 segment.s_end
             );
         const float segment_end_dist =
-            glm::length(vehicle.state().m_position - segment_end_projection.point);
+            glm::length(vehicle.state().position - segment_end_projection.point);
 
         if (segment_end_dist > segment_switch_radius)
             break;
@@ -496,19 +496,19 @@ VehicleCommand LocalPlanner::predict_vehicle_command(
 
     last_control_command = control;
 
-    float effective_steering_angle_velocity = vehicle.state().m_steering_angle_velocity;
-    if ((vehicle.state().m_steering_angle <= -kMaxSteeringAngle + Utils::eps &&
+    float effective_steering_angle_velocity = vehicle.state().steering_angle_velocity;
+    if ((vehicle.state().steering_angle <= -kMaxSteeringAngle + Utils::eps &&
          effective_steering_angle_velocity < 0.0f) ||
-        (vehicle.state().m_steering_angle >= kMaxSteeringAngle - Utils::eps &&
+        (vehicle.state().steering_angle >= kMaxSteeringAngle - Utils::eps &&
          effective_steering_angle_velocity > 0.0f))
     {
         effective_steering_angle_velocity = 0.0f;
     }
     float steering_angle_velocity_target =
         effective_steering_angle_velocity + 0.5f * control.steer_acceleration * command_delta_time;
-    if ((vehicle.state().m_steering_angle <= -kMaxSteeringAngle + Utils::eps &&
+    if ((vehicle.state().steering_angle <= -kMaxSteeringAngle + Utils::eps &&
          steering_angle_velocity_target < 0.0f) ||
-        (vehicle.state().m_steering_angle >= kMaxSteeringAngle - Utils::eps &&
+        (vehicle.state().steering_angle >= kMaxSteeringAngle - Utils::eps &&
          steering_angle_velocity_target > 0.0f))
     {
         steering_angle_velocity_target = 0.0f;
