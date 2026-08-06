@@ -437,8 +437,10 @@ void Celeris::update(VulkanSubmitContext& submit_context) {
     logger().check(m_voxel_grid, "Voxel grid was null");
 
     sync_path_planner_result();
+
     try_receive_and_process_imu();
-    try_receive_and_process_lidar_scan();
+    if (!odometry_estimator().is_gravity_calibration_underway())
+        try_receive_and_process_lidar_scan();
 
     // Определение позиции машины (предсказание/из скана лидара)
     static uint32_t vehicle_scan_generation = 0;
@@ -722,6 +724,10 @@ WaypointPath& Celeris::waypoint_path() noexcept {
     return m_waypoint_path;
 }
 
+OdometryEstimator& Celeris::odometry_estimator() noexcept {
+    return m_odometry_estimator;
+}
+
 const WaypointPath& Celeris::waypoint_path() const noexcept {
     return m_waypoint_path;
 }
@@ -900,22 +906,32 @@ void Celeris::try_receive_and_process_imu() {
     ImuMeasurement imu_message{};
     if (m_imu_receiver.try_pop_back_imu_message(imu_message)) {
         m_odometry_estimator.submit_imu(imu_message);
+
+        // Odometry latest_odometry = m_odometry_estimator.get_latest_odometry();
+
+        // m_lidar_transform.position = latest_odometry.position;
+        // m_lidar_transform.rotation = latest_odometry.orientation;
     }
 }
 
 void Celeris::try_receive_and_process_lidar_scan() {
     if (auto scan = m_lidar_scan_receiver.try_pop_front_lidar_scan()) {
-        if (m_network_scan)
+        if (m_network_scan) {
             m_retired_network_scans.push_back(std::move(m_network_scan));
+        }
 
         m_network_scan = std::move(scan);
-
+        
         while (m_retired_network_scans.size() > m_engine->num_frames_in_flight())
             m_retired_network_scans.pop_front();
-        
+
         Odometry closest_odometry{};
         if (!m_odometry_estimator.get_closest_prev_odometry(m_network_scan->timestamp(), closest_odometry))
             closest_odometry.timestamp_ns = m_network_scan->timestamp();
+
+        // Odometry closest_odometry = m_odometry_estimator.get_latest_odometry();
+        
+        // std::cout << "(" << closest_odometry.position.x << ", " << closest_odometry.position.y << ", " << closest_odometry.position.z << "),    timestamp: " << m_network_scan->timestamp() << std::endl;
 
         m_network_scan->point_cloud().transform.position = closest_odometry.position;
         m_network_scan->point_cloud().transform.rotation = closest_odometry.orientation;
@@ -926,8 +942,23 @@ void Celeris::try_receive_and_process_lidar_scan() {
                             m_network_scan->normal_buffer(),
                             m_desc.max_gicp_iterations);
         }
+
+        Odometry last_lidar_odometry{};
+        if (m_odometry_estimator.get_last_lidar_odometry(last_lidar_odometry))
+            last_lidar_odometry.timestamp_ns = m_network_scan->timestamp();
+
+        // last_lidar_odometry.timestamp_ns = m_network_scan->timestamp();
+        // if (last_lidar_odometry_id >= 0)
+        //     last_lidar_odometry = m_odometry_estimator.get_odometry(last_lidar_odometry_id);
+
+        m_odometry_estimator.submit_lidar_imu_fusion(*m_network_scan, closest_odometry, last_lidar_odometry);
+        // m_odometry_estimator.submit_lidar_scan(*m_network_scan, last_lidar_odometry);
+
+        // m_odometry_estimator.submit_lidar_scan(*m_network_scan, closest_odometry);
+
+        // last_lidar_odometry_id = m_odometry_estimator.history_size() - 1;
         
-        m_odometry_estimator.submit_lidar_scan(*m_network_scan, closest_odometry);
+        // m_lidar_transform = m_network_scan->point_cloud().transform;
         
         m_voxel_map_inserter.insert(m_voxel_point_map, m_network_scan->point_cloud(), m_network_scan->normal_buffer());
         m_voxel_grid->voxelize_point_cloud(

@@ -4,5 +4,5 @@
 
 struct LidarMessagePointData {
     glm::vec3 position;
-    uint64_t timestamp;
+    uint64_t time_offset_ns;
 };
