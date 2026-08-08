@@ -1,6 +1,9 @@
 #pragma once
 
 #include <deque>
+#include <cstdint>
+#include <cstddef>
+#include <glm/glm.hpp>
 
 #include "../../vulkan_self/logger/logger_header.h"
 #include "../sensors/imu/imu_measurement.h"
