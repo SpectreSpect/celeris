@@ -21,6 +21,8 @@ public:
 
     PointCloud point_cloud_from_lidar_msg(LidarMessage&& message);
 
+    void save(std::filesystem::path path);
+
     PointCloud& point_cloud() noexcept;
     VulkanBuffer& normal_buffer() noexcept;
     uint64_t timestamp() const noexcept;

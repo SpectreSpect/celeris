@@ -49,6 +49,10 @@ PointCloud LidarScan::point_cloud_from_lidar_msg(LidarMessage&& message) {
     return PointCloud(*m_manager_bundle, std::move(message.points));
 }
 
+void LidarScan::save(std::filesystem::path path) {
+    m_point_cloud.save(path);
+}
+
 PointCloud& LidarScan::point_cloud() noexcept {
     return m_point_cloud;
 }

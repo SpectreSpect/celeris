@@ -269,6 +269,8 @@ int main() {
         engine.compute_queue(1)
     );
 
+    PointCloud loaded_point_cloud(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.bin");
+
     Celeris celeris(
         engine,
         engine.compute_queue(),
@@ -305,7 +307,7 @@ int main() {
     // celeris.set_start_lidar_scan_position(start_lidar_scan_position);
     // celeris.load_map(saved_maps_directory / "test4.vpm");
     // celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim_3.wpp");
-    celeris.start(std::move(planner_submit_context));
+    // celeris.start(std::move(planner_submit_context));
     // celeris.set_vehicle_command(VehicleCommand{
     //     .acceleration = 0.5f,
     //     .steering_angle_velocity = 0.5f
@@ -341,10 +343,11 @@ int main() {
     Scene scene;
 
     scene.add(skybox);
-    scene.add(celeris_visualizer);
-    // scene.add(test_gazelle_next);
-    scene.add(voxel_grid.render_object());
-    scene.add(test_arrow);
+    // scene.add(celeris_visualizer);
+    // // scene.add(test_gazelle_next);
+    // scene.add(voxel_grid.render_object());
+    // scene.add(test_arrow);
+    scene.add(loaded_point_cloud);
 
     skybox.update(scene);
 

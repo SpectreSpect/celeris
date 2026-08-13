@@ -917,6 +917,8 @@ void Celeris::try_receive_and_process_imu() {
 }
 
 void Celeris::try_receive_and_process_lidar_scan() {
+    LOG_METHOD();
+
     if (auto scan = m_lidar_scan_receiver.try_pop_front_lidar_scan()) {
         if (m_network_scan) {
             m_retired_network_scans.push_back(std::move(m_network_scan));
@@ -954,6 +956,10 @@ void Celeris::try_receive_and_process_lidar_scan() {
         //     last_lidar_odometry = m_odometry_estimator.get_odometry(last_lidar_odometry_id);
 
         m_odometry_estimator.submit_lidar_imu_fusion(*m_network_scan, closest_odometry, last_lidar_odometry);
+
+        m_network_scan.get()->save("/home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.bin");
+        logger().log("Saved lidar scan to /home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.bin");
+
         // m_odometry_estimator.submit_lidar_scan(*m_network_scan, last_lidar_odometry);
 
         // m_odometry_estimator.submit_lidar_scan(*m_network_scan, closest_odometry);
