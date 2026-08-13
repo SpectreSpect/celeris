@@ -269,7 +269,8 @@ int main() {
         engine.compute_queue(1)
     );
 
-    PointCloud loaded_point_cloud(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.bin");
+    // PointCloud loaded_point_cloud(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.bin");
+    LidarScan loaded_lidar_scan(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.lsb");
 
     Celeris celeris(
         engine,
@@ -347,7 +348,8 @@ int main() {
     // // scene.add(test_gazelle_next);
     // scene.add(voxel_grid.render_object());
     // scene.add(test_arrow);
-    scene.add(loaded_point_cloud);
+    // scene.add(loaded_point_cloud);
+    scene.add(loaded_lidar_scan);
 
     skybox.update(scene);
 

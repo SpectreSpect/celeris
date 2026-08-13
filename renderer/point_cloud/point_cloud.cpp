@@ -121,6 +121,8 @@ void PointCloud::save(std::filesystem::path path) {
 }
 
 PointCloud PointCloud::load(ManagerBundle& manager_bundle, std::filesystem::path path) {
+    LOG_NAMED("PointCloud");
+    
     logger().check(!path.empty(), "Output path was empty");
     logger().check(path.has_filename(), "Output path has no filename");
 
