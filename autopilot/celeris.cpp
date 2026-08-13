@@ -429,6 +429,8 @@ void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     m_imu_receiver.start();
     m_command_sender.start();
     m_path_planner.start(std::move(planner_submit_context));
+
+    m_lidar_odometry_recorder.start("/home/spectre/TEMP_lidar_output_mesh/test_lidar_recording");
 }
 
 void Celeris::update(VulkanSubmitContext& submit_context) {
@@ -957,8 +959,10 @@ void Celeris::try_receive_and_process_lidar_scan() {
 
         m_odometry_estimator.submit_lidar_imu_fusion(*m_network_scan, closest_odometry, last_lidar_odometry);
 
-        m_network_scan.get()->save("/home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.lsb");
-        logger().log("Saved lidar scan to /home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.lsb");
+        m_lidar_odometry_recorder.record(*m_network_scan, m_odometry_estimator.get_latest_odometry());
+
+        // m_network_scan.get()->save("/home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.lsb");
+        // logger().log("Saved lidar scan to /home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.lsb");
 
         // m_odometry_estimator.submit_lidar_scan(*m_network_scan, last_lidar_odometry);
 

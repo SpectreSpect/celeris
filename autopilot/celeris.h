@@ -38,6 +38,7 @@
 #include "odometry/odometry_estimator.h"
 #include "sensors/lidar/lidar_scan_receiver.h"
 #include "sensors/lidar/lidar_scan.h"
+#include "recorder/lidar_odometry_recorder.h"
 
 class VulkanQueue;
 class ComputePassManager;
@@ -238,6 +239,8 @@ private:
     VoxelPointMap m_voxel_point_map;
     VoxelMapPointInserter m_voxel_map_inserter;
     VoxelMapPointReseter m_voxel_map_reseter;
+
+    LidarOdometryRecorder m_lidar_odometry_recorder;
 
     VulkanBuffer voxel_write_list;
     std::vector<glm::ivec3> m_path_potential_visualization_voxels;

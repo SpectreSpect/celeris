@@ -308,7 +308,7 @@ int main() {
     // celeris.set_start_lidar_scan_position(start_lidar_scan_position);
     // celeris.load_map(saved_maps_directory / "test4.vpm");
     // celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim_3.wpp");
-    // celeris.start(std::move(planner_submit_context));
+    celeris.start(std::move(planner_submit_context));
     // celeris.set_vehicle_command(VehicleCommand{
     //     .acceleration = 0.5f,
     //     .steering_angle_velocity = 0.5f
@@ -344,12 +344,12 @@ int main() {
     Scene scene;
 
     scene.add(skybox);
-    // scene.add(celeris_visualizer);
+    scene.add(celeris_visualizer);
     // // scene.add(test_gazelle_next);
-    // scene.add(voxel_grid.render_object());
+    scene.add(voxel_grid.render_object());
     // scene.add(test_arrow);
     // scene.add(loaded_point_cloud);
-    scene.add(loaded_lidar_scan);
+    // scene.add(loaded_lidar_scan);
 
     skybox.update(scene);
 
