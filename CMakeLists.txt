@@ -161,6 +161,7 @@ add_executable(app
   autopilot/sensors/lidar/lidar_scan.cpp
   autopilot/sensors/lidar/lidar_scan_receiver.cpp
   autopilot/dynamics/ackermann_dynamics.cpp
+  autopilot/dynamics/hybrid_dynamical_system.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
