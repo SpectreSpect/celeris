@@ -20,6 +20,7 @@
 #include <vector>
 #include <chrono>
 
+class LidarMessageOdometryEntry;
 struct VehicleGeometry;
 
 class CelerisVisualizer : public SceneObject {
@@ -43,6 +44,7 @@ public:
     void set_vehicle(const NonholonomicPos& nonholonomic_position);
     void set_car_pose_override(const NonholonomicPos& nonholonomic_position);
     void clear_car_pose_override();
+    void set_recording_lidar_scan(LidarMessageOdometryEntry& entry);
 
     glm::vec3 get_start_marker_pos();
 
@@ -82,6 +84,7 @@ private:
     RenderObject m_segment_switch_rear_axle_point;
 
     PointCloud m_point_map_point_cloud;
+    // PointCloud m_recording_point_cloud;
 
     MarkerInterpolationState m_start_marker_interpolation;
     MarkerInterpolationState m_goal_marker_interpolation;

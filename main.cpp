@@ -304,9 +304,12 @@ int main() {
     LidarMessageOdometryRecordering loaded_recording;
     loaded_recording.load("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg_recording/");
 
-    LidarMessage& recording_lidar_message = loaded_recording.get_entry(195).lidar_message;
-    LidarScan recording_lidar_scan(manager_bundle, point_cloud_preprocessor, recording_lidar_message);
-
+    auto& first_entry = loaded_recording.get_entry(0);
+    PointCloud lidar_msg_point_cloud(
+        manager_bundle,
+        first_entry.lidar_message.points
+    );
+    
     // celeris.set_vehicle_command(VehicleCommand{
     //     .acceleration = 0.5f,
     //     .steering_angle_velocity = 0.5f
@@ -361,7 +364,8 @@ int main() {
     // scene.add(test_arrow);
     // scene.add(loaded_point_cloud);
     // scene.add(loaded_lidar_scan);
-    scene.add(recording_lidar_scan);
+    // scene.add(recording_lidar_scan);
+    scene.add(lidar_msg_point_cloud);
 
     skybox.update(scene);
 
@@ -373,6 +377,8 @@ int main() {
     uint32_t pending_skybox_environment_map_id = skybox.environment_map_id();
     bool skybox_environment_update_pending = false;
     float angular_speed = glm::half_pi<float>() * 0.5f;
+
+    int current_entry_id = -1;
 
     // use_fps_camera_controller();
 
@@ -410,6 +416,19 @@ int main() {
         celeris.update(compute_submit_context);
         celeris_user_controller.update(delta_time, camera, keyboard_input_reciever, fps_camera_controller);
         celeris_visualizer.update();
+
+        if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_N)) {
+            current_entry_id = (current_entry_id + 1) % loaded_recording.size();
+            
+            LidarMessageOdometryEntry& entry = loaded_recording.get_entry(current_entry_id);
+
+            // LidarMessage& recording_lidar_message = entry.lidar_message;
+            // LidarScan recording_lidar_scan(manager_bundle, point_cloud_preprocessor, recording_lidar_message);
+            lidar_msg_point_cloud.set_points(entry.lidar_message.points);
+
+            lidar_msg_point_cloud.transform.position = entry.odometry.position;
+            lidar_msg_point_cloud.transform.rotation = entry.odometry.orientation;
+        }
         
         third_person_camera_controller.set_target(celeris.vehicle_transform().position);
         if (celeris_user_controller.camera_controller_mode() == CelerisUserController::CameraControllerMode::FPS)

@@ -104,3 +104,7 @@ LidarMessageOdometryEntry& LidarMessageOdometryRecordering::get_entry(size_t ind
 
     return m_entries[index];
 }
+
+uint32_t LidarMessageOdometryRecordering::size() const noexcept {
+    return static_cast<uint32_t>(m_entries.size());
+}

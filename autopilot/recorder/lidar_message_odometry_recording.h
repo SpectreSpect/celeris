@@ -19,6 +19,7 @@ public:
         int last_entry_id = -1);
 
     LidarMessageOdometryEntry& get_entry(size_t index);
+    uint32_t size() const noexcept;
 
 private:
     std::vector<LidarMessageOdometryEntry> m_entries;
