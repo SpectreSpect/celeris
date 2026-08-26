@@ -6,48 +6,16 @@
 #include <algorithm>
 #include <vector>
 #include <map>
-#include <chrono>
 #include <optional>
 
 #include "../../vulkan_self/logger/logger_header.h"
 #include "dynamic_interface.h"
+#include "clock.h"
+#include "state_estimate.h"
+#include "instant_event.h"
 
 namespace celeris {
     namespace simulation {
-        struct Clock {
-            using duration = std::chrono::nanoseconds;
-            using rep = duration::rep;
-            using period = duration::period;
-            using time_point = std::chrono::time_point<Clock, duration>;
-        };
-
-        using Timestamp = Clock::time_point;
-        using Duration = Clock::duration;
-
-        [[nodiscard]]
-        constexpr double to_seconds(Duration duration) noexcept {
-            return std::chrono::duration<double>{duration}.count();
-        }
-    }
-
-    template<class State>
-    struct StateEstimate {
-        State state;
-        simulation::Timestamp timestamp;
-        // В теории сюда можно добавить информацию о "достоверности" состояния...
-    };
-
-    template<class State>
-    class InstantEvent {
-    public:
-        _XPARENT_NAME(InstantEvent);
-
-        virtual ~InstantEvent() noexcept = default;
-
-        virtual simulation::Timestamp timestamp() const noexcept = 0;
-        virtual void apply(StateEstimate<State>& state) const = 0;
-    };
-
     template<class State>
     class HybridDynamicalSystem {
     public:
@@ -318,10 +286,11 @@ namespace celeris {
 
                 logger().check(duration > Duration::zero(), "Simulation timestamp failed to advance.");
 
-                m_dynamic_model->simulate_dynamic_inplace(
+                m_dynamic_model->simulate_for_inplace(
+                    state.timestamp,
                     state.state, 
-                    simulation::to_seconds(duration),
-                    simulation::to_seconds(m_max_integration_step)
+                    duration
+                    m_max_integration_step
                 );
 
                 state.timestamp = next_timestamp;
