@@ -82,6 +82,7 @@
 #include "autopilot/odometry/odometry_estimator.h"
 #include "autopilot/sensors/lidar/lidar_scan.h"
 #include "autopilot/sensors/lidar/lidar_scan_receiver.h"
+#include "autopilot/sensors/lidar/lidar_message.h"
 
 #include <algorithm>
 #include <exception>
@@ -272,6 +273,9 @@ int main() {
     // PointCloud loaded_point_cloud(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.bin");
     // LidarScan loaded_lidar_scan(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.lsb");
 
+    LidarMessage loaded_lidar_msg("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg.lmb");
+    LidarScan loaded_lidar_scan(manager_bundle, point_cloud_preprocessor, std::move(loaded_lidar_msg));
+
     Celeris celeris(
         engine,
         engine.compute_queue(),
@@ -349,7 +353,7 @@ int main() {
     scene.add(voxel_grid.render_object());
     // scene.add(test_arrow);
     // scene.add(loaded_point_cloud);
-    // scene.add(loaded_lidar_scan);
+    scene.add(loaded_lidar_scan);
 
     skybox.update(scene);
 

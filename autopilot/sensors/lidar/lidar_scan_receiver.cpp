@@ -99,6 +99,9 @@ void LidarScanReceiver::push_back_lidar_msg(LidarMessage& message) {
 
         if (m_lidar_msg_queue.size() == m_max_queued_messages)
             m_lidar_msg_queue.pop_front();
+        
+        // message.save("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg.lmb");
+        
         m_lidar_msg_queue.push_back(message);
     }
 }

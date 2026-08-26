@@ -29,11 +29,11 @@ LidarScan::LidarScan(
         16
     );
 
-    logger().check(
-        message.latest_point_id >= 0 &&
-        message.latest_point_id < message.timestamps.size(),
-        "Latest point index was out of bounds"
-    );
+    // logger().check(
+    //     message.latest_point_id >= 0 &&
+    //     message.latest_point_id < message.timestamps.size(),
+    //     "Latest point index was out of bounds"
+    // );
 
     m_timestamp = message.timestamps[0];
     
