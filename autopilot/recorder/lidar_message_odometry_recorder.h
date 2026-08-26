@@ -14,10 +14,12 @@ public:
 
     ~LidarMessageOdometryRecorder() noexcept;
 
+    
     void start(std::filesystem::path path);
     void stop();
     void record(const LidarMessage& lidar_msg, const Odometry& odometry);
     bool is_recording() const noexcept;
+    void update_record_count();
 
 private:
     bool m_is_recording = false;

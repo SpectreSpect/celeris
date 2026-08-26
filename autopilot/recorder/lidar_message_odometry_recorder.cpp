@@ -33,6 +33,18 @@ void LidarMessageOdometryRecorder::start(std::filesystem::path path) {
     m_recording_dir = std::move(path);
     m_is_recording = true;
     m_record_count = 0;
+
+    m_index_file.write(
+        reinterpret_cast<const char*>(&m_record_count),
+        static_cast<std::streamsize>(sizeof(m_record_count))
+    );
+
+    logger().check(
+        static_cast<bool>(m_index_file),
+        "Failed to write initial record count"
+    );
+
+    // update_record_count();
 }
 
 void LidarMessageOdometryRecorder::stop() {
@@ -88,8 +100,29 @@ void LidarMessageOdometryRecorder::record(const LidarMessage& lidar_msg, const O
     );
 
     m_record_count++;
+
+    update_record_count();
 }
 
 bool LidarMessageOdometryRecorder::is_recording() const noexcept {
     return m_is_recording;
+}
+
+void LidarMessageOdometryRecorder::update_record_count() {
+    m_index_file.flush();
+
+    const auto current_position = m_index_file.tellp();
+
+    m_index_file.seekp(0, std::ios::beg);
+    m_index_file.write(
+        reinterpret_cast<const char*>(&m_record_count),
+        sizeof(m_record_count)
+    );
+
+    m_index_file.seekp(current_position);
+
+    logger().check(
+        static_cast<bool>(m_index_file),
+        "Failed to update record count"
+    );
 }

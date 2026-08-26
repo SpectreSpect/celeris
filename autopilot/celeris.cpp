@@ -425,9 +425,9 @@ void Celeris::start_lidar_receiver() {
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     // start_lidar_receiver();
 
-    m_lidar_scan_receiver.start();
+    // m_lidar_scan_receiver.start();
     // m_vehicle_state_receiver.start();
-    m_imu_receiver.start();
+    // m_imu_receiver.start();
     // m_command_sender.start();
     // m_path_planner.start(std::move(planner_submit_context));
 

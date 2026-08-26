@@ -83,6 +83,7 @@
 #include "autopilot/sensors/lidar/lidar_scan.h"
 #include "autopilot/sensors/lidar/lidar_scan_receiver.h"
 #include "autopilot/sensors/lidar/lidar_message.h"
+#include "autopilot/recorder/lidar_message_odometry_recording.h"
 
 #include <algorithm>
 #include <exception>
@@ -273,8 +274,8 @@ int main() {
     // PointCloud loaded_point_cloud(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.bin");
     // LidarScan loaded_lidar_scan(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.lsb");
 
-    LidarMessage loaded_lidar_msg("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg.lmb");
-    LidarScan loaded_lidar_scan(manager_bundle, point_cloud_preprocessor, loaded_lidar_msg);
+    // LidarMessage loaded_lidar_msg("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg.lmb");
+    // LidarScan loaded_lidar_scan(manager_bundle, point_cloud_preprocessor, loaded_lidar_msg);
 
     Celeris celeris(
         engine,
@@ -299,6 +300,12 @@ int main() {
     // celeris.odometry_estimator().set_gravity(glm::vec3(-0.203579f, 10.0965f, -0.240282f)); // ros bag 2
     // celeris.odometry_estimator().set_gravity(glm::vec3(-0.123099f, 9.78485f, -0.69118f)); // simulator
     celeris.odometry_estimator().start_gravity_calibration(100);
+
+    LidarMessageOdometryRecordering loaded_recording;
+    loaded_recording.load("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg_recording/");
+
+    LidarMessage& recording_lidar_message = loaded_recording.get_entry(195).lidar_message;
+    LidarScan recording_lidar_scan(manager_bundle, point_cloud_preprocessor, recording_lidar_message);
 
     // celeris.set_vehicle_command(VehicleCommand{
     //     .acceleration = 0.5f,
@@ -353,7 +360,8 @@ int main() {
     scene.add(voxel_grid.render_object());
     // scene.add(test_arrow);
     // scene.add(loaded_point_cloud);
-    scene.add(loaded_lidar_scan);
+    // scene.add(loaded_lidar_scan);
+    scene.add(recording_lidar_scan);
 
     skybox.update(scene);
 

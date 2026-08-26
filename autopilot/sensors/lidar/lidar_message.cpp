@@ -87,8 +87,8 @@ void LidarMessage::save(std::filesystem::path path) const {
 LidarMessage LidarMessage::load(std::filesystem::path path) {
     LOG_NAMED("LidarMessage");
     
-    logger().check(!path.empty(), "Output path was empty");
-    logger().check(path.has_filename(), "Output path has no filename");
+    logger().check(!path.empty(), "Path was empty");
+    logger().check(path.has_filename(), "Path has no filename");
 
     const auto parent = path.parent_path();
 
