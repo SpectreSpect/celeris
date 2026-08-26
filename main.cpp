@@ -270,7 +270,7 @@ int main() {
     );
 
     // PointCloud loaded_point_cloud(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.bin");
-    LidarScan loaded_lidar_scan(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.lsb");
+    // LidarScan loaded_lidar_scan(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.lsb");
 
     Celeris celeris(
         engine,

@@ -18,6 +18,7 @@ public:
     void start(std::filesystem::path path);
     void stop();
     void record(LidarScan& lidar_scan, const Odometry& odometry);
+    bool is_recording() const noexcept;
 
 private:
     bool m_is_recording = false;

@@ -59,7 +59,6 @@ std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_front_lidar_scan() {
         return nullptr;
     
     
-    
     std::unique_ptr<LidarScan> scan = std::make_unique<LidarScan>(
         *m_manager_bundle,
         *m_point_cloud_preprocessor,

@@ -89,3 +89,7 @@ void LidarOdometryRecorder::record(LidarScan& lidar_scan, const Odometry& odomet
 
     m_record_count++;
 }
+
+bool LidarOdometryRecorder::is_recording() const noexcept {
+    return m_is_recording;
+}
