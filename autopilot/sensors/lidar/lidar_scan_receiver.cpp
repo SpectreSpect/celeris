@@ -44,6 +44,27 @@ bool LidarScanReceiver::try_pop_front_lidar_msg(LidarMessage& message) {
     return true;
 }
 
+std::unique_ptr<LidarScan> LidarScanReceiver::try_get_lidar_scan_from_lidar_msg(LidarMessage& message) {
+    LOG_METHOD();
+
+    logger().check(m_manager_bundle, "Manager bundle was null");
+    logger().check(m_point_cloud_preprocessor, "Point cloud preprocessor was null");
+
+    // if (!try_pop_front_lidar_msg(message))
+    //     return nullptr;
+    
+    if (message.points.empty() || message.timestamps.empty())
+        return nullptr;
+    
+    std::unique_ptr<LidarScan> scan = std::make_unique<LidarScan>(
+        *m_manager_bundle,
+        *m_point_cloud_preprocessor,
+        message
+    );
+
+    return scan;
+}
+
 std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_front_lidar_scan() {
     LOG_METHOD();
 
@@ -55,15 +76,17 @@ std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_front_lidar_scan() {
     if (!try_pop_front_lidar_msg(message))
         return nullptr;
     
-    if (message.points.empty() || message.timestamps.empty())
-        return nullptr;
+    // if (message.points.empty() || message.timestamps.empty())
+    //     return nullptr;
     
     
-    std::unique_ptr<LidarScan> scan = std::make_unique<LidarScan>(
-        *m_manager_bundle,
-        *m_point_cloud_preprocessor,
-        std::move(message)
-    );
+    // std::unique_ptr<LidarScan> scan = std::make_unique<LidarScan>(
+    //     *m_manager_bundle,
+    //     *m_point_cloud_preprocessor,
+    //     std::move(message)
+    // );
+
+    std::unique_ptr<LidarScan> scan = try_get_lidar_scan_from_lidar_msg(message);
 
     return scan;
 }

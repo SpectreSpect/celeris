@@ -58,36 +58,36 @@ void LidarMessageOdometryRecorder::stop() {
 }
 
 void LidarMessageOdometryRecorder::record(const LidarMessage& lidar_msg, const Odometry& odometry) {
-    // LOG_METHOD();
+    LOG_METHOD();
 
-    // logger().check(m_is_recording, "Cannot record before recording has been started");
-    // logger().check(m_index_file.is_open(), "The index file wasn't open");
+    logger().check(m_is_recording, "Cannot record before recording has been started");
+    logger().check(m_index_file.is_open(), "The index file wasn't open");
 
-    // std::string scan_file_name = "scan_" + std::to_string(m_record_count) + ".lmb";
-    // std::filesystem::path scan_file_path = m_recording_dir / scan_file_name;
+    std::string scan_file_name = "scan_" + std::to_string(m_record_count) + ".lmb";
+    std::filesystem::path scan_file_path = m_recording_dir / scan_file_name;
 
-    // lidar_msg.save(scan_file_path);
+    lidar_msg.save(scan_file_path);
     
-    // m_index_file.write(
-    //     reinterpret_cast<const char*>(&m_record_count), 
-    //     static_cast<std::streamsize>(sizeof(m_record_count))
-    // );
-    // logger().check(static_cast<bool>(m_index_file), "Failed to write entry index to file");
+    m_index_file.write(
+        reinterpret_cast<const char*>(&m_record_count), 
+        static_cast<std::streamsize>(sizeof(m_record_count))
+    );
+    logger().check(static_cast<bool>(m_index_file), "Failed to write entry index to file");
 
-    // m_index_file.write(
-    //     reinterpret_cast<const char*>(&odometry), 
-    //     static_cast<std::streamsize>(sizeof(odometry))
-    // );
-    // logger().check(static_cast<bool>(m_index_file), "Failed to write odometry to file");
+    m_index_file.write(
+        reinterpret_cast<const char*>(&odometry), 
+        static_cast<std::streamsize>(sizeof(odometry))
+    );
+    logger().check(static_cast<bool>(m_index_file), "Failed to write odometry to file");
 
-    // m_index_file.flush();
+    m_index_file.flush();
 
-    // logger().check(
-    //     static_cast<bool>(m_index_file),
-    //     "Failed to flush index file"
-    // );
+    logger().check(
+        static_cast<bool>(m_index_file),
+        "Failed to flush index file"
+    );
 
-    // m_record_count++;
+    m_record_count++;
 }
 
 bool LidarMessageOdometryRecorder::is_recording() const noexcept {

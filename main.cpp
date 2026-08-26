@@ -274,7 +274,7 @@ int main() {
     // LidarScan loaded_lidar_scan(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.lsb");
 
     LidarMessage loaded_lidar_msg("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg.lmb");
-    LidarScan loaded_lidar_scan(manager_bundle, point_cloud_preprocessor, std::move(loaded_lidar_msg));
+    LidarScan loaded_lidar_scan(manager_bundle, point_cloud_preprocessor, loaded_lidar_msg);
 
     Celeris celeris(
         engine,

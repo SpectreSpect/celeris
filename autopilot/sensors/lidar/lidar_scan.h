@@ -16,7 +16,7 @@ public:
     LidarScan(
         ManagerBundle& manager_bundle, 
         PointCloudPreprocessor& point_cloud_preprocessor, 
-        LidarMessage&& message
+        LidarMessage& message
     );
     LidarScan(
         ManagerBundle& manager_bundle, 
@@ -26,7 +26,7 @@ public:
     );
     LidarScan(ManagerBundle& manager_bundle, std::filesystem::path path);
 
-    PointCloud point_cloud_from_lidar_msg(LidarMessage&& message);
+    PointCloud point_cloud_from_lidar_msg(LidarMessage& message);
 
     void save(std::filesystem::path path);
     static LidarScan load(ManagerBundle& manager_bundle, std::filesystem::path path);

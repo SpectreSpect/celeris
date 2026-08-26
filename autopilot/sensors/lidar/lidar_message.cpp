@@ -3,7 +3,7 @@
 LidarMessage::LidarMessage(std::filesystem::path path) 
     :   LidarMessage(load(path)) {}
 
-void LidarMessage::save(std::filesystem::path path) {
+void LidarMessage::save(std::filesystem::path path) const {
     LOG_METHOD();
 
     logger().check(!path.empty(), "Output path was empty");

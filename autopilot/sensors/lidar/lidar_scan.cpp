@@ -7,9 +7,9 @@
 LidarScan::LidarScan(
     ManagerBundle& manager_bundle, 
     PointCloudPreprocessor& point_cloud_preprocessor, 
-    LidarMessage&& message)   
+    LidarMessage& message)   
     :   m_manager_bundle(&manager_bundle),
-        m_point_cloud(point_cloud_from_lidar_msg(std::move(message))),
+        m_point_cloud(point_cloud_from_lidar_msg(message)),
         m_normal_buffer(
            VulkanBuffer::create_host_visible_storage_buffer(
                manager_bundle.engine(), 
@@ -64,13 +64,13 @@ LidarScan::LidarScan(
 LidarScan::LidarScan(ManagerBundle& manager_bundle, std::filesystem::path path) 
     :   LidarScan(load(manager_bundle, path)) {}
 
-PointCloud LidarScan::point_cloud_from_lidar_msg(LidarMessage&& message) {
+PointCloud LidarScan::point_cloud_from_lidar_msg(LidarMessage& message) {
     LOG_METHOD();
 
     logger().check(m_manager_bundle, "Manager bundle was null");
     logger().check(!message.points.empty(), "Lidar message had no points");
 
-    return PointCloud(*m_manager_bundle, std::move(message.points));
+    return PointCloud(*m_manager_bundle, message.points);
 }
 
 void LidarScan::save(std::filesystem::path path) {

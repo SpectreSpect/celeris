@@ -19,6 +19,6 @@ public:
     LidarMessage() = default;
     LidarMessage(std::filesystem::path path);
 
-    void save(std::filesystem::path path);
+    void save(std::filesystem::path path) const;
     static LidarMessage load(std::filesystem::path path);
 };

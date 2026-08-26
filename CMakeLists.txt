@@ -163,6 +163,7 @@ add_executable(app
   autopilot/dynamics/ackermann_dynamics.cpp
   autopilot/recorder/lidar_odometry_recorder.cpp
   autopilot/sensors/lidar/lidar_message.cpp
+  autopilot/recorder/lidar_message_odometry_recorder.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

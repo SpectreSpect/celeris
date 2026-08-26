@@ -36,6 +36,7 @@ public:
 
     void start();
     bool try_pop_front_lidar_msg(LidarMessage& message);
+    std::unique_ptr<LidarScan> try_get_lidar_scan_from_lidar_msg(LidarMessage& message);
     std::unique_ptr<LidarScan> try_pop_front_lidar_scan();
     
 public:
