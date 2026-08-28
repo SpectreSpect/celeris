@@ -38,6 +38,8 @@ public:
     bool get_last_lidar_odometry(Odometry& output);
     bool get_last_imu_odometry(Odometry& output);
 
+    bool interpolate_odometry(uint64_t timestamp, Odometry& output_odometry);
+
     size_t history_size();
     Odometry get_odometry(uint32_t id);
 

@@ -321,7 +321,7 @@ int main() {
         first_entry.lidar_message.points
     );
 
-    deskewer.deskew(first_entry.lidar_message);
+    deskewer.deskew(first_entry.lidar_message, first_entry.odometry);
 
     PointCloud deskewed_lidar_msg_point_cloud(
         manager_bundle,
@@ -451,7 +451,7 @@ int main() {
             // LidarMessage& recording_lidar_message = entry.lidar_message;
             // LidarScan recording_lidar_scan(manager_bundle, point_cloud_preprocessor, recording_lidar_message);
             lidar_msg_point_cloud.set_points(entry.lidar_message.points);
-            deskewer.deskew(entry.lidar_message);
+            deskewer.deskew(entry.lidar_message, entry.odometry);
             deskewed_lidar_msg_point_cloud.set_points(entry.lidar_message.points);
 
             lidar_msg_point_cloud.transform.position = entry.odometry.position;

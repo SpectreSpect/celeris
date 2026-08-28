@@ -8,6 +8,7 @@
 
 class OdometryEstimator;
 class LidarMessage;
+class Odometry;
 
 class LidarScanDeskewer {
 public:
@@ -15,7 +16,7 @@ public:
 
     LidarScanDeskewer(OdometryEstimator& odometry_estimator);
 
-    void deskew(LidarMessage& lidar_msg);
+    void deskew(LidarMessage& lidar_msg, Odometry& scan_odometry);
 
 private:
     OdometryEstimator* m_odometry_estimator = nullptr;
