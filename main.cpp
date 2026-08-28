@@ -297,18 +297,21 @@ int main() {
             .gamepad_commands_enabled = false
         }
     );
-    // celeris.odometry_estimator().set_gravity(glm::vec3(-0.203579f, 10.0965f, -0.240282f)); // ros bag 2
+    celeris.odometry_estimator().set_gravity(glm::vec3(-0.203579f, 10.0965f, -0.240282f)); // ros bag 2
     // celeris.odometry_estimator().set_gravity(glm::vec3(-0.123099f, 9.78485f, -0.69118f)); // simulator
-    celeris.odometry_estimator().start_gravity_calibration(100);
+    // celeris.odometry_estimator().start_gravity_calibration(100);
 
     LidarMessageOdometryRecordering loaded_recording;
-    loaded_recording.load("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg_recording/", 20);
+    // loaded_recording.load("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg_recording/", 20);
+    loaded_recording.load("/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording/", 30);
 
     auto& first_entry = loaded_recording.get_entry(0);
     PointCloud lidar_msg_point_cloud(
         manager_bundle,
         first_entry.lidar_message.points
     );
+    lidar_msg_point_cloud.transform.position = first_entry.odometry.position;
+    lidar_msg_point_cloud.transform.rotation = first_entry.odometry.orientation;
     
     // celeris.set_vehicle_command(VehicleCommand{
     //     .acceleration = 0.5f,
@@ -378,7 +381,7 @@ int main() {
     bool skybox_environment_update_pending = false;
     float angular_speed = glm::half_pi<float>() * 0.5f;
 
-    int current_entry_id = -1;
+    int current_entry_id = 0;
 
     // use_fps_camera_controller();
 
@@ -419,7 +422,7 @@ int main() {
 
         if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_N)) {
             current_entry_id = (current_entry_id + 1) % loaded_recording.size();
-            
+
             LidarMessageOdometryEntry& entry = loaded_recording.get_entry(current_entry_id);
 
             // LidarMessage& recording_lidar_message = entry.lidar_message;
