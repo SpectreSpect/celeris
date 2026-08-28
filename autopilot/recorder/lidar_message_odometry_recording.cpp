@@ -39,11 +39,11 @@ void LidarMessageOdometryRecordering::load(
         "Entry count is too large"
     );
 
-    logger().check(first_entry_id < static_cast<int>(entry_count), "First entry index was out of bounds");
-    logger().check(last_entry_id >= first_entry_id, "Last entry index must be greater than first entry index");
-
     if (first_entry_id < 0) first_entry_id = 0;
     if (last_entry_id < 0) last_entry_id = static_cast<int>(entry_count) - 1;
+
+    logger().check(first_entry_id < static_cast<int>(entry_count), "First entry index was out of bounds");
+    logger().check(last_entry_id >= first_entry_id, "Last entry index must be greater than first entry index");
 
     const auto entry_size = static_cast<std::streamoff>(sizeof(std::uint32_t) + sizeof(Odometry));
     const auto first_entry_position = 

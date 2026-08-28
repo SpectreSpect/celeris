@@ -302,7 +302,7 @@ int main() {
     celeris.odometry_estimator().start_gravity_calibration(100);
 
     LidarMessageOdometryRecordering loaded_recording;
-    loaded_recording.load("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg_recording/");
+    loaded_recording.load("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg_recording/", 20);
 
     auto& first_entry = loaded_recording.get_entry(0);
     PointCloud lidar_msg_point_cloud(
