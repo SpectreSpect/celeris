@@ -165,6 +165,7 @@ add_executable(app
   autopilot/sensors/lidar/lidar_message.cpp
   autopilot/recorder/lidar_message_odometry_recorder.cpp
   autopilot/recorder/lidar_message_odometry_recording.cpp
+  autopilot/sensors/lidar/deskewing/lidar_scan_deskewer.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
