@@ -304,11 +304,11 @@ int main() {
     // celeris.odometry_estimator().start_gravity_calibration(100);
     // celeris.start_lidar_recording("/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording_TEMP_DELETE_THIS/");
 
-    DeskewingDebugger deskewing_debugger(
-        manager_bundle, 
-        "/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording_TEMP_DELETE_THIS/",
-        3277
-    );
+    // DeskewingDebugger deskewing_debugger(
+    //     manager_bundle, 
+    //     "/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording_TEMP_DELETE_THIS/",
+    //     3277
+    // );
 
     // celeris.set_vehicle_command(VehicleCommand{
     //     .acceleration = 0.5f,
@@ -357,13 +357,13 @@ int main() {
 
     Scene scene;
 
-    // scene.add(skybox);
-    // scene.add(celeris_visualizer);
+    scene.add(skybox);
+    scene.add(celeris_visualizer);
     // // scene.add(test_gazelle_next);
-    // scene.add(voxel_grid.render_object());
+    scene.add(voxel_grid.render_object());
     // scene.add(test_arrow);
 
-    scene.add(deskewing_debugger);
+    // scene.add(deskewing_debugger);
 
     skybox.update(scene);
 
@@ -414,7 +414,7 @@ int main() {
         celeris.update(compute_submit_context);
         celeris_user_controller.update(delta_time, camera, keyboard_input_reciever, fps_camera_controller);
         celeris_visualizer.update();
-        deskewing_debugger.update(keyboard_input_reciever);
+        // deskewing_debugger.update(keyboard_input_reciever);
         
         third_person_camera_controller.set_target(celeris.vehicle_transform().position);
         if (celeris_user_controller.camera_controller_mode() == CelerisUserController::CameraControllerMode::FPS)
