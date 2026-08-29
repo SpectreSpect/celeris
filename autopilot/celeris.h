@@ -117,6 +117,7 @@ public:
             
     void start_lidar_receiver();
     void start(VulkanSubmitContext&& planner_submit_context);
+    void start_lidar_recording(std::filesystem::path output_directory);
     void update(VulkanSubmitContext& submit_context);
 
     void set_start(const NonholonomicPos& position);

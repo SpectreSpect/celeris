@@ -436,6 +436,10 @@ void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     // m_lidar_msg_odom_recorder.start("/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording_stationary/");
 }
 
+void Celeris::start_lidar_recording(std::filesystem::path output_directory) {
+    m_lidar_msg_odom_recorder.start(output_directory);
+}
+
 void Celeris::update(VulkanSubmitContext& submit_context) {
     logger().check(m_engine, "Engine was null");
     logger().check(m_manager_bundle, "Manager bundle was null");

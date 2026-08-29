@@ -302,13 +302,14 @@ int main() {
     celeris.odometry_estimator().set_gravity(glm::vec3(-0.203579f, 10.0965f, -0.240282f)); // ros bag 2
     // celeris.odometry_estimator().set_gravity(glm::vec3(-0.123099f, 9.78485f, -0.69118f)); // simulator
     // celeris.odometry_estimator().start_gravity_calibration(100);
+    // celeris.start_lidar_recording("/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording_TEMP_DELETE_THIS/");
 
     DeskewingDebugger deskewing_debugger(
         manager_bundle, 
-        "/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording_2/",
+        "/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording_TEMP_DELETE_THIS/",
         3277
     );
-    
+
     // celeris.set_vehicle_command(VehicleCommand{
     //     .acceleration = 0.5f,
     //     .steering_angle_velocity = 0.5f
