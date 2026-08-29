@@ -25,6 +25,7 @@ TextureManager::TextureManager(VulkanEngine& engine, VulkanResourceLoader& resou
         prefilter_pass(engine, compute_pass_manager),
         irradiance_pass(engine, compute_pass_manager),
         flat_color_texture_pass(engine, compute_pass_manager),
+        mcp_visualization_texture_pass(engine, compute_pass_manager),
         brdf_lut(brdf_lut_pass.generate(512, 512)),
         white_texture(flat_color_texture_pass.generate(1, 1, glm::vec4(1.0f))),
         irradiance_maps(

@@ -169,6 +169,7 @@ add_executable(app
   autopilot/recorder/lidar_message_odometry_recording.cpp
   autopilot/sensors/lidar/deskewing/lidar_scan_deskewer.cpp
   autopilot/sensors/lidar/deskewing/deskewing_debugger.cpp
+  renderer/mcp/mcp_visalizer.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

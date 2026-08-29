@@ -48,7 +48,6 @@
 #include "renderer/pbr/brdf_lut_pass.h"
 #include "renderer/pbr/prefilter_map_pass.h"
 #include "renderer/pbr/irradiance_map_pass.h"
-#include "renderer/mcp/mcp_visualization_texture_pass.h"
 #include "vulkan_self/image/cubemap_array.h"
 #include "voxel_grid_vulkan/voxel_grid.h"
 #include "renderer/static_mesh_data.h"
@@ -87,6 +86,7 @@
 #include "autopilot/recorder/lidar_message_odometry_recording.h"
 #include "autopilot/sensors/lidar/deskewing/lidar_scan_deskewer.h"
 #include "autopilot/sensors/lidar/deskewing/deskewing_debugger.h"
+#include "renderer/mcp/mcp_visalizer.h"
 
 #include <algorithm>
 #include <exception>
@@ -339,10 +339,9 @@ int main() {
     );
 
     Transform quad_transform;
-    quad_transform.scale = glm::vec3(10.0f, 1.0f, 10.0f);
+    quad_transform.scale = glm::vec3(5.0f, 1.0f, 5.0f);
 
-    McpVisualizationTexturePass mcp_visualization_texture_pass(engine, compute_pass_manager);
-    VulkanTexture2D mcp_visualization_texture = mcp_visualization_texture_pass.generate(
+    VulkanTexture2D mcp_visualization_texture = texture_manager.mcp_visualization_texture_pass.generate(
         512,
         512,
         quad_transform.get_model_matrix(),
@@ -378,6 +377,18 @@ int main() {
     std::unique_ptr<LidarScan> m_network_scan;
     std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;
 
+    MCPVisualizer mcp_visualizer(
+        engine, 
+        texture_manager, 
+        material_manager, 
+        mesh_manager, 
+        512, 
+        512, 
+        skybox_exposure
+    );
+
+    mcp_visualizer.transform.scale = glm::vec3(10, 1, 10);
+
     // GazelleNext test_gazelle_next(mesh_manager, material_instance_manager, vehicle_geometry, skybox_exposure);
 
     Scene scene;
@@ -386,7 +397,8 @@ int main() {
     // scene.add(celeris_visualizer);
     // // scene.add(test_gazelle_next);
     // scene.add(voxel_grid.render_object());
-    scene.add(quad_object);
+    // scene.add(quad_object);
+    scene.add(mcp_visualizer);
     // scene.add(test_arrow);
 
     // scene.add(deskewing_debugger);
@@ -455,12 +467,16 @@ int main() {
         voxel_grid.render_object().visible = celeris_user_controller.show_voxel_grid();
         voxel_grid.update(window, camera);
 
-        mcp_visualization_texture_pass.render(
-            mcp_visualization_texture,
-            quad_transform.get_model_matrix(),
-            camera.position,
-            5.0f
-        );
+        quad_object.transform.position.x = cos(timer) * 3;
+
+        // texture_manager.mcp_visualization_texture_pass.render(
+        //     mcp_visualization_texture,
+        //     quad_object.transform.get_model_matrix(),
+        //     camera.position,
+        //     5.0f
+        // );
+
+        mcp_visualizer.update(camera.position);
 
         // Запись команд
         {auto command_buffer_scope = command_buffer.begin_scope();
