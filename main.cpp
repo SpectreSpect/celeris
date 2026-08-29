@@ -306,7 +306,7 @@ int main() {
 
     LidarMessageOdometryRecordering loaded_recording;
     // loaded_recording.load("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg_recording/", 20);
-    loaded_recording.load("/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording_2/", 30);
+    loaded_recording.load("/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording_stationary/");
 
     for (int i = 0; i < loaded_recording.size(); i++) {
         LidarMessageOdometryEntry& entry = loaded_recording.get_entry(i);

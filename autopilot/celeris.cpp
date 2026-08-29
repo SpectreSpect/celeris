@@ -432,7 +432,7 @@ void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     // m_path_planner.start(std::move(planner_submit_context));
 
     // m_lidar_odometry_recorder.start("/home/spectre/TEMP_lidar_output_mesh/test_lidar_recording");
-    // m_lidar_msg_odom_recorder.start("/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording_2/");
+    // m_lidar_msg_odom_recorder.start("/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording_stationary/");
 }
 
 void Celeris::update(VulkanSubmitContext& submit_context) {
