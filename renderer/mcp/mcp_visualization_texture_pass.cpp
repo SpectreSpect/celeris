@@ -9,11 +9,17 @@ McpVisualizationTexturePass::McpVisualizationTexturePass(
     VulkanEngine& engine,
     ComputePassManager& compute_pass_manager)
     : m_engine(engine),
+      m_uniform_buffer(VulkanBuffer::create_host_visible_uniform_buffer(engine, sizeof(UniformData))),
       m_pass(compute_pass_manager.mcp_visualization_texture_cp, compute_pass_manager.descriptor_pool()),
       m_compute_command_buffer(engine.device(), engine.compute_command_pool()),
       m_compute_fence(engine.device()) {}
 
-VulkanTexture2D McpVisualizationTexturePass::generate(uint32_t width, uint32_t height)
+VulkanTexture2D McpVisualizationTexturePass::generate(
+    uint32_t width,
+    uint32_t height,
+    const glm::mat4& quad_model,
+    const glm::vec3& target_position,
+    float distance_falloff)
 {
     LOG_METHOD();
 
@@ -32,12 +38,16 @@ VulkanTexture2D McpVisualizationTexturePass::generate(uint32_t width, uint32_t h
     desc.sampler_max_lod = 0.0f;
 
     VulkanTexture2D texture(m_engine.physical_device(), m_engine.device(), desc);
-    render(texture);
+    render(texture, quad_model, target_position, distance_falloff);
 
     return texture;
 }
 
-void McpVisualizationTexturePass::render(VulkanTexture2D& texture)
+void McpVisualizationTexturePass::render(
+    VulkanTexture2D& texture,
+    const glm::mat4& quad_model,
+    const glm::vec3& target_position,
+    float distance_falloff)
 {
     LOG_METHOD();
 
@@ -50,6 +60,7 @@ void McpVisualizationTexturePass::render(VulkanTexture2D& texture)
         "Texture format must be VK_FORMAT_R8G8B8A8_UNORM"
     );
     logger().check(texture.mip_levels() == 1, "Texture must have exactly one mip level");
+    logger().check(distance_falloff > 0.0f, "Distance falloff must be greater than 0");
 
     const VkExtent2D extent = texture.extent2d();
     logger().check(extent.width != 0, "Texture width must be greater than 0");
@@ -66,6 +77,13 @@ void McpVisualizationTexturePass::render(VulkanTexture2D& texture)
         ? VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT
         : 0;
 
+    const UniformData uniform_data{
+        .quad_model = quad_model,
+        .target_position_and_falloff = glm::vec4(target_position, distance_falloff)
+    };
+    m_uniform_buffer.upload(&uniform_data, sizeof(uniform_data));
+    m_pass.set_uniform_buffer(0, m_uniform_buffer);
+
     {
         auto compute_scope = m_compute_command_buffer.begin_scope();
 
@@ -78,7 +96,7 @@ void McpVisualizationTexturePass::render(VulkanTexture2D& texture)
             VK_ACCESS_SHADER_WRITE_BIT
         );
 
-        m_pass.set_storage_texture(0, texture);
+        m_pass.set_storage_texture(1, texture);
         m_pass.bind(m_compute_command_buffer);
         m_compute_command_buffer.dispatch(x_groups, y_groups, 1);
 

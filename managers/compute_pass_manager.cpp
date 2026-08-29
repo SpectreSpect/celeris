@@ -136,7 +136,8 @@ ComputePass ComputePassManager::create_mcp_visualization_texture_pass(
     LOG_METHOD();
 
     ComputePassBuilder builder;
-    builder.add_storage_image(0, ShaderStages::compute);
+    builder.add_uniform_buffer(0, ShaderStages::compute);
+    builder.add_storage_image(1, ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }

@@ -338,8 +338,17 @@ int main() {
         skybox_exposure
     );
 
+    Transform quad_transform;
+    quad_transform.scale = glm::vec3(10.0f, 1.0f, 10.0f);
+
     McpVisualizationTexturePass mcp_visualization_texture_pass(engine, compute_pass_manager);
-    VulkanTexture2D mcp_visualization_texture = mcp_visualization_texture_pass.generate(512, 512);
+    VulkanTexture2D mcp_visualization_texture = mcp_visualization_texture_pass.generate(
+        512,
+        512,
+        quad_transform.get_model_matrix(),
+        camera.position,
+        5.0f
+    );
 
     SlotPassInstance quad_pi(material_manager.create_pbr_material(
             engine, 
@@ -350,7 +359,8 @@ int main() {
         ));
 
     RenderObject quad_object(mesh_manager.quad, quad_pi);
-    quad_object.set_material_data(PBRMaterialData::create(0, 1, skybox_exposure, glm::vec4(1, 1, 1, 1)));
+    quad_object.set_material_data(PBRMaterialData::create(0, 1.0f, skybox_exposure, glm::vec4(1, 1, 1, 1)));
+    quad_object.transform = quad_transform;
 
     Arrow test_arrow(
         engine,
@@ -444,6 +454,13 @@ int main() {
 
         voxel_grid.render_object().visible = celeris_user_controller.show_voxel_grid();
         voxel_grid.update(window, camera);
+
+        mcp_visualization_texture_pass.render(
+            mcp_visualization_texture,
+            quad_transform.get_model_matrix(),
+            camera.position,
+            5.0f
+        );
 
         // Запись команд
         {auto command_buffer_scope = command_buffer.begin_scope();
