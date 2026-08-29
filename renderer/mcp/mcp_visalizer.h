@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "../../vulkan_self/pass/instance/slot_pass_instance.h"
 #include "../../vulkan_self/image/vulkan_texture_2d.h"
 #include "../scene_object.h"
@@ -24,9 +26,10 @@ public:
 
     void update(glm::vec3 target_position);
 private:
+    VulkanEngine* m_engine = nullptr;
     TextureManager* m_texture_manager = nullptr;
 
-    VulkanTexture2D m_visualization_texture;
-    SlotPassInstance m_pass_instance;
-    RenderObject quad;
+    std::vector<VulkanTexture2D> m_visualization_textures;
+    std::vector<SlotPassInstance> m_pass_instances;
+    std::vector<RenderObject> m_quads;
 };

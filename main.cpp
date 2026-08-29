@@ -338,29 +338,6 @@ int main() {
         skybox_exposure
     );
 
-    Transform quad_transform;
-    quad_transform.scale = glm::vec3(5.0f, 1.0f, 5.0f);
-
-    VulkanTexture2D mcp_visualization_texture = texture_manager.mcp_visualization_texture_pass.generate(
-        512,
-        512,
-        quad_transform.get_model_matrix(),
-        camera.position,
-        5.0f
-    );
-
-    SlotPassInstance quad_pi(material_manager.create_pbr_material(
-            engine, 
-            texture_manager.irradiance_maps, 
-            texture_manager.prefilter_maps, 
-            texture_manager.brdf_lut,
-            mcp_visualization_texture
-        ));
-
-    RenderObject quad_object(mesh_manager.quad, quad_pi);
-    quad_object.set_material_data(PBRMaterialData::create(0, 1.0f, skybox_exposure, glm::vec4(1, 1, 1, 1)));
-    quad_object.transform = quad_transform;
-
     Arrow test_arrow(
         engine,
         mesh_manager,
@@ -386,7 +363,6 @@ int main() {
         512, 
         skybox_exposure
     );
-
     mcp_visualizer.transform.scale = glm::vec3(10, 1, 10);
 
     // GazelleNext test_gazelle_next(mesh_manager, material_instance_manager, vehicle_geometry, skybox_exposure);
@@ -466,9 +442,7 @@ int main() {
 
         voxel_grid.render_object().visible = celeris_user_controller.show_voxel_grid();
         voxel_grid.update(window, camera);
-
-        quad_object.transform.position.x = cos(timer) * 3;
-
+        
         // texture_manager.mcp_visualization_texture_pass.render(
         //     mcp_visualization_texture,
         //     quad_object.transform.get_model_matrix(),
