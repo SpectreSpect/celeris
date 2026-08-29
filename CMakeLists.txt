@@ -123,6 +123,8 @@ add_executable(app
   # vulkan_self/buffer_filler.cpp
   renderer/pbr/equirect_to_cubemap_pass.cpp
   renderer/pbr/brdf_lut_pass.cpp
+  renderer/pbr/flat_color_texture_pass.cpp
+  renderer/mcp/mcp_visualization_texture_pass.cpp
   renderer/pbr/prefilter_map_pass.cpp
   renderer/pbr/irradiance_map_pass.cpp
   renderer/pbr/pbr_maps.cpp

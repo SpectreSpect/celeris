@@ -16,6 +16,8 @@ MeshManager::MeshManager(VulkanEngine& engine, VulkanResourceLoader& resource_lo
         line_quad(engine, resource_loader, StaticMeshData::line_quad_vertices.data(), Utils::size_bytes(StaticMeshData::line_quad_vertices), StaticMeshData::line_quad_indices.data(), Utils::size_bytes(StaticMeshData::line_quad_indices)),
         skybox_cube(engine, resource_loader, StaticMeshData::skybox_cube_vertices.data(), Utils::size_bytes(StaticMeshData::skybox_cube_vertices), 
                                              StaticMeshData::skybox_cube_indices.data(), Utils::size_bytes(StaticMeshData::skybox_cube_indices)),
+        quad(engine, resource_loader, StaticMeshData::quad_vertices.data(), Utils::size_bytes(StaticMeshData::quad_vertices), 
+                                             StaticMeshData::quad_indices.data(), Utils::size_bytes(StaticMeshData::quad_indices)),
         two_sphere_indirect_test(engine, resource_loader, StaticMeshData::two_sphere_indirect_test_vertices.data(), Utils::size_bytes(StaticMeshData::two_sphere_indirect_test_vertices), 
                                              StaticMeshData::two_sphere_indirect_test_indices.data(), Utils::size_bytes(StaticMeshData::two_sphere_indirect_test_indices)){
 }

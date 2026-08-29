@@ -48,6 +48,7 @@
 #include "renderer/pbr/brdf_lut_pass.h"
 #include "renderer/pbr/prefilter_map_pass.h"
 #include "renderer/pbr/irradiance_map_pass.h"
+#include "renderer/mcp/mcp_visualization_texture_pass.h"
 #include "vulkan_self/image/cubemap_array.h"
 #include "voxel_grid_vulkan/voxel_grid.h"
 #include "renderer/static_mesh_data.h"
@@ -322,7 +323,7 @@ int main() {
     // celeris.set_start_lidar_scan_position(start_lidar_scan_position);
     // celeris.load_map(saved_maps_directory / "test4.vpm");
     // celeris.load_waypoint_path(saved_waypoint_paths_directory / "robocross_sim_3.wpp");
-    celeris.start(std::move(planner_submit_context));
+    // celeris.start(std::move(planner_submit_context));
     // celeris.set_vehicle_command(VehicleCommand{
     //     .acceleration = 0.5f,
     //     .steering_angle_velocity = 0.5f
@@ -336,6 +337,20 @@ int main() {
         20000,
         skybox_exposure
     );
+
+    McpVisualizationTexturePass mcp_visualization_texture_pass(engine, compute_pass_manager);
+    VulkanTexture2D mcp_visualization_texture = mcp_visualization_texture_pass.generate(512, 512);
+
+    SlotPassInstance quad_pi(material_manager.create_pbr_material(
+            engine, 
+            texture_manager.irradiance_maps, 
+            texture_manager.prefilter_maps, 
+            texture_manager.brdf_lut,
+            mcp_visualization_texture
+        ));
+
+    RenderObject quad_object(mesh_manager.quad, quad_pi);
+    quad_object.set_material_data(PBRMaterialData::create(0, 1, skybox_exposure, glm::vec4(1, 1, 1, 1)));
 
     Arrow test_arrow(
         engine,
@@ -358,9 +373,10 @@ int main() {
     Scene scene;
 
     scene.add(skybox);
-    scene.add(celeris_visualizer);
+    // scene.add(celeris_visualizer);
     // // scene.add(test_gazelle_next);
-    scene.add(voxel_grid.render_object());
+    // scene.add(voxel_grid.render_object());
+    scene.add(quad_object);
     // scene.add(test_arrow);
 
     // scene.add(deskewing_debugger);

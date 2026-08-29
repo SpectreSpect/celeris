@@ -23,6 +23,8 @@ ShaderManager::ShaderManager(VulkanDevice& device)
         // Compute shaders
         // General
         fill_buffer_cs(device, path_utils::executable_dir() / "shaders" / "fill_buffer.comp.spv"),
+        flat_color_texture_cs(device, path_utils::executable_dir() / "shaders" / "flat_color_texture.comp.spv"),
+        mcp_visualization_texture_cs(device, path_utils::executable_dir() / "shaders" / "mcp" / "mcp_visualization_texture.comp.spv"),
 
         // GICP
         gicp_step_cs(
