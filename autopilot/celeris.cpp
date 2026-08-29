@@ -304,6 +304,7 @@ Celeris::Celeris(
         m_command_sender(),
         m_vehicle_state_receiver(desc.vehicle_state_receiver_port),
         m_imu_receiver(desc.imu_receiver_port, 1),
+        m_deskewer(m_odometry_estimator),
         m_vehicle(std::make_unique<Vehicle>(
             desc.max_vehicle_acceleration,
             desc.max_vehicle_steer_acceleration,
@@ -425,9 +426,9 @@ void Celeris::start_lidar_receiver() {
 void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     // start_lidar_receiver();
 
-    // m_lidar_scan_receiver.start();
+    m_lidar_scan_receiver.start();
     // m_vehicle_state_receiver.start();
-    // m_imu_receiver.start();
+    m_imu_receiver.start();
     // m_command_sender.start();
     // m_path_planner.start(std::move(planner_submit_context));
 
@@ -926,6 +927,10 @@ void Celeris::try_receive_and_process_lidar_scan() {
     LidarMessage lidar_message;
     if (!m_lidar_scan_receiver.try_pop_front_lidar_msg(lidar_message))
         return;
+
+    Odometry lidar_msg_odometry;
+    if (m_odometry_estimator.interpolate_odometry(lidar_message.scan_timestamp, lidar_msg_odometry))
+        m_deskewer.deskew(lidar_message, lidar_msg_odometry);
     
     // logger().log("Lidar message timestamp: " + std::to_string(static_cast<double>(lidar_message.timestamp_ns / 1e9)));
         
@@ -942,16 +947,16 @@ void Celeris::try_receive_and_process_lidar_scan() {
     while (m_retired_network_scans.size() > m_engine->num_frames_in_flight())
         m_retired_network_scans.pop_front();
 
-    Odometry closest_odometry{};
-    if (!m_odometry_estimator.get_closest_prev_odometry(m_network_scan->timestamp(), closest_odometry))
-        closest_odometry.timestamp_ns = m_network_scan->timestamp();
+    Odometry closest_prev_odometry{};
+    if (!m_odometry_estimator.get_closest_prev_odometry(m_network_scan->timestamp(), closest_prev_odometry))
+        closest_prev_odometry.timestamp_ns = m_network_scan->timestamp();
 
-    // Odometry closest_odometry = m_odometry_estimator.get_latest_odometry();
+    // Odometry closest_prev_odometry = m_odometry_estimator.get_latest_odometry();
     
-    // std::cout << "(" << closest_odometry.position.x << ", " << closest_odometry.position.y << ", " << closest_odometry.position.z << "),    timestamp: " << m_network_scan->timestamp() << std::endl;
+    // std::cout << "(" << closest_prev_odometry.position.x << ", " << closest_prev_odometry.position.y << ", " << closest_prev_odometry.position.z << "),    timestamp: " << m_network_scan->timestamp() << std::endl;
 
-    m_network_scan->point_cloud().transform.position = closest_odometry.position;
-    m_network_scan->point_cloud().transform.rotation = closest_odometry.orientation;
+    m_network_scan->point_cloud().transform.position = closest_prev_odometry.position;
+    m_network_scan->point_cloud().transform.rotation = closest_prev_odometry.orientation;
 
     if (m_voxel_point_map.map_point_count() > 0u) {
         m_gicp_pass.fit(m_voxel_point_map,
@@ -971,7 +976,7 @@ void Celeris::try_receive_and_process_lidar_scan() {
     // if (last_lidar_odometry_id >= 0)
     //     last_lidar_odometry = m_odometry_estimator.get_odometry(last_lidar_odometry_id);
 
-    m_odometry_estimator.submit_lidar_imu_fusion(*m_network_scan, closest_odometry, last_lidar_odometry);
+    m_odometry_estimator.submit_lidar_imu_fusion(*m_network_scan, closest_prev_odometry, last_lidar_odometry);
 
     if (m_lidar_odometry_recorder.is_recording())
         m_lidar_odometry_recorder.record(*m_network_scan, m_odometry_estimator.get_latest_odometry());

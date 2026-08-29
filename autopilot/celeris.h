@@ -40,6 +40,7 @@
 #include "sensors/lidar/lidar_scan.h"
 #include "recorder/lidar_odometry_recorder.h"
 #include "recorder/lidar_message_odometry_recorder.h"
+#include "sensors/lidar/deskewing/lidar_scan_deskewer.h"
 
 class VulkanQueue;
 class ComputePassManager;
@@ -232,6 +233,7 @@ private:
     ImuReceiver m_imu_receiver;
 
     OdometryEstimator m_odometry_estimator;
+    LidarScanDeskewer m_deskewer;
 
     std::unique_ptr<VehicleBase> m_vehicle;
     PathPlanner m_path_planner;

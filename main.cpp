@@ -382,14 +382,14 @@ int main() {
 
     Scene scene;
 
-    // scene.add(skybox);
-    // scene.add(celeris_visualizer);
+    scene.add(skybox);
+    scene.add(celeris_visualizer);
     // // scene.add(test_gazelle_next);
-    // scene.add(voxel_grid.render_object());
+    scene.add(voxel_grid.render_object());
     // scene.add(test_arrow);
 
-    scene.add(lidar_msg_point_cloud);
-    scene.add(deskewed_lidar_msg_point_cloud);
+    // scene.add(lidar_msg_point_cloud);
+    // scene.add(deskewed_lidar_msg_point_cloud);
 
     skybox.update(scene);
 
