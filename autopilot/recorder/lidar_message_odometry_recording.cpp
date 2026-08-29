@@ -1,5 +1,12 @@
 #include "lidar_message_odometry_recording.h"
 
+LidarMessageOdometryRecordering::LidarMessageOdometryRecordering(
+    std::filesystem::path path, 
+    int first_entry_id,
+    int last_entry_id) {
+    load(path, first_entry_id, last_entry_id);
+}
+
 void LidarMessageOdometryRecordering::load(
     std::filesystem::path path,
     int first_entry_id,

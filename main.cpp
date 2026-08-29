@@ -85,6 +85,7 @@
 #include "autopilot/sensors/lidar/lidar_message.h"
 #include "autopilot/recorder/lidar_message_odometry_recording.h"
 #include "autopilot/sensors/lidar/deskewing/lidar_scan_deskewer.h"
+#include "autopilot/sensors/lidar/deskewing/deskewing_debugger.h"
 
 #include <algorithm>
 #include <exception>
@@ -302,38 +303,11 @@ int main() {
     // celeris.odometry_estimator().set_gravity(glm::vec3(-0.123099f, 9.78485f, -0.69118f)); // simulator
     // celeris.odometry_estimator().start_gravity_calibration(100);
 
-    OdometryEstimator temp_odometry_estimator;
-
-    LidarMessageOdometryRecordering loaded_recording;
-    // loaded_recording.load("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg_recording/", 20);
-    loaded_recording.load("/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording_stationary/");
-
-    for (int i = 0; i < loaded_recording.size(); i++) {
-        LidarMessageOdometryEntry& entry = loaded_recording.get_entry(i);
-        temp_odometry_estimator.submit_odometry(entry.odometry);
-    }
-
-    LidarScanDeskewer deskewer(temp_odometry_estimator);
-
-    auto& first_entry = loaded_recording.get_entry(0);
-    PointCloud lidar_msg_point_cloud(
-        manager_bundle,
-        first_entry.lidar_message.points
+    DeskewingDebugger deskewing_debugger(
+        manager_bundle, 
+        "/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording_2/",
+        3277
     );
-
-    deskewer.deskew(first_entry.lidar_message, first_entry.odometry);
-
-    PointCloud deskewed_lidar_msg_point_cloud(
-        manager_bundle,
-        first_entry.lidar_message.points
-    );
-    lidar_msg_point_cloud.transform.position = first_entry.odometry.position;
-    lidar_msg_point_cloud.transform.rotation = first_entry.odometry.orientation;
-    deskewed_lidar_msg_point_cloud.transform.position = first_entry.odometry.position;
-    deskewed_lidar_msg_point_cloud.transform.rotation = first_entry.odometry.orientation;
-
-    lidar_msg_point_cloud.set_color(glm::vec4(1, 0, 0, 1));
-    deskewed_lidar_msg_point_cloud.set_color(glm::vec4(0, 0, 1, 1));
     
     // celeris.set_vehicle_command(VehicleCommand{
     //     .acceleration = 0.5f,
@@ -382,14 +356,13 @@ int main() {
 
     Scene scene;
 
-    scene.add(skybox);
-    scene.add(celeris_visualizer);
+    // scene.add(skybox);
+    // scene.add(celeris_visualizer);
     // // scene.add(test_gazelle_next);
-    scene.add(voxel_grid.render_object());
+    // scene.add(voxel_grid.render_object());
     // scene.add(test_arrow);
 
-    // scene.add(lidar_msg_point_cloud);
-    // scene.add(deskewed_lidar_msg_point_cloud);
+    scene.add(deskewing_debugger);
 
     skybox.update(scene);
 
@@ -440,24 +413,7 @@ int main() {
         celeris.update(compute_submit_context);
         celeris_user_controller.update(delta_time, camera, keyboard_input_reciever, fps_camera_controller);
         celeris_visualizer.update();
-
-        if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_N)) {
-            current_entry_id = (current_entry_id + 1) % loaded_recording.size();
-
-            LidarMessageOdometryEntry& entry = loaded_recording.get_entry(current_entry_id);
-
-            // LidarMessage& recording_lidar_message = entry.lidar_message;
-            // LidarScan recording_lidar_scan(manager_bundle, point_cloud_preprocessor, recording_lidar_message);
-            lidar_msg_point_cloud.set_points(entry.lidar_message.points);
-            deskewer.deskew(entry.lidar_message, entry.odometry);
-            deskewed_lidar_msg_point_cloud.set_points(entry.lidar_message.points);
-
-            lidar_msg_point_cloud.transform.position = entry.odometry.position;
-            lidar_msg_point_cloud.transform.rotation = entry.odometry.orientation;
-
-            deskewed_lidar_msg_point_cloud.transform.position = entry.odometry.position;
-            deskewed_lidar_msg_point_cloud.transform.rotation = entry.odometry.orientation;
-        }
+        deskewing_debugger.update(keyboard_input_reciever);
         
         third_person_camera_controller.set_target(celeris.vehicle_transform().position);
         if (celeris_user_controller.camera_controller_mode() == CelerisUserController::CameraControllerMode::FPS)
