@@ -1,6 +1,9 @@
 #include "odometry_estimator.h"
 
+#include <algorithm>
 #include <iostream>
+#include <iterator>
+#include <limits>
 
 #include "../sensors/lidar/lidar_scan.h"
 
@@ -185,6 +188,8 @@ void OdometryEstimator::submit_lidar_imu_fusion(
     fused_odometry.orientation =
         lidar_scan.point_cloud().transform.rotation;
 
+    // logger().log("Fused odometry timestamp: " + std::to_string(static_cast<double>(fused_odometry.timestamp_ns / 1e9)));
+
     submit_odometry(fused_odometry);
 }
 
@@ -197,15 +202,32 @@ void OdometryEstimator::submit_odometry(const Odometry& odometry) {
     m_history.push_back(odometry);
 }
 
-bool OdometryEstimator::get_closest_prev_odometry(uint64_t timestamp, Odometry& output) {
-    for (int i = m_history.size() - 1; i >= 0; i--) {
+// bool OdometryEstimator::get_closest_prev_odometry(uint64_t timestamp, Odometry& output) {
+//     for (int i = m_history.size() - 1; i >= 0; i--) {
         
-        if (m_history[i].timestamp_ns < timestamp) {
-            output = m_history[i];
-            return true;
+//         if (m_history[i].timestamp_ns < timestamp) {
+//             output = m_history[i];
+//             return true;
+//         }
+//     }
+//     return false;
+// }
+
+bool OdometryEstimator::get_closest_prev_odometry(uint64_t timestamp, Odometry& output) {
+    const auto first_not_before = std::lower_bound(
+        m_history.begin(),
+        m_history.end(),
+        timestamp,
+        [](const Odometry& odometry, uint64_t target_timestamp) {
+            return odometry.timestamp_ns < target_timestamp;
         }
-    }
-    return false;
+    );
+
+    if (first_not_before == m_history.begin())
+        return false;
+
+    output = *std::prev(first_not_before);
+    return true;
 }
 
 bool OdometryEstimator::get_last_lidar_odometry(Odometry& output) {
@@ -228,6 +250,72 @@ bool OdometryEstimator::get_last_imu_odometry(Odometry& output) {
         }
     }
     return false;
+}
+
+bool OdometryEstimator::interpolate_odometry(uint64_t timestamp, Odometry& output_odometry) {
+    if (timestamp > static_cast<uint64_t>(std::numeric_limits<std::int64_t>::max()))
+        return false;
+
+    const auto target_timestamp = static_cast<std::int64_t>(timestamp);
+    const auto next = std::lower_bound(
+        m_history.begin(),
+        m_history.end(),
+        target_timestamp,
+        [](const Odometry& odometry, std::int64_t target_timestamp) {
+            return odometry.timestamp_ns < target_timestamp;
+        }
+    );
+
+    if (next == m_history.end())
+        return false;
+
+    if (next->timestamp_ns == target_timestamp) {
+        output_odometry = *next;
+        return true;
+    }
+
+    if (next == m_history.begin())
+        return false;
+
+    const auto previous = std::prev(next);
+    const auto interval_ns = next->timestamp_ns - previous->timestamp_ns;
+    if (interval_ns <= 0)
+        return false;
+
+    const float interpolation_factor = static_cast<float>(
+        static_cast<double>(target_timestamp - previous->timestamp_ns) /
+        static_cast<double>(interval_ns)
+    );
+
+    output_odometry.linear_acceleration = glm::mix(
+        previous->linear_acceleration,
+        next->linear_acceleration,
+        interpolation_factor
+    );
+    output_odometry.linear_velocity = glm::mix(
+        previous->linear_velocity,
+        next->linear_velocity,
+        interpolation_factor
+    );
+    output_odometry.angular_velocity = glm::mix(
+        previous->angular_velocity,
+        next->angular_velocity,
+        interpolation_factor
+    );
+    output_odometry.position = glm::mix(
+        previous->position,
+        next->position,
+        interpolation_factor
+    );
+    output_odometry.orientation = glm::normalize(glm::slerp(
+        previous->orientation,
+        next->orientation,
+        interpolation_factor
+    ));
+    output_odometry.timestamp_ns = target_timestamp;
+    output_odometry.sensor_type = previous->sensor_type;
+
+    return true;
 }
 
 size_t OdometryEstimator::history_size() {

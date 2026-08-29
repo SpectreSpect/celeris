@@ -1,5 +1,6 @@
 #include "celeris_user_controller.h"
 
+#include "recorder/lidar_message_odometry_recording.h"
 #include "../vulkan_self/keyboard_input_reciever.h"
 #include "../imgui_layer.h"
 #include "celeris_visualizer.h"
@@ -74,8 +75,12 @@ void CelerisUserController::update(
         add_nondirectional_waypoint(camera);
     if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_L))
         delete_last_waypoint();
-    if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_N)) {
-    }
+    // if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_N)) {
+    //     // current_record_id = (current_record_id + 1) % recording.size();
+    //     // LidarMessageOdometryEntry& entry = recording.get_entry(current_record_id);
+
+    //     // entry.lidar_message
+    // }
 }
 
 void CelerisUserController::display_interface(Camera& camera, GamepadController& gamepad_controller) {

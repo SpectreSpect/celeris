@@ -65,6 +65,117 @@ PointCloud::PointCloud(ManagerBundle& manager_bundle, const std::vector<PointIns
     set_points(points);
 }
 
+PointCloud::PointCloud(ManagerBundle& manager_bundle, std::filesystem::path path)
+    :   PointCloud(load(manager_bundle, path)) {
+}
+
+void PointCloud::save(std::filesystem::path path) {
+    LOG_METHOD();
+
+    logger().check(!path.empty(), "Output path was empty");
+    logger().check(path.has_filename(), "Output path has no filename");
+
+    const auto parent = path.parent_path();
+
+    logger().check(
+        parent.empty() || std::filesystem::is_directory(parent),
+        "Output folder does not exist: " + parent.string()
+    );
+
+    logger().check(
+        m_instance_batch->instance_count() > 0,
+        "Point cloud didn't have any points"
+    );
+
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+
+    logger().check(
+        out.is_open(),
+        "Failed to create file: " + path.string()
+    );
+
+    std::vector<PointInstance> points(m_instance_batch.get()->instance_count());
+
+    m_instance_batch.get()->buffer().read(points.data(), sizeof(PointInstance) * points.size(), 0);
+
+    uint64_t point_count = points.size();
+    out.write(
+        reinterpret_cast<const char*>(&point_count),
+        static_cast<std::streamsize>(sizeof(uint64_t))
+    );
+
+    logger().check(
+        out.good(),
+        "Failed to write point count to file: " + path.string()
+    );
+
+    out.write(
+        reinterpret_cast<const char*>(points.data()),
+        static_cast<std::streamsize>(sizeof(PointInstance) * point_count)
+    );
+
+    logger().check(
+        out.good(),
+        "Failed to write points to file: " + path.string()
+    );
+}
+
+PointCloud PointCloud::load(ManagerBundle& manager_bundle, std::filesystem::path path) {
+    LOG_NAMED("PointCloud");
+    
+    logger().check(!path.empty(), "Output path was empty");
+    logger().check(path.has_filename(), "Output path has no filename");
+
+    const auto parent = path.parent_path();
+
+    logger().check(
+        parent.empty() || std::filesystem::is_directory(parent),
+        "Output folder does not exist: " + parent.string()
+    );
+
+    std::ifstream file(path, std::ios::binary);
+
+    logger().check(
+        file.is_open(),
+        "Failed to open file: " + path.string()
+    );
+
+    uint64_t point_count = 0;
+    file.read(
+        reinterpret_cast<char*>(&point_count),
+        static_cast<std::streamsize>(sizeof(uint64_t))
+    );
+
+    logger().check(
+        static_cast<bool>(file),
+        "Failed to read point count from: " + path.string()
+    );
+
+    logger().check(
+        point_count > 0,
+        "Point count was 0"
+    );
+
+    logger().check(
+        point_count <= std::numeric_limits<std::size_t>::max(),
+        "Point count is too large"
+    );
+    
+    std::vector<PointInstance> points(static_cast<std::size_t>(point_count));
+
+    file.read(
+        reinterpret_cast<char*>(points.data()),
+        static_cast<std::streamsize>(sizeof(PointInstance) * point_count)
+    );
+
+    logger().check(
+        static_cast<bool>(file),
+        "Failed to read point data from: " + path.string()
+    );
+    
+    return PointCloud(manager_bundle, points);
+}
+
 void PointCloud::set_points(const std::vector<PointInstance>& points) {
     LOG_METHOD();
 

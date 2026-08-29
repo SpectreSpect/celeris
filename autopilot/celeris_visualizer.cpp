@@ -83,6 +83,11 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
             m_celeris->voxel_point_map().map_point_buffer,
             celeris.voxel_point_map().m_map_point_count
         )
+        // m_recording_point_cloud(
+        //     *m_celeris->engine(),
+        //     mesh_manager,
+        //     material_instance_manager
+        // )
 {
     m_path_line_cloud.set_material_data(LineMaterialData{
         .color = glm::vec4(1, 1, 1, 1),
@@ -146,6 +151,7 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
     add_child(m_segment_switch_rear_axle_point);
     add_child(m_celeris->waypoint_path());
     add_child(m_point_map_point_cloud);
+    // add_child(m_recording_point_cloud);
 
     if (m_celeris->has_start_position())
         set_start(m_celeris->start_position());
@@ -157,6 +163,7 @@ CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
     m_goal_marker.visible = show_goal_marker && m_celeris->has_goal_position();
     m_lookahead_marker.visible = false;
     m_point_map_point_cloud.visible = show_voxel_point_map;
+    // m_recording_point_cloud.visible = true;
     m_segment_switch_sphere_line_cloud.visible = show_segment_switch_debug;
     m_segment_switch_rear_axle_point.visible = show_segment_switch_debug;
 }
@@ -204,6 +211,13 @@ void CelerisVisualizer::set_car_pose_override(const NonholonomicPos& nonholonomi
 void CelerisVisualizer::clear_car_pose_override() {
     m_has_car_pose_override = false;
 }
+
+// void CelerisVisualizer::set_recording_lidar_scan(LidarMessageOdometryEntry& entry) {
+//     LidarMessage& lidar_message = entry.lidar_message;
+//     LidarScan recording_lidar_scan(manager_bundle, point_cloud_preprocessor, lidar_message);
+
+//     m_point_map_point_cloud
+// }
 
 glm::vec3 CelerisVisualizer::get_start_marker_pos() {
     return m_start_marker.transform.position;

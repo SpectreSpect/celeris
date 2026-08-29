@@ -38,6 +38,9 @@
 #include "odometry/odometry_estimator.h"
 #include "sensors/lidar/lidar_scan_receiver.h"
 #include "sensors/lidar/lidar_scan.h"
+#include "recorder/lidar_odometry_recorder.h"
+#include "recorder/lidar_message_odometry_recorder.h"
+#include "sensors/lidar/deskewing/lidar_scan_deskewer.h"
 
 class VulkanQueue;
 class ComputePassManager;
@@ -114,6 +117,7 @@ public:
             
     void start_lidar_receiver();
     void start(VulkanSubmitContext&& planner_submit_context);
+    void start_lidar_recording(std::filesystem::path output_directory);
     void update(VulkanSubmitContext& submit_context);
 
     void set_start(const NonholonomicPos& position);
@@ -230,6 +234,7 @@ private:
     ImuReceiver m_imu_receiver;
 
     OdometryEstimator m_odometry_estimator;
+    LidarScanDeskewer m_deskewer;
 
     std::unique_ptr<VehicleBase> m_vehicle;
     PathPlanner m_path_planner;
@@ -238,6 +243,9 @@ private:
     VoxelPointMap m_voxel_point_map;
     VoxelMapPointInserter m_voxel_map_inserter;
     VoxelMapPointReseter m_voxel_map_reseter;
+
+    LidarOdometryRecorder m_lidar_odometry_recorder;
+    LidarMessageOdometryRecorder m_lidar_msg_odom_recorder;
 
     VulkanBuffer voxel_write_list;
     std::vector<glm::ivec3> m_path_potential_visualization_voxels;

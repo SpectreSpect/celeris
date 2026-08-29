@@ -16,10 +16,20 @@ public:
     LidarScan(
         ManagerBundle& manager_bundle, 
         PointCloudPreprocessor& point_cloud_preprocessor, 
-        LidarMessage&& message
+        LidarMessage& message
     );
+    LidarScan(
+        ManagerBundle& manager_bundle, 
+        const std::vector<PointInstance>& points,
+        const std::vector<glm::vec4>& normals,
+        uint64_t timestamp
+    );
+    LidarScan(ManagerBundle& manager_bundle, std::filesystem::path path);
 
-    PointCloud point_cloud_from_lidar_msg(LidarMessage&& message);
+    PointCloud point_cloud_from_lidar_msg(LidarMessage& message);
+
+    void save(std::filesystem::path path);
+    static LidarScan load(ManagerBundle& manager_bundle, std::filesystem::path path);
 
     PointCloud& point_cloud() noexcept;
     VulkanBuffer& normal_buffer() noexcept;

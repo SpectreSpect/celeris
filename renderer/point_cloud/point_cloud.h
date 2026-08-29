@@ -32,6 +32,11 @@ public:
     PointCloud(ManagerBundle& manager_bundle, uint32_t instance_count);
     PointCloud(ManagerBundle& manager_bundle, const std::vector<PointInstance>& points);
 
+    PointCloud(ManagerBundle& manager_bundle, std::filesystem::path path);
+
+    void save(std::filesystem::path path);
+    static PointCloud load(ManagerBundle& manager_bundle, std::filesystem::path path);
+
     uint32_t point_count() const noexcept;
 
     void set_points(const std::vector<PointInstance>& points);

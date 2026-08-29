@@ -44,6 +44,27 @@ bool LidarScanReceiver::try_pop_front_lidar_msg(LidarMessage& message) {
     return true;
 }
 
+std::unique_ptr<LidarScan> LidarScanReceiver::try_get_lidar_scan_from_lidar_msg(LidarMessage& message) {
+    LOG_METHOD();
+
+    logger().check(m_manager_bundle, "Manager bundle was null");
+    logger().check(m_point_cloud_preprocessor, "Point cloud preprocessor was null");
+
+    // if (!try_pop_front_lidar_msg(message))
+    //     return nullptr;
+    
+    if (message.points.empty() || message.timestamps.empty())
+        return nullptr;
+    
+    std::unique_ptr<LidarScan> scan = std::make_unique<LidarScan>(
+        *m_manager_bundle,
+        *m_point_cloud_preprocessor,
+        message
+    );
+
+    return scan;
+}
+
 std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_front_lidar_scan() {
     LOG_METHOD();
 
@@ -55,16 +76,17 @@ std::unique_ptr<LidarScan> LidarScanReceiver::try_pop_front_lidar_scan() {
     if (!try_pop_front_lidar_msg(message))
         return nullptr;
     
-    if (message.points.empty() || message.timestamps.empty())
-        return nullptr;
+    // if (message.points.empty() || message.timestamps.empty())
+    //     return nullptr;
     
     
-    
-    std::unique_ptr<LidarScan> scan = std::make_unique<LidarScan>(
-        *m_manager_bundle,
-        *m_point_cloud_preprocessor,
-        std::move(message)
-    );
+    // std::unique_ptr<LidarScan> scan = std::make_unique<LidarScan>(
+    //     *m_manager_bundle,
+    //     *m_point_cloud_preprocessor,
+    //     std::move(message)
+    // );
+
+    std::unique_ptr<LidarScan> scan = try_get_lidar_scan_from_lidar_msg(message);
 
     return scan;
 }
@@ -100,6 +122,9 @@ void LidarScanReceiver::push_back_lidar_msg(LidarMessage& message) {
 
         if (m_lidar_msg_queue.size() == m_max_queued_messages)
             m_lidar_msg_queue.pop_front();
+        
+        // message.save("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg.lmb");
+        
         m_lidar_msg_queue.push_back(message);
     }
 }
@@ -124,8 +149,11 @@ bool LidarScanReceiver::receive_lidar_msg_from_client(int client_socket) {
             return false;
 
         LidarMessage lidar_message;
+        lidar_message.scan_timestamp = header.timestamp_ns;
         lidar_message.points.reserve(header.point_count);
         lidar_message.timestamps.reserve(header.point_count);
+
+        // logger().log("Header timestamp: " + std::to_string(static_cast<double>(header.timestamp_ns / 1e9)));
 
         uint64_t latest_time_offset_ns = points[0].time_offset_ns;
         // for (LidarMessagePointData& point_data : points) {

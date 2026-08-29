@@ -82,6 +82,10 @@
 #include "autopilot/odometry/odometry_estimator.h"
 #include "autopilot/sensors/lidar/lidar_scan.h"
 #include "autopilot/sensors/lidar/lidar_scan_receiver.h"
+#include "autopilot/sensors/lidar/lidar_message.h"
+#include "autopilot/recorder/lidar_message_odometry_recording.h"
+#include "autopilot/sensors/lidar/deskewing/lidar_scan_deskewer.h"
+#include "autopilot/sensors/lidar/deskewing/deskewing_debugger.h"
 
 #include <algorithm>
 #include <exception>
@@ -269,6 +273,12 @@ int main() {
         engine.compute_queue(1)
     );
 
+    // PointCloud loaded_point_cloud(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.bin");
+    // LidarScan loaded_lidar_scan(manager_bundle, "/home/spectre/TEMP_lidar_output_mesh/test_lidar_scan.lsb");
+
+    // LidarMessage loaded_lidar_msg("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg.lmb");
+    // LidarScan loaded_lidar_scan(manager_bundle, point_cloud_preprocessor, loaded_lidar_msg);
+
     Celeris celeris(
         engine,
         engine.compute_queue(),
@@ -289,9 +299,16 @@ int main() {
             .gamepad_commands_enabled = false
         }
     );
-    // celeris.odometry_estimator().set_gravity(glm::vec3(-0.203579f, 10.0965f, -0.240282f)); // ros bag 2
+    celeris.odometry_estimator().set_gravity(glm::vec3(-0.203579f, 10.0965f, -0.240282f)); // ros bag 2
     // celeris.odometry_estimator().set_gravity(glm::vec3(-0.123099f, 9.78485f, -0.69118f)); // simulator
-    celeris.odometry_estimator().start_gravity_calibration(100);
+    // celeris.odometry_estimator().start_gravity_calibration(100);
+    // celeris.start_lidar_recording("/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording_TEMP_DELETE_THIS/");
+
+    // DeskewingDebugger deskewing_debugger(
+    //     manager_bundle, 
+    //     "/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording_TEMP_DELETE_THIS/",
+    //     3277
+    // );
 
     // celeris.set_vehicle_command(VehicleCommand{
     //     .acceleration = 0.5f,
@@ -342,9 +359,11 @@ int main() {
 
     scene.add(skybox);
     scene.add(celeris_visualizer);
-    // scene.add(test_gazelle_next);
+    // // scene.add(test_gazelle_next);
     scene.add(voxel_grid.render_object());
-    scene.add(test_arrow);
+    // scene.add(test_arrow);
+
+    // scene.add(deskewing_debugger);
 
     skybox.update(scene);
 
@@ -356,6 +375,8 @@ int main() {
     uint32_t pending_skybox_environment_map_id = skybox.environment_map_id();
     bool skybox_environment_update_pending = false;
     float angular_speed = glm::half_pi<float>() * 0.5f;
+
+    int current_entry_id = 0;
 
     // use_fps_camera_controller();
 
@@ -393,6 +414,7 @@ int main() {
         celeris.update(compute_submit_context);
         celeris_user_controller.update(delta_time, camera, keyboard_input_reciever, fps_camera_controller);
         celeris_visualizer.update();
+        // deskewing_debugger.update(keyboard_input_reciever);
         
         third_person_camera_controller.set_target(celeris.vehicle_transform().position);
         if (celeris_user_controller.camera_controller_mode() == CelerisUserController::CameraControllerMode::FPS)

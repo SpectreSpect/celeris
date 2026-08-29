@@ -1,15 +1,18 @@
 #pragma once
 
+#include <cstdint>
+
+#include "../camera/controllers/fps_camera_controller.h"
 #include "../vulkan_self/logger/logger_header.h"
+#include "celeris_visualizer.h"
 #include "../camera/camera.h"
 #include "celeris.h"
-#include "celeris_visualizer.h"
-#include "../camera/controllers/fps_camera_controller.h"
 
 // class Celeris;
 class CelerisVisualizer;
 class KeyboardInputReciever;
 class GamepadController;
+class LidarMessageOdometryRecordering;
 
 class CelerisUserController {
 public:
@@ -267,4 +270,6 @@ private:
     float m_car_playback_distance = 0.0f;
     float m_car_playback_total_length = 0.0f;
     float m_car_playback_speed = 4.0f;
+
+    uint32_t current_record_id = 0;
 };
