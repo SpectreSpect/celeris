@@ -188,6 +188,8 @@ void OdometryEstimator::submit_lidar_imu_fusion(
     fused_odometry.orientation =
         lidar_scan.point_cloud().transform.rotation;
 
+    // logger().log("Fused odometry timestamp: " + std::to_string(static_cast<double>(fused_odometry.timestamp_ns / 1e9)));
+
     submit_odometry(fused_odometry);
 }
 

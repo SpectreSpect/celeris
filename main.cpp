@@ -306,7 +306,7 @@ int main() {
 
     LidarMessageOdometryRecordering loaded_recording;
     // loaded_recording.load("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg_recording/", 20);
-    loaded_recording.load("/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording/", 30);
+    loaded_recording.load("/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording_2/", 30);
 
     for (int i = 0; i < loaded_recording.size(); i++) {
         LidarMessageOdometryEntry& entry = loaded_recording.get_entry(i);
@@ -332,8 +332,8 @@ int main() {
     deskewed_lidar_msg_point_cloud.transform.position = first_entry.odometry.position;
     deskewed_lidar_msg_point_cloud.transform.rotation = first_entry.odometry.orientation;
 
-    lidar_msg_point_cloud.set_color(glm::vec4(0, 0, 1, 1));
-    deskewed_lidar_msg_point_cloud.set_color(glm::vec4(1, 0, 0, 1));
+    lidar_msg_point_cloud.set_color(glm::vec4(1, 0, 0, 1));
+    deskewed_lidar_msg_point_cloud.set_color(glm::vec4(0, 0, 1, 1));
     
     // celeris.set_vehicle_command(VehicleCommand{
     //     .acceleration = 0.5f,
@@ -387,9 +387,7 @@ int main() {
     // // scene.add(test_gazelle_next);
     // scene.add(voxel_grid.render_object());
     // scene.add(test_arrow);
-    // scene.add(loaded_point_cloud);
-    // scene.add(loaded_lidar_scan);
-    // scene.add(recording_lidar_scan);
+
     scene.add(lidar_msg_point_cloud);
     scene.add(deskewed_lidar_msg_point_cloud);
 

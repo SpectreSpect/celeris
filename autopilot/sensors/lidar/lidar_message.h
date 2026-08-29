@@ -12,6 +12,7 @@ class LidarMessage {
 public:
     _XCLASS_NAME(LidarMessage);
 
+    uint64_t scan_timestamp = 0;
     std::vector<PointInstance> points;
     std::vector<uint64_t> timestamps;
     uint32_t latest_point_id = -1;

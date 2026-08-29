@@ -432,7 +432,7 @@ void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
     // m_path_planner.start(std::move(planner_submit_context));
 
     // m_lidar_odometry_recorder.start("/home/spectre/TEMP_lidar_output_mesh/test_lidar_recording");
-    // m_lidar_msg_odom_recorder.start("/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording/");
+    // m_lidar_msg_odom_recorder.start("/home/spectre/TEMP_lidar_output_mesh/ros_bag_recording_2/");
 }
 
 void Celeris::update(VulkanSubmitContext& submit_context) {
@@ -926,6 +926,8 @@ void Celeris::try_receive_and_process_lidar_scan() {
     LidarMessage lidar_message;
     if (!m_lidar_scan_receiver.try_pop_front_lidar_msg(lidar_message))
         return;
+    
+    // logger().log("Lidar message timestamp: " + std::to_string(static_cast<double>(lidar_message.timestamp_ns / 1e9)));
         
     std::unique_ptr<LidarScan> scan = m_lidar_scan_receiver.try_get_lidar_scan_from_lidar_msg(lidar_message);
     if (!scan)
@@ -961,6 +963,9 @@ void Celeris::try_receive_and_process_lidar_scan() {
     Odometry last_lidar_odometry{};
     if (m_odometry_estimator.get_last_lidar_odometry(last_lidar_odometry))
         last_lidar_odometry.timestamp_ns = m_network_scan->timestamp();
+
+    // logger().log("Timestamp: " + std::to_string(static_cast<double>(last_lidar_odometry.timestamp_ns / 1e9)));
+    // logger().log("Timestamp: " + std::to_string(last_lidar_odometry.timestamp_ns));
 
     // last_lidar_odometry.timestamp_ns = m_network_scan->timestamp();
     // if (last_lidar_odometry_id >= 0)

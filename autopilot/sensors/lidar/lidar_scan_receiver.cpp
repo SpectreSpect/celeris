@@ -149,8 +149,11 @@ bool LidarScanReceiver::receive_lidar_msg_from_client(int client_socket) {
             return false;
 
         LidarMessage lidar_message;
+        lidar_message.scan_timestamp = header.timestamp_ns;
         lidar_message.points.reserve(header.point_count);
         lidar_message.timestamps.reserve(header.point_count);
+
+        // logger().log("Header timestamp: " + std::to_string(static_cast<double>(header.timestamp_ns / 1e9)));
 
         uint64_t latest_time_offset_ns = points[0].time_offset_ns;
         // for (LidarMessagePointData& point_data : points) {
