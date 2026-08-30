@@ -155,6 +155,8 @@ bool LidarScanReceiver::receive_lidar_msg_from_client(int client_socket) {
 
         // logger().log("Header timestamp: " + std::to_string(static_cast<double>(header.timestamp_ns / 1e9)));
 
+        logger().log("Point count: " + std::to_string(points.size()));
+
         uint64_t latest_time_offset_ns = points[0].time_offset_ns;
         // for (LidarMessagePointData& point_data : points) {
         for (LidarMessagePointData& point_data : points) {

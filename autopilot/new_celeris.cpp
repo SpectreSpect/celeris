@@ -130,6 +130,7 @@ void NewCeleris::try_receive_and_process_lidar_scan() {
         m_network_scan->point_cloud(),
         m_network_scan->normal_buffer()
     );
+
     m_voxel_grid->voxelize_point_cloud(
         *m_engine,
         m_network_scan->point_cloud(),
