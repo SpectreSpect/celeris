@@ -441,6 +441,7 @@ void Celeris::start_lidar_recording(std::filesystem::path output_directory) {
 }
 
 void Celeris::update(VulkanSubmitContext& submit_context) {
+    LOG_METHOD();
     logger().check(m_engine, "Engine was null");
     logger().check(m_manager_bundle, "Manager bundle was null");
     logger().check(m_voxel_grid, "Voxel grid was null");

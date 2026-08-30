@@ -87,6 +87,7 @@
 #include "autopilot/sensors/lidar/deskewing/lidar_scan_deskewer.h"
 #include "autopilot/sensors/lidar/deskewing/deskewing_debugger.h"
 #include "renderer/mcp/mcp_visalizer.h"
+#include "autopilot/new_celeris.h"
 
 #include <algorithm>
 #include <exception>
@@ -280,6 +281,15 @@ int main() {
     // LidarMessage loaded_lidar_msg("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg.lmb");
     // LidarScan loaded_lidar_scan(manager_bundle, point_cloud_preprocessor, loaded_lidar_msg);
 
+    NewCeleris new_celeris(
+        engine, 
+        manager_bundle, 
+        engine.compute_queue(), 
+        voxel_grid, 
+        NewCeleris::CelerisDesc{}
+    );
+    new_celeris.start();
+
     Celeris celeris(
         engine,
         engine.compute_queue(),
@@ -372,9 +382,9 @@ int main() {
     scene.add(skybox);
     // scene.add(celeris_visualizer);
     // // scene.add(test_gazelle_next);
-    // scene.add(voxel_grid.render_object());
+    scene.add(voxel_grid.render_object());
     // scene.add(quad_object);
-    scene.add(mcp_visualizer);
+    // scene.add(mcp_visualizer);
     // scene.add(test_arrow);
 
     // scene.add(deskewing_debugger);
@@ -425,9 +435,10 @@ int main() {
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
         
-        celeris.update(compute_submit_context);
-        celeris_user_controller.update(delta_time, camera, keyboard_input_reciever, fps_camera_controller);
-        celeris_visualizer.update();
+        new_celeris.update();
+        // celeris.update(compute_submit_context);
+        // celeris_user_controller.update(delta_time, camera, keyboard_input_reciever, fps_camera_controller);
+        // celeris_visualizer.update();
         // deskewing_debugger.update(keyboard_input_reciever);
         
         third_person_camera_controller.set_target(celeris.vehicle_transform().position);
@@ -464,7 +475,7 @@ int main() {
                 ui.update_mouse_mode(window);
 
                 celeris_user_controller.display_interface(camera, gamepad_controller);
-                mcp_visualizer.display_interface();
+                // mcp_visualizer.display_interface();
 
                 ui.end_frame(command_buffer);
             }
