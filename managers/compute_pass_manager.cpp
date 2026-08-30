@@ -11,6 +11,8 @@ ComputePassManager::ComputePassManager(VulkanDevice& device, ShaderManager& shad
     :   
         // General
         fill_buffer_cp(create_fill_buffer_compute_pass(device, shader_manager.fill_buffer_cs)),
+        flat_color_texture_cp(create_flat_color_texture_pass(device, shader_manager.flat_color_texture_cs)),
+        mcp_visualization_texture_cp(create_mcp_visualization_texture_pass(device, shader_manager.mcp_visualization_texture_cs)),
 
         // GICP
         gicp_cp(create_gicp_compute_pass(device, shader_manager.gicp_step_cs)),
@@ -110,6 +112,32 @@ ComputePass ComputePassManager::create_fill_buffer_compute_pass(VulkanDevice& de
 
     builder.add_storage_buffer(0, ShaderStages::compute); // ClearableBuffer
     builder.add_push_constantsf(sizeof(FillBufferPushConstants), ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_flat_color_texture_pass(
+    VulkanDevice& device,
+    VulkanShaderModule& compute_shader_module)
+{
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+    builder.add_uniform_buffer(0, ShaderStages::compute);
+    builder.add_storage_image(1, ShaderStages::compute);
+
+    return create_pass(device, compute_shader_module, builder);
+}
+
+ComputePass ComputePassManager::create_mcp_visualization_texture_pass(
+    VulkanDevice& device,
+    VulkanShaderModule& compute_shader_module)
+{
+    LOG_METHOD();
+
+    ComputePassBuilder builder;
+    builder.add_uniform_buffer(0, ShaderStages::compute);
+    builder.add_storage_image(1, ShaderStages::compute);
 
     return create_pass(device, compute_shader_module, builder);
 }

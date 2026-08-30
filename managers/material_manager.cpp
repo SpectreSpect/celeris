@@ -190,6 +190,7 @@ MaterialPass MaterialManager::create_pbr_pass(VulkanEngine& engine, FrameResourc
     builder.add_combined_image_sampler(1, ShaderStages::fragment); // irradianceMap
     builder.add_combined_image_sampler(2, ShaderStages::fragment); // prefilterMap
     builder.add_combined_image_sampler(3, ShaderStages::fragment); // brdfLUT
+    builder.add_combined_image_sampler(4, ShaderStages::fragment); // albedo
 
     builder.add_push_constants(sizeof(TransformPushConstants), 0);
     builder.add_descriptor_set_layout(frame_resources.descriptor_layout());
@@ -295,12 +296,18 @@ SlotPassInstance MaterialManager::create_skybox_material(VulkanEngine& engine, C
     return material;
 }
 
-SlotPassInstance MaterialManager::create_pbr_material(VulkanEngine& engine, CubemapArray& irradiance_maps, CubemapArray& prefilter_maps, VulkanTexture2D& brdf_lut) {
+SlotPassInstance MaterialManager::create_pbr_material(
+    VulkanEngine& engine, 
+    CubemapArray& irradiance_maps, 
+    CubemapArray& prefilter_maps, 
+    VulkanTexture2D& brdf_lut,
+    VulkanTexture2D& albedo) {
     SlotPassInstance material(engine, m_pool, pbr_mp, sizeof(PBRMaterialData));
 
     material.descripter_set().write_cubemap_array(1, irradiance_maps);
     material.descripter_set().write_cubemap_array(2, prefilter_maps);
     material.set_texture(3, brdf_lut);
+    material.set_texture(4, albedo);
 
     return material;
 }

@@ -8,6 +8,10 @@
 #include "../image/cubemap_array.h"
 #include "../image/vulkan_image_view.h"
 
+VkDescriptorSet DescriptorSet::handle() const noexcept {
+    return m_descriptor_set;
+}
+
 void DescriptorSet::write_buffer(uint32_t binding, const VulkanBuffer& buffer, VkDescriptorType descriptor_type) {
     LOG_METHOD();
 

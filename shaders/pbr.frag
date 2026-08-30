@@ -34,6 +34,7 @@ layout(std430, set = 0, binding = 0) readonly buffer MaterialBuffer {
 layout(set = 0, binding = 1) uniform samplerCubeArray irradianceMaps;
 layout(set = 0, binding = 2) uniform samplerCubeArray prefilterMaps;
 layout(set = 0, binding = 3) uniform sampler2D brdfLUT;
+layout(set = 0, binding = 4) uniform sampler2D albedo_map;
 
 layout(set = 1, binding = 0) uniform CameraUniform {
     mat4 view;
@@ -197,7 +198,11 @@ void main()
     float irradiance_map_id = float(material_data.pbr_map_ids.x);
     float prefilter_map_id = float(material_data.pbr_map_ids.y);
 
-    vec3 albedo = clamp(material_data.color.rgb, 0.0, 1.0);
+    
+    // vec3 albedo = clamp(material_data.color.rgb, 0.0, 1.0);
+    vec3 albedo = clamp(texture(albedo_map, frag_uv).rgb * material_data.color.rgb, 0.0, 1.0);
+    // vec3 albedo = clamp(texture(albedo_map, frag_uv).rgb, 0.0, 1.0);
+
     float environment_multiplier = material_data.color.a > 0.0
         ? material_data.color.a
         : 1.0;

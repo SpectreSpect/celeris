@@ -448,4 +448,17 @@ namespace StaticMeshData{
         0, 1, 2,
         2, 3, 0
     };
+
+    inline std::vector<float> quad_vertices = {
+        // position                         normal                         uv          tangent
+        -0.5f, 0.0f, -0.5f, 1.0f,          0.0f, 1.0f, 0.0f, 0.0f,       0.0f, 1.0f,  1.0f, 0.0f, 0.0f, 1.0f, // 0
+        -0.5f, 0.0f,  0.5f, 1.0f,          0.0f, 1.0f, 0.0f, 0.0f,       0.0f, 0.0f,  1.0f, 0.0f, 0.0f, 1.0f, // 1
+         0.5f, 0.0f,  0.5f, 1.0f,          0.0f, 1.0f, 0.0f, 0.0f,       1.0f, 0.0f,  1.0f, 0.0f, 0.0f, 1.0f, // 2
+         0.5f, 0.0f, -0.5f, 1.0f,          0.0f, 1.0f, 0.0f, 0.0f,       1.0f, 1.0f,  1.0f, 0.0f, 0.0f, 1.0f  // 3
+    };
+
+    inline std::vector<uint32_t> quad_indices = {
+        0, 1, 2,
+        2, 3, 0
+    };
 }

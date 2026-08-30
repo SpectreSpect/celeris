@@ -23,6 +23,8 @@ public:
 
     explicit DescriptorSet(VkDevice device, VkDescriptorSet descriptor_set) noexcept
         : m_device(device), m_descriptor_set(descriptor_set) {};
+
+    VkDescriptorSet handle() const noexcept;
     
     void write_buffer(uint32_t binding, const VulkanBuffer& buffer, VkDescriptorType descriptor_type);
     void write_uniform_buffer(uint32_t binding, const VulkanBuffer& buffer);

@@ -21,6 +21,8 @@ public:
 
     // General
     ComputePass fill_buffer_cp;
+    ComputePass flat_color_texture_cp;
+    ComputePass mcp_visualization_texture_cp;
 
     // GICP
     ComputePass gicp_cp;
@@ -104,6 +106,8 @@ public:
 
     // General
     ComputePass create_fill_buffer_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_flat_color_texture_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
+    ComputePass create_mcp_visualization_texture_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);
 
     // GICP
     ComputePass create_gicp_compute_pass(VulkanDevice& device, VulkanShaderModule& compute_shader_module);

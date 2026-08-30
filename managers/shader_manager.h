@@ -29,6 +29,8 @@ public:
     // Compute shaders
     // General
     VulkanShaderModule fill_buffer_cs;
+    VulkanShaderModule flat_color_texture_cs;
+    VulkanShaderModule mcp_visualization_texture_cs;
 
     // GICP
     VulkanShaderModule gicp_step_cs;

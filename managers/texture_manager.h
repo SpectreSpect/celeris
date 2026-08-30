@@ -11,6 +11,8 @@
 #include "../renderer/pbr/brdf_lut_pass.h"
 #include "../renderer/pbr/prefilter_map_pass.h"
 #include "../renderer/pbr/irradiance_map_pass.h"
+#include "../renderer/pbr/flat_color_texture_pass.h"
+#include "../renderer/mcp/mcp_visualization_texture_pass.h"
 #include "../path_utils.h"
 
 class VulkanEngine;
@@ -36,8 +38,11 @@ public:
     BrdfLutPass brdf_lut_pass;
     PrefilterPass prefilter_pass;
     IrradiancePass irradiance_pass;
+    FlatColorTexturePass flat_color_texture_pass;
+    McpVisualizationTexturePass mcp_visualization_texture_pass;
 
     VulkanTexture2D brdf_lut;
+    VulkanTexture2D white_texture;
     CubemapArray irradiance_maps;
     CubemapArray prefilter_maps;
 
