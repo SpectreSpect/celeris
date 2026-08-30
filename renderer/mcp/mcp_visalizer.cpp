@@ -1,5 +1,9 @@
 #include "mcp_visalizer.h"
 
+#include <algorithm>
+#include <imgui.h>
+#include <imgui_impl_vulkan.h>
+
 #include "../../vulkan_self/vulkan_engine.h"
 #include "../../managers/material_manager.h"
 #include "../../managers/texture_manager.h"
@@ -19,6 +23,7 @@ MCPVisualizer::MCPVisualizer(
     const uint32_t frame_count = engine.num_frames_in_flight();
 
     m_visualization_textures.reserve(frame_count);
+    m_imgui_texture_sets.reserve(frame_count);
     m_pass_instances.reserve(frame_count);
     m_quads.reserve(frame_count);
 
@@ -27,6 +32,17 @@ MCPVisualizer::MCPVisualizer(
             texture_manager.mcp_visualization_texture_pass.generate(
                 texture_width,
                 texture_height
+            )
+        );
+    }
+
+    for (VulkanTexture2D& texture : m_visualization_textures) {
+        m_imgui_texture_sets.emplace_back(
+            engine.device().handle(),
+            ImGui_ImplVulkan_AddTexture(
+                texture.sampler().handle(),
+                texture.view().handle(),
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
             )
         );
     }
@@ -56,6 +72,17 @@ MCPVisualizer::MCPVisualizer(
     }
 }
 
+MCPVisualizer::~MCPVisualizer() noexcept {
+    // Descriptor sets may still be referenced by submitted ImGui draw commands.
+    m_engine->device().wait_idle();
+
+    for (const DescriptorSet& descriptor_set : m_imgui_texture_sets) {
+        if (descriptor_set.handle() != VK_NULL_HANDLE) {
+            ImGui_ImplVulkan_RemoveTexture(descriptor_set.handle());
+        }
+    }
+}
+
 void MCPVisualizer::update(glm::vec3 target_position) {
     const size_t frame = m_engine->current_frame();
 
@@ -72,4 +99,51 @@ void MCPVisualizer::update(glm::vec3 target_position) {
         target_position,
         5.0f
     );
+}
+
+void MCPVisualizer::display_interface() {
+    const size_t frame = m_engine->current_frame();
+    logger().check(frame < m_imgui_texture_sets.size(), "Current frame is out of range");
+
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const ImVec2 default_size(
+        std::min(540.0f, viewport->WorkSize.x - 40.0f),
+        std::min(580.0f, viewport->WorkSize.y - 40.0f)
+    );
+    const ImVec2 default_position(
+        viewport->WorkPos.x + viewport->WorkSize.x - default_size.x - 20.0f,
+        viewport->WorkPos.y + 20.0f
+    );
+
+    ImGui::SetNextWindowPos(default_position, ImGuiCond_Appearing);
+    ImGui::SetNextWindowSize(default_size, ImGuiCond_Appearing);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(240.0f, 280.0f), viewport->WorkSize);
+    ImGui::Begin("MCP Visualization");
+
+    const VkExtent2D texture_extent = m_visualization_textures[frame].extent2d();
+    ImVec2 image_size = ImGui::GetContentRegionAvail();
+
+    if (image_size.x > 0.0f && image_size.y > 0.0f && texture_extent.height != 0) {
+        const float aspect_ratio =
+            static_cast<float>(texture_extent.width) / static_cast<float>(texture_extent.height);
+
+        if (image_size.x / image_size.y > aspect_ratio) {
+            image_size.x = image_size.y * aspect_ratio;
+        } else {
+            image_size.y = image_size.x / aspect_ratio;
+        }
+
+        ImGui::Image(
+            reinterpret_cast<ImTextureID>(m_imgui_texture_sets[frame].handle()),
+            image_size,
+            ImVec2(0.0f, 0.0f),
+            ImVec2(1.0f, 1.0f)
+        );
+    }
+
+    ImGui::End();
+}
+
+VulkanTexture2D& MCPVisualizer::texture(uint32_t frame_in_flight_id) {
+    return m_visualization_textures[frame_in_flight_id];
 }

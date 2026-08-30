@@ -449,9 +449,9 @@ int main() {
         //     camera.position,
         //     5.0f
         // );
-
+        
         mcp_visualizer.update(camera.position);
-
+        
         // Запись команд
         {auto command_buffer_scope = command_buffer.begin_scope();
             {auto render_pass_scope = engine.swapchain_resources().render_pass.begin_scope(
@@ -464,6 +464,7 @@ int main() {
                 ui.update_mouse_mode(window);
 
                 celeris_user_controller.display_interface(camera, gamepad_controller);
+                mcp_visualizer.display_interface();
 
                 ui.end_frame(command_buffer);
             }
