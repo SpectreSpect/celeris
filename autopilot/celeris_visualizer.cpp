@@ -18,7 +18,7 @@
 
 CelerisVisualizer::CelerisVisualizer(MeshManager& mesh_manager,
                                      MaterialInstanceManager& material_instance_manager,
-                                     Celeris& celeris,
+                                     celeris::Celeris& celeris,
                                      const VehicleGeometry& vehicle_geometry,
                                      uint32_t max_path_line_count,
                                      float skybox_exposure)

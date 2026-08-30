@@ -12,7 +12,7 @@
 FootprintVisualizer::FootprintVisualizer(
     MeshManager& mesh_manager,
     MaterialInstanceManager& material_instance_manager,
-    Celeris& celeris,
+    celeris::Celeris& celeris,
     Footprint& footprint,
     float skybox_exposure)
     : m_footprint(&footprint)

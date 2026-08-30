@@ -17,5 +17,9 @@ namespace celeris {
             const State& state,
             const Control& control
         ) const = 0;
+
+        virtual void project_state_inplace(State& state) const {
+            // Nothing by default
+        }
     };
 }

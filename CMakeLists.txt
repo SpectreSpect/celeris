@@ -160,8 +160,7 @@ add_executable(app
   autopilot/odometry/odometry_estimator.cpp
   autopilot/sensors/lidar/lidar_scan.cpp
   autopilot/sensors/lidar/lidar_scan_receiver.cpp
-  autopilot/dynamics/ackermann_dynamics.cpp
-  autopilot/dynamics/hybrid_dynamical_system.cpp
+  autopilot/dynamics/dynamics/ode_dynamics/vehicle_dynamics/linear_dynamics/vehicle_linear_dynamics.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

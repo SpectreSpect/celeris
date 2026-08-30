@@ -1,6 +1,5 @@
 #pragma once
 
-#include "celeris.h"
 #include "gazelle_next.h"
 #include "spherical_pose_marker.h"
 #include "../a_star/a_star_structures.h"
@@ -22,13 +21,17 @@
 
 struct VehicleGeometry;
 
+namespace celeris {
+    class Celeris;
+}
+
 class CelerisVisualizer : public SceneObject {
 public:
     _XCLASS_NAME(CelerisVisualizer);
 
     CelerisVisualizer(MeshManager& mesh_manager, 
                       MaterialInstanceManager& material_instance_manager, 
-                      Celeris& celeris,
+                      celeris::Celeris& celeris,
                       const VehicleGeometry& vehicle_geometry,
                       uint32_t max_path_line_count = 20000,
                       float skybox_exposure = 1.8f);
@@ -63,7 +66,7 @@ private:
     uint32_t max_path_line_count = 0;
     uint32_t scan_generation = 0;
     
-    Celeris* m_celeris = nullptr;
+    celeris::Celeris* m_celeris = nullptr;
 
     SphericalPoseMarker m_start_marker;
     SphericalPoseMarker m_goal_marker;

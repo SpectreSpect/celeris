@@ -9,13 +9,12 @@
 #include <optional>
 
 #include "../../vulkan_self/logger/logger_header.h"
-#include "dynamic_interface.h"
+#include "dynamics/dynamic_interface.h"
 #include "clock.h"
 #include "state_estimate.h"
 #include "instant_event.h"
 
 namespace celeris {
-    namespace simulation {
     template<class State>
     class HybridDynamicalSystem {
     public:
@@ -289,7 +288,7 @@ namespace celeris {
                 m_dynamic_model->simulate_for_inplace(
                     state.timestamp,
                     state.state, 
-                    duration
+                    duration,
                     m_max_integration_step
                 );
 

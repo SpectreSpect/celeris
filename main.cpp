@@ -82,6 +82,7 @@
 #include "autopilot/odometry/odometry_estimator.h"
 #include "autopilot/sensors/lidar/lidar_scan.h"
 #include "autopilot/sensors/lidar/lidar_scan_receiver.h"
+#include "autopilot/dynamics/dynamics/ode_dynamics/vehicle_dynamics/linear_dynamics/vehicle_linear_dynamics.h"
 
 #include <algorithm>
 #include <exception>
@@ -91,6 +92,7 @@
 #include <vector>
 #include <random>
 #include <string>
+#include <memory>
 
 VkClearValue clear_color = {0.05f, 0.05f, 0.05f, 1.0f};
 
@@ -269,7 +271,7 @@ int main() {
         engine.compute_queue(1)
     );
 
-    Celeris celeris(
+    celeris::Celeris celeris(
         engine,
         engine.compute_queue(),
         compute_submit_context,
@@ -281,7 +283,8 @@ int main() {
         scan_index_buffer,
         mesher,
         gazelle,
-        Celeris::CelerisDesc{
+        std::make_unique<celeris::VehicleLinearDynamicsRk2>(),
+        celeris::Celeris::CelerisDesc{
             .vehicle_geometry = vehicle_geometry,
             .footprint_sample_count = 5,
             .footprint_horizontal_inflation_size = horizontal_inflation_size,

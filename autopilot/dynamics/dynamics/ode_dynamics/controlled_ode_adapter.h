@@ -7,7 +7,7 @@
 #include "../../../../vulkan_self/logger/logger_header.h"
 #include "../../integrators/ode_integrator_interface.h"
 #include "../../integrators/ode_equation_interface.h"
-#include "dynamic_interface.h"
+#include "../dynamic_interface.h"
 #include "../../clock.h"
 #include "../state_and_control.h"
 

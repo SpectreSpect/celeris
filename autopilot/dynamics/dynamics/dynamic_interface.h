@@ -15,12 +15,12 @@ namespace celeris {
 
         virtual void simulate_step_inplace(simulation::Timestamp timestamp, State& state, simulation::Duration delta_time) const = 0;
 
-        static void check_delta_time(simulation::Duration delta_time) const {
+        static void check_delta_time(simulation::Duration delta_time) {
             logger().check(delta_time > simulation::Duration::zero())
                 << "`delta_time` must be positive.";
         }
 
-        static void check_duration(simulation::Duration duration) const {
+        static void check_duration(simulation::Duration duration) {
             logger().check(duration >= simulation::Duration::zero())
                 << "`duration` must be non-negative.";
         }
@@ -29,7 +29,6 @@ namespace celeris {
         State simulate_step(simulation::Timestamp timestamp, State state, simulation::Duration delta_time) const {
             LOG_METHOD();
 
-            check_duration(duration);
             check_delta_time(delta_time);
 
             simulate_step_inplace(timestamp, state, delta_time);

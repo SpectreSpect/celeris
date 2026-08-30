@@ -6,7 +6,6 @@
 #include "celeris_visualizer.h"
 #include "../camera/controllers/fps_camera_controller.h"
 
-// class Celeris;
 class CelerisVisualizer;
 class KeyboardInputReciever;
 class GamepadController;
@@ -20,7 +19,7 @@ public:
         ThirdPerson
     };
 
-    CelerisUserController(Celeris& celeris, CelerisVisualizer& celeris_visualizer);
+    CelerisUserController(celeris::Celeris& celeris, CelerisVisualizer& celeris_visualizer);
 
     void update(
         float delta_time, 
@@ -226,7 +225,7 @@ public:
     }
 
 private:
-    Celeris* m_celeris = nullptr;
+    celeris::Celeris* m_celeris = nullptr;
     CelerisVisualizer* m_celeris_visualizer = nullptr;
 
     CameraControllerMode m_camera_controller_mode = CameraControllerMode::FPS;

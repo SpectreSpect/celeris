@@ -6,7 +6,7 @@
 #include "gamepad_controller.h"
 
 CelerisUserController::CelerisUserController(
-    Celeris& celeris, 
+    celeris::Celeris& celeris, 
     CelerisVisualizer& celeris_visualizer)
     :   m_celeris(&celeris),
         m_celeris_visualizer(&celeris_visualizer)
@@ -231,11 +231,11 @@ void CelerisUserController::display_interface(Camera& camera, GamepadController&
         ImGui::SameLine();
         ImGui::TextUnformatted("Key: 4");
 
-        const std::vector<Celeris::Waypoint>& waypoints = m_celeris->waypoints();
+        const std::vector<celeris::Celeris::Waypoint>& waypoints = m_celeris->waypoints();
         const size_t directional_waypoint_count = std::count_if(
             waypoints.begin(),
             waypoints.end(),
-            [](const Celeris::Waypoint& waypoint) {
+            [](const celeris::Celeris::Waypoint& waypoint) {
                 return waypoint.directional();
             }
         );

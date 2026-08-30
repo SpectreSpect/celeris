@@ -7,7 +7,9 @@
 
 #include <vector>
 
-class Celeris;
+namespace celeris {
+    class Celeris;
+}
 class MaterialInstanceManager;
 class MeshManager;
 
@@ -16,7 +18,7 @@ public:
     FootprintVisualizer(
         MeshManager& mesh_manager,
         MaterialInstanceManager& material_instance_manager,
-        Celeris& celeris,
+        celeris::Celeris& celeris,
         Footprint& footprint,
         float skybox_exposure
     );

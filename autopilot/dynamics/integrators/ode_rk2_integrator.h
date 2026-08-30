@@ -50,10 +50,15 @@ namespace celeris {
                 
                 const Derivative derivative0 = equation.calculate_derivative(current_timestamp, current_state, control);
                 
-                const State estimated_state1 = current_state + duration_seconds * derivative0;
+                State estimated_state1 = current_state + duration_seconds * derivative0;
+
+                equation.project_state_inplace(estimated_state1);
+
                 const Derivative derivative1 = equation.calculate_derivative(next_timestamp, estimated_state1, control);
 
                 current_state += duration_seconds / 2.0 * (derivative0 + derivative1);
+
+                equation.project_state_inplace(current_state);
 
                 current_timestamp = next_timestamp;
             }
