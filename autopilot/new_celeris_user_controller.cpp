@@ -25,6 +25,8 @@ void NewCelerisUserController::update(const Camera& camera, KeyboardInputRecieve
         place_planner_start(camera);
     if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_2))
         place_planner_goal(camera);
+    if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_3))
+        m_celeris->request_path_replan();
 }
 
 void NewCelerisUserController::display_celeris_general_panel(Camera& camera) {

@@ -68,12 +68,18 @@ public:
         int max_y_diff = -1,
         bool allow_flying_over_precepices = true
     );
+
+    // m_path_planner.request_path_replan(start, goal);
+    void request_path_replan();
     
     OdometryEstimator& odometry_estimator();
     Transform* lidar_tranform();
     VoxelGrid* voxel_grid();
+    glm::vec3 voxel_center_bottom_world_pos(const glm::ivec3& voxel_pos);
+    glm::vec3 voxel_center_world_pos(const glm::ivec3& voxel_pos);
     NonholonomicPos start_position() const noexcept;
     NonholonomicPos goal_position() const noexcept;
+    const PathPlanner::PathPlannerResult& path_planner_snapshot() const noexcept;
 
 private:
     VulkanEngine* m_engine = nullptr;

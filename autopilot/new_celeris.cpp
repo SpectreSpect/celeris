@@ -108,6 +108,12 @@ bool NewCeleris::adjust_to_ground(
 
 // void set_goal(const NonholonomicPos& position);
 
+void NewCeleris::request_path_replan() {
+    LOG_METHOD();
+
+    m_path_planner.request_path_replan(m_start_position, m_goal_position);
+}
+
 OdometryEstimator& NewCeleris::odometry_estimator() {
     return m_odometry_estimator;
 }
@@ -122,12 +128,30 @@ VoxelGrid* NewCeleris::voxel_grid() {
     return m_voxel_grid;
 }
 
+glm::vec3 NewCeleris::voxel_center_bottom_world_pos(const glm::ivec3& voxel_pos) {
+    logger().check(m_voxel_grid, "Voxel grid was null");
+    
+    // return m_path_planner.request_voxel_center_world_pos(voxel_pos);
+    return (glm::vec3(voxel_pos) + glm::vec3(0.5f, 0.0f, 0.5f)) * m_voxel_grid->voxel_size();
+}
+
+glm::vec3 NewCeleris::voxel_center_world_pos(const glm::ivec3& voxel_pos) {
+    logger().check(m_voxel_grid, "Voxel grid was null");
+    
+    // return m_path_planner.request_voxel_center_world_pos(voxel_pos);
+    return (glm::vec3(voxel_pos) + glm::vec3(0.5f)) * m_voxel_grid->voxel_size();
+}
+
 NonholonomicPos NewCeleris::start_position() const noexcept {
     return m_start_position;
 }
 
 NonholonomicPos NewCeleris::goal_position() const noexcept {
     return m_goal_position;
+}
+
+const PathPlanner::PathPlannerResult& NewCeleris::path_planner_snapshot() const noexcept {
+    return m_path_planner_snapshot;
 }
 
 // NonholonomicPos goal_position();

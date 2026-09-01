@@ -295,6 +295,7 @@ int main() {
     new_celeris.start(std::move(planner_submit_context));
 
     NewCelerisVisualizer new_celeris_visualizer(
+        engine,
         mesh_manager,
         material_instance_manager, 
         new_celeris, 
