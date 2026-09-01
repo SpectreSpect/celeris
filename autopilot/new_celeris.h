@@ -18,6 +18,7 @@ class ManagerBundle;
 class VulkanEngine;
 class VulkanQueue;
 class VoxelGrid;
+class Transform;
 
 class NewCeleris {
 public:
@@ -47,6 +48,9 @@ public:
 
     void start();
     void update();
+    
+    OdometryEstimator& odometry_estimator();
+    Transform* lidar_tranform();
 
 private:
     VulkanEngine* m_engine = nullptr;
@@ -71,7 +75,7 @@ private:
     std::unique_ptr<LidarScan> m_network_scan;
     std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;
     uint32_t m_received_scan_count = 0;
-
+    
     void try_receive_and_process_imu();
     void try_receive_and_process_lidar_scan();
 };

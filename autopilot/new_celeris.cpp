@@ -1,5 +1,6 @@
 #include "new_celeris.h"
 
+#include "../renderer/transform.h"
 #include "../voxel_grid_vulkan/voxel_grid.h"
 #include "../vulkan_self/vulkan_engine.h"
 #include "../managers/manager_bundle.h"
@@ -54,6 +55,16 @@ void NewCeleris::update() {
     try_receive_and_process_imu();
     if (!m_odometry_estimator.is_gravity_calibration_underway())
         try_receive_and_process_lidar_scan();
+}
+
+OdometryEstimator& NewCeleris::odometry_estimator() {
+    return m_odometry_estimator;
+}
+
+Transform* NewCeleris::lidar_tranform() {
+    if (!m_network_scan)
+        return nullptr;
+    return &m_network_scan->point_cloud().transform;
 }
 
 void NewCeleris::try_receive_and_process_imu() {

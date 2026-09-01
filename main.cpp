@@ -88,6 +88,7 @@
 #include "autopilot/sensors/lidar/deskewing/deskewing_debugger.h"
 #include "renderer/mcp/mcp_visalizer.h"
 #include "autopilot/new_celeris.h"
+#include "autopilot/new_celeris_visualizer.h"
 
 #include <algorithm>
 #include <exception>
@@ -288,7 +289,16 @@ int main() {
         voxel_grid, 
         NewCeleris::CelerisDesc{}
     );
+    new_celeris.odometry_estimator().set_gravity(glm::vec3(-0.123099f, 9.78485f, -0.69118f)); // simulator
     new_celeris.start();
+
+    NewCelerisVisualizer new_celeris_visualizer(
+        mesh_manager,
+        material_instance_manager, 
+        new_celeris, 
+        vehicle_geometry,
+        skybox_exposure
+    );
 
     Celeris celeris(
         engine,
@@ -383,6 +393,7 @@ int main() {
     // scene.add(celeris_visualizer);
     // // scene.add(test_gazelle_next);
     scene.add(voxel_grid.render_object());
+    scene.add(new_celeris_visualizer);
     // scene.add(quad_object);
     // scene.add(mcp_visualizer);
     // scene.add(test_arrow);
@@ -436,6 +447,7 @@ int main() {
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
         
         new_celeris.update();
+        new_celeris_visualizer.update();
         // celeris.update(compute_submit_context);
         // celeris_user_controller.update(delta_time, camera, keyboard_input_reciever, fps_camera_controller);
         // celeris_visualizer.update();
