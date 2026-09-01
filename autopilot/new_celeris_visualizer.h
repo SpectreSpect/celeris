@@ -2,9 +2,11 @@
 
 #include "../vulkan_self/logger/logger_header.h"
 #include "../renderer/scene_object.h"
+#include "spherical_pose_marker.h"
 #include "gazelle_next.h"
 
 class VehicleGeometry;
+class NonholonomicPos;
 class MeshManager;
 class NewCeleris;
 
@@ -30,5 +32,14 @@ private:
 
     GazelleNext m_gazelle_next;
 
+    SphericalPoseMarker m_start_marker;
+    SphericalPoseMarker m_goal_marker;
+
     void update_gazelle_next_transform();
+    void set_marker_pose(
+        SphericalPoseMarker& marker, 
+        NonholonomicPos nonholonomic_position
+    ); 
+    void set_start(const NonholonomicPos& position);
+    void set_goal(const NonholonomicPos& position);
 };

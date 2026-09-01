@@ -1,15 +1,17 @@
 #include "new_celeris.h"
 
-#include "../renderer/transform.h"
+#include "../vulkan_self/vulkan_submit_context.h"
 #include "../voxel_grid_vulkan/voxel_grid.h"
 #include "../vulkan_self/vulkan_engine.h"
 #include "../managers/manager_bundle.h"
 #include "sensors/lidar/lidar_scan.h"
+#include "../renderer/transform.h"
 
 NewCeleris::NewCeleris(
     VulkanEngine& engine,
     ManagerBundle& manager_bundle, 
     VulkanQueue& compute_queue,
+    VulkanSubmitContext& submit_context,
     VoxelGrid& voxel_grid,
     const CelerisDesc& desc)
     :   m_engine(&engine),
@@ -32,7 +34,23 @@ NewCeleris::NewCeleris(
         m_gicp_pass(engine, manager_bundle.compute_pass_manager()),
         m_voxel_write_list(VulkanBuffer::create_host_visible_storage_buffer(
             engine, 
-            sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * desc.max_write_count)) {
+            sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * desc.max_write_count)),
+        m_path_intersection_detector(
+            engine.physical_device(),
+            engine.device(),
+            submit_context,
+            manager_bundle.compute_pass_manager(),
+            voxel_grid,
+            desc.path_intersection_detector_max_path_points
+        ),
+        m_path_planner(
+            engine,
+            submit_context,
+            manager_bundle,
+            voxel_grid,
+            m_path_intersection_detector,
+            desc.path_planner_desc
+        ) {
     LOG_METHOD();
     logger().check(desc.voxel_point_map_num_hash_table_slots > 0, 
                  "The number of voxel point map hash table slots must be greater than 0");
@@ -42,11 +60,12 @@ NewCeleris::NewCeleris(
     m_voxel_map_reseter.reset(m_voxel_point_map);
 }
 
-void NewCeleris::start() {
+void NewCeleris::start(VulkanSubmitContext&& planner_submit_context) {
     LOG_METHOD();
 
-    m_lidar_scan_receiver.start();
-    m_imu_receiver.start();
+    // m_lidar_scan_receiver.start();
+    // m_imu_receiver.start();
+    m_path_planner.start(std::move(planner_submit_context));
 }
 
 void NewCeleris::update() {
@@ -55,7 +74,39 @@ void NewCeleris::update() {
     try_receive_and_process_imu();
     if (!m_odometry_estimator.is_gravity_calibration_underway())
         try_receive_and_process_lidar_scan();
+    
+    if (m_path_planner_snapshot.generation != m_path_planner.request_result_generation())
+        m_path_planner_snapshot = m_path_planner.request_result_snapshot();
 }
+
+void NewCeleris::set_start(const NonholonomicPos& position) {
+    m_start_position = position;
+}
+
+void NewCeleris::set_start(const Camera& camera) {
+
+}
+
+void NewCeleris::set_goal(const NonholonomicPos& position) {
+    m_goal_position = position;
+}
+
+bool NewCeleris::adjust_to_ground(
+    glm::vec3& output,
+    int max_step_up,
+    int max_drop,
+    int max_y_diff,
+    bool allow_flying_over_precepices) {
+    return m_path_planner.request_adjust_to_ground(
+        output,
+        max_step_up,
+        max_drop,
+        max_y_diff,
+        allow_flying_over_precepices
+    );
+}
+
+// void set_goal(const NonholonomicPos& position);
 
 OdometryEstimator& NewCeleris::odometry_estimator() {
     return m_odometry_estimator;
@@ -70,6 +121,16 @@ Transform* NewCeleris::lidar_tranform() {
 VoxelGrid* NewCeleris::voxel_grid() {
     return m_voxel_grid;
 }
+
+NonholonomicPos NewCeleris::start_position() const noexcept {
+    return m_start_position;
+}
+
+NonholonomicPos NewCeleris::goal_position() const noexcept {
+    return m_goal_position;
+}
+
+// NonholonomicPos goal_position();
 
 void NewCeleris::try_receive_and_process_imu() {
     LOG_METHOD();

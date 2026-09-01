@@ -6,6 +6,7 @@
 
 #include "../renderer/transform.h"
 #include "../vulkan_self/utils.h"
+#include "../camera/camera.h"
 
 struct AStarCell {
     float g;
@@ -55,6 +56,17 @@ struct NonholonomicPos {
         p.pos = transform.position;
         p.theta = std::atan2(forward.z, forward.x);
         return p;
+    }
+
+    static bool from_camera(const Camera& camera, NonholonomicPos& output) {
+        glm::vec3 horizontal_front(camera.front.x, 0.0f, camera.front.z);
+        if (glm::dot(horizontal_front, horizontal_front) == 0.0f)
+            return false;
+
+        output.pos = camera.position;
+        output.theta = std::atan2(horizontal_front.z, horizontal_front.x);
+
+        return true;
     }
 };
 

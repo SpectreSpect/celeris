@@ -287,11 +287,12 @@ int main() {
         engine, 
         manager_bundle, 
         engine.compute_queue(), 
+        compute_submit_context,
         voxel_grid, 
         NewCeleris::CelerisDesc{}
     );
     new_celeris.odometry_estimator().set_gravity(glm::vec3(-0.123099f, 9.78485f, -0.69118f)); // simulator
-    new_celeris.start();
+    new_celeris.start(std::move(planner_submit_context));
 
     NewCelerisVisualizer new_celeris_visualizer(
         mesh_manager,
@@ -454,7 +455,7 @@ int main() {
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
         
-        new_celeris_user_controller.update();
+        new_celeris_user_controller.update(camera, keyboard_input_reciever);
         new_celeris.update();
         new_celeris_visualizer.update();
         

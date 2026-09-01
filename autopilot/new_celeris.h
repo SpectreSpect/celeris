@@ -2,23 +2,27 @@
 
 #include <cstdint>
 #include <cstddef>
+
 #include "../renderer/point_cloud/gicp/voxel_map_point_inserter.h"
 #include "../renderer/point_cloud/gicp/voxel_map_point_reseter.h"
 #include "../renderer/point_cloud/point_cloud_preprocessor.h"
 #include "../renderer/point_cloud/gicp/voxel_point_map.h"
 #include "sensors/lidar/deskewing/lidar_scan_deskewer.h"
 #include "../renderer/point_cloud/gicp/gicp_pass.h"
+#include "../a_star/path_intersection_detector.h"
 #include "../vulkan_self/logger/logger_header.h"
 #include "sensors/lidar/lidar_scan_receiver.h"
-
 #include "odometry/odometry_estimator.h"
 #include "sensors/imu/imu_receiver.h"
+#include "path_planner.h"
 
+class VulkanSubmitContext;
 class ManagerBundle;
 class VulkanEngine;
 class VulkanQueue;
 class VoxelGrid;
 class Transform;
+class Camera;
 
 class NewCeleris {
 public:
@@ -36,22 +40,40 @@ public:
         uint32_t max_gicp_iterations = 10;
 
         uint32_t max_write_count = 100000;
+
+        uint32_t path_intersection_detector_max_path_points = 1024;
+        PathPlanner::PathPlannerDesc path_planner_desc{};
     };
 
     NewCeleris(
         VulkanEngine& engine,
         ManagerBundle& manager_bundle, 
         VulkanQueue& compute_queue,
+        VulkanSubmitContext& submit_context,
         VoxelGrid& voxel_grid,
         const CelerisDesc& desc
     );
 
-    void start();
+    void start(VulkanSubmitContext&& planner_submit_context);
     void update();
+
+    void set_start(const NonholonomicPos& position);
+    void set_start(const Camera& camera);
+    void set_goal(const NonholonomicPos& position);
+
+    bool adjust_to_ground(
+        glm::vec3& output,
+        int max_step_up = 500,
+        int max_drop = 500,
+        int max_y_diff = -1,
+        bool allow_flying_over_precepices = true
+    );
     
     OdometryEstimator& odometry_estimator();
     Transform* lidar_tranform();
     VoxelGrid* voxel_grid();
+    NonholonomicPos start_position() const noexcept;
+    NonholonomicPos goal_position() const noexcept;
 
 private:
     VulkanEngine* m_engine = nullptr;
@@ -76,6 +98,13 @@ private:
     std::unique_ptr<LidarScan> m_network_scan;
     std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;
     uint32_t m_received_scan_count = 0;
+
+    PathIntersectionDetector m_path_intersection_detector;
+    PathPlanner m_path_planner;
+    PathPlanner::PathPlannerResult m_path_planner_snapshot{};
+
+    NonholonomicPos m_start_position{};
+    NonholonomicPos m_goal_position{};
     
     void try_receive_and_process_imu();
     void try_receive_and_process_lidar_scan();
