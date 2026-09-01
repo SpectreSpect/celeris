@@ -1,18 +1,18 @@
 #pragma once
 
 #include <memory>
-#include <deque>
 #include <utility>
 #include <algorithm>
 #include <vector>
 #include <map>
-#include <optional>
+#include <iterator>
+#include <chrono>
 
 #include "../../vulkan_self/logger/logger_header.h"
 #include "dynamics/dynamic_interface.h"
 #include "clock.h"
 #include "state_estimate.h"
-#include "instant_event.h"
+#include "events/instant_event.h"
 
 namespace celeris {
     template<class State>
@@ -20,11 +20,14 @@ namespace celeris {
     public:
         _XPARENT_NAME(HybridDynamicalSystem);
 
+        using Timestamp = simulation::Timestamp;
+        using Duration = simulation::Duration;
+
         using EventPtr = std::unique_ptr<InstantEvent<State>>;
         using EventBucket = std::vector<EventPtr>;
 
-        using Timestamp = simulation::Timestamp;
-        using Duration = simulation::Duration;
+        using StateHistoryContainer = std::map<Timestamp, StateEstimate<State>>;
+        using EventHistoryContainer = std::map<Timestamp, EventBucket>;
 
         /*
             max_integration_step - максимальный шаг интегрирования (delta_time)
@@ -54,41 +57,7 @@ namespace celeris {
                 "`max_history_step` must be greater than zero."
             );
 
-            m_state_history.push_back(m_initial_state);
-        }
-
-        const StateEstimate<State>& current_state() const noexcept {
-            return m_state_history.back();
-        }
-
-        void insert_events(std::vector<EventPtr> events) {
-            LOG_METHOD();
-
-            if (events.empty()) {
-                return;
-            }
-            
-            for (const EventPtr& event : events) {
-                check_event_ptr(event);
-            }
-
-            const Timestamp previous_end = current_state().timestamp;
-
-            std::optional<Timestamp> earliest_affected;
-
-            for (EventPtr& event : events) {
-                const Timestamp timestamp = event->timestamp();
-
-                if (timestamp <= previous_end && (!earliest_affected || timestamp < *earliest_affected)) {
-                    earliest_affected = timestamp;
-                }
-
-                insert_event_without_resimulation(std::move(event));
-            }
-
-            if (earliest_affected) {
-                resimulate_at_and_until(*earliest_affected, previous_end);
-            }
+            m_state_history.insert({m_initial_state.timestamp, m_initial_state});
         }
 
         void insert_event(EventPtr event) {
@@ -96,102 +65,136 @@ namespace celeris {
 
             check_event_ptr(event);
 
-            const Timestamp event_timestamp = event->timestamp();
-            const Timestamp previous_end = current_state().timestamp;
+            const Timestamp timestamp = event->timestamp();
+            m_event_history[timestamp].push_back(std::move(event));
 
-            insert_event_without_resimulation(std::move(event));
-
-            if (event_timestamp <= previous_end) {
-                resimulate_at_and_until(event_timestamp, previous_end);
-            }
+            invalidate_cache_from(timestamp);
         }
 
-        const StateEstimate<State>& simulate_for(Duration duration) {
+        /*
+            Эта функция небезопасна для использования! Если есть такая возможность,
+            предпочтите использовать функцию define_state_at() вместо этой.
+
+            Причина в том, что функция возвращает значение по ссылке, но ссылка
+            ссылается на кеш, который в некоторых ситуациях может инвалидироваться
+            (при вставке событий, timestamp которых равен или раньше текущего timestamp
+            или очистке истории состояний)
+        */
+        [[nodiscard]]
+        const StateEstimate<State>& define_state_at_ref_unsafe(Timestamp timestamp)
+        {
             LOG_METHOD();
 
-            logger().check(m_dynamic_model != nullptr, "`dynamic_model` must not be null.");
-            logger().check(duration >= Duration::zero(),
-                "`duration` must be non-negative."
+            logger().check(
+                timestamp >= m_initial_state.timestamp,
+                "`timestamp` cannot precede the initial state."
             );
 
-            const Timestamp end_timestamp = current_state().timestamp + duration;
-            while (current_state().timestamp < end_timestamp) {
-                auto next = m_event_history.upper_bound(current_state().timestamp);
+            ensure_initial_state_cached();
 
-                if (next == m_event_history.end() || next->first > end_timestamp) {
-                    simulate_without_events_until(end_timestamp);
-                    break;
-                }
+            auto upper = m_state_history.lower_bound(timestamp);
 
-                const Timestamp event_timestamp = next->first;
-
-                simulate_without_events_until(event_timestamp);
-                apply_events_to_state(mutable_current_state(), next->second);
+            if (upper != m_state_history.end() && upper->first == timestamp) {
+                return upper->second;
             }
 
-            return current_state();
+            logger().check(
+                upper != m_state_history.begin(),
+                "A preceding state must exist."
+            );
+
+            const StateEstimate<State>* current = &std::prev(upper)->second;
+
+            while (current->timestamp < timestamp) {
+                const auto next_event = m_event_history.upper_bound(current->timestamp);
+
+                const bool reaches_event =
+                    next_event != m_event_history.end() &&
+                    next_event->first <= timestamp;
+
+                const Timestamp segment_end = reaches_event ? next_event->first : timestamp;
+                
+                StateEstimate<State>& next_state = simulate_between_events(segment_end, *current);
+
+                if (reaches_event) {
+                    apply_events_to_state(next_state, next_event->second);
+                }
+
+                current = &next_state;
+            }
+
+            return *current;
         }
 
-        const StateEstimate<State>& simulate_until(Timestamp timestamp) {
+        [[nodiscard]]
+        StateEstimate<State> define_state_at(Timestamp timestamp) {
             LOG_METHOD();
-
-            logger().check(m_dynamic_model != nullptr, "`dynamic_model` must not be null.");
-            logger().check(timestamp >= current_state().timestamp, "The simulation must simulate dynamics extending into the future.");
-
-            const Duration duration = timestamp - current_state().timestamp;
-            return simulate_for(duration);
-        }
-
-        const StateEstimate<State>& resimulate_at_and_for(Timestamp start_timestamp, Duration duration) {
-            LOG_METHOD();
-
-            logger().check(m_dynamic_model != nullptr, "`dynamic_model` must not be null.");
-            logger().check(duration >= Duration::zero(), "`duration` must be equal or greater than zero.");
-
-            const Timestamp end_timestamp = start_timestamp + duration;
-
-            check_resimulate_start_timestamp(start_timestamp, end_timestamp);
-
-            clear_state_history_at_and_after(start_timestamp);
-            simulate_until(end_timestamp);
-            return current_state();
-        }
-
-        const StateEstimate<State>& resimulate_at_and_until(Timestamp start_timestamp, Timestamp end_timestamp) {
-            LOG_METHOD();
-
-            logger().check(m_dynamic_model != nullptr, "`dynamic_model` must not be null.");
-            check_resimulate_start_timestamp(start_timestamp, end_timestamp);
-
-            return resimulate_at_and_for(start_timestamp, end_timestamp - start_timestamp);
-        }
-
-        const StateEstimate<State>& resimulate_at_and_until_last_state(Timestamp start_timestamp) {
-            LOG_METHOD();
-
-            logger().check(m_dynamic_model != nullptr, "`dynamic_model` must not be null.");
-
-            const Timestamp end_timestamp = current_state().timestamp;
-
-            check_resimulate_start_timestamp(start_timestamp, end_timestamp);
-
-            return resimulate_at_and_until(start_timestamp, end_timestamp);
+            return define_state_at_ref_unsafe(timestamp);
         }
 
     private:
         std::unique_ptr<DynamicInterface<State>> m_dynamic_model;
 
         StateEstimate<State> m_initial_state;
-
-        std::deque<StateEstimate<State>> m_state_history;
-        std::map<Timestamp, EventBucket> m_event_history;
+        
+        StateHistoryContainer m_state_history;
+        EventHistoryContainer m_event_history;
 
         Duration m_max_integration_step = std::chrono::milliseconds{10};
         Duration m_max_history_step = std::chrono::milliseconds{100};
 
     private:
-        StateEstimate<State>& mutable_current_state() noexcept {
-            return m_state_history.back();
+        StateEstimate<State>& simulate_between_events(
+            Timestamp end_timestamp,
+            const StateEstimate<State>& start_state)
+        {
+            logger().check(
+                end_timestamp > start_state.timestamp,
+                "`end_timestamp` must follow `start_state.timestamp`."
+            );
+
+            const auto event_it = m_event_history.upper_bound(start_state.timestamp);
+
+            logger().check(
+                event_it == m_event_history.end() ||
+                event_it->first >= end_timestamp,
+                "There must be no event strictly inside the integration interval."
+            );
+
+            StateEstimate<State> working_state = start_state;
+            StateEstimate<State>* stored_state = nullptr;
+
+            while (working_state.timestamp < end_timestamp) {
+                const Duration remaining = end_timestamp - working_state.timestamp;
+                const Duration duration = std::min(m_max_history_step, remaining);
+
+                logger().check(
+                    duration > Duration::zero(),
+                    "Simulation timestamp failed to advance."
+                );
+
+                const Timestamp next_timestamp = working_state.timestamp + duration;
+
+                m_dynamic_model->simulate_for_inplace(
+                    working_state.timestamp,
+                    working_state.state,
+                    duration,
+                    m_max_integration_step
+                );
+
+                working_state.timestamp = next_timestamp;
+
+                auto [it, inserted] = m_state_history.emplace(next_timestamp, working_state);
+
+                logger().check(
+                    inserted,
+                    "A state at this timestamp is already cached."
+                );
+
+                stored_state = &it->second;
+            }
+
+            return *stored_state;
         }
 
         void check_event_ptr(const EventPtr& event) {
@@ -202,36 +205,30 @@ namespace celeris {
             );
         }
 
-        void insert_event_without_resimulation(EventPtr event) {
+        void invalidate_cache_from(Timestamp timestamp) {
             LOG_METHOD();
 
-            check_event_ptr(event);
-
-            const Timestamp timestamp = event->timestamp();
-
-            m_event_history[timestamp].push_back(std::move(event));
+            m_state_history.erase(
+                m_state_history.lower_bound(timestamp),
+                m_state_history.end()
+            );
         }
 
-        void reset_history_to_initial_state() {
+        void ensure_initial_state_cached() {
             LOG_METHOD();
 
-            m_state_history.clear();
-            m_state_history.push_back(m_initial_state);
-
-            apply_state_events(mutable_current_state());
-        }
-
-        void clear_state_history_at_and_after(Timestamp timestamp) {
-            LOG_METHOD();
-
-            if (timestamp <= m_initial_state.timestamp) {
-                reset_history_to_initial_state();
+            if (m_state_history.contains(m_initial_state.timestamp)) {
                 return;
             }
 
-            while (m_state_history.back().timestamp >= timestamp) {
-                m_state_history.pop_back();
-            }
+            auto [it, inserted] = m_state_history.emplace(
+                m_initial_state.timestamp,
+                m_initial_state
+            );
+
+            logger().check(inserted, "The initial state could not be cached.");
+
+            apply_state_events(it->second);
         }
 
         void apply_events_to_state(StateEstimate<State>& state, const EventBucket& events) {
@@ -269,40 +266,6 @@ namespace celeris {
             auto it = m_event_history.find(state.timestamp);
             if (it != m_event_history.end() && !it->second.empty())
                 apply_events_to_state(state, it->second);
-        }
-
-        const StateEstimate<State>& simulate_without_events_until(Timestamp end_timestamp) {
-            LOG_METHOD();
-
-            logger().check(m_dynamic_model != nullptr, "`dynamic_model` must not be null.");
-            logger().check(end_timestamp >= current_state().timestamp, "`end_timestamp` cannot precede the current state.");
-
-            StateEstimate<State> state = current_state();
-
-            while (state.timestamp < end_timestamp) {
-                const Timestamp next_timestamp = std::min(state.timestamp + m_max_history_step, end_timestamp);
-                const Duration duration = next_timestamp - state.timestamp;
-
-                logger().check(duration > Duration::zero(), "Simulation timestamp failed to advance.");
-
-                m_dynamic_model->simulate_for_inplace(
-                    state.timestamp,
-                    state.state, 
-                    duration,
-                    m_max_integration_step
-                );
-
-                state.timestamp = next_timestamp;
-                m_state_history.push_back(state);
-            }
-
-            return current_state();
-        }
-
-        void check_resimulate_start_timestamp(Timestamp start_timestamp, Timestamp end_timestamp) const {
-            logger().check(start_timestamp >= m_initial_state.timestamp, "`start_timestamp` cannot precede the initial state.");
-            logger().check(start_timestamp <= current_state().timestamp,"`start_timestamp` cannot be later than the current state.");
-            logger().check(start_timestamp <= end_timestamp, "`start_timestamp` must not be later than `end_timestamp`.");
         }
     };
 }

@@ -29,6 +29,8 @@
 #include "../managers/manager_bundle.h"
 #include "gazelle_next.h"
 #include "dynamics/state_estimate.h"
+#include "dynamics/dynamics/ode_dynamics/vehicle_dynamics/vehicle_state.h"
+#include "dynamics/events/state_replacement_event.h"
 
 namespace {
     constexpr int COLLISION_BINARY_SEARCH_ITERATIONS = 16;
@@ -466,6 +468,29 @@ namespace celeris {
         }
 
         Odometry odometry = m_odometry_estimator.get_latest_odometry();
+
+        // celeris::TotalVehicleState total_vehicle_state = celeris::TotalVehicleState{
+        //     .state = celeris::VehicleState{
+        //         .odometry = VehicleOdometryState{
+        //             .position = odometry.position,
+        //             .linear_velocity = odometry.linear_velocity,
+        //             .orientation = odometry.orientation
+        //         },
+        //         .steering_wheel = VehicleSteeringWheelState{
+        //             .steering_angle = 0.0, // #TODO
+        //             .steering_rate = 0.0 // #TODO
+        //         }
+        //     },
+        //     .control = celeris::VehicleControl() // #TODO
+        // };
+
+        // simulation::Timestamp measurement_timestamp{simulation::Duration(odometry.timestamp_ns)};
+        
+        // m_dynamical_system.insert_event(
+        //     std::make_unique<
+        //         StateReplacementEvent<celeris::TotalVehicleState>
+        //     >(measurement_timestamp, total_vehicle_state)
+        // );
         
         /*
             Получение фидбека динамики машины (позиции и руля).
@@ -908,15 +933,40 @@ namespace celeris {
         return true;
     }
 
+    // void Celeris::try_receive_and_process_imu() {
+    //     ImuMeasurement imu_message{};
+    //     if (m_imu_receiver.try_pop_back_imu_message(imu_message)) {
+    //         m_odometry_estimator.submit_imu(imu_message);
+
+    //         // Odometry latest_odometry = m_odometry_estimator.get_latest_odometry();
+
+    //         // m_lidar_transform.position = latest_odometry.position;
+    //         // m_lidar_transform.rotation = latest_odometry.orientation;
+    //     }
+    // }
+
     void Celeris::try_receive_and_process_imu() {
         ImuMeasurement imu_message{};
         if (m_imu_receiver.try_pop_back_imu_message(imu_message)) {
-            m_odometry_estimator.submit_imu(imu_message);
+            // m_odometry_estimator.submit_imu(imu_message);
 
-            // Odometry latest_odometry = m_odometry_estimator.get_latest_odometry();
+            celeris::TotalVehicleState current_state = m_dynamical_system.latest_defined_state().state;
 
-            // m_lidar_transform.position = latest_odometry.position;
-            // m_lidar_transform.rotation = latest_odometry.orientation;
+            
+            current_state.control.odometry.linear_acceleration = imu_message.linear_acceleration;
+            current_state.control.odometry.angular_velocity = imu_message.angular_velocity;
+
+            /*
+                Здесь скорее всего нужно будет делать преобразование временной
+                шкалы. #TODO
+            */
+            simulation::Timestamp measurement_timestamp{simulation::Duration(imu_message.timestamp)};
+
+            m_dynamical_system.insert_event(
+                std::make_unique<
+                    StateReplacementEvent<celeris::TotalVehicleState>
+                >(measurement_timestamp, current_state)
+            );
         }
     }
 
@@ -952,19 +1002,27 @@ namespace celeris {
             Odometry last_lidar_odometry{};
             if (m_odometry_estimator.get_last_lidar_odometry(last_lidar_odometry))
                 last_lidar_odometry.timestamp_ns = m_network_scan->timestamp();
-
-            // last_lidar_odometry.timestamp_ns = m_network_scan->timestamp();
-            // if (last_lidar_odometry_id >= 0)
-            //     last_lidar_odometry = m_odometry_estimator.get_odometry(last_lidar_odometry_id);
-
-            m_odometry_estimator.submit_lidar_imu_fusion(*m_network_scan, closest_odometry, last_lidar_odometry);
-            // m_odometry_estimator.submit_lidar_scan(*m_network_scan, last_lidar_odometry);
-
-            // m_odometry_estimator.submit_lidar_scan(*m_network_scan, closest_odometry);
-
-            // last_lidar_odometry_id = m_odometry_estimator.history_size() - 1;
             
-            // m_lidar_transform = m_network_scan->point_cloud().transform;
+            ///////////////////////////////////////////////////////////////////////////////////////////
+            celeris::TotalVehicleState current_state = m_dynamical_system.latest_defined_state().state;
+            
+            current_state.control.odometry.linear_acceleration = imu_message.linear_acceleration;
+            current_state.control.odometry.angular_velocity = imu_message.angular_velocity;
+
+            /*
+                Здесь скорее всего нужно будет делать преобразование временной
+                шкалы. #TODO
+            */
+            simulation::Timestamp measurement_timestamp{simulation::Duration(imu_message.timestamp)};
+
+            m_dynamical_system.insert_event(
+                std::make_unique<
+                    StateReplacementEvent<celeris::TotalVehicleState>
+                >(measurement_timestamp, current_state)
+            );
+            ///////////////////////////////////////////////////////////////////////////////////////////
+            
+            // m_odometry_estimator.submit_lidar_imu_fusion(*m_network_scan, closest_odometry, last_lidar_odometry);
             
             m_voxel_map_inserter.insert(m_voxel_point_map, m_network_scan->point_cloud(), m_network_scan->normal_buffer());
             m_voxel_grid->voxelize_point_cloud(

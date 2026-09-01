@@ -57,8 +57,6 @@ namespace celeris {
 
                 current_time = next_timestamp;
             }
-
-            return state;
         }
 
         [[nodiscard]]
