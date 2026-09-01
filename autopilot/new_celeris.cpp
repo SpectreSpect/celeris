@@ -67,6 +67,10 @@ Transform* NewCeleris::lidar_tranform() {
     return &m_network_scan->point_cloud().transform;
 }
 
+VoxelGrid* NewCeleris::voxel_grid() {
+    return m_voxel_grid;
+}
+
 void NewCeleris::try_receive_and_process_imu() {
     LOG_METHOD();
 

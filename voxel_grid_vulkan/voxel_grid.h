@@ -60,7 +60,7 @@ private:
 };
 
 
-class VoxelGrid {
+class VoxelGrid : public SceneObject {
 public:
     _XCLASS_NAME(VoxelGrid);
 

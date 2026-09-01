@@ -22,8 +22,13 @@ public:
 
     void update();
 
+    void gazelle_next_visible(bool visible);
+    void voxel_grid_visible(bool visible);
+
 private:
     NewCeleris* m_celeris = nullptr;
 
     GazelleNext m_gazelle_next;
+
+    void update_gazelle_next_transform();
 };

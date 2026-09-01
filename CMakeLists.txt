@@ -172,6 +172,7 @@ add_executable(app
   renderer/mcp/mcp_visalizer.cpp
   autopilot/new_celeris.cpp
   autopilot/new_celeris_visualizer.cpp
+  autopilot/new_celeris_user_controller.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

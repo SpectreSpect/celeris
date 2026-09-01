@@ -89,6 +89,7 @@
 #include "renderer/mcp/mcp_visalizer.h"
 #include "autopilot/new_celeris.h"
 #include "autopilot/new_celeris_visualizer.h"
+#include "autopilot/new_celeris_user_controller.h"
 
 #include <algorithm>
 #include <exception>
@@ -300,6 +301,12 @@ int main() {
         skybox_exposure
     );
 
+    NewCelerisUserController new_celeris_user_controller(
+        new_celeris,
+        new_celeris_visualizer,
+        NewCelerisUserController::NewCelerisUserControllerConfig{}
+    );
+
     Celeris celeris(
         engine,
         engine.compute_queue(),
@@ -392,7 +399,8 @@ int main() {
     scene.add(skybox);
     // scene.add(celeris_visualizer);
     // // scene.add(test_gazelle_next);
-    scene.add(voxel_grid.render_object());
+    // scene.add(voxel_grid.render_object());
+    scene.add(voxel_grid);
     scene.add(new_celeris_visualizer);
     // scene.add(quad_object);
     // scene.add(mcp_visualizer);
@@ -446,8 +454,10 @@ int main() {
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
         
+        new_celeris_user_controller.update();
         new_celeris.update();
         new_celeris_visualizer.update();
+        
         // celeris.update(compute_submit_context);
         // celeris_user_controller.update(delta_time, camera, keyboard_input_reciever, fps_camera_controller);
         // celeris_visualizer.update();
@@ -486,7 +496,8 @@ int main() {
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
 
-                celeris_user_controller.display_interface(camera, gamepad_controller);
+                // celeris_user_controller.display_interface(camera, gamepad_controller);
+                new_celeris_user_controller.display_interface(camera);
                 // mcp_visualizer.display_interface();
 
                 ui.end_frame(command_buffer);

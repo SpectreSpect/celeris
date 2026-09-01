@@ -51,6 +51,7 @@ public:
     
     OdometryEstimator& odometry_estimator();
     Transform* lidar_tranform();
+    VoxelGrid* voxel_grid();
 
 private:
     VulkanEngine* m_engine = nullptr;
