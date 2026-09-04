@@ -5,6 +5,8 @@
 
 #include <glm/vec3.hpp>
 
+class Transform;
+
 struct VehicleGeometry {
     std::string name;
 
@@ -22,6 +24,7 @@ struct VehicleGeometry {
     glm::vec3 rear_axle_midpoint() const;
     glm::vec3 front_axle_midpoint() const;
     glm::vec3 lidar_position() const;
+    glm::vec3 rear_axle_world_position(const Transform& lidar_transform) const;
 };
 
 VehicleGeometry load_vehicle_geometry(const std::filesystem::path& path);

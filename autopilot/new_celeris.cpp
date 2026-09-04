@@ -18,6 +18,7 @@ NewCeleris::NewCeleris(
     :   m_engine(&engine),
         m_voxel_grid(&voxel_grid),
         m_desc(desc),
+        m_vehicle_geometry(vehicle_geometry),
         m_point_cloud_preprocessor(engine.device(), compute_queue, manager_bundle.compute_pass_manager()),
         m_lidar_scan_receiver(
             manager_bundle, 
@@ -80,7 +81,14 @@ void NewCeleris::update() {
     if (m_path_planner_snapshot.generation != m_path_planner.request_result_generation())
         m_path_planner_snapshot = m_path_planner.request_result_snapshot();
     
-    
+    if (has_lidar_transform()) {
+        const Transform& transform = *lidar_tranform();
+        
+        m_start_position.pos = m_vehicle_geometry.rear_axle_world_position(transform);
+        m_start_position.pos.y += voxel_grid()->voxel_size().y * 0.5f;
+
+        m_start_position.theta = NonholonomicPos::from_transform(transform).theta;
+    }
 }
 
 void NewCeleris::set_start(const NonholonomicPos& position) {
@@ -116,6 +124,10 @@ void NewCeleris::request_path_replan() {
 
 OdometryEstimator& NewCeleris::odometry_estimator() {
     return m_odometry_estimator;
+}
+
+bool NewCeleris::has_lidar_transform() {
+    return m_network_scan.get();
 }
 
 Transform* NewCeleris::lidar_tranform() {

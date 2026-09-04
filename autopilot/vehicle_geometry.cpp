@@ -1,5 +1,7 @@
 #include "vehicle_geometry.h"
 
+#include "../renderer/transform.h"
+
 #include <stdexcept>
 
 #include <yaml-cpp/yaml.h>
@@ -29,6 +31,20 @@ glm::vec3 VehicleGeometry::front_axle_midpoint() const {
 
 glm::vec3 VehicleGeometry::lidar_position() const {
     return glm::vec3(lidar_from_left, lidar_height, lidar_from_rear);
+}
+
+glm::vec3 VehicleGeometry::rear_axle_world_position(
+    const Transform& lidar_transform
+) const {
+    const glm::vec3 lidar_to_rear_axle = rear_axle_midpoint() - lidar_position();
+    const glm::vec3 model_offset(
+        lidar_to_rear_axle.z,
+        lidar_to_rear_axle.y,
+        lidar_to_rear_axle.x
+    );
+
+    return lidar_transform.position +
+        glm::normalize(lidar_transform.rotation) * (model_offset * lidar_transform.scale);
 }
 
 VehicleGeometry load_vehicle_geometry(const std::filesystem::path& path) {

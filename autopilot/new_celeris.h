@@ -73,6 +73,7 @@ public:
     void request_path_replan();
     
     OdometryEstimator& odometry_estimator();
+    bool has_lidar_transform();
     Transform* lidar_tranform();
     VoxelGrid* voxel_grid();
     glm::vec3 voxel_center_bottom_world_pos(const glm::ivec3& voxel_pos);
@@ -86,6 +87,7 @@ private:
     VoxelGrid* m_voxel_grid = nullptr;
     
     CelerisDesc m_desc;
+    VehicleGeometry m_vehicle_geometry;
 
     PointCloudPreprocessor m_point_cloud_preprocessor;
 
