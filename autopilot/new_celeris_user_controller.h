@@ -15,6 +15,8 @@ public:
     struct NewCelerisUserControllerConfig {
         bool show_gazelle_next = true;
         bool show_voxel_grid = true;
+        
+        bool show_guide_path = true;
     };
 
     NewCelerisUserController(

@@ -33,6 +33,12 @@ NewCelerisVisualizer::NewCelerisVisualizer(
             material_instance_manager,
             PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(0, 0, 1, 1))
         ),
+        // m_path_line_cloud(
+        //     engine,
+        //     mesh_manager.line_quad,
+        //     material_instance_manager.line,
+        //     max_path_line_count
+        // ),
         m_guide_path_line_cloud(
             engine,
             mesh_manager.line_quad,
@@ -77,6 +83,10 @@ void NewCelerisVisualizer::voxel_grid_visible(bool visible) {
     logger().check(m_celeris->voxel_grid(), "Voxel grid was null");
 
     m_celeris->voxel_grid()->visible = visible;
+}
+
+void NewCelerisVisualizer::guide_path_visible(bool visible) {
+    m_guide_path_line_cloud.visible = visible;
 }
 
 void NewCelerisVisualizer::update_gazelle_next_transform() {

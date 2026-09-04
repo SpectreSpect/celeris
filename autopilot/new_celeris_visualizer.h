@@ -30,6 +30,7 @@ public:
 
     void gazelle_next_visible(bool visible);
     void voxel_grid_visible(bool visible);
+    void guide_path_visible(bool visible);
 
 private:
     NewCeleris* m_celeris = nullptr;
@@ -41,7 +42,13 @@ private:
     SphericalPoseMarker m_start_marker;
     SphericalPoseMarker m_goal_marker;
 
-    LineCloud m_guide_path_line_cloud;
+    // LineCloud m_path_line_cloud;
+    
+    LineCloud m_guide_path_line_cloud; // Done
+
+    // LineCloud m_explored_paths_line_cloud;
+    // LineCloud m_unimpended_path_line_cloud;
+
 
     void update_gazelle_next_transform();
     

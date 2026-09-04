@@ -20,6 +20,10 @@ NewCelerisUserController::NewCelerisUserController(
 void NewCelerisUserController::update(const Camera& camera, KeyboardInputReciever& keyboard_input_reciever) {
     m_celeris_visualizer->gazelle_next_visible(m_config.show_gazelle_next);
     m_celeris_visualizer->voxel_grid_visible(m_config.show_voxel_grid);
+    
+    m_celeris_visualizer->guide_path_visible(m_config.show_guide_path);
+
+    // show_guide_path
 
     if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_1))
         place_planner_start(camera);
@@ -72,6 +76,8 @@ void NewCelerisUserController::display_path_planner_panel(Camera& camera){
         replan_path();
     ImGui::SameLine();
     ImGui::TextUnformatted("Key: 3");
+
+    ImGui::Checkbox("Show guide path", &m_config.show_guide_path);
 
     ImGui::End();
 }
