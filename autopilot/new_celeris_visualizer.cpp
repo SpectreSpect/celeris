@@ -41,8 +41,8 @@ NewCelerisVisualizer::NewCelerisVisualizer(
         // ),
         m_guide_path_line_cloud(
             engine,
-            mesh_manager.line_quad,
-            material_instance_manager.line,
+            mesh_manager,
+            material_instance_manager,
             max_path_line_count
         ) {
     m_guide_path_line_cloud.set_material_data(LineMaterialData{
