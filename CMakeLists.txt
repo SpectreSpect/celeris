@@ -170,6 +170,7 @@ add_executable(app
   autopilot/sensors/lidar/deskewing/lidar_scan_deskewer.cpp
   autopilot/sensors/lidar/deskewing/deskewing_debugger.cpp
   renderer/mcp/mcp_visalizer.cpp
+  autopilot/collision/collision_escape_resolver.cpp
   autopilot/new_celeris.cpp
   autopilot/new_celeris_visualizer.cpp
   autopilot/new_celeris_user_controller.cpp

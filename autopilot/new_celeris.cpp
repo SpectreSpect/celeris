@@ -78,9 +78,6 @@ void NewCeleris::update() {
     if (!m_odometry_estimator.is_gravity_calibration_underway())
         try_receive_and_process_lidar_scan();
     
-    if (m_path_planner_snapshot.generation != m_path_planner.request_result_generation())
-        m_path_planner_snapshot = m_path_planner.request_result_snapshot();
-    
     if (has_lidar_transform()) {
         const Transform& transform = *lidar_tranform();
         
@@ -89,6 +86,9 @@ void NewCeleris::update() {
 
         m_start_position.theta = NonholonomicPos::from_transform(transform).theta;
     }
+
+    if (m_path_planner_snapshot.generation != m_path_planner.request_result_generation())
+        m_path_planner_snapshot = m_path_planner.request_result_snapshot();
 }
 
 void NewCeleris::set_start(const NonholonomicPos& position) {
