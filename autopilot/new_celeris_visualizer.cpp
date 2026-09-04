@@ -93,30 +93,16 @@ void NewCelerisVisualizer::update() {
     set_start(m_celeris->start_position());
     set_goal(m_celeris->goal_position());
 
-    const PathPlanner::PathPlannerResult& path_planner_stapshot = m_celeris->path_planner_snapshot();
+    const PathPlanner::PathPlannerResult& path_planner_snapshot = m_celeris->path_planner_snapshot();
 
-    std::vector<LineInstance> path_lines = get_line_instances(
-        path_planner_stapshot.nonholonomic_astar_path,
-        glm::vec4(1.0f, 0.0f, 0.0f, 1.0f),
-        glm::vec4(0.0f, 0.0f, 1.0f, 1.0f)
-    );
-    m_path_line_cloud.set_lines(path_lines);
+    if (m_planner_snapshot_generation != path_planner_snapshot.generation) {
+        update_path_line_cloud(path_planner_snapshot);
+        update_guide_path_line_cloud(path_planner_snapshot);
+        m_explored_paths_line_cloud.set_lines(path_planner_snapshot.explored_paths);
+        update_unimpended_path_line_cloud(path_planner_snapshot);
 
-    std::vector<LineInstance> guide_path_lines = get_line_instances(
-        path_planner_stapshot.plain_astar_path.path,
-        glm::vec4(0.3f, 1.0f, 0.3f, 1.0f)
-    );
-    m_guide_path_line_cloud.set_lines(guide_path_lines);
-
-    m_explored_paths_line_cloud.set_lines(path_planner_stapshot.explored_paths);
-
-    std::vector<LineInstance> unimpended_path_lines = get_line_instances(
-        path_planner_stapshot.unimpended_path,
-        glm::vec4(1.0f, 1.0f, 0.0f, 1.0f),
-        glm::vec4(1.0f, 1.0f, 0.0f, 1.0f),
-        0.15f
-    );
-    m_unimpended_path_line_cloud.set_lines(unimpended_path_lines);
+        m_planner_snapshot_generation = path_planner_snapshot.generation;
+    }
 }
 
 void NewCelerisVisualizer::gazelle_next_visible(bool visible) {
@@ -236,4 +222,37 @@ std::vector<LineInstance> NewCelerisVisualizer::get_line_instances(
     }
 
     return path_lines;
+}
+
+void NewCelerisVisualizer::update_path_line_cloud(
+    const PathPlanner::PathPlannerResult& path_planner_snapshot) 
+{
+    std::vector<LineInstance> path_lines = get_line_instances(
+        path_planner_snapshot.nonholonomic_astar_path,
+        glm::vec4(1.0f, 0.0f, 0.0f, 1.0f),
+        glm::vec4(0.0f, 0.0f, 1.0f, 1.0f)
+    );
+    m_path_line_cloud.set_lines(path_lines);
+}
+
+void NewCelerisVisualizer::update_guide_path_line_cloud(
+    const PathPlanner::PathPlannerResult& path_planner_snapshot)
+{
+    std::vector<LineInstance> guide_path_lines = get_line_instances(
+        path_planner_snapshot.plain_astar_path.path,
+        glm::vec4(0.3f, 1.0f, 0.3f, 1.0f)
+    );
+    m_guide_path_line_cloud.set_lines(guide_path_lines);
+}
+
+void NewCelerisVisualizer::update_unimpended_path_line_cloud(
+    const PathPlanner::PathPlannerResult& path_planner_snapshot)
+{
+    std::vector<LineInstance> unimpended_path_lines = get_line_instances(
+        path_planner_snapshot.unimpended_path,
+        glm::vec4(1.0f, 1.0f, 0.0f, 1.0f),
+        glm::vec4(1.0f, 1.0f, 0.0f, 1.0f),
+        0.15f
+    );
+    m_unimpended_path_line_cloud.set_lines(unimpended_path_lines);
 }

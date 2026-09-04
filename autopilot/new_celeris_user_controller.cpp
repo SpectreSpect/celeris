@@ -63,29 +63,33 @@ void NewCelerisUserController::display_voxel_grid_panel() {
 void NewCelerisUserController::display_path_planner_panel(Camera& camera){
     ImGui::Begin("Path planner");
 
-    if (ImGui::CollapsingHeader("Controls")) {
-        if (ImGui::Button("Place start"))
-            place_planner_start(camera);
-        ImGui::SameLine();
-        ImGui::TextUnformatted("Key: 1");
+    // if (ImGui::CollapsingHeader("Controls")) {
+    ImGui::SeparatorText("Controls");
 
-        if (ImGui::Button("Place goal"))
-            place_planner_goal(camera);
-        ImGui::SameLine();
-        ImGui::TextUnformatted("Key: 2");
+    if (ImGui::Button("Place start"))
+        place_planner_start(camera);
+    ImGui::SameLine();
+    ImGui::TextUnformatted("Key: 1");
 
-        if (ImGui::Button("Replan path"))
-            replan_path();
-        ImGui::SameLine();
-        ImGui::TextUnformatted("Key: 3");
-    }
+    if (ImGui::Button("Place goal"))
+        place_planner_goal(camera);
+    ImGui::SameLine();
+    ImGui::TextUnformatted("Key: 2");
 
-    if (ImGui::CollapsingHeader("Visibility")) {
-        ImGui::Checkbox("Show path", &m_config.show_path);
-        ImGui::Checkbox("Show guide path", &m_config.show_guide_path);
-        ImGui::Checkbox("Show explored paths", &m_config.show_explored_paths);
-        ImGui::Checkbox("Show unimpended path", &m_config.show_unimpended_path);
-    }
+    if (ImGui::Button("Replan path"))
+        replan_path();
+    ImGui::SameLine();
+    ImGui::TextUnformatted("Key: 3");
+    // }
+
+    // if (ImGui::CollapsingHeader("Visibility")) {
+    ImGui::SeparatorText("Visibility");
+
+    ImGui::Checkbox("Show path", &m_config.show_path);
+    ImGui::Checkbox("Show guide path", &m_config.show_guide_path);
+    ImGui::Checkbox("Show explored paths", &m_config.show_explored_paths);
+    ImGui::Checkbox("Show unimpended path", &m_config.show_unimpended_path);
+    // }
     
     ImGui::End();
 }

@@ -5,7 +5,9 @@
 #include "../renderer/scene_object.h"
 #include "spherical_pose_marker.h"
 #include "gazelle_next.h"
+#include "path_planner.h"
 
+class PathPlannerResult;
 class VehicleGeometry;
 class NonholonomicPos;
 class VulkanEngine;
@@ -46,6 +48,8 @@ private:
     SphericalPoseMarker m_start_marker;
     SphericalPoseMarker m_goal_marker;
 
+    uint64_t m_planner_snapshot_generation = 0;
+
     LineCloud m_path_line_cloud;
     LineCloud m_guide_path_line_cloud;
     LineCloud m_explored_paths_line_cloud;
@@ -71,5 +75,15 @@ private:
         const std::vector<glm::ivec3> path, 
         glm::vec4 color,
         float y_offset = 0.1f
+    );
+
+    void update_path_line_cloud(
+        const PathPlanner::PathPlannerResult& path_planner_snapshot
+    );
+    void update_guide_path_line_cloud(
+        const PathPlanner::PathPlannerResult& path_planner_snapshot
+    );
+    void update_unimpended_path_line_cloud(
+        const PathPlanner::PathPlannerResult& path_planner_snapshot
     );
 };
