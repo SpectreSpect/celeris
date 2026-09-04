@@ -20,10 +20,11 @@ NewCelerisUserController::NewCelerisUserController(
 void NewCelerisUserController::update(const Camera& camera, KeyboardInputReciever& keyboard_input_reciever) {
     m_celeris_visualizer->gazelle_next_visible(m_config.show_gazelle_next);
     m_celeris_visualizer->voxel_grid_visible(m_config.show_voxel_grid);
-    
-    m_celeris_visualizer->guide_path_visible(m_config.show_guide_path);
 
-    // show_guide_path
+    m_celeris_visualizer->path_visibile(m_config.show_path);
+    m_celeris_visualizer->guide_path_visible(m_config.show_guide_path);
+    m_celeris_visualizer->explored_paths_visible(m_config.show_explored_paths);
+    m_celeris_visualizer->unimpended_path_visible(m_config.show_unimpended_path);
 
     if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_1))
         place_planner_start(camera);
@@ -62,23 +63,30 @@ void NewCelerisUserController::display_voxel_grid_panel() {
 void NewCelerisUserController::display_path_planner_panel(Camera& camera){
     ImGui::Begin("Path planner");
 
-    if (ImGui::Button("Place start"))
-        place_planner_start(camera);
-    ImGui::SameLine();
-    ImGui::TextUnformatted("Key: 1");
+    if (ImGui::CollapsingHeader("Controls")) {
+        if (ImGui::Button("Place start"))
+            place_planner_start(camera);
+        ImGui::SameLine();
+        ImGui::TextUnformatted("Key: 1");
 
-    if (ImGui::Button("Place goal"))
-        place_planner_goal(camera);
-    ImGui::SameLine();
-    ImGui::TextUnformatted("Key: 2");
+        if (ImGui::Button("Place goal"))
+            place_planner_goal(camera);
+        ImGui::SameLine();
+        ImGui::TextUnformatted("Key: 2");
 
-    if (ImGui::Button("Replan path"))
-        replan_path();
-    ImGui::SameLine();
-    ImGui::TextUnformatted("Key: 3");
+        if (ImGui::Button("Replan path"))
+            replan_path();
+        ImGui::SameLine();
+        ImGui::TextUnformatted("Key: 3");
+    }
 
-    ImGui::Checkbox("Show guide path", &m_config.show_guide_path);
-
+    if (ImGui::CollapsingHeader("Visibility")) {
+        ImGui::Checkbox("Show path", &m_config.show_path);
+        ImGui::Checkbox("Show guide path", &m_config.show_guide_path);
+        ImGui::Checkbox("Show explored paths", &m_config.show_explored_paths);
+        ImGui::Checkbox("Show unimpended path", &m_config.show_unimpended_path);
+    }
+    
     ImGui::End();
 }
 

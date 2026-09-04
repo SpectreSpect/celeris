@@ -30,7 +30,11 @@ public:
 
     void gazelle_next_visible(bool visible);
     void voxel_grid_visible(bool visible);
+
+    void path_visibile(bool visible);
     void guide_path_visible(bool visible);
+    void explored_paths_visible(bool visible);
+    void unimpended_path_visible(bool visible);
 
 private:
     NewCeleris* m_celeris = nullptr;
@@ -43,12 +47,9 @@ private:
     SphericalPoseMarker m_goal_marker;
 
     LineCloud m_path_line_cloud;
-    
-    LineCloud m_guide_path_line_cloud; // Done
-
-    // LineCloud m_explored_paths_line_cloud;
-    // LineCloud m_unimpended_path_line_cloud;
-
+    LineCloud m_guide_path_line_cloud;
+    LineCloud m_explored_paths_line_cloud;
+    LineCloud m_unimpended_path_line_cloud;
 
     void update_gazelle_next_transform();
     
@@ -61,13 +62,14 @@ private:
 
     std::vector<LineInstance> get_line_instances(
         const std::vector<NonholonomicPos> path, 
-        glm::vec4 forward_color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f),
-        glm::vec4 backward_color = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f),
-        float y_offset = 0.15f,
+        glm::vec4 forward_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+        glm::vec4 backward_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+        float y_offset = 0.1f,
         float forward_dir_y_offset = 0.05f
     );
     std::vector<LineInstance> get_line_instances(
         const std::vector<glm::ivec3> path, 
+        glm::vec4 color,
         float y_offset = 0.1f
     );
 };

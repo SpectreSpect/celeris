@@ -44,21 +44,44 @@ NewCelerisVisualizer::NewCelerisVisualizer(
             mesh_manager,
             material_instance_manager,
             max_path_line_count
-        ) {
+        ),
+        m_explored_paths_line_cloud(
+            engine,
+            mesh_manager,
+            material_instance_manager,
+            max_path_line_count
+        ),
+        m_unimpended_path_line_cloud(
+            engine,
+            mesh_manager,
+            material_instance_manager,
+            max_path_line_count
+        ){
     m_path_line_cloud.set_material_data(LineMaterialData{
         .color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
         .line_width_pixels = 5
     });
     m_guide_path_line_cloud.set_material_data(LineMaterialData{
-        .color = glm::vec4(0.3f, 1.0f, 0.3f, 1.0f),
+        .color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+        .line_width_pixels = 5
+    });
+    m_explored_paths_line_cloud.set_material_data(LineMaterialData{
+        .color = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f),
+        .line_width_pixels = 3
+    });
+    m_unimpended_path_line_cloud.set_material_data(LineMaterialData{
+        .color = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f),
         .line_width_pixels = 5
     });
     
     add_child(m_gazelle_next);
     add_child(m_start_marker);
     add_child(m_goal_marker);
+
     add_child(m_path_line_cloud);
     add_child(m_guide_path_line_cloud);
+    add_child(m_explored_paths_line_cloud);
+    add_child(m_unimpended_path_line_cloud);
 }
 
 void NewCelerisVisualizer::update() {
@@ -73,14 +96,27 @@ void NewCelerisVisualizer::update() {
     const PathPlanner::PathPlannerResult& path_planner_stapshot = m_celeris->path_planner_snapshot();
 
     std::vector<LineInstance> path_lines = get_line_instances(
-        path_planner_stapshot.nonholonomic_astar_path
+        path_planner_stapshot.nonholonomic_astar_path,
+        glm::vec4(1.0f, 0.0f, 0.0f, 1.0f),
+        glm::vec4(0.0f, 0.0f, 1.0f, 1.0f)
     );
     m_path_line_cloud.set_lines(path_lines);
 
     std::vector<LineInstance> guide_path_lines = get_line_instances(
-        path_planner_stapshot.plain_astar_path.path
+        path_planner_stapshot.plain_astar_path.path,
+        glm::vec4(0.3f, 1.0f, 0.3f, 1.0f)
     );
     m_guide_path_line_cloud.set_lines(guide_path_lines);
+
+    m_explored_paths_line_cloud.set_lines(path_planner_stapshot.explored_paths);
+
+    std::vector<LineInstance> unimpended_path_lines = get_line_instances(
+        path_planner_stapshot.unimpended_path,
+        glm::vec4(1.0f, 1.0f, 0.0f, 1.0f),
+        glm::vec4(1.0f, 1.0f, 0.0f, 1.0f),
+        0.15f
+    );
+    m_unimpended_path_line_cloud.set_lines(unimpended_path_lines);
 }
 
 void NewCelerisVisualizer::gazelle_next_visible(bool visible) {
@@ -95,8 +131,20 @@ void NewCelerisVisualizer::voxel_grid_visible(bool visible) {
     m_celeris->voxel_grid()->visible = visible;
 }
 
+void NewCelerisVisualizer::path_visibile(bool visible){
+    m_path_line_cloud.visible = visible;
+}
+
 void NewCelerisVisualizer::guide_path_visible(bool visible) {
     m_guide_path_line_cloud.visible = visible;
+}
+
+void NewCelerisVisualizer::explored_paths_visible(bool visible) {
+    m_explored_paths_line_cloud.visible = visible;
+}
+
+void NewCelerisVisualizer::unimpended_path_visible(bool visible) {
+    m_unimpended_path_line_cloud.visible = visible;
 }
 
 void NewCelerisVisualizer::update_gazelle_next_transform() {
@@ -166,7 +214,8 @@ std::vector<LineInstance> NewCelerisVisualizer::get_line_instances(
 }
 
 std::vector<LineInstance> NewCelerisVisualizer::get_line_instances(
-    const std::vector<glm::ivec3> path, 
+    const std::vector<glm::ivec3> path,
+    glm::vec4 color,
     float y_offset) 
 {
     std::vector<LineInstance> path_lines;
@@ -182,7 +231,7 @@ std::vector<LineInstance> NewCelerisVisualizer::get_line_instances(
         path_lines.push_back(LineInstance{
             .p0 = p0,
             .p1 = p1,
-            .color = glm::vec4(1.0f)
+            .color = color
         });
     }
 

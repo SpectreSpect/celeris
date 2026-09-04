@@ -16,7 +16,10 @@ public:
         bool show_gazelle_next = true;
         bool show_voxel_grid = true;
         
-        bool show_guide_path = true;
+        bool show_path = true;
+        bool show_guide_path = false;
+        bool show_explored_paths = false;
+        bool show_unimpended_path = false;
     };
 
     NewCelerisUserController(
