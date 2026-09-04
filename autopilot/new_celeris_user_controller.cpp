@@ -26,7 +26,7 @@ void NewCelerisUserController::update(const Camera& camera, KeyboardInputRecieve
     if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_2))
         place_planner_goal(camera);
     if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_3))
-        m_celeris->request_path_replan();
+        replan_path();
 }
 
 void NewCelerisUserController::display_celeris_general_panel(Camera& camera) {
@@ -67,6 +67,11 @@ void NewCelerisUserController::display_path_planner_panel(Camera& camera){
         place_planner_goal(camera);
     ImGui::SameLine();
     ImGui::TextUnformatted("Key: 2");
+
+    if (ImGui::Button("Replan path"))
+        replan_path();
+    ImGui::SameLine();
+    ImGui::TextUnformatted("Key: 3");
 
     ImGui::End();
 }
@@ -110,4 +115,8 @@ void NewCelerisUserController::place_planner_goal(const Camera& camera) {
         return;
     
     m_celeris->set_goal(pose);
+}
+
+void NewCelerisUserController::replan_path() {
+    m_celeris->request_path_replan();
 }

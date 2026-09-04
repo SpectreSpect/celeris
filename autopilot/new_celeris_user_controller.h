@@ -38,6 +38,7 @@ private:
     bool make_pose_from_camera(const Camera& camera, NonholonomicPos& out_pose);
     void place_planner_start(const Camera& camera);
     void place_planner_goal(const Camera& camera);
+    void replan_path();
 
     // inline void place_start(Camera& camera) {
     //     LOG_METHOD();
