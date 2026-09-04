@@ -14,6 +14,7 @@ PathPlanner::PathPlanner(
     ManagerBundle& manager_bundle,
     VoxelGrid& voxel_grid,
     PathIntersectionDetector& path_intersection_detector,
+    const VehicleGeometry& vehicle_geometry,
     const PathPlannerDesc& desc)
     :   m_unimpended_path_finder(
             engine.physical_device(),
@@ -33,7 +34,7 @@ PathPlanner::PathPlanner(
         ),
         m_footprint(
             m_occupancy_grid,
-            desc.vehicle_geometry,
+            vehicle_geometry,
             desc.footprint_sample_count,
             desc.footprint_horizontal_inflation_size,
             desc.footprint_vertical_inflation_size

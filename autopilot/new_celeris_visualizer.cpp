@@ -33,18 +33,22 @@ NewCelerisVisualizer::NewCelerisVisualizer(
             material_instance_manager,
             PBRMaterialData::create(1.0f, 0.7f, skybox_exposure, glm::vec4(0, 0, 1, 1))
         ),
-        // m_path_line_cloud(
-        //     engine,
-        //     mesh_manager.line_quad,
-        //     material_instance_manager.line,
-        //     max_path_line_count
-        // ),
+        m_path_line_cloud(
+            engine,
+            mesh_manager,
+            material_instance_manager,
+            max_path_line_count
+        ),
         m_guide_path_line_cloud(
             engine,
             mesh_manager,
             material_instance_manager,
             max_path_line_count
         ) {
+    m_path_line_cloud.set_material_data(LineMaterialData{
+        .color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+        .line_width_pixels = 5
+    });
     m_guide_path_line_cloud.set_material_data(LineMaterialData{
         .color = glm::vec4(0.3f, 1.0f, 0.3f, 1.0f),
         .line_width_pixels = 5
@@ -53,6 +57,7 @@ NewCelerisVisualizer::NewCelerisVisualizer(
     add_child(m_gazelle_next);
     add_child(m_start_marker);
     add_child(m_goal_marker);
+    add_child(m_path_line_cloud);
     add_child(m_guide_path_line_cloud);
 }
 
@@ -66,6 +71,11 @@ void NewCelerisVisualizer::update() {
     set_goal(m_celeris->goal_position());
 
     const PathPlanner::PathPlannerResult& path_planner_stapshot = m_celeris->path_planner_snapshot();
+
+    std::vector<LineInstance> path_lines = get_line_instances(
+        path_planner_stapshot.nonholonomic_astar_path
+    );
+    m_path_line_cloud.set_lines(path_lines);
 
     std::vector<LineInstance> guide_path_lines = get_line_instances(
         path_planner_stapshot.plain_astar_path.path
@@ -117,6 +127,31 @@ void NewCelerisVisualizer::set_start(const NonholonomicPos& position) {
 
 void NewCelerisVisualizer::set_goal(const NonholonomicPos& position) {
     set_marker_pose(m_goal_marker, position);
+}
+
+std::vector<LineInstance> NewCelerisVisualizer::get_line_instances(
+    const std::vector<NonholonomicPos> path, 
+    float y_offset) 
+{
+    std::vector<LineInstance> path_lines;
+    path_lines.reserve(std::min<size_t>(path.size(), m_max_path_line_count));
+
+    glm::vec3 voxel_size = m_celeris->voxel_grid()->voxel_size();
+    for (uint32_t i = 1; i < path.size() && path_lines.size() < m_max_path_line_count; i++) {
+        glm::vec3 p0 = path[i - 1].pos;
+        glm::vec3 p1 = path[i].pos;
+
+        p0.y += voxel_size.y * y_offset;
+        p1.y += voxel_size.y * y_offset;
+
+        path_lines.push_back(LineInstance{
+            .p0 = p0,
+            .p1 = p1,
+            .color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)
+        });
+    }
+
+    return path_lines;
 }
 
 std::vector<LineInstance> NewCelerisVisualizer::get_line_instances(

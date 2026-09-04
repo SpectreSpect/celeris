@@ -29,8 +29,7 @@ public:
     struct PathPlannerDesc {
         uint32_t unimpended_path_window_size = 64;
         uint32_t unimpended_path_max_astar_points = 4096;
-        VehicleGeometry vehicle_geometry;
-        uint32_t footprint_sample_count = 0; //5
+        uint32_t footprint_sample_count = 5; //5
         uint32_t footprint_horizontal_inflation_size = 1;
         uint32_t footprint_vertical_inflation_size = 1;
         NonholonomicAStar::NonholonomicAStarDesc nonholonomic_astar_desc;
@@ -58,6 +57,7 @@ public:
         ManagerBundle& manager_bundle,
         VoxelGrid& voxel_grid,
         PathIntersectionDetector& path_intersection_detector,
+        const VehicleGeometry& vehicle_geometry,
         const PathPlannerDesc& desc
     );
     ~PathPlanner() noexcept;

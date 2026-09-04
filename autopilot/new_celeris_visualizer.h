@@ -42,7 +42,7 @@ private:
     SphericalPoseMarker m_start_marker;
     SphericalPoseMarker m_goal_marker;
 
-    // LineCloud m_path_line_cloud;
+    LineCloud m_path_line_cloud;
     
     LineCloud m_guide_path_line_cloud; // Done
 
@@ -59,5 +59,12 @@ private:
     void set_start(const NonholonomicPos& position);
     void set_goal(const NonholonomicPos& position);
 
-    std::vector<LineInstance> get_line_instances(const std::vector<glm::ivec3> path, float y_offset = 0.2f);
+    std::vector<LineInstance> get_line_instances(
+        const std::vector<NonholonomicPos> path, 
+        float y_offset = 0.2f
+    );
+    std::vector<LineInstance> get_line_instances(
+        const std::vector<glm::ivec3> path, 
+        float y_offset = 0.2f
+    );
 };

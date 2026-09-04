@@ -13,6 +13,7 @@ NewCeleris::NewCeleris(
     VulkanQueue& compute_queue,
     VulkanSubmitContext& submit_context,
     VoxelGrid& voxel_grid,
+    const VehicleGeometry& vehicle_geometry,
     const CelerisDesc& desc)
     :   m_engine(&engine),
         m_voxel_grid(&voxel_grid),
@@ -49,6 +50,7 @@ NewCeleris::NewCeleris(
             manager_bundle,
             voxel_grid,
             m_path_intersection_detector,
+            vehicle_geometry,
             desc.path_planner_desc
         ) {
     LOG_METHOD();

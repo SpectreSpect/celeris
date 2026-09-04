@@ -51,6 +51,7 @@ public:
         VulkanQueue& compute_queue,
         VulkanSubmitContext& submit_context,
         VoxelGrid& voxel_grid,
+        const VehicleGeometry& vehicle_geometry,
         const CelerisDesc& desc
     );
 

@@ -159,8 +159,8 @@ int main() {
         compute_pass_manager
     );
 
-    glm::vec3 voxel_size(0.2f);
-    // glm::vec3 voxel_size(1.0f);
+    // glm::vec3 voxel_size(0.2f);
+    glm::vec3 voxel_size(1.0f);
     uint32_t vertical_inflation_size =
         static_cast<uint32_t>(std::ceil(vehicle_geometry.size.y / voxel_size.y));
     uint32_t horizontal_inflation_size =
@@ -288,7 +288,8 @@ int main() {
         manager_bundle, 
         engine.compute_queue(), 
         compute_submit_context,
-        voxel_grid, 
+        voxel_grid,
+        vehicle_geometry, 
         NewCeleris::CelerisDesc{}
     );
     new_celeris.odometry_estimator().set_gravity(glm::vec3(-0.123099f, 9.78485f, -0.69118f)); // simulator
@@ -306,7 +307,9 @@ int main() {
     NewCelerisUserController new_celeris_user_controller(
         new_celeris,
         new_celeris_visualizer,
-        NewCelerisUserController::NewCelerisUserControllerConfig{}
+        NewCelerisUserController::NewCelerisUserControllerConfig{
+            // .show_gazelle_next = false
+        }
     );
 
     Celeris celeris(
