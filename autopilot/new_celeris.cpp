@@ -65,8 +65,8 @@ NewCeleris::NewCeleris(
 void NewCeleris::start(VulkanSubmitContext&& planner_submit_context) {
     LOG_METHOD();
 
-    // m_lidar_scan_receiver.start();
-    // m_imu_receiver.start();
+    m_lidar_scan_receiver.start();
+    m_imu_receiver.start();
     m_path_planner.start(std::move(planner_submit_context));
 }
 
@@ -79,6 +79,8 @@ void NewCeleris::update() {
     
     if (m_path_planner_snapshot.generation != m_path_planner.request_result_generation())
         m_path_planner_snapshot = m_path_planner.request_result_snapshot();
+    
+    
 }
 
 void NewCeleris::set_start(const NonholonomicPos& position) {

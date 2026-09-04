@@ -134,9 +134,17 @@ void NewCelerisVisualizer::unimpended_path_visible(bool visible) {
 }
 
 void NewCelerisVisualizer::update_gazelle_next_transform() {
+    LOG_METHOD();
+
+    logger().check(m_celeris, "Celeris was null");
+
     Transform* lidar_transform = m_celeris->lidar_tranform();
-    if (lidar_transform)
+    if (lidar_transform) {
+        const glm::vec3& voxel_size = m_celeris->voxel_grid()->voxel_size();
+
         m_gazelle_next.set_lidar_transform(*lidar_transform);
+        m_gazelle_next.transform.position.y += voxel_size.y * 0.5f;
+    }
 }
 
 void NewCelerisVisualizer::set_marker_pose(
