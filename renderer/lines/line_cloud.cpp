@@ -36,8 +36,10 @@ LineCloud::LineCloud(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& materia
 void LineCloud::set_lines(const std::vector<LineInstance>& lines) {
     LOG_METHOD();
 
-    logger().check(!lines.empty(), "Lines vector was empty");
+    // logger().check(!lines.empty(), "Lines vector was empty");
 
     set_instance_count(lines.size());
-    instance_buffer().upload(lines);
+
+    if (!lines.empty())
+        instance_buffer().upload(lines);
 }

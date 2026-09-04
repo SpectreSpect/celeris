@@ -60,15 +60,11 @@ void NewCelerisVisualizer::update() {
     set_goal(m_celeris->goal_position());
 
     const PathPlanner::PathPlannerResult& path_planner_stapshot = m_celeris->path_planner_snapshot();
+
     std::vector<LineInstance> guide_path_lines = get_line_instances(
         path_planner_stapshot.plain_astar_path.path
     );
-    if (guide_path_lines.empty())
-        m_guide_path_line_cloud.visible = false;
-    else {
-        m_guide_path_line_cloud.set_lines(guide_path_lines);
-        m_guide_path_line_cloud.visible = true;
-    }
+    m_guide_path_line_cloud.set_lines(guide_path_lines);
 }
 
 void NewCelerisVisualizer::gazelle_next_visible(bool visible) {
