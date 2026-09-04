@@ -46,6 +46,11 @@ CollisionEscapeResolver::CollisionEscapeResolver(
             static_cast<uint32_t>(std::numeric_limits<int>::max()),
         "Collision escape search radius must fit in an int"
     );
+    logger().check(
+        std::isfinite(m_desc.collision_clearance_voxels) &&
+            m_desc.collision_clearance_voxels >= 0.0f,
+        "Collision clearance in voxels must be finite and not negative"
+    );
 }
 
 void CollisionEscapeResolver::push_out(glm::vec3& position) {
@@ -176,12 +181,53 @@ float CollisionEscapeResolver::sample_step() {
     );
 }
 
+float CollisionEscapeResolver::clearance_distance() {
+    logger().check(m_path_planner, "Path planner was null");
+
+    const glm::vec3 voxel_size = m_path_planner->request_voxel_size();
+    logger().check(
+        glm::all(glm::greaterThan(voxel_size, glm::vec3(0.0f))),
+        "Voxel size must be greater than zero"
+    );
+
+    return minimum_component(voxel_size) *
+        m_desc.collision_clearance_voxels;
+}
+
 float CollisionEscapeResolver::minimum_component(glm::vec3 value) const {
     return std::min({value.x, value.y, value.z});
 }
 
 float CollisionEscapeResolver::squared_length(glm::vec3 value) const {
     return glm::dot(value, value);
+}
+
+bool CollisionEscapeResolver::add_clearance(
+    glm::vec3 position,
+    glm::vec3 direction,
+    glm::vec3& cleared_position) {
+    const float distance = clearance_distance();
+    if (distance == 0.0f) {
+        cleared_position = position;
+        return true;
+    }
+
+    const float direction_length_squared = squared_length(direction);
+    if (!std::isfinite(direction_length_squared) ||
+        direction_length_squared <= m_desc.minimum_direction_length_squared) {
+        return false;
+    }
+
+    const glm::vec3 direction_normalized =
+        direction / std::sqrt(direction_length_squared);
+    const glm::vec3 candidate = position + direction_normalized * distance;
+
+    if (!point_is_free(candidate)) {
+        return false;
+    }
+
+    cleared_position = candidate;
+    return true;
 }
 
 bool CollisionEscapeResolver::find_first_free_point_on_segment(
@@ -234,7 +280,9 @@ bool CollisionEscapeResolver::find_first_free_point_on_segment(
             }
         }
 
-        free_point = free;
+        if (!add_clearance(free, segment, free_point)) {
+            free_point = free;
+        }
         return true;
     }
 
@@ -292,8 +340,18 @@ bool CollisionEscapeResolver::find_escape_point(
                     continue;
                 }
 
-                const glm::vec3 candidate_position =
+                const glm::vec3 surface_position =
                     point_in_voxel_closest_to(candidate_voxel, position);
+                const glm::vec3 surface_offset = surface_position - position;
+
+                glm::vec3 candidate_position(0.0f);
+                if (!add_clearance(
+                        surface_position,
+                        surface_offset,
+                        candidate_position)) {
+                    continue;
+                }
+
                 const glm::vec3 offset = candidate_position - position;
                 const float candidate_distance_squared = squared_length(offset);
 

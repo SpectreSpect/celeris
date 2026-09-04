@@ -13,6 +13,7 @@ public:
     struct CollisionEscapeResolverDesc {
         size_t collision_history_size = 8;
         uint32_t collision_escape_search_radius_voxels = 8;
+        float collision_clearance_voxels = 0.1f;
         uint32_t binary_search_iterations = 16;
         float voxel_boundary_epsilon_scale = 1e-3f;
         float sample_step_voxel_scale = 0.25f;
@@ -46,8 +47,14 @@ private:
         glm::vec3 reference
     );
     float sample_step();
+    float clearance_distance();
     float minimum_component(glm::vec3 value) const;
     float squared_length(glm::vec3 value) const;
+    bool add_clearance(
+        glm::vec3 position,
+        glm::vec3 direction,
+        glm::vec3& cleared_position
+    );
 
     bool find_first_free_point_on_segment(
         glm::vec3 from,
