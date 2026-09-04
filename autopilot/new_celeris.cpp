@@ -53,6 +53,10 @@ NewCeleris::NewCeleris(
             m_path_intersection_detector,
             vehicle_geometry,
             desc.path_planner_desc
+        ),
+        m_collision_escape_resolver(
+            m_path_planner,
+            desc.collision_escape_resolver_desc
         ) {
     LOG_METHOD();
     logger().check(desc.voxel_point_map_num_hash_table_slots > 0, 
@@ -66,6 +70,7 @@ NewCeleris::NewCeleris(
 void NewCeleris::start(VulkanSubmitContext&& planner_submit_context) {
     LOG_METHOD();
 
+    m_collision_escape_resolver.reset();
     m_lidar_scan_receiver.start();
     m_imu_receiver.start();
     m_path_planner.start(std::move(planner_submit_context));
@@ -85,6 +90,7 @@ void NewCeleris::update() {
         m_start_position.pos.y += voxel_grid()->voxel_size().y * 0.5f;
 
         m_start_position.theta = NonholonomicPos::from_transform(transform).theta;
+        m_collision_escape_resolver.push_out(m_start_position.pos);
     }
 
     if (m_path_planner_snapshot.generation != m_path_planner.request_result_generation())
@@ -93,6 +99,7 @@ void NewCeleris::update() {
 
 void NewCeleris::set_start(const NonholonomicPos& position) {
     m_start_position = position;
+    m_collision_escape_resolver.reset();
 }
 
 void NewCeleris::set_goal(const NonholonomicPos& position) {

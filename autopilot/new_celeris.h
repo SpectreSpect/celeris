@@ -14,6 +14,7 @@
 #include "sensors/lidar/lidar_scan_receiver.h"
 #include "odometry/odometry_estimator.h"
 #include "sensors/imu/imu_receiver.h"
+#include "collision/collision_escape_resolver.h"
 #include "path_planner.h"
 
 class VulkanSubmitContext;
@@ -43,6 +44,8 @@ public:
 
         uint32_t path_intersection_detector_max_path_points = 1024;
         PathPlanner::PathPlannerDesc path_planner_desc{};
+        CollisionEscapeResolver::CollisionEscapeResolverDesc
+            collision_escape_resolver_desc{};
     };
 
     NewCeleris(
@@ -109,6 +112,7 @@ private:
 
     PathIntersectionDetector m_path_intersection_detector;
     PathPlanner m_path_planner;
+    CollisionEscapeResolver m_collision_escape_resolver;
     PathPlanner::PathPlannerResult m_path_planner_snapshot{};
 
     NonholonomicPos m_start_position{};
