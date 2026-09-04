@@ -292,6 +292,7 @@ int main() {
         vehicle_geometry, 
         NewCeleris::CelerisDesc{}
     );
+    
     new_celeris.odometry_estimator().set_gravity(glm::vec3(-0.123099f, 9.78485f, -0.69118f)); // simulator
     new_celeris.start(std::move(planner_submit_context));
 

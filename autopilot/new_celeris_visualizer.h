@@ -61,10 +61,13 @@ private:
 
     std::vector<LineInstance> get_line_instances(
         const std::vector<NonholonomicPos> path, 
-        float y_offset = 0.2f
+        glm::vec4 forward_color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f),
+        glm::vec4 backward_color = glm::vec4(0.0f, 0.0f, 1.0f, 1.0f),
+        float y_offset = 0.15f,
+        float forward_dir_y_offset = 0.05f
     );
     std::vector<LineInstance> get_line_instances(
         const std::vector<glm::ivec3> path, 
-        float y_offset = 0.2f
+        float y_offset = 0.1f
     );
 };

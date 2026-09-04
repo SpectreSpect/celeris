@@ -131,23 +131,34 @@ void NewCelerisVisualizer::set_goal(const NonholonomicPos& position) {
 
 std::vector<LineInstance> NewCelerisVisualizer::get_line_instances(
     const std::vector<NonholonomicPos> path, 
-    float y_offset) 
+    glm::vec4 forward_color,
+    glm::vec4 backward_color,
+    float y_offset,
+    float forward_dir_y_offset) 
 {
     std::vector<LineInstance> path_lines;
     path_lines.reserve(std::min<size_t>(path.size(), m_max_path_line_count));
 
+    float backward_dir_y_offset = 0.02f;
     glm::vec3 voxel_size = m_celeris->voxel_grid()->voxel_size();
     for (uint32_t i = 1; i < path.size() && path_lines.size() < m_max_path_line_count; i++) {
         glm::vec3 p0 = path[i - 1].pos;
         glm::vec3 p1 = path[i].pos;
 
-        p0.y += voxel_size.y * y_offset;
-        p1.y += voxel_size.y * y_offset;
+        float final_y_offset = y_offset;
+        glm::vec4 color = backward_color;
+        if (path[i].dir == 1) {
+            color =forward_color;
+            final_y_offset += forward_dir_y_offset;
+        }
+
+        p0.y += voxel_size.y * final_y_offset;
+        p1.y += voxel_size.y * final_y_offset;        
 
         path_lines.push_back(LineInstance{
             .p0 = p0,
             .p1 = p1,
-            .color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)
+            .color = color
         });
     }
 
