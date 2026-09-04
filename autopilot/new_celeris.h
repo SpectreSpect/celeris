@@ -59,7 +59,6 @@ public:
     void update();
 
     void set_start(const NonholonomicPos& position);
-    void set_start(const Camera& camera);
     void set_goal(const NonholonomicPos& position);
 
     bool adjust_to_ground(

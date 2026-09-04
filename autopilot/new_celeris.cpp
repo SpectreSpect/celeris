@@ -85,10 +85,6 @@ void NewCeleris::set_start(const NonholonomicPos& position) {
     m_start_position = position;
 }
 
-void NewCeleris::set_start(const Camera& camera) {
-
-}
-
 void NewCeleris::set_goal(const NonholonomicPos& position) {
     m_goal_position = position;
 }
