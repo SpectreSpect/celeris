@@ -16,23 +16,23 @@ class PointMapBlock {
 public:
     _XCLASS_NAME(PointMapBlock);
 
-    struct PointMapBlockDesc {
-        uint32_t voxel_point_map_num_hash_table_slots = 1500000;
-        uint32_t voxel_point_map_max_map_point_count = 1500000;
+    struct Desc {
+        uint32_t hash_table_slots = 1500000;
+        uint32_t max_points = 1500000;
         uint32_t max_gicp_iterations = 10;
     };
 
     PointMapBlock(
         VulkanEngine& engine,
         ManagerBundle& manager_bundle,
-        const PointMapBlockDesc& desc
+        const Desc& desc
     );
 
     void fit(std::unique_ptr<LidarScan>& lidar_scan);
     void insert(std::unique_ptr<LidarScan>& lidar_scan);
 
 private:
-    PointMapBlockDesc m_desc;
+    Desc m_desc;
 
     VoxelPointMap m_voxel_point_map;
     VoxelMapPointInserter m_voxel_map_inserter;

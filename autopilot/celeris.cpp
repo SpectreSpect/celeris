@@ -317,13 +317,13 @@ Celeris::Celeris(
             voxel_grid,
             m_path_intersection_detector,
             desc.vehicle_geometry,
-            PathPlanner::PathPlannerDesc{
-                .unimpended_path_window_size = desc.unimpended_path_window_size,
-                .unimpended_path_max_astar_points = desc.unimpended_path_max_astar_points,
-                .footprint_sample_count = desc.footprint_sample_count,
-                .footprint_horizontal_inflation_size = desc.footprint_horizontal_inflation_size,
-                .footprint_vertical_inflation_size = desc.footprint_vertical_inflation_size,
-                .nonholonomic_astar_desc = desc.nonholonomic_astar_desc
+            PathPlanner::Desc{
+                .unimpended_window_size = desc.unimpended_path_window_size,
+                .max_unimpended_astar_points = desc.unimpended_path_max_astar_points,
+                .footprint_samples = desc.footprint_sample_count,
+                .footprint_horizontal_inflation = desc.footprint_horizontal_inflation_size,
+                .footprint_vertical_inflation = desc.footprint_vertical_inflation_size,
+                .nonholonomic_astar = desc.nonholonomic_astar_desc
             }
         ),
         m_local_planner(std::make_unique<LocalPlanner>()),

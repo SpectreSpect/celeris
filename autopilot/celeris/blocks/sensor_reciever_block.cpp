@@ -10,7 +10,7 @@ SensorRecieverBlock::SensorRecieverBlock(
     VulkanEngine& engine,
     ManagerBundle& manager_bundle,
     VulkanQueue& compute_queue,
-    const SensorRecieverBlockDesc& desc)
+    const Desc& desc)
     :   m_engine(&engine),
         m_desc(desc),
         m_point_cloud_preprocessor(
@@ -21,13 +21,13 @@ SensorRecieverBlock::SensorRecieverBlock(
         m_lidar_scan_receiver(
             manager_bundle,
             m_point_cloud_preprocessor,
-            desc.lidar_scan_receiver_port,
-            desc.lidar_scan_receiver_max_queued_messages),
-        m_imu_receiver(desc.imu_receiver_port, desc.max_queued_imu_messages),
+            desc.lidar_port,
+            desc.lidar_queue_capacity),
+        m_imu_receiver(desc.imu_port, desc.imu_queue_capacity),
         m_deskewer(m_odometry_estimator),
         m_voxel_write_list(VulkanBuffer::create_host_visible_storage_buffer(
             engine, 
-            sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * desc.max_voxel_grid_write_count)) {
+            sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * desc.max_voxel_writes)) {
 }
 
 void SensorRecieverBlock::start_imu_reciever() {
@@ -74,7 +74,7 @@ void SensorRecieverBlock::voxelize(
         lidar_scan->point_cloud(),
         lidar_scan->normal_buffer(),
         m_voxel_write_list,
-        m_desc.max_voxel_grid_write_count
+        m_desc.max_voxel_writes
     );
 }
 

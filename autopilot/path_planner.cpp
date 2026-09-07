@@ -15,15 +15,15 @@ PathPlanner::PathPlanner(
     VoxelGrid& voxel_grid,
     PathIntersectionDetector& path_intersection_detector,
     const VehicleGeometry& vehicle_geometry,
-    const PathPlannerDesc& desc)
+    const Desc& desc)
     :   m_unimpended_path_finder(
             engine.physical_device(),
             engine.device(),
             submit_context,
             manager_bundle.compute_pass_manager(),
             voxel_grid,
-            desc.unimpended_path_window_size,
-            desc.unimpended_path_max_astar_points
+            desc.unimpended_window_size,
+            desc.max_unimpended_astar_points
         ),
         m_path_intersection_detector(&path_intersection_detector),
         m_occupancy_grid(
@@ -35,21 +35,21 @@ PathPlanner::PathPlanner(
         m_footprint(
             m_occupancy_grid,
             vehicle_geometry,
-            desc.footprint_sample_count,
-            desc.footprint_horizontal_inflation_size,
-            desc.footprint_vertical_inflation_size
+            desc.footprint_samples,
+            desc.footprint_horizontal_inflation,
+            desc.footprint_vertical_inflation
         ),
         m_planner(
             m_occupancy_grid,
-            desc.nonholonomic_astar_desc,
+            desc.nonholonomic_astar,
             m_unimpended_path_finder,
             m_footprint
         )
 {
     LOG_METHOD();
 
-    logger().check(desc.unimpended_path_window_size > 1, "Unimpended path window size must be greater than 1");
-    logger().check(desc.unimpended_path_max_astar_points > 0, "Unimpended path max astar points must be greater than 0");
+    logger().check(desc.unimpended_window_size > 1, "Unimpended path window size must be greater than 1");
+    logger().check(desc.max_unimpended_astar_points > 0, "Unimpended path max astar points must be greater than 0");
 }
 
 PathPlanner::~PathPlanner() noexcept {

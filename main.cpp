@@ -290,7 +290,7 @@ int main() {
         compute_submit_context,
         voxel_grid,
         vehicle_geometry, 
-        NewCeleris::CelerisDesc{}
+        NewCeleris::Desc{}
     );
     
     new_celeris.odometry_estimator().set_gravity(glm::vec3(-0.123099f, 9.78485f, -0.69118f)); // simulator

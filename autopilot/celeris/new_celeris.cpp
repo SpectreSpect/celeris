@@ -14,7 +14,7 @@ NewCeleris::NewCeleris(
     VulkanSubmitContext& submit_context,
     VoxelGrid& voxel_grid,
     const VehicleGeometry& vehicle_geometry,
-    const CelerisDesc& desc)
+    const Desc& desc)
     :   m_engine(&engine),
         m_voxel_grid(&voxel_grid),
         m_desc(desc),
@@ -23,16 +23,16 @@ NewCeleris::NewCeleris(
             engine, 
             manager_bundle,
             compute_queue,
-            desc.sensor_reciever_block_desc
+            desc.sensors
         ),
-        m_point_map_block(engine, manager_bundle, desc.point_map_block_desc),
+        m_point_map_block(engine, manager_bundle, desc.point_map),
         m_path_intersection_detector(
             engine.physical_device(),
             engine.device(),
             submit_context,
             manager_bundle.compute_pass_manager(),
             voxel_grid,
-            desc.path_intersection_detector_max_path_points
+            desc.max_intersection_path_points
         ),
         m_path_planner(
             engine,
@@ -41,11 +41,11 @@ NewCeleris::NewCeleris(
             voxel_grid,
             m_path_intersection_detector,
             vehicle_geometry,
-            desc.path_planner_desc
+            desc.planner
         ),
         m_collision_escape_resolver(
             m_path_planner,
-            desc.collision_escape_resolver_desc
+            desc.collision_escape
         ) {
 }
 

@@ -31,14 +31,13 @@ class NewCeleris {
 public:
     _XCLASS_NAME(NewCeleris);
 
-    struct CelerisDesc {
-        SensorRecieverBlock::SensorRecieverBlockDesc sensor_reciever_block_desc;
-        PointMapBlock::PointMapBlockDesc point_map_block_desc;
+    struct Desc {
+        SensorRecieverBlock::Desc sensors;
+        PointMapBlock::Desc point_map;
 
-        uint32_t path_intersection_detector_max_path_points = 1024;
-        PathPlanner::PathPlannerDesc path_planner_desc{};
-        CollisionEscapeResolver::CollisionEscapeResolverDesc
-            collision_escape_resolver_desc{};
+        uint32_t max_intersection_path_points = 1024;
+        PathPlanner::Desc planner{};
+        CollisionEscapeResolver::Desc collision_escape{};
     };
 
     NewCeleris(
@@ -48,7 +47,7 @@ public:
         VulkanSubmitContext& submit_context,
         VoxelGrid& voxel_grid,
         const VehicleGeometry& vehicle_geometry,
-        const CelerisDesc& desc
+        const Desc& desc
     );
 
     void start(VulkanSubmitContext&& planner_submit_context);
@@ -82,7 +81,7 @@ private:
     VulkanEngine* m_engine = nullptr;
     VoxelGrid* m_voxel_grid = nullptr;
     
-    CelerisDesc m_desc;
+    Desc m_desc;
     VehicleGeometry m_vehicle_geometry;
 
     SensorRecieverBlock m_sensor_reciever_block;

@@ -10,21 +10,21 @@ class PathPlanner;
 
 class CollisionEscapeResolver {
 public:
-    struct CollisionEscapeResolverDesc {
-        size_t collision_history_size = 8;
-        uint32_t collision_escape_search_radius_voxels = 8;
-        float collision_clearance_voxels = 0.1f;
+    struct Desc {
+        size_t history_size = 8;
+        uint32_t search_radius_voxels = 8;
+        float clearance_voxels = 0.1f;
         uint32_t binary_search_iterations = 16;
-        float voxel_boundary_epsilon_scale = 1e-3f;
+        float boundary_epsilon_scale = 1e-3f;
         float sample_step_voxel_scale = 0.25f;
-        float minimum_sample_step = 1e-4f;
-        float minimum_segment_length = 1e-6f;
-        float minimum_direction_length_squared = 1e-8f;
+        float min_sample_step = 1e-4f;
+        float min_segment_length = 1e-6f;
+        float min_direction_length_sq = 1e-8f;
     };
 
     CollisionEscapeResolver(
         PathPlanner& path_planner,
-        const CollisionEscapeResolverDesc& desc
+        const Desc& desc
     );
 
     void push_out(glm::vec3& position);
@@ -32,7 +32,7 @@ public:
 
 private:
     PathPlanner* m_path_planner = nullptr;
-    CollisionEscapeResolverDesc m_desc;
+    Desc m_desc;
 
     std::vector<glm::vec3> m_free_raw_position_history;
     glm::vec3 m_collision_surface_point{0.0f};

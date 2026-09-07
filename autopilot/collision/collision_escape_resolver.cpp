@@ -13,7 +13,7 @@
 
 CollisionEscapeResolver::CollisionEscapeResolver(
     PathPlanner& path_planner,
-    const CollisionEscapeResolverDesc& desc)
+    const Desc& desc)
     :   m_path_planner(&path_planner),
         m_desc(desc) {
     logger().check(
@@ -21,8 +21,8 @@ CollisionEscapeResolver::CollisionEscapeResolver(
         "Collision binary search iteration count must be greater than zero"
     );
     logger().check(
-        m_desc.voxel_boundary_epsilon_scale > 0.0f &&
-            m_desc.voxel_boundary_epsilon_scale < 0.5f,
+        m_desc.boundary_epsilon_scale > 0.0f &&
+            m_desc.boundary_epsilon_scale < 0.5f,
         "Collision voxel boundary epsilon scale must be between zero and one half"
     );
     logger().check(
@@ -30,25 +30,25 @@ CollisionEscapeResolver::CollisionEscapeResolver(
         "Collision sample step voxel scale must be greater than zero"
     );
     logger().check(
-        m_desc.minimum_sample_step > 0.0f,
+        m_desc.min_sample_step > 0.0f,
         "Collision minimum sample step must be greater than zero"
     );
     logger().check(
-        m_desc.minimum_segment_length >= 0.0f,
+        m_desc.min_segment_length >= 0.0f,
         "Collision minimum segment length must not be negative"
     );
     logger().check(
-        m_desc.minimum_direction_length_squared >= 0.0f,
+        m_desc.min_direction_length_sq >= 0.0f,
         "Collision minimum direction length squared must not be negative"
     );
     logger().check(
-        m_desc.collision_escape_search_radius_voxels <=
+        m_desc.search_radius_voxels <=
             static_cast<uint32_t>(std::numeric_limits<int>::max()),
         "Collision escape search radius must fit in an int"
     );
     logger().check(
-        std::isfinite(m_desc.collision_clearance_voxels) &&
-            m_desc.collision_clearance_voxels >= 0.0f,
+        std::isfinite(m_desc.clearance_voxels) &&
+            m_desc.clearance_voxels >= 0.0f,
         "Collision clearance in voxels must be finite and not negative"
     );
 }
@@ -125,7 +125,7 @@ void CollisionEscapeResolver::resolve_collision(glm::vec3& position) {
 }
 
 void CollisionEscapeResolver::remember_raw_position(glm::vec3 position) {
-    if (m_desc.collision_history_size == 0) {
+    if (m_desc.history_size == 0) {
         reset();
         return;
     }
@@ -141,8 +141,8 @@ void CollisionEscapeResolver::remember_raw_position(glm::vec3 position) {
         position
     );
 
-    if (m_free_raw_position_history.size() > m_desc.collision_history_size) {
-        m_free_raw_position_history.resize(m_desc.collision_history_size);
+    if (m_free_raw_position_history.size() > m_desc.history_size) {
+        m_free_raw_position_history.resize(m_desc.history_size);
     }
 }
 
@@ -161,7 +161,7 @@ glm::vec3 CollisionEscapeResolver::point_in_voxel_closest_to(
         m_path_planner->request_voxel_to_world_pos(voxel_position);
     const glm::vec3 voxel_max = voxel_min + voxel_size;
     const glm::vec3 epsilon =
-        voxel_size * m_desc.voxel_boundary_epsilon_scale;
+        voxel_size * m_desc.boundary_epsilon_scale;
 
     return glm::clamp(reference, voxel_min + epsilon, voxel_max - epsilon);
 }
@@ -177,7 +177,7 @@ float CollisionEscapeResolver::sample_step() {
 
     return std::max(
         minimum_component(voxel_size) * m_desc.sample_step_voxel_scale,
-        m_desc.minimum_sample_step
+        m_desc.min_sample_step
     );
 }
 
@@ -191,7 +191,7 @@ float CollisionEscapeResolver::clearance_distance() {
     );
 
     return minimum_component(voxel_size) *
-        m_desc.collision_clearance_voxels;
+        m_desc.clearance_voxels;
 }
 
 float CollisionEscapeResolver::minimum_component(glm::vec3 value) const {
@@ -214,7 +214,7 @@ bool CollisionEscapeResolver::add_clearance(
 
     const float direction_length_squared = squared_length(direction);
     if (!std::isfinite(direction_length_squared) ||
-        direction_length_squared <= m_desc.minimum_direction_length_squared) {
+        direction_length_squared <= m_desc.min_direction_length_sq) {
         return false;
     }
 
@@ -238,7 +238,7 @@ bool CollisionEscapeResolver::find_first_free_point_on_segment(
     const float segment_length = glm::length(segment);
 
     if (!std::isfinite(segment_length) ||
-        segment_length <= m_desc.minimum_segment_length) {
+        segment_length <= m_desc.min_segment_length) {
         if (point_is_free(to)) {
             free_point = to;
             return true;
@@ -308,13 +308,13 @@ bool CollisionEscapeResolver::find_escape_point(
     glm::vec3 position,
     glm::vec3 direction,
     glm::vec3& resolved_position) {
-    if (m_desc.collision_escape_search_radius_voxels == 0) {
+    if (m_desc.search_radius_voxels == 0) {
         return false;
     }
 
     const float direction_length_squared = squared_length(direction);
     if (!std::isfinite(direction_length_squared) ||
-        direction_length_squared <= m_desc.minimum_direction_length_squared) {
+        direction_length_squared <= m_desc.min_direction_length_sq) {
         return false;
     }
 
@@ -323,7 +323,7 @@ bool CollisionEscapeResolver::find_escape_point(
     const glm::ivec3 center_voxel =
         m_path_planner->request_world_to_voxel_pos(position);
     const int radius = static_cast<int>(
-        m_desc.collision_escape_search_radius_voxels
+        m_desc.search_radius_voxels
     );
 
     bool found = false;
@@ -356,7 +356,7 @@ bool CollisionEscapeResolver::find_escape_point(
                 const float candidate_distance_squared = squared_length(offset);
 
                 if (candidate_distance_squared <=
-                    m_desc.minimum_direction_length_squared) {
+                    m_desc.min_direction_length_sq) {
                     continue;
                 }
 

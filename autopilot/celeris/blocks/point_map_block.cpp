@@ -6,19 +6,19 @@
 PointMapBlock::PointMapBlock(
     VulkanEngine& engine,
     ManagerBundle& manager_bundle,
-    const PointMapBlockDesc& desc)
+    const Desc& desc)
     :   m_desc(desc),
         m_voxel_point_map(
             engine,
-            desc.voxel_point_map_num_hash_table_slots,
-            desc.voxel_point_map_max_map_point_count),
+            desc.hash_table_slots,
+            desc.max_points),
         m_voxel_map_inserter(engine, manager_bundle.compute_pass_manager()),
         m_voxel_map_reseter(engine, manager_bundle.compute_pass_manager()),
         m_gicp_pass(engine, manager_bundle.compute_pass_manager()) {
     LOG_METHOD();
-    logger().check(desc.voxel_point_map_num_hash_table_slots > 0,
+    logger().check(desc.hash_table_slots > 0,
                  "The number of voxel point map hash table slots must be greater than 0");
-    logger().check(desc.voxel_point_map_max_map_point_count > 0,
+    logger().check(desc.max_points > 0,
                  "The maximum number of voxel point map points must be greater than 0");
 
     m_voxel_map_reseter.reset(m_voxel_point_map);

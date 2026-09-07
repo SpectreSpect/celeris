@@ -23,21 +23,21 @@ class SensorRecieverBlock {
 public:
     _XCLASS_NAME(SensorRecieverBlock);
 
-    struct SensorRecieverBlockDesc {
-        uint16_t lidar_scan_receiver_port = 5000;
-        size_t lidar_scan_receiver_max_queued_messages = 3;
+    struct Desc {
+        uint16_t lidar_port = 5000;
+        size_t lidar_queue_capacity = 3;
 
-        uint16_t imu_receiver_port = 5003;
-        size_t max_queued_imu_messages = 1;
+        uint16_t imu_port = 5003;
+        size_t imu_queue_capacity = 1;
 
-        uint32_t max_voxel_grid_write_count = 100000;
+        uint32_t max_voxel_writes = 100000;
     };
 
     SensorRecieverBlock(
         VulkanEngine& engine,
         ManagerBundle& manager_bundle,
         VulkanQueue& compute_queue,
-        const SensorRecieverBlockDesc& desc
+        const Desc& desc
     );
 
     void start();
@@ -54,7 +54,7 @@ public:
 private:
     VulkanEngine* m_engine = nullptr;
 
-    SensorRecieverBlockDesc m_desc;
+    Desc m_desc;
 
     LidarScanReceiver m_lidar_scan_receiver;
     ImuReceiver m_imu_receiver;
