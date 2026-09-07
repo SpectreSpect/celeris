@@ -16,6 +16,7 @@
 #include "../odometry/odometry_estimator.h"
 #include "blocks/sensor_reciever_block.h"
 #include "../sensors/imu/imu_receiver.h"
+#include "blocks/global_planner_block.h"
 #include "blocks/point_map_block.h"
 #include "../path_planner.h"
 
@@ -34,10 +35,7 @@ public:
     struct Desc {
         SensorRecieverBlock::Desc sensors;
         PointMapBlock::Desc point_map;
-
-        uint32_t max_intersection_path_points = 1024;
-        PathPlanner::Desc planner{};
-        CollisionEscapeResolver::Desc collision_escape{};
+        GlobalPlannerBlock::Desc global_planner;
     };
 
     NewCeleris(
@@ -53,29 +51,15 @@ public:
     void start(VulkanSubmitContext&& planner_submit_context);
     void update(VulkanSubmitContext& submit_context);
 
-    void set_start(const NonholonomicPos& position);
-    void set_goal(const NonholonomicPos& position);
-
-    bool adjust_to_ground(
-        glm::vec3& output,
-        int max_step_up = 500,
-        int max_drop = 500,
-        int max_y_diff = -1,
-        bool allow_flying_over_precepices = true
-    );
-
-    void request_path_replan();
-    void update_start_position();
+    void update_global_planner_start_position();
     
     OdometryEstimator& odometry_estimator();
     bool has_lidar_transform();
     Transform* lidar_tranform();
     VoxelGrid* voxel_grid();
-    glm::vec3 voxel_center_bottom_world_pos(const glm::ivec3& voxel_pos);
-    glm::vec3 voxel_center_world_pos(const glm::ivec3& voxel_pos);
-    NonholonomicPos start_position() const noexcept;
-    NonholonomicPos goal_position() const noexcept;
-    const PathPlanner::PathPlannerResult& path_planner_snapshot() const noexcept;
+    const PathPlanner::PathPlannerResult& global_path_snapshot() const noexcept;
+    GlobalPlannerBlock& global_planner() noexcept;
+    SensorRecieverBlock& sensor_receiver_block() noexcept;
 
 private:
     VulkanEngine* m_engine = nullptr;
@@ -86,14 +70,5 @@ private:
 
     SensorRecieverBlock m_sensor_reciever_block;
     PointMapBlock m_point_map_block;
-
-    PathIntersectionDetector m_path_intersection_detector;
-    PathPlanner m_path_planner;
-    CollisionEscapeResolver m_collision_escape_resolver;
-    PathPlanner::PathPlannerResult m_path_planner_snapshot{};
-
-    NonholonomicPos m_start_position{};
-    NonholonomicPos m_goal_position{};
-    
-    bool path_replan_required(VulkanSubmitContext& submit_context);
+    GlobalPlannerBlock m_global_planner_block;
 };

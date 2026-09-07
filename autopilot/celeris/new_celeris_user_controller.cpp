@@ -109,7 +109,7 @@ bool NewCelerisUserController::make_pose_from_camera(const Camera& camera, Nonho
         return false;
     
     glm::vec3 grounded_position = out_pose.pos;
-    if (m_celeris->adjust_to_ground(grounded_position))
+    if (m_celeris->global_planner().adjust_to_ground(grounded_position))
         out_pose.pos = grounded_position;
     
     return true;
@@ -122,7 +122,7 @@ void NewCelerisUserController::place_planner_start(const Camera& camera) {
     if (!make_pose_from_camera(camera, pose))
         return;
     
-    m_celeris->set_start(pose);
+    m_celeris->global_planner().set_start(pose);
 }
 
 void NewCelerisUserController::place_planner_goal(const Camera& camera) {
@@ -132,11 +132,11 @@ void NewCelerisUserController::place_planner_goal(const Camera& camera) {
     if (!make_pose_from_camera(camera, pose))
         return;
     
-    m_celeris->set_goal(pose);
+    m_celeris->global_planner().set_goal(pose);
     replan_path();
 }
 
 void NewCelerisUserController::replan_path() {
-    m_celeris->update_start_position();
-    m_celeris->request_path_replan();
+    m_celeris->update_global_planner_start_position();
+    m_celeris->global_planner().request_path_replan();
 }

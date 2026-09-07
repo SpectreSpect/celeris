@@ -86,4 +86,13 @@ private:
     void update_unimpended_path_line_cloud(
         const PathPlanner::PathPlannerResult& path_planner_snapshot
     );
+
+    glm::vec3 voxel_center_bottom_world_pos(
+        const glm::vec3& voxel_size, 
+        const glm::ivec3& voxel_pos
+    );
+    glm::vec3 voxel_center_world_pos(
+        const glm::vec3& voxel_size, 
+        const glm::ivec3& voxel_pos
+    );
 };

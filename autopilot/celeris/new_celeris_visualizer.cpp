@@ -6,6 +6,7 @@
 // #include "../../vulkan_self/vulkan_engine.h"
 #include "../../a_star/a_star_structures.h"
 #include "../../managers/mesh_manager.h"
+#include "blocks/global_planner_block.h"
 #include "new_celeris.h"
 
 NewCelerisVisualizer::NewCelerisVisualizer(
@@ -90,10 +91,10 @@ void NewCelerisVisualizer::update() {
     logger().check(m_celeris, "Celeris was null");
 
     update_gazelle_next_transform();
-    set_start(m_celeris->start_position());
-    set_goal(m_celeris->goal_position());
+    set_start(m_celeris->global_planner().start_position());
+    set_goal(m_celeris->global_planner().goal_position());
 
-    const PathPlanner::PathPlannerResult& path_planner_snapshot = m_celeris->path_planner_snapshot();
+    const PathPlanner::PathPlannerResult& path_planner_snapshot = m_celeris->global_path_snapshot();
 
     if (m_planner_snapshot_generation != path_planner_snapshot.generation) {
         update_path_line_cloud(path_planner_snapshot);
@@ -217,8 +218,8 @@ std::vector<LineInstance> NewCelerisVisualizer::get_line_instances(
 
     glm::vec3 voxel_size = m_celeris->voxel_grid()->voxel_size();
     for (uint32_t i = 1; i < path.size() && path_lines.size() < m_max_path_line_count; i++) {
-        glm::vec3 p0 = m_celeris->voxel_center_bottom_world_pos(path[i - 1]);
-        glm::vec3 p1 = m_celeris->voxel_center_bottom_world_pos(path[i]);
+        glm::vec3 p0 = voxel_center_bottom_world_pos(voxel_size, path[i - 1]);
+        glm::vec3 p1 = voxel_center_bottom_world_pos(voxel_size, path[i]);
         p0.y += voxel_size.y * y_offset;
         p1.y += voxel_size.y * y_offset;
 
@@ -263,4 +264,18 @@ void NewCelerisVisualizer::update_unimpended_path_line_cloud(
         0.15f
     );
     m_unimpended_path_line_cloud.set_lines(unimpended_path_lines);
+}
+
+glm::vec3 NewCelerisVisualizer::voxel_center_bottom_world_pos(
+    const glm::vec3& voxel_size, 
+    const glm::ivec3& voxel_pos) 
+{
+    return (glm::vec3(voxel_pos) + glm::vec3(0.5f, 0.0f, 0.5f)) * voxel_size;
+}
+
+glm::vec3 NewCelerisVisualizer::voxel_center_world_pos(
+    const glm::vec3& voxel_size, 
+    const glm::ivec3& voxel_pos) 
+{
+    return (glm::vec3(voxel_pos) + glm::vec3(0.5f)) * voxel_size;
 }
