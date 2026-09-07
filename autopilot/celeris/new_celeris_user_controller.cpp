@@ -1,11 +1,11 @@
 #include "new_celeris_user_controller.h"
 
-#include "../vulkan_self/keyboard_input_reciever.h"
-#include "../voxel_grid_vulkan/voxel_grid.h"
-#include "../a_star/a_star_structures.h"
+#include "../../vulkan_self/keyboard_input_reciever.h"
+#include "../../voxel_grid_vulkan/voxel_grid.h"
+#include "../../a_star/a_star_structures.h"
 #include "new_celeris_visualizer.h"
-#include "../camera/camera.h"
-#include "../imgui_layer.h"
+#include "../../camera/camera.h"
+#include "../../imgui_layer.h"
 #include "new_celeris.h"
 
 NewCelerisUserController::NewCelerisUserController(

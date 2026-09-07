@@ -1,11 +1,11 @@
 #include "new_celeris.h"
 
-#include "../vulkan_self/vulkan_submit_context.h"
-#include "../voxel_grid_vulkan/voxel_grid.h"
-#include "../vulkan_self/vulkan_engine.h"
-#include "../managers/manager_bundle.h"
-#include "sensors/lidar/lidar_scan.h"
-#include "../renderer/transform.h"
+#include "../../vulkan_self/vulkan_submit_context.h"
+#include "../../voxel_grid_vulkan/voxel_grid.h"
+#include "../../vulkan_self/vulkan_engine.h"
+#include "../../managers/manager_bundle.h"
+#include "../sensors/lidar/lidar_scan.h"
+#include "../../renderer/transform.h"
 
 NewCeleris::NewCeleris(
     VulkanEngine& engine,

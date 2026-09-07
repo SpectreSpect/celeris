@@ -1,11 +1,11 @@
 #pragma once
 
-#include "../vulkan_self/logger/logger_header.h"
-#include "../renderer/lines/line_cloud.h"
-#include "../renderer/scene_object.h"
-#include "spherical_pose_marker.h"
-#include "gazelle_next.h"
-#include "path_planner.h"
+#include "../../vulkan_self/logger/logger_header.h"
+#include "../../renderer/lines/line_cloud.h"
+#include "../../renderer/scene_object.h"
+#include "../spherical_pose_marker.h"
+#include "../gazelle_next.h"
+#include "../path_planner.h"
 
 class PathPlannerResult;
 class VehicleGeometry;

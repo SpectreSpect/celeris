@@ -87,9 +87,9 @@
 #include "autopilot/sensors/lidar/deskewing/lidar_scan_deskewer.h"
 #include "autopilot/sensors/lidar/deskewing/deskewing_debugger.h"
 #include "renderer/mcp/mcp_visalizer.h"
-#include "autopilot/new_celeris.h"
-#include "autopilot/new_celeris_visualizer.h"
-#include "autopilot/new_celeris_user_controller.h"
+#include "autopilot/celeris/new_celeris.h"
+#include "autopilot/celeris/new_celeris_visualizer.h"
+#include "autopilot/celeris/new_celeris_user_controller.h"
 
 #include <algorithm>
 #include <exception>

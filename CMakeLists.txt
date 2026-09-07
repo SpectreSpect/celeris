@@ -171,9 +171,9 @@ add_executable(app
   autopilot/sensors/lidar/deskewing/deskewing_debugger.cpp
   renderer/mcp/mcp_visalizer.cpp
   autopilot/collision/collision_escape_resolver.cpp
-  autopilot/new_celeris.cpp
-  autopilot/new_celeris_visualizer.cpp
-  autopilot/new_celeris_user_controller.cpp
+  autopilot/celeris/new_celeris.cpp
+  autopilot/celeris/new_celeris_visualizer.cpp
+  autopilot/celeris/new_celeris_user_controller.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

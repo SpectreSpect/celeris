@@ -1,11 +1,11 @@
 #include "new_celeris_visualizer.h"
 
-#include "../managers/material_instance_manager.h"
-#include "../renderer/material_data_types.h"
-#include "../voxel_grid_vulkan/voxel_grid.h"
-// #include "../vulkan_self/vulkan_engine.h"
-#include "../a_star/a_star_structures.h"
-#include "../managers/mesh_manager.h"
+#include "../../managers/material_instance_manager.h"
+#include "../../renderer/material_data_types.h"
+#include "../../voxel_grid_vulkan/voxel_grid.h"
+// #include "../../vulkan_self/vulkan_engine.h"
+#include "../../a_star/a_star_structures.h"
+#include "../../managers/mesh_manager.h"
 #include "new_celeris.h"
 
 NewCelerisVisualizer::NewCelerisVisualizer(
