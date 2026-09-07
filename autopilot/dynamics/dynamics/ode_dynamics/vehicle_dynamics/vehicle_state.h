@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <optional>
 
 #include "../../state_and_control.h"
 
@@ -23,6 +24,26 @@ namespace celeris {
     struct VehicleState {
         VehicleOdometryState odometry;
         VehicleSteeringWheelState steering_wheel;
+    };
+    //-------------------------------------------------------
+
+    // ====== Partial state replacement ======
+    struct VehicleOdometryStatePatch {
+        std::optional<glm::dvec3> position{};
+        std::optional<glm::dvec3> linear_velocity{};
+
+        std::optional<glm::dquat> orientation{};
+    };
+
+    struct VehicleSteeringWheelStatePatch {
+        std::optional<double> steering_angle{};
+        std::optional<double> steering_rate{};
+    };
+
+    //-------------------------------------------------------
+    struct VehicleStatePatch {
+        std::optional<VehicleOdometryStatePatch> odometry{};
+        std::optional<VehicleSteeringWheelStatePatch> steering_wheel{};
     };
     //-------------------------------------------------------
 
@@ -61,8 +82,30 @@ namespace celeris {
     };
     //-------------------------------------------------------
 
+    // ====== Partial control replacement ======
+    struct VehicleOdometryControlPatch {
+        std::optional<glm::dvec3> linear_acceleration{};
+        std::optional<glm::dvec3> angular_velocity{};
+    };
+
+    struct VehicleSteeringWheelControlPatch {
+        std::optional<double> steering_acceleration{};
+    };
+
+    //-------------------------------------------------------
+    struct VehicleControlPatch {
+        std::optional<VehicleOdometryControlPatch> odometry{};
+        std::optional<VehicleSteeringWheelControlPatch> steering_wheel{};
+    };
+    //-------------------------------------------------------
+
     // ====== Total vehicle state ======
     using TotalVehicleState = StateAndControl<VehicleState, VehicleControl>;
+
+    struct TotalVehicleStatePatch {
+        std::optional<VehicleStatePatch> state{};
+        std::optional<VehicleControlPatch> control{};
+    };
 
     inline VehicleState operator*(double scalar, const VehicleStateDerivative& derivative) {
         return VehicleState{
@@ -76,6 +119,10 @@ namespace celeris {
                 .steering_rate = scalar * derivative.steering_wheel_derivative.steering_acceleration
             }
         };
+    }
+
+    inline VehicleState operator*(const VehicleStateDerivative& derivative, double scalar) {
+        return scalar * derivative;
     }
 
     inline VehicleStateDerivative operator+(const VehicleStateDerivative& lhs_derivative, const VehicleStateDerivative& rhs_derivative) {
@@ -116,5 +163,69 @@ namespace celeris {
         lhs_state.steering_wheel.steering_rate += rhs_state.steering_wheel.steering_rate;
 
         return lhs_state;
+    }
+
+    inline VehicleState& operator^=(VehicleState& state, const VehicleStatePatch& patch) {
+        if (patch.odometry.has_value()) {
+            const VehicleOdometryStatePatch& odometry_patch = *patch.odometry;
+
+            if (odometry_patch.position.has_value()) {
+                state.odometry.position = *odometry_patch.position;
+            }
+            if (odometry_patch.linear_velocity.has_value()) {
+                state.odometry.linear_velocity = *odometry_patch.linear_velocity;
+            }
+            if (odometry_patch.orientation.has_value()) {
+                state.odometry.orientation = *odometry_patch.orientation;
+            }
+        }
+
+        if (patch.steering_wheel.has_value()) {
+            const VehicleSteeringWheelStatePatch& steering_patch = *patch.steering_wheel;
+
+            if (steering_patch.steering_angle.has_value()) {
+                state.steering_wheel.steering_angle = *steering_patch.steering_angle;
+            }
+            if (steering_patch.steering_rate.has_value()) {
+                state.steering_wheel.steering_rate = *steering_patch.steering_rate;
+            }
+        }
+
+        return state;
+    }
+
+    inline VehicleControl& operator^=(VehicleControl& control, const VehicleControlPatch& patch) {
+        if (patch.odometry.has_value()) {
+            const VehicleOdometryControlPatch& odometry_patch = *patch.odometry;
+
+            if (odometry_patch.linear_acceleration.has_value()) {
+                control.odometry.linear_acceleration = *odometry_patch.linear_acceleration;
+            }
+            if (odometry_patch.angular_velocity.has_value()) {
+                control.odometry.angular_velocity = *odometry_patch.angular_velocity;
+            }
+        }
+
+        if (patch.steering_wheel.has_value()) {
+            const VehicleSteeringWheelControlPatch& steering_patch = *patch.steering_wheel;
+
+            if (steering_patch.steering_acceleration.has_value()) {
+                control.steering_wheel.steering_acceleration = *steering_patch.steering_acceleration;
+            }
+        }
+
+        return control;
+    }
+
+    inline TotalVehicleState& operator^=(TotalVehicleState& total_state, const TotalVehicleStatePatch& patch) {
+        if (patch.state.has_value()) {
+            total_state.state ^= *patch.state;
+        }
+        
+        if (patch.control.has_value()) {
+            total_state.control ^= *patch.control;
+        }
+
+        return total_state;
     }
 }

@@ -12,20 +12,46 @@
 #include "../state_and_control.h"
 
 namespace celeris {
-    template<
-        class State,
-        class Derivative,
-        class Control,
-        class Equation,
-        class Integrator
-    >
+    template<class State, class Derivative, class Control, class Equation>
+    concept equation_derived = std::derived_from<Equation, OdeEquationInterface<State, Derivative, Control>>;
+
+    template<class State, class Derivative, class Control, class Integrator>
+    concept integrator_derived = std::derived_from<Integrator, OdeIntegratorInterface<State, Derivative, Control>>;
+
+    template<class State, class Derivative, class Control, class Equation, class Integrator>
+    class ControlledOdeAdapter {
+        static_assert(
+            equation_derived<State, Derivative, Control, Equation>,
+            "The `Equation` type must derive from"
+            "the `OdeEquationInterface<State, Derivative, Control>` interface."
+        );
+
+        static_assert(
+            integrator_derived<State, Derivative, Control, Integrator>,
+            "The `Integrator` type must derive from"
+            "the `OdeIntegratorInterface<State, Derivative, Control>` interface."
+        );
+
+        static_assert(
+            std::move_constructible<Equation>,
+            "The `Equation` type must have a move constructor."
+        );
+
+        static_assert(
+            std::move_constructible<Integrator>,
+            "The `Integrator` type must have a move constructor."
+        );
+    };
+
+    template<class State, class Derivative, class Control, class Equation, class Integrator>
     requires(
-        std::derived_from<Equation, OdeEquationInterface<State, Derivative, Control>> &&
-        std::derived_from<Integrator, OdeIntegratorInterface<State, Derivative, Control>> &&
+        equation_derived<State, Derivative, Control, Equation> &&
+        integrator_derived<State, Derivative, Control, Integrator> &&
         std::move_constructible<Equation> &&
         std::move_constructible<Integrator>
     )
-    class ControlledOdeAdapter : public DynamicInterface<StateAndControl<State, Control>> {
+    class ControlledOdeAdapter<State, Derivative, Control, Equation, Integrator> 
+        :   public DynamicInterface<StateAndControl<State, Control>> {
     public:
         _XCHILD_NAME(ControlledOdeAdapter)
 

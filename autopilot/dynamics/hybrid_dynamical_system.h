@@ -37,7 +37,7 @@ namespace celeris {
         */
         explicit HybridDynamicalSystem(
             std::unique_ptr<DynamicInterface<State>> dynamic_model,
-            const StateEstimate<State>& initial_state,
+            const StateEstimate<State>& initial_state = StateEstimate<TotalVehicleState>{},
             Duration max_integration_step = std::chrono::milliseconds{10},
             Duration max_history_step = std::chrono::milliseconds{100})
             :   m_dynamic_model(std::move(dynamic_model)),
@@ -58,6 +58,44 @@ namespace celeris {
             );
 
             m_state_history.insert({m_initial_state.timestamp, m_initial_state});
+        }
+
+        void reset(StateEstimate<State> initial_state) {
+            LOG_METHOD();
+
+            m_initial_state = std::move(initial_state);
+
+            m_state_history.clear();
+            m_event_history.clear();
+
+            m_state_history.emplace(
+                m_initial_state.timestamp,
+                m_initial_state
+            );
+        }
+
+        void rebase_at(Timestamp timestamp) {
+            LOG_METHOD();
+
+            logger().check(
+                timestamp >= m_initial_state.timestamp, 
+                "`timestamp` cannot precede the initial state."
+            );
+
+            StateEstimate<State> new_initial_state = define_state_at(timestamp);
+            m_initial_state = std::move(new_initial_state);
+
+            // Стираем не актуальные состояния (не включая тех, что в timestamp)
+            m_state_history.erase(
+                m_state_history.begin(),
+                m_state_history.lower_bound(timestamp)
+            );
+
+            // Стираем не актуальные события (ВКЛЮЧАЯ те, что в timestamp)
+            m_event_history.erase(
+                m_event_history.begin(),
+                m_event_history.upper_bound(timestamp)
+            );
         }
 
         void insert_event(EventPtr event) {
@@ -130,6 +168,10 @@ namespace celeris {
         StateEstimate<State> define_state_at(Timestamp timestamp) {
             LOG_METHOD();
             return define_state_at_ref_unsafe(timestamp);
+        }
+
+        const StateEstimate<State>& initial_state() const noexcept {
+            return m_initial_state;
         }
 
     private:

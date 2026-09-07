@@ -8,6 +8,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <optional>
 
 #include "../managers/material_instance_manager.h"
 #include "../managers/material_manager.h"
@@ -39,8 +40,11 @@
 #include "sensors/lidar/lidar_scan_receiver.h"
 #include "sensors/lidar/lidar_scan.h"
 
-#include "dynamics/hybrid_dynamical_system.h"
+#include "dynamics/clock.h"
 #include "dynamics/dynamics/ode_dynamics/vehicle_dynamics/vehicle_state.h"
+#include "dynamics/hybrid_dynamics_runtime.h"
+#include "timestamp_mappers/fixed_offset_timestamp_mapper.cpp"
+
 
 class VulkanQueue;
 class ComputePassManager;
@@ -59,6 +63,8 @@ namespace celeris {
         _XCLASS_NAME(Celeris);
 
         using Waypoint = WaypointPath::Waypoint;
+        using Timestamp = simulation::Timestamp;
+        using Duration = simulation::Duration;
 
         struct CelerisDesc {
             uint16_t receiver_port = 5000;
@@ -102,6 +108,10 @@ namespace celeris {
             bool gamepad_commands_enabled = false;
             VehicleCommand gamepad_command;
             NonholonomicAStar::NonholonomicAStarDesc nonholonomic_astar_desc;
+            StateEstimate<TotalVehicleState> initial_state = {
+                .state = {},
+                .timestamp = simulation::Timestamp{std::chrono::seconds{0}}
+            };
         };
 
         Celeris(
@@ -247,7 +257,12 @@ namespace celeris {
         VoxelMapPointInserter m_voxel_map_inserter;
         VoxelMapPointReseter m_voxel_map_reseter;
 
-        HybridDynamicalSystem<TotalVehicleState> m_dynamical_system;
+        StateEstimate<TotalVehicleState> m_initial_state;
+        std::optional<FixedOffsetTimestampMapper> m_timestamp_mapper;
+        std::unique_ptr<DynamicInterface<TotalVehicleState>> m_dynamical_model;
+        std::unique_ptr<HybridDynamicsRuntime<TotalVehicleState>> m_dynamics_controller;
+
+        std::optional<Timestamp> m_start_simulation_timestamp = std::nullopt;
 
         VulkanBuffer voxel_write_list;
         std::vector<glm::ivec3> m_path_potential_visualization_voxels;

@@ -22,8 +22,19 @@ namespace celeris {
     };
 
     template<class State, class Derivative, class Control>
+    class OdeRk2Integrator {
+        static_assert(
+            Rk2Compatible<State, Derivative>, 
+            "The state type and its derivative type do not"
+            "implement all the operators required to"
+            "instantiate the Rk2 integrator."
+        );
+    };
+
+    template<class State, class Derivative, class Control>
     requires (Rk2Compatible<State, Derivative>)
-    class OdeRk2Integrator final : public OdeIntegratorInterface<State, Derivative, Control> {
+    class OdeRk2Integrator<State, Derivative, Control>
+        :   public OdeIntegratorInterface<State, Derivative, Control> {
     public:
         _XCHILD_NAME(OdeRk2Integrator)
 

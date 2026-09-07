@@ -161,6 +161,7 @@ add_executable(app
   autopilot/sensors/lidar/lidar_scan.cpp
   autopilot/sensors/lidar/lidar_scan_receiver.cpp
   autopilot/dynamics/dynamics/ode_dynamics/vehicle_dynamics/linear_dynamics/vehicle_linear_dynamics.cpp
+  autopilot/timestamp_mappers/fixed_offset_timestamp_mapper.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

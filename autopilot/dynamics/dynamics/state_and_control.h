@@ -3,7 +3,7 @@
 namespace celeris {
     template<class State, class Control>
     struct StateAndControl {
-        State state;
-        Control control;
+        State state{};
+        Control control{};
     };
 }

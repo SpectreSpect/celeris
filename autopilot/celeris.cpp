@@ -30,7 +30,7 @@
 #include "gazelle_next.h"
 #include "dynamics/state_estimate.h"
 #include "dynamics/dynamics/ode_dynamics/vehicle_dynamics/vehicle_state.h"
-#include "dynamics/events/state_replacement_event.h"
+#include "dynamics/events/selective_replacement_event.h"
 
 namespace {
     constexpr int COLLISION_BINARY_SEARCH_ITERATIONS = 16;
@@ -336,7 +336,8 @@ namespace celeris {
                             desc.voxel_point_map_max_map_point_count),
             m_voxel_map_inserter(engine, manager_bundle.compute_pass_manager()),
             m_voxel_map_reseter(engine, manager_bundle.compute_pass_manager()),
-            m_dynamical_system(std::move(dynamical_model), StateEstimate<TotalVehicleState>{}),
+            m_initial_state(desc.initial_state),
+            m_dynamical_model(std::move(dynamical_model)),
             voxel_write_list(VulkanBuffer::create_host_visible_storage_buffer(engine, 
                             sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * desc.max_write_count)) {
         LOG_METHOD();
@@ -429,15 +430,25 @@ namespace celeris {
     }
 
     void Celeris::start(VulkanSubmitContext&& planner_submit_context) {
-        // start_lidar_receiver();
+        LOG_METHOD();
+
         m_lidar_scan_receiver.start();
         m_vehicle_state_receiver.start();
         m_imu_receiver.start();
         m_command_sender.start();
         m_path_planner.start(std::move(planner_submit_context));
+        
+        if (!m_dynamical_model) {
+            HybridDynamicalSystem<TotalVehicleState> system(std::move(m_dynamical_model), m_initial_state);
+            m_dynamics_controller = std::make_unique<HybridDynamicsRuntime<TotalVehicleState>>(std::move(system));
+        }
+            
+        m_dynamics_controller->start();
     }
 
     void Celeris::update(VulkanSubmitContext& submit_context) {
+        LOG_METHOD();
+
         logger().check(m_engine, "Engine was null");
         logger().check(m_manager_bundle, "Manager bundle was null");
         logger().check(m_voxel_grid, "Voxel grid was null");
@@ -491,6 +502,8 @@ namespace celeris {
         //         StateReplacementEvent<celeris::TotalVehicleState>
         //     >(measurement_timestamp, total_vehicle_state)
         // );
+
+        
         
         /*
             Получение фидбека динамики машины (позиции и руля).
@@ -946,27 +959,51 @@ namespace celeris {
     // }
 
     void Celeris::try_receive_and_process_imu() {
+        LOG_METHOD();
+
         ImuMeasurement imu_message{};
         if (m_imu_receiver.try_pop_back_imu_message(imu_message)) {
-            // m_odometry_estimator.submit_imu(imu_message);
+            if (!m_timestamp_mapper.has_value()) {
+                m_timestamp_mapper.emplace(
+                    imu_message.timestamp,
+                    m_initial_state.timestamp
+                );
+            }
 
-            celeris::TotalVehicleState current_state = m_dynamical_system.latest_defined_state().state;
+            std::chrono::steady_clock::time_point imu_received_at = std::chrono::steady_clock::now();
+            std::optional<simulation::Timestamp> measurement_timestamp =
+                m_timestamp_mapper->map(imu_message.timestamp, imu_received_at);
 
+            if (!measurement_timestamp.has_value()) {
+                /*
+                    Время не синхронизированно. Пока просто отбрасываем измерение, в
+                    будущем такие измерения нужно будет накапливать в очередь и уже
+                    после удачной синхронизации часов повторно отправлять системе.
+
+                    #TODO
+                */
+
+                logger().log(clr("Time is not synchronized. The IMU measurement was discarded..."));
+                return;
+            }
+
+            TotalVehicleStatePatch imu_patch = TotalVehicleStatePatch{
+                .control = VehicleControlPatch{
+                    .odometry = VehicleOdometryControlPatch{
+                        .linear_acceleration = imu_message.linear_acceleration,
+                        .angular_velocity = imu_message.angular_velocity
+                    }
+                }
+            };
+
+            using SlRpEvent = SelectiveReplacementEvent<TotalVehicleState, TotalVehicleStatePatch>;
             
-            current_state.control.odometry.linear_acceleration = imu_message.linear_acceleration;
-            current_state.control.odometry.angular_velocity = imu_message.angular_velocity;
-
-            /*
-                Здесь скорее всего нужно будет делать преобразование временной
-                шкалы. #TODO
-            */
-            simulation::Timestamp measurement_timestamp{simulation::Duration(imu_message.timestamp)};
-
-            m_dynamical_system.insert_event(
-                std::make_unique<
-                    StateReplacementEvent<celeris::TotalVehicleState>
-                >(measurement_timestamp, current_state)
+            std::unique_ptr<SlRpEvent> imu_measurment_event = std::make_unique<SlRpEvent>(
+                *measurement_timestamp,
+                std::move(imu_patch)
             );
+
+            m_dynamics_controller->submit_event(std::move(imu_measurment_event));
         }
     }
 
@@ -1004,7 +1041,7 @@ namespace celeris {
                 last_lidar_odometry.timestamp_ns = m_network_scan->timestamp();
             
             ///////////////////////////////////////////////////////////////////////////////////////////
-            celeris::TotalVehicleState current_state = m_dynamical_system.latest_defined_state().state;
+            celeris::TotalVehicleState current_state = m_dynamics_controller.latest_defined_state().state;
             
             current_state.control.odometry.linear_acceleration = imu_message.linear_acceleration;
             current_state.control.odometry.angular_velocity = imu_message.angular_velocity;
@@ -1015,7 +1052,7 @@ namespace celeris {
             */
             simulation::Timestamp measurement_timestamp{simulation::Duration(imu_message.timestamp)};
 
-            m_dynamical_system.insert_event(
+            m_dynamics_controller.insert_event(
                 std::make_unique<
                     StateReplacementEvent<celeris::TotalVehicleState>
                 >(measurement_timestamp, current_state)
