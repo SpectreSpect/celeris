@@ -11,10 +11,12 @@
 #include "../../renderer/point_cloud/gicp/gicp_pass.h"
 #include "../../a_star/path_intersection_detector.h"
 #include "../../vulkan_self/logger/logger_header.h"
+#include "../collision/collision_escape_resolver.h"
 #include "../sensors/lidar/lidar_scan_receiver.h"
 #include "../odometry/odometry_estimator.h"
+#include "blocks/sensor_reciever_block.h"
 #include "../sensors/imu/imu_receiver.h"
-#include "../collision/collision_escape_resolver.h"
+#include "blocks/point_map_block.h"
 #include "../path_planner.h"
 
 class VulkanSubmitContext;
@@ -30,17 +32,8 @@ public:
     _XCLASS_NAME(NewCeleris);
 
     struct CelerisDesc {
-        uint16_t lidar_scan_receiver_port = 5000;
-        size_t lidar_scan_receiver_max_queued_messages = 3;
-
-        uint16_t imu_receiver_port = 5003;
-        size_t max_queued_imu_messages = 1;
-
-        uint32_t voxel_point_map_num_hash_table_slots = 1500000;
-        uint32_t voxel_point_map_max_map_point_count = 1500000;
-        uint32_t max_gicp_iterations = 10;
-
-        uint32_t max_write_count = 100000;
+        SensorRecieverBlock::SensorRecieverBlockDesc sensor_reciever_block_desc;
+        PointMapBlock::PointMapBlockDesc point_map_block_desc;
 
         uint32_t path_intersection_detector_max_path_points = 1024;
         PathPlanner::PathPlannerDesc path_planner_desc{};
@@ -72,7 +65,6 @@ public:
         bool allow_flying_over_precepices = true
     );
 
-    // m_path_planner.request_path_replan(start, goal);
     void request_path_replan();
     void update_start_position();
     
@@ -93,23 +85,8 @@ private:
     CelerisDesc m_desc;
     VehicleGeometry m_vehicle_geometry;
 
-    PointCloudPreprocessor m_point_cloud_preprocessor;
-
-    LidarScanReceiver m_lidar_scan_receiver;
-    ImuReceiver m_imu_receiver;
-    OdometryEstimator m_odometry_estimator;
-    LidarScanDeskewer m_deskewer;
-
-    VoxelPointMap m_voxel_point_map;
-    VoxelMapPointInserter m_voxel_map_inserter;
-    VoxelMapPointReseter m_voxel_map_reseter;
-    GICPPass m_gicp_pass;
-
-    VulkanBuffer m_voxel_write_list;
-
-    std::unique_ptr<LidarScan> m_network_scan;
-    std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;
-    uint32_t m_received_scan_count = 0;
+    SensorRecieverBlock m_sensor_reciever_block;
+    PointMapBlock m_point_map_block;
 
     PathIntersectionDetector m_path_intersection_detector;
     PathPlanner m_path_planner;
@@ -119,7 +96,5 @@ private:
     NonholonomicPos m_start_position{};
     NonholonomicPos m_goal_position{};
     
-    void try_receive_and_process_imu();
-    void try_receive_and_process_lidar_scan();
     bool path_replan_required(VulkanSubmitContext& submit_context);
 };

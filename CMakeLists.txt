@@ -174,6 +174,8 @@ add_executable(app
   autopilot/celeris/new_celeris.cpp
   autopilot/celeris/new_celeris_visualizer.cpp
   autopilot/celeris/new_celeris_user_controller.cpp
+  autopilot/celeris/blocks/point_map_block.cpp
+  autopilot/celeris/blocks/sensor_reciever_block.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
