@@ -461,7 +461,7 @@ int main() {
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
         
         new_celeris_user_controller.update(camera, keyboard_input_reciever);
-        new_celeris.update();
+        new_celeris.update(compute_submit_context);
         new_celeris_visualizer.update();
         
         // celeris.update(compute_submit_context);

@@ -59,7 +59,7 @@ public:
     );
 
     void start(VulkanSubmitContext&& planner_submit_context);
-    void update();
+    void update(VulkanSubmitContext& submit_context);
 
     void set_start(const NonholonomicPos& position);
     void set_goal(const NonholonomicPos& position);
@@ -74,6 +74,7 @@ public:
 
     // m_path_planner.request_path_replan(start, goal);
     void request_path_replan();
+    void update_start_position();
     
     OdometryEstimator& odometry_estimator();
     bool has_lidar_transform();
@@ -120,5 +121,5 @@ private:
     
     void try_receive_and_process_imu();
     void try_receive_and_process_lidar_scan();
-    void update_start_position();
+    bool path_replan_required(VulkanSubmitContext& submit_context);
 };

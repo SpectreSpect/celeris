@@ -76,17 +76,20 @@ void NewCeleris::start(VulkanSubmitContext&& planner_submit_context) {
     m_path_planner.start(std::move(planner_submit_context));
 }
 
-void NewCeleris::update() {
+void NewCeleris::update(VulkanSubmitContext& submit_context) {
     LOG_METHOD();
+
+    if (m_path_planner_snapshot.generation != m_path_planner.request_result_generation())
+        m_path_planner_snapshot = m_path_planner.request_result_snapshot();
     
     try_receive_and_process_imu();
     if (!m_odometry_estimator.is_gravity_calibration_underway())
         try_receive_and_process_lidar_scan();
-    
-    update_start_position();
 
-    if (m_path_planner_snapshot.generation != m_path_planner.request_result_generation())
-        m_path_planner_snapshot = m_path_planner.request_result_snapshot();
+    if (path_replan_required(submit_context)) {
+        update_start_position();
+        request_path_replan();
+    }
 }
 
 void NewCeleris::set_start(const NonholonomicPos& position) {
@@ -119,6 +122,19 @@ void NewCeleris::request_path_replan() {
     LOG_METHOD();
 
     m_path_planner.request_path_replan(m_start_position, m_goal_position);
+}
+
+void NewCeleris::update_start_position() {
+    if (!has_lidar_transform())
+        return;
+
+    const Transform& transform = *lidar_tranform();
+    
+    m_start_position.pos = m_vehicle_geometry.rear_axle_world_position(transform);
+    m_start_position.pos.y += voxel_grid()->voxel_size().y * 0.5f;
+
+    m_start_position.theta = NonholonomicPos::from_transform(transform).theta;
+    m_collision_escape_resolver.push_out(m_start_position.pos);
 }
 
 OdometryEstimator& NewCeleris::odometry_estimator() {
@@ -253,15 +269,6 @@ void NewCeleris::try_receive_and_process_lidar_scan() {
     m_received_scan_count++;
 }
 
-void NewCeleris::update_start_position() {
-    if (!has_lidar_transform())
-        return;
-
-    const Transform& transform = *lidar_tranform();
-    
-    m_start_position.pos = m_vehicle_geometry.rear_axle_world_position(transform);
-    m_start_position.pos.y += voxel_grid()->voxel_size().y * 0.5f;
-
-    m_start_position.theta = NonholonomicPos::from_transform(transform).theta;
-    m_collision_escape_resolver.push_out(m_start_position.pos);
+bool NewCeleris::path_replan_required(VulkanSubmitContext& submit_context) {
+    return has_lidar_transform() && m_path_planner.request_is_path_impended(submit_context);
 }
