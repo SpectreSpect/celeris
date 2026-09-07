@@ -1,6 +1,6 @@
 #include "deskewing_debugger.h"
 
-#include "../../../../vulkan_self/keyboard_input_reciever.h"
+#include "../../../../vulkan_self/keyboard_input_receiver.h"
 #include "../../../../managers/manager_bundle.h"
 
 DeskewingDebugger::DeskewingDebugger(
@@ -28,8 +28,8 @@ DeskewingDebugger::DeskewingDebugger(
     add_child(m_deskewed_point_cloud);
 }
 
-void DeskewingDebugger::update(KeyboardInputReciever& keyboard_input_reciever) {
-    if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_N)) {
+void DeskewingDebugger::update(KeyboardInputReceiver& keyboard_input_receiver) {
+    if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_N)) {
         next_entry();
     }
 }

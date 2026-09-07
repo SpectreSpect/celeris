@@ -10,7 +10,7 @@
 
 // class Celeris;
 class CelerisVisualizer;
-class KeyboardInputReciever;
+class KeyboardInputReceiver;
 class GamepadController;
 class LidarMessageOdometryRecordering;
 
@@ -28,7 +28,7 @@ public:
     void update(
         float delta_time, 
         Camera& camera, 
-        KeyboardInputReciever& keyboard_input_reciever, 
+        KeyboardInputReceiver& keyboard_input_receiver, 
         FPSCameraController& fps_camera_controller
     );
     void display_interface(Camera& camera, GamepadController& gamepad_controller);

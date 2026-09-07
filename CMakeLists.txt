@@ -156,7 +156,7 @@ add_executable(app
   a_star/local_planner.cpp
   a_star/pure_pursuit_vehicle.cpp
   a_star/pure_pursuit_local_planner.cpp
-  vulkan_self/keyboard_input_reciever.cpp
+  vulkan_self/keyboard_input_receiver.cpp
   autopilot/celeris_user_controller.cpp
   autopilot/sensors/imu/imu_receiver.cpp
   autopilot/odometry/odometry_estimator.cpp
@@ -175,7 +175,7 @@ add_executable(app
   autopilot/celeris/new_celeris_visualizer.cpp
   autopilot/celeris/new_celeris_user_controller.cpp
   autopilot/celeris/blocks/point_map_block.cpp
-  autopilot/celeris/blocks/sensor_reciever_block.cpp
+  autopilot/celeris/blocks/sensor_receiver_block.cpp
   autopilot/celeris/blocks/global_planner_block.cpp
 )
 

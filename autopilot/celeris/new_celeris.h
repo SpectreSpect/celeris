@@ -14,7 +14,7 @@
 #include "../collision/collision_escape_resolver.h"
 #include "../sensors/lidar/lidar_scan_receiver.h"
 #include "../odometry/odometry_estimator.h"
-#include "blocks/sensor_reciever_block.h"
+#include "blocks/sensor_receiver_block.h"
 #include "../sensors/imu/imu_receiver.h"
 #include "blocks/global_planner_block.h"
 #include "blocks/point_map_block.h"
@@ -31,13 +31,13 @@ class Camera;
 class NewCeleris {
 public:
     _XCLASS_NAME(NewCeleris);
-
+    
     struct Desc {
-        SensorRecieverBlock::Desc sensors;
+        SensorReceiverBlock::Desc sensors;
         PointMapBlock::Desc point_map;
         GlobalPlannerBlock::Desc global_planner;
     };
-
+    
     NewCeleris(
         VulkanEngine& engine,
         ManagerBundle& manager_bundle, 
@@ -59,7 +59,7 @@ public:
     VoxelGrid* voxel_grid();
     const PathPlanner::PathPlannerResult& global_path_snapshot() const noexcept;
     GlobalPlannerBlock& global_planner() noexcept;
-    SensorRecieverBlock& sensor_receiver_block() noexcept;
+    SensorReceiverBlock& sensor_receiver_block() noexcept;
 
 private:
     VulkanEngine* m_engine = nullptr;
@@ -67,8 +67,8 @@ private:
     
     Desc m_desc;
     VehicleGeometry m_vehicle_geometry;
-
-    SensorRecieverBlock m_sensor_reciever_block;
+    
+    SensorReceiverBlock m_sensor_receiver_block;
     PointMapBlock m_point_map_block;
     GlobalPlannerBlock m_global_planner_block;
 };

@@ -75,7 +75,7 @@
 #include "autopilot/vehicle_command_sender.h"
 #include "autopilot/celeris_user_controller.h"
 #include "vulkan_self/vulkan_submit_context.h"
-#include "vulkan_self/keyboard_input_reciever.h"
+#include "vulkan_self/keyboard_input_receiver.h"
 #include "autopilot/arrow.h"
 #include "autopilot/sensors/imu/imu_receiver.h"
 #include "autopilot/sensors/imu/imu_measurement.h"
@@ -429,13 +429,13 @@ int main() {
 
     // use_fps_camera_controller();
 
-    KeyboardInputReciever keyboard_input_reciever(window);
+    KeyboardInputReceiver keyboard_input_receiver(window);
 
     CelerisUserController celeris_user_controller(celeris, celeris_visualizer);
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
-        keyboard_input_reciever.update();
+        keyboard_input_receiver.update();
         gamepad_controller.update(
             celeris.car_speed(),
             celeris.vehicle_speed(),
@@ -460,14 +460,14 @@ int main() {
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
         
-        new_celeris_user_controller.update(camera, keyboard_input_reciever);
+        new_celeris_user_controller.update(camera, keyboard_input_receiver);
         new_celeris.update(compute_submit_context);
         new_celeris_visualizer.update();
         
         // celeris.update(compute_submit_context);
-        // celeris_user_controller.update(delta_time, camera, keyboard_input_reciever, fps_camera_controller);
+        // celeris_user_controller.update(delta_time, camera, keyboard_input_receiver, fps_camera_controller);
         // celeris_visualizer.update();
-        // deskewing_debugger.update(keyboard_input_reciever);
+        // deskewing_debugger.update(keyboard_input_receiver);
         
         third_person_camera_controller.set_target(celeris.vehicle_transform().position);
         if (celeris_user_controller.camera_controller_mode() == CelerisUserController::CameraControllerMode::FPS)

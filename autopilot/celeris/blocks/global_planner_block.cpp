@@ -2,7 +2,7 @@
 
 #include "../../../vulkan_self/vulkan_engine.h"
 #include "../../../managers/manager_bundle.h"
-#include "sensor_reciever_block.h"
+#include "sensor_receiver_block.h"
 
 GlobalPlannerBlock::GlobalPlannerBlock(
     VulkanEngine& engine,
@@ -44,14 +44,14 @@ void GlobalPlannerBlock::start(VulkanSubmitContext&& planner_submit_context) {
 
 void GlobalPlannerBlock::update(
     VulkanSubmitContext& submit_context, 
-    SensorRecieverBlock& sensor_reciever_block) 
+    SensorReceiverBlock& sensor_receiver_block) 
 {
     LOG_METHOD();
 
     sync_path_snapshot();
 
-    if (path_replan_required(submit_context, sensor_reciever_block)) {
-        update_start_position(sensor_reciever_block);
+    if (path_replan_required(submit_context, sensor_receiver_block)) {
+        update_start_position(sensor_receiver_block);
         request_path_replan();
     }
 }
@@ -62,16 +62,16 @@ void GlobalPlannerBlock::request_path_replan() {
     m_path_planner.request_path_replan(m_start_position, m_goal_position);
 }
 
-void GlobalPlannerBlock::update_start_position(SensorRecieverBlock& sensor_reciever_block) {
+void GlobalPlannerBlock::update_start_position(SensorReceiverBlock& sensor_receiver_block) {
     LOG_METHOD();
 
     logger().check(m_vehicle_geometry, "Vehicle geometry was null");
     logger().check(m_voxel_grid, "Voxel grid was null");
 
-    if (!sensor_reciever_block.has_lidar_transform())
+    if (!sensor_receiver_block.has_lidar_transform())
         return;
 
-    const Transform& transform = *sensor_reciever_block.lidar_tranform();
+    const Transform& transform = *sensor_receiver_block.lidar_tranform();
     
     m_start_position.pos = m_vehicle_geometry->rear_axle_world_position(transform);
     m_start_position.pos.y += m_voxel_grid->voxel_size().y * 0.5f;
@@ -123,9 +123,9 @@ void GlobalPlannerBlock::sync_path_snapshot() {
 
 bool GlobalPlannerBlock::path_replan_required(
     VulkanSubmitContext& submit_context, 
-    SensorRecieverBlock& sensor_reciever_block) 
+    SensorReceiverBlock& sensor_receiver_block) 
 {
     return 
-        sensor_reciever_block.has_lidar_transform() && 
+        sensor_receiver_block.has_lidar_transform() && 
         m_path_planner.request_is_path_impended(submit_context);
 }

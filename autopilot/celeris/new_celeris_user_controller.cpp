@@ -1,6 +1,6 @@
 #include "new_celeris_user_controller.h"
 
-#include "../../vulkan_self/keyboard_input_reciever.h"
+#include "../../vulkan_self/keyboard_input_receiver.h"
 #include "../../voxel_grid_vulkan/voxel_grid.h"
 #include "../../a_star/a_star_structures.h"
 #include "new_celeris_visualizer.h"
@@ -17,7 +17,7 @@ NewCelerisUserController::NewCelerisUserController(
         m_config(config) {
 }
 
-void NewCelerisUserController::update(const Camera& camera, KeyboardInputReciever& keyboard_input_reciever) {
+void NewCelerisUserController::update(const Camera& camera, KeyboardInputReceiver& keyboard_input_receiver) {
     m_celeris_visualizer->gazelle_next_visible(m_config.show_gazelle_next);
     m_celeris_visualizer->voxel_grid_visible(m_config.show_voxel_grid);
 
@@ -26,11 +26,11 @@ void NewCelerisUserController::update(const Camera& camera, KeyboardInputRecieve
     m_celeris_visualizer->explored_paths_visible(m_config.show_explored_paths);
     m_celeris_visualizer->unimpended_path_visible(m_config.show_unimpended_path);
 
-    // if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_1))
+    // if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_1))
     //     place_planner_start(camera);
-    if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_2))
+    if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_2))
         place_planner_goal(camera);
-    if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_3))
+    if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_3))
         replan_path();
 }
 

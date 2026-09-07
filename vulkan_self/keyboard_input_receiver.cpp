@@ -1,9 +1,9 @@
-#include "keyboard_input_reciever.h"
+#include "keyboard_input_receiver.h"
 
-KeyboardInputReciever::KeyboardInputReciever(Window& window) 
+KeyboardInputReceiver::KeyboardInputReceiver(Window& window) 
     :   m_window(&window) {}
 
-bool KeyboardInputReciever::on_key_pressed(int glfw_key_code) {
+bool KeyboardInputReceiver::on_key_pressed(int glfw_key_code) {
     LOG_METHOD();
 
     logger().check(m_window, "Window was null");
@@ -26,7 +26,7 @@ bool KeyboardInputReciever::on_key_pressed(int glfw_key_code) {
     return m_on_key_press_states[glfw_key_code];
 }
 
-void KeyboardInputReciever::update() {
+void KeyboardInputReceiver::update() {
     LOG_METHOD();
     
     for (auto it = m_on_key_press_states.begin(); it != m_on_key_press_states.end(); it++)

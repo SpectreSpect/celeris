@@ -19,7 +19,7 @@ NewCeleris::NewCeleris(
         m_voxel_grid(&voxel_grid),
         m_desc(desc),
         m_vehicle_geometry(vehicle_geometry),
-        m_sensor_reciever_block(
+        m_sensor_receiver_block(
             engine, 
             manager_bundle,
             compute_queue,
@@ -39,33 +39,33 @@ NewCeleris::NewCeleris(
 void NewCeleris::start(VulkanSubmitContext&& planner_submit_context) {
     LOG_METHOD();
 
-    m_sensor_reciever_block.start();
+    m_sensor_receiver_block.start();
     m_global_planner_block.start(std::move(planner_submit_context));
 }
 
 void NewCeleris::update(VulkanSubmitContext& submit_context) {
     LOG_METHOD();
 
-    m_sensor_reciever_block.update(m_point_map_block, m_voxel_grid);
-    m_global_planner_block.update(submit_context, m_sensor_reciever_block);
+    m_sensor_receiver_block.update(m_point_map_block, m_voxel_grid);
+    m_global_planner_block.update(submit_context, m_sensor_receiver_block);
 }
 
 void NewCeleris::update_global_planner_start_position() {
     m_global_planner_block.update_start_position(
-        m_sensor_reciever_block
+        m_sensor_receiver_block
     );
 }
 
 OdometryEstimator& NewCeleris::odometry_estimator() {
-    return m_sensor_reciever_block.odometry_estimator();
+    return m_sensor_receiver_block.odometry_estimator();
 }
 
 bool NewCeleris::has_lidar_transform() {
-    return m_sensor_reciever_block.has_lidar_transform();
+    return m_sensor_receiver_block.has_lidar_transform();
 }
 
 Transform* NewCeleris::lidar_tranform() {
-    return m_sensor_reciever_block.lidar_tranform();
+    return m_sensor_receiver_block.lidar_tranform();
 }
 
 VoxelGrid* NewCeleris::voxel_grid() {
@@ -80,6 +80,6 @@ GlobalPlannerBlock& NewCeleris::global_planner() noexcept {
     return m_global_planner_block;
 }
 
-SensorRecieverBlock& NewCeleris::sensor_receiver_block() noexcept {
-    return m_sensor_reciever_block;
+SensorReceiverBlock& NewCeleris::sensor_receiver_block() noexcept {
+    return m_sensor_receiver_block;
 }

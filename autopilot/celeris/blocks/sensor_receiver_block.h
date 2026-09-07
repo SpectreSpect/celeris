@@ -19,9 +19,9 @@ class VulkanQueue;
 class Transform;
 class VoxelGrid;
 
-class SensorRecieverBlock {
+class SensorReceiverBlock {
 public:
-    _XCLASS_NAME(SensorRecieverBlock);
+    _XCLASS_NAME(SensorReceiverBlock);
 
     struct Desc {
         uint16_t lidar_port = 5000;
@@ -33,7 +33,7 @@ public:
         uint32_t max_voxel_writes = 100000;
     };
 
-    SensorRecieverBlock(
+    SensorReceiverBlock(
         VulkanEngine& engine,
         ManagerBundle& manager_bundle,
         VulkanQueue& compute_queue,
@@ -42,7 +42,7 @@ public:
 
     void start();
     
-    void start_imu_reciever();
+    void start_imu_receiver();
     void start_lidar_scan_receiver();
     
     void update(PointMapBlock& point_map_block, VoxelGrid* voxel_grid);

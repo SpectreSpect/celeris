@@ -1,4 +1,4 @@
-#include "sensor_reciever_block.h"
+#include "sensor_receiver_block.h"
 
 #include "../../../voxel_grid_vulkan/voxel_grid_structures.h"
 #include "../../../voxel_grid_vulkan/voxel_grid.h"
@@ -6,7 +6,7 @@
 #include "../../../renderer/transform.h"
 #include "point_map_block.h"
 
-SensorRecieverBlock::SensorRecieverBlock(
+SensorReceiverBlock::SensorReceiverBlock(
     VulkanEngine& engine,
     ManagerBundle& manager_bundle,
     VulkanQueue& compute_queue,
@@ -30,40 +30,40 @@ SensorRecieverBlock::SensorRecieverBlock(
             sizeof(uint32_t) * 4 + sizeof(VoxelWriteGPU) * desc.max_voxel_writes)) {
 }
 
-void SensorRecieverBlock::start_imu_reciever() {
+void SensorReceiverBlock::start_imu_receiver() {
     m_imu_receiver.start();
 }
 
-void SensorRecieverBlock::start_lidar_scan_receiver() {
+void SensorReceiverBlock::start_lidar_scan_receiver() {
     m_lidar_scan_receiver.start();
 }
 
-void SensorRecieverBlock::start() {
-    start_imu_reciever();
+void SensorReceiverBlock::start() {
+    start_imu_receiver();
     start_lidar_scan_receiver();
 }
 
-void SensorRecieverBlock::update(PointMapBlock& point_map_block, VoxelGrid* voxel_grid) {
+void SensorReceiverBlock::update(PointMapBlock& point_map_block, VoxelGrid* voxel_grid) {
     try_receive_and_process_imu();
     if (!m_odometry_estimator.is_gravity_calibration_underway())
         try_receive_and_process_lidar_scan(point_map_block, voxel_grid);
 }
 
-OdometryEstimator& SensorRecieverBlock::odometry_estimator() {
+OdometryEstimator& SensorReceiverBlock::odometry_estimator() {
     return m_odometry_estimator;
 }
 
-bool SensorRecieverBlock::has_lidar_transform() {
+bool SensorReceiverBlock::has_lidar_transform() {
     return m_network_scan.get();
 }
 
-Transform* SensorRecieverBlock::lidar_tranform() {
+Transform* SensorReceiverBlock::lidar_tranform() {
     if (!m_network_scan)
         return nullptr;
     return &m_network_scan->point_cloud().transform;
 }
 
-void SensorRecieverBlock::voxelize(
+void SensorReceiverBlock::voxelize(
     VoxelGrid* voxel_grid, 
     std::unique_ptr<LidarScan>& lidar_scan) 
 {
@@ -78,7 +78,7 @@ void SensorRecieverBlock::voxelize(
     );
 }
 
-void SensorRecieverBlock::try_receive_and_process_imu() {
+void SensorReceiverBlock::try_receive_and_process_imu() {
     LOG_METHOD();
 
     ImuMeasurement imu_message{};
@@ -92,7 +92,7 @@ void SensorRecieverBlock::try_receive_and_process_imu() {
     }
 }
 
-void SensorRecieverBlock::try_receive_and_process_lidar_scan(PointMapBlock& point_map_block, VoxelGrid* voxel_grid) {
+void SensorReceiverBlock::try_receive_and_process_lidar_scan(PointMapBlock& point_map_block, VoxelGrid* voxel_grid) {
     LOG_METHOD();
 
     logger().check(m_engine, "Engine was null");

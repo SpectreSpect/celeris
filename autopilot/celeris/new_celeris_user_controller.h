@@ -2,7 +2,7 @@
 
 #include "../../vulkan_self/logger/logger_header.h"
 
-class KeyboardInputReciever;
+class KeyboardInputReceiver;
 class NewCelerisVisualizer;
 class NonholonomicPos;
 class NewCeleris;
@@ -28,7 +28,7 @@ public:
         const NewCelerisUserControllerConfig& config
     );
 
-    void update(const Camera& camera, KeyboardInputReciever& keyboard_input_reciever);
+    void update(const Camera& camera, KeyboardInputReceiver& keyboard_input_receiver);
     void display_celeris_general_panel(Camera& camera);
     void display_voxel_grid_panel();
     void display_path_planner_panel(Camera& camera);

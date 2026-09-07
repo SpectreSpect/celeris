@@ -8,7 +8,7 @@
 #include "../../path_planner.h"
 
 class VulkanSubmitContext;
-class SensorRecieverBlock;
+class SensorReceiverBlock;
 class VehicleGeometry;
 class ManagerBundle;
 class VulkanEngine;
@@ -36,11 +36,11 @@ public:
     void start(VulkanSubmitContext&& planner_submit_context);
     void update(
         VulkanSubmitContext& submit_context, 
-        SensorRecieverBlock& sensor_reciever_block
+        SensorReceiverBlock& sensor_receiver_block
     );
 
     void request_path_replan();
-    void update_start_position(SensorRecieverBlock& sensor_reciever_block);
+    void update_start_position(SensorReceiverBlock& sensor_receiver_block);
 
     void set_start(const NonholonomicPos& position);
     void set_goal(const NonholonomicPos& position);
@@ -72,6 +72,6 @@ private:
     void sync_path_snapshot();
     bool path_replan_required(
         VulkanSubmitContext& submit_context, 
-        SensorRecieverBlock& sensor_reciever_block
+        SensorReceiverBlock& sensor_receiver_block
     );
 };
