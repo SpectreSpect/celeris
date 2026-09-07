@@ -120,4 +120,5 @@ private:
     
     void try_receive_and_process_imu();
     void try_receive_and_process_lidar_scan();
+    void update_start_position();
 };

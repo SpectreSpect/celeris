@@ -83,15 +83,7 @@ void NewCeleris::update() {
     if (!m_odometry_estimator.is_gravity_calibration_underway())
         try_receive_and_process_lidar_scan();
     
-    if (has_lidar_transform()) {
-        const Transform& transform = *lidar_tranform();
-        
-        m_start_position.pos = m_vehicle_geometry.rear_axle_world_position(transform);
-        m_start_position.pos.y += voxel_grid()->voxel_size().y * 0.5f;
-
-        m_start_position.theta = NonholonomicPos::from_transform(transform).theta;
-        m_collision_escape_resolver.push_out(m_start_position.pos);
-    }
+    update_start_position();
 
     if (m_path_planner_snapshot.generation != m_path_planner.request_result_generation())
         m_path_planner_snapshot = m_path_planner.request_result_snapshot();
@@ -259,4 +251,17 @@ void NewCeleris::try_receive_and_process_lidar_scan() {
     );
 
     m_received_scan_count++;
+}
+
+void NewCeleris::update_start_position() {
+    if (!has_lidar_transform())
+        return;
+
+    const Transform& transform = *lidar_tranform();
+    
+    m_start_position.pos = m_vehicle_geometry.rear_axle_world_position(transform);
+    m_start_position.pos.y += voxel_grid()->voxel_size().y * 0.5f;
+
+    m_start_position.theta = NonholonomicPos::from_transform(transform).theta;
+    m_collision_escape_resolver.push_out(m_start_position.pos);
 }
