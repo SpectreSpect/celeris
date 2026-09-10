@@ -159,6 +159,7 @@ add_executable(app
   vulkan_self/keyboard_input_receiver.cpp
   autopilot/celeris_user_controller.cpp
   autopilot/sensors/imu/imu_receiver.cpp
+  autopilot/sensors/imu/new_imu_receiver.cpp
   autopilot/odometry/odometry_estimator.cpp
   autopilot/sensors/lidar/lidar_scan.cpp
   autopilot/sensors/lidar/lidar_scan_receiver.cpp
@@ -178,6 +179,7 @@ add_executable(app
   autopilot/celeris/blocks/sensor_receiver_block.cpp
   autopilot/celeris/blocks/global_planner_block.cpp
   autopilot/sensors/lidar/new_lidar_scan_receiver.cpp
+  autopilot/sensors/imu/new_imu_receiver.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)

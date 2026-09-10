@@ -22,12 +22,6 @@ class NewLidarScanReceiver : public ReceiverServer<LidarMessage> {
 public:
     _XCLASS_NAME(NewLidarScanReceiver);
 
-    // struct ImuMessage {
-    //     glm::vec3 linear_acceleration;
-    //     glm::vec3 angular_velocity;
-    //     std::int64_t timestamp;
-    // };
-
     NewLidarScanReceiver(
         ManagerBundle& manager_bundle,
         PointCloudPreprocessor& point_cloud_preprocessor,

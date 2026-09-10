@@ -18,7 +18,13 @@ class ReceiverServer {
 public:
     _XPARENT_NAME(ReceiverServer);
 
-    ReceiverServer(uint16_t port, size_t max_queued_messages);
+    enum class QueueOverflowPolicy { DropOldest, DropNewest };
+
+    ReceiverServer(
+        uint16_t port,
+        size_t max_queued_messages,
+        QueueOverflowPolicy overflow_policy = QueueOverflowPolicy::DropOldest
+    );
     virtual ~ReceiverServer();
 
     void start();
@@ -32,6 +38,7 @@ public:
 protected:
     uint16_t m_port = 5003;
     size_t m_max_queued_messages = 0;
+    QueueOverflowPolicy m_overflow_policy = QueueOverflowPolicy::DropOldest;
 
     std::thread m_receiver_thread;
     std::mutex m_pending_msg_mtx;

@@ -3,9 +3,11 @@
 template<typename Message>
 ReceiverServer<Message>::ReceiverServer(
     uint16_t port, 
-    size_t max_queued_messages) 
+    size_t max_queued_messages,
+    QueueOverflowPolicy overflow_policy)
     :   m_port(port),
-        m_max_queued_messages(max_queued_messages){
+        m_max_queued_messages(max_queued_messages),
+        m_overflow_policy(overflow_policy){
 }
 
 template<typename Message>
@@ -115,8 +117,12 @@ void ReceiverServer<Message>::push_back_message(Message& message) {
     {
         std::unique_lock<std::mutex> lock(m_msg_queue_mtx);
 
-        if (m_msg_queue.size() == m_max_queued_messages)
-            m_msg_queue.pop_front();
+        if (m_msg_queue.size() == m_max_queued_messages) {
+            if (m_overflow_policy == QueueOverflowPolicy::DropOldest)
+                m_msg_queue.pop_front();
+            else
+                m_msg_queue.pop_back();
+        }
         m_msg_queue.push_back(message);
     }
 }
