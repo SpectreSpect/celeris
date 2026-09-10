@@ -1,0 +1,98 @@
+#pragma once
+
+#include "../../vulkan_self/logger/logger_header.h"
+#include "../../renderer/lines/line_cloud.h"
+#include "../../renderer/scene_object.h"
+#include "../spherical_pose_marker.h"
+#include "../gazelle_next.h"
+#include "../path_planner.h"
+
+class PathPlannerResult;
+class VehicleGeometry;
+class NonholonomicPos;
+class VulkanEngine;
+class MeshManager;
+class NewCeleris;
+
+class NewCelerisVisualizer : public SceneObject {
+public:
+    _XCLASS_NAME(NewCelerisVisualizer);
+
+    NewCelerisVisualizer(
+        VulkanEngine& engine,
+        MeshManager& mesh_manager,
+        MaterialInstanceManager& material_instance_manager, 
+        NewCeleris& celeris, 
+        const VehicleGeometry& vehicle_geometry,
+        float skybox_exposure = 1.8f,
+        uint32_t max_path_line_count = 20000
+    );
+
+    void update();
+
+    void gazelle_next_visible(bool visible);
+    void voxel_grid_visible(bool visible);
+
+    void path_visibile(bool visible);
+    void guide_path_visible(bool visible);
+    void explored_paths_visible(bool visible);
+    void unimpended_path_visible(bool visible);
+
+private:
+    NewCeleris* m_celeris = nullptr;
+
+    uint32_t m_max_path_line_count = 0;
+
+    GazelleNext m_gazelle_next;
+
+    SphericalPoseMarker m_start_marker;
+    SphericalPoseMarker m_goal_marker;
+
+    uint64_t m_planner_snapshot_generation = 0;
+
+    LineCloud m_path_line_cloud;
+    LineCloud m_guide_path_line_cloud;
+    LineCloud m_explored_paths_line_cloud;
+    LineCloud m_unimpended_path_line_cloud;
+
+    void update_gazelle_next_transform();
+    
+    void set_marker_pose(
+        SphericalPoseMarker& marker, 
+        NonholonomicPos nonholonomic_position
+    ); 
+    void set_start(const NonholonomicPos& position);
+    void set_goal(const NonholonomicPos& position);
+
+    std::vector<LineInstance> get_line_instances(
+        const std::vector<NonholonomicPos> path, 
+        glm::vec4 forward_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+        glm::vec4 backward_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+        float y_offset = 0.1f,
+        float forward_dir_y_offset = 0.05f
+    );
+    std::vector<LineInstance> get_line_instances(
+        const std::vector<glm::ivec3> path, 
+        glm::vec4 color,
+        float y_offset = 0.1f
+    );
+
+    void update_path_line_cloud(
+        const PathPlanner::PathPlannerResult& path_planner_snapshot
+    );
+    void update_guide_path_line_cloud(
+        const PathPlanner::PathPlannerResult& path_planner_snapshot
+    );
+    void update_unimpended_path_line_cloud(
+        const PathPlanner::PathPlannerResult& path_planner_snapshot
+    );
+
+    glm::vec3 voxel_center_bottom_world_pos(
+        const glm::vec3& voxel_size, 
+        const glm::ivec3& voxel_pos
+    );
+    glm::vec3 voxel_center_world_pos(
+        const glm::vec3& voxel_size, 
+        const glm::ivec3& voxel_pos
+    );
+};

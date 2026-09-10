@@ -5,11 +5,11 @@
 #include "logger/logger_header.h"
 #include "window.h"
 
-class KeyboardInputReciever {
+class KeyboardInputReceiver {
 public:
-    _XCLASS_NAME(KeyboardInputReciever);
+    _XCLASS_NAME(KeyboardInputReceiver);
 
-    KeyboardInputReciever(Window& window);
+    KeyboardInputReceiver(Window& window);
 
     bool on_key_pressed(int glfw_key_code);
     void update();

@@ -316,14 +316,14 @@ Celeris::Celeris(
             manager_bundle,
             voxel_grid,
             m_path_intersection_detector,
-            PathPlanner::PathPlannerDesc{
-                .unimpended_path_window_size = desc.unimpended_path_window_size,
-                .unimpended_path_max_astar_points = desc.unimpended_path_max_astar_points,
-                .vehicle_geometry = desc.vehicle_geometry,
-                .footprint_sample_count = desc.footprint_sample_count,
-                .footprint_horizontal_inflation_size = desc.footprint_horizontal_inflation_size,
-                .footprint_vertical_inflation_size = desc.footprint_vertical_inflation_size,
-                .nonholonomic_astar_desc = desc.nonholonomic_astar_desc
+            desc.vehicle_geometry,
+            PathPlanner::Desc{
+                .unimpended_window_size = desc.unimpended_path_window_size,
+                .max_unimpended_astar_points = desc.unimpended_path_max_astar_points,
+                .footprint_samples = desc.footprint_sample_count,
+                .footprint_horizontal_inflation = desc.footprint_horizontal_inflation_size,
+                .footprint_vertical_inflation = desc.footprint_vertical_inflation_size,
+                .nonholonomic_astar = desc.nonholonomic_astar_desc
             }
         ),
         m_local_planner(std::make_unique<LocalPlanner>()),
@@ -441,6 +441,7 @@ void Celeris::start_lidar_recording(std::filesystem::path output_directory) {
 }
 
 void Celeris::update(VulkanSubmitContext& submit_context) {
+    LOG_METHOD();
     logger().check(m_engine, "Engine was null");
     logger().check(m_manager_bundle, "Manager bundle was null");
     logger().check(m_voxel_grid, "Voxel grid was null");

@@ -8,7 +8,7 @@
 #include "../../../../renderer/scene_object.h"
 #include "lidar_scan_deskewer.h"
 
-class KeyboardInputReciever;
+class KeyboardInputReceiver;
 class ManagerBundle;
 
 class DeskewingDebugger : public SceneObject {
@@ -21,7 +21,7 @@ public:
         int last_entry_id = -1
     );
 
-    void update(KeyboardInputReciever& keyboard_input_reciever);
+    void update(KeyboardInputReceiver& keyboard_input_receiver);
 
 private:
     OdometryEstimator m_odometry_estimator;

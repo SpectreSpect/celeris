@@ -10,15 +10,21 @@ class VulkanEngine;
 class Mesh;
 class SlotPassInstance;
 class LineInstance;
+class MeshManager;
+class MaterialInstanceManager;
 
 class LineCloud : public InstancedRenderObject {
 public:
     _XCHILD_NAME(LineCloud);
 
     explicit LineCloud(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material, InstanceBatch&& instance_batch);
+    explicit LineCloud(VulkanEngine& engine, MeshManager& mesh_manager, MaterialInstanceManager& material_instance_manager, InstanceBatch&& instance_batch);
     explicit LineCloud(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material, InstanceBatch& instance_batch);
+    explicit LineCloud(VulkanEngine& engine, MeshManager& mesh_manager, MaterialInstanceManager& material_instance_manager, InstanceBatch& instance_batch);
     explicit LineCloud(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material, uint32_t instance_count);
+    explicit LineCloud(VulkanEngine& engine, MeshManager& mesh_manager, MaterialInstanceManager& material_instance_manager, uint32_t instance_count);
     explicit LineCloud(VulkanEngine& engine, Mesh& mesh, SlotPassInstance& material, const std::vector<LineInstance>& lines);
+    explicit LineCloud(VulkanEngine& engine, MeshManager& mesh_manager, MaterialInstanceManager& material_instance_manager, const std::vector<LineInstance>& lines);
     ~LineCloud() noexcept override = default;
 
     LineCloud(const LineCloud&) = delete;

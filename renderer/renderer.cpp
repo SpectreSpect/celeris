@@ -40,38 +40,41 @@ void Renderer::render(VulkanCommandBuffer& command_buffer, RenderObject& render_
 }
 
 void Renderer::render(VulkanCommandBuffer& command_buffer, InstancedRenderObject& instanced_render_object, glm::mat4 transform) {
-        instanced_render_object.sync_material();
+    if (instanced_render_object.instance_count() <= 0)
+        return;
 
-        logger().check(instanced_render_object.mesh_view().valid(), "Mesh view was invalid");
+    instanced_render_object.sync_material();
 
-        if (!instanced_render_object.instance_buffer_view_valid())
-            return;
-    
-        static TransformPushConstants pc;
-        pc.model = transform;
-        pc.material_data_id = instanced_render_object.material_data_id();
+    logger().check(instanced_render_object.mesh_view().valid(), "Mesh view was invalid");
 
-        // blinn_phong_material_instance.bind(command_buffer);
-        SlotPassInstance& material = instanced_render_object.material();
-        material.bind(command_buffer);
-        auto& pass = static_cast<MaterialPass&>(material.pipepline_pass());
+    if (!instanced_render_object.instance_buffer_view_valid())
+        return;
 
-        m_frame_resources->bind(m_engine->current_frame(), command_buffer, pass.pipeline(), 1);
+    static TransformPushConstants pc;
+    pc.model = transform;
+    pc.material_data_id = instanced_render_object.material_data_id();
 
-        pass.pipeline().set_y_up_viewport(command_buffer, *m_engine);
-        pass.pipeline().set_scissor(command_buffer, *m_engine);
+    // blinn_phong_material_instance.bind(command_buffer);
+    SlotPassInstance& material = instanced_render_object.material();
+    material.bind(command_buffer);
+    auto& pass = static_cast<MaterialPass&>(material.pipepline_pass());
 
-        instanced_render_object.mesh_view().bind_vertex_buffer(command_buffer, 0);
-        // if (render_object.instance_data.external_buffer)
-        //     render_object.instance_data.external_buffer->bind_as_vertex_buffer(command_buffer, 1);
-        // else
-        instanced_render_object.instance_buffer().bind_as_vertex_buffer(command_buffer, 1);
+    m_frame_resources->bind(m_engine->current_frame(), command_buffer, pass.pipeline(), 1);
 
-        instanced_render_object.mesh_view().bind_index_buffer(command_buffer);
+    pass.pipeline().set_y_up_viewport(command_buffer, *m_engine);
+    pass.pipeline().set_scissor(command_buffer, *m_engine);
 
-        pass.pipeline_layout().push_constants(command_buffer, pc);
+    instanced_render_object.mesh_view().bind_vertex_buffer(command_buffer, 0);
+    // if (render_object.instance_data.external_buffer)
+    //     render_object.instance_data.external_buffer->bind_as_vertex_buffer(command_buffer, 1);
+    // else
+    instanced_render_object.instance_buffer().bind_as_vertex_buffer(command_buffer, 1);
 
-        command_buffer.draw_indexed(instanced_render_object.mesh_view().index_count(), instanced_render_object.instance_count());
+    instanced_render_object.mesh_view().bind_index_buffer(command_buffer);
+
+    pass.pipeline_layout().push_constants(command_buffer, pc);
+
+    command_buffer.draw_indexed(instanced_render_object.mesh_view().index_count(), instanced_render_object.instance_count());
 };
 
 

@@ -26,14 +26,13 @@ class PathPlanner {
 public:
     _XCLASS_NAME(PathPlanner);
 
-    struct PathPlannerDesc {
-        uint32_t unimpended_path_window_size = 64;
-        uint32_t unimpended_path_max_astar_points = 4096;
-        VehicleGeometry vehicle_geometry;
-        uint32_t footprint_sample_count = 0; //5
-        uint32_t footprint_horizontal_inflation_size = 1;
-        uint32_t footprint_vertical_inflation_size = 1;
-        NonholonomicAStar::NonholonomicAStarDesc nonholonomic_astar_desc;
+    struct Desc {
+        uint32_t unimpended_window_size = 64;
+        uint32_t max_unimpended_astar_points = 4096;
+        uint32_t footprint_samples = 5; //5
+        uint32_t footprint_horizontal_inflation = 1;
+        uint32_t footprint_vertical_inflation = 1;
+        NonholonomicAStar::NonholonomicAStarDesc nonholonomic_astar;
     };
 
     struct PathPlannerResult {
@@ -58,7 +57,8 @@ public:
         ManagerBundle& manager_bundle,
         VoxelGrid& voxel_grid,
         PathIntersectionDetector& path_intersection_detector,
-        const PathPlannerDesc& desc
+        const VehicleGeometry& vehicle_geometry,
+        const Desc& desc
     );
     ~PathPlanner() noexcept;
 

@@ -153,8 +153,6 @@ bool LidarScanReceiver::receive_lidar_msg_from_client(int client_socket) {
         lidar_message.points.reserve(header.point_count);
         lidar_message.timestamps.reserve(header.point_count);
 
-        // logger().log("Header timestamp: " + std::to_string(static_cast<double>(header.timestamp_ns / 1e9)));
-
         uint64_t latest_time_offset_ns = points[0].time_offset_ns;
         // for (LidarMessagePointData& point_data : points) {
         for (LidarMessagePointData& point_data : points) {
@@ -169,9 +167,6 @@ bool LidarScanReceiver::receive_lidar_msg_from_client(int client_socket) {
                 lidar_message.latest_point_id = lidar_message.points.size() - 1;
             }
         }
-
-
-        
         // LidarMessage lidar_message{};
 
         // if (!read_exact(client_socket, &lidar_message, sizeof(LidarMessage)))

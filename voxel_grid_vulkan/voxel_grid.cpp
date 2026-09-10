@@ -95,6 +95,8 @@ VoxelGrid::VoxelGrid(
 
     world_init_gpu();
     init_mesh_pool();
+
+    add_child(m_render_object);
 }
 
 void VoxelGrid::conditional_prepare_rebuild(VulkanCommandBuffer& command_buffer, VulkanBuffer& clear_dispatch_args, VulkanBuffer& fill_dispatch_args) {

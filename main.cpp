@@ -75,7 +75,7 @@
 #include "autopilot/vehicle_command_sender.h"
 #include "autopilot/celeris_user_controller.h"
 #include "vulkan_self/vulkan_submit_context.h"
-#include "vulkan_self/keyboard_input_reciever.h"
+#include "vulkan_self/keyboard_input_receiver.h"
 #include "autopilot/arrow.h"
 #include "autopilot/sensors/imu/imu_receiver.h"
 #include "autopilot/sensors/imu/imu_measurement.h"
@@ -87,6 +87,9 @@
 #include "autopilot/sensors/lidar/deskewing/lidar_scan_deskewer.h"
 #include "autopilot/sensors/lidar/deskewing/deskewing_debugger.h"
 #include "renderer/mcp/mcp_visalizer.h"
+#include "autopilot/celeris/new_celeris.h"
+#include "autopilot/celeris/new_celeris_visualizer.h"
+#include "autopilot/celeris/new_celeris_user_controller.h"
 
 #include <algorithm>
 #include <exception>
@@ -156,8 +159,8 @@ int main() {
         compute_pass_manager
     );
 
-    glm::vec3 voxel_size(0.2f);
-    // glm::vec3 voxel_size(1.0f);
+    // glm::vec3 voxel_size(0.2f);
+    glm::vec3 voxel_size(1.0f);
     uint32_t vertical_inflation_size =
         static_cast<uint32_t>(std::ceil(vehicle_geometry.size.y / voxel_size.y));
     uint32_t horizontal_inflation_size =
@@ -280,6 +283,36 @@ int main() {
     // LidarMessage loaded_lidar_msg("/home/spectre/TEMP_lidar_output_mesh/test_lidar_msg.lmb");
     // LidarScan loaded_lidar_scan(manager_bundle, point_cloud_preprocessor, loaded_lidar_msg);
 
+    NewCeleris new_celeris(
+        engine, 
+        manager_bundle, 
+        engine.compute_queue(), 
+        compute_submit_context,
+        voxel_grid,
+        vehicle_geometry, 
+        NewCeleris::Desc{}
+    );
+    
+    new_celeris.odometry_estimator().set_gravity(glm::vec3(-0.123099f, 9.78485f, -0.69118f)); // simulator
+    new_celeris.start(std::move(planner_submit_context));
+
+    NewCelerisVisualizer new_celeris_visualizer(
+        engine,
+        mesh_manager,
+        material_instance_manager, 
+        new_celeris, 
+        vehicle_geometry,
+        skybox_exposure
+    );
+
+    NewCelerisUserController new_celeris_user_controller(
+        new_celeris,
+        new_celeris_visualizer,
+        NewCelerisUserController::NewCelerisUserControllerConfig{
+            // .show_gazelle_next = false
+        }
+    );
+
     Celeris celeris(
         engine,
         engine.compute_queue(),
@@ -373,8 +406,10 @@ int main() {
     // scene.add(celeris_visualizer);
     // // scene.add(test_gazelle_next);
     // scene.add(voxel_grid.render_object());
+    scene.add(voxel_grid);
+    scene.add(new_celeris_visualizer);
     // scene.add(quad_object);
-    scene.add(mcp_visualizer);
+    // scene.add(mcp_visualizer);
     // scene.add(test_arrow);
 
     // scene.add(deskewing_debugger);
@@ -394,13 +429,13 @@ int main() {
 
     // use_fps_camera_controller();
 
-    KeyboardInputReciever keyboard_input_reciever(window);
+    KeyboardInputReceiver keyboard_input_receiver(window);
 
     CelerisUserController celeris_user_controller(celeris, celeris_visualizer);
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
-        keyboard_input_reciever.update();
+        keyboard_input_receiver.update();
         gamepad_controller.update(
             celeris.car_speed(),
             celeris.vehicle_speed(),
@@ -425,10 +460,14 @@ int main() {
         if (!engine.aquire_free_resources(image_index)) continue;
         VulkanCommandBuffer& command_buffer = engine.get_active_command_buffer();
         
-        celeris.update(compute_submit_context);
-        celeris_user_controller.update(delta_time, camera, keyboard_input_reciever, fps_camera_controller);
-        celeris_visualizer.update();
-        // deskewing_debugger.update(keyboard_input_reciever);
+        new_celeris_user_controller.update(camera, keyboard_input_receiver);
+        new_celeris.update(compute_submit_context);
+        new_celeris_visualizer.update();
+        
+        // celeris.update(compute_submit_context);
+        // celeris_user_controller.update(delta_time, camera, keyboard_input_receiver, fps_camera_controller);
+        // celeris_visualizer.update();
+        // deskewing_debugger.update(keyboard_input_receiver);
         
         third_person_camera_controller.set_target(celeris.vehicle_transform().position);
         if (celeris_user_controller.camera_controller_mode() == CelerisUserController::CameraControllerMode::FPS)
@@ -463,8 +502,9 @@ int main() {
                 ui.begin_frame();
                 ui.update_mouse_mode(window);
 
-                celeris_user_controller.display_interface(camera, gamepad_controller);
-                mcp_visualizer.display_interface();
+                // celeris_user_controller.display_interface(camera, gamepad_controller);
+                new_celeris_user_controller.display_interface(camera);
+                // mcp_visualizer.display_interface();
 
                 ui.end_frame(command_buffer);
             }

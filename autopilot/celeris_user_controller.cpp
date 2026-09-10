@@ -1,7 +1,7 @@
 #include "celeris_user_controller.h"
 
 #include "recorder/lidar_message_odometry_recording.h"
-#include "../vulkan_self/keyboard_input_reciever.h"
+#include "../vulkan_self/keyboard_input_receiver.h"
 #include "../imgui_layer.h"
 #include "celeris_visualizer.h"
 #include "gamepad_controller.h"
@@ -35,7 +35,7 @@ CelerisUserController::CelerisUserController(
 void CelerisUserController::update(
     float delta_time, 
     Camera& camera, 
-    KeyboardInputReciever& keyboard_input_reciever,
+    KeyboardInputReceiver& keyboard_input_receiver,
     FPSCameraController& fps_camera_controller) {
     if (m_car_playback_active) {
         m_car_playback_distance += m_car_playback_speed * delta_time;
@@ -54,28 +54,28 @@ void CelerisUserController::update(
         );
     }
 
-    if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_F)) {
+    if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_F)) {
         use_fps_camera_controller(fps_camera_controller);
     }
-    if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_R)) {
+    if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_R)) {
         use_third_person_camera_controller();
     }
 
-    if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_1))
+    if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_1))
         place_start(camera);
-    if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_2))
+    if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_2))
         place_end(camera);
-    if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_3))
+    if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_3))
         start_path_planning();
-    if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_4))
+    if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_4))
         move_start_to_vehicle();
-    if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_T))
+    if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_T))
         add_directional_waypoint(camera);
-    if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_G))
+    if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_G))
         add_nondirectional_waypoint(camera);
-    if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_L))
+    if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_L))
         delete_last_waypoint();
-    // if (keyboard_input_reciever.on_key_pressed(GLFW_KEY_N)) {
+    // if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_N)) {
     //     // current_record_id = (current_record_id + 1) % recording.size();
     //     // LidarMessageOdometryEntry& entry = recording.get_entry(current_record_id);
 
