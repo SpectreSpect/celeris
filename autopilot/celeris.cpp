@@ -930,7 +930,7 @@ void Celeris::try_receive_and_process_lidar_scan() {
     LOG_METHOD();
 
     LidarMessage lidar_message;
-    if (!m_lidar_scan_receiver.try_pop_front_lidar_msg(lidar_message))
+    if (!m_lidar_scan_receiver.try_pop_front(lidar_message))
         return;
 
     Odometry lidar_msg_odometry;

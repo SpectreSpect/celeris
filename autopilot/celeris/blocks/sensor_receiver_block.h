@@ -6,10 +6,10 @@
 #include "../../../renderer/point_cloud/point_cloud_preprocessor.h"
 #include "../../sensors/lidar/deskewing/lidar_scan_deskewer.h"
 #include "../../../vulkan_self/logger/logger_header.h"
-#include "../../sensors/lidar/new_lidar_scan_receiver.h"
+#include "../../sensors/lidar/lidar_scan_receiver.h"
 #include "../../../vulkan_self/vulkan_buffer.h"
 #include "../../odometry/odometry_estimator.h"
-#include "../../sensors/imu/new_imu_receiver.h"
+#include "../../sensors/imu/imu_receiver.h"
 
 
 
@@ -58,8 +58,8 @@ private:
 
     Desc m_desc;
 
-    NewLidarScanReceiver m_lidar_scan_receiver;
-    NewImuReceiver m_imu_receiver;
+    LidarScanReceiver m_lidar_scan_receiver;
+    ImuReceiver m_imu_receiver;
     PointCloudPreprocessor m_point_cloud_preprocessor;
     OdometryEstimator m_odometry_estimator;
     LidarScanDeskewer m_deskewer;
