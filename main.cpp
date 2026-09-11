@@ -90,6 +90,7 @@
 #include "autopilot/celeris/new_celeris.h"
 #include "autopilot/celeris/new_celeris_visualizer.h"
 #include "autopilot/celeris/new_celeris_user_controller.h"
+#include "autopilot/sender_server/control_command_sender/control_command_sender.h"
 
 #include <algorithm>
 #include <exception>
@@ -433,6 +434,9 @@ int main() {
 
     CelerisUserController celeris_user_controller(celeris, celeris_visualizer);
 
+    ControlCommandSender control_command_sender("127.0.0.1", 5005);
+    control_command_sender.start();
+
     while (!engine.window().should_close()) {
         engine.window().poll_events();
         keyboard_input_receiver.update();
@@ -481,6 +485,11 @@ int main() {
 
         voxel_grid.render_object().visible = celeris_user_controller.show_voxel_grid();
         voxel_grid.update(window, camera);
+
+        control_command_sender.submit(ControlCommand{
+            .acceleration = 20,
+            .steering_angle_velocity = 1
+        });
         
         // texture_manager.mcp_visualization_texture_pass.render(
         //     mcp_visualization_texture,
