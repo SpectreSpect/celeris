@@ -486,10 +486,28 @@ int main() {
         voxel_grid.render_object().visible = celeris_user_controller.show_voxel_grid();
         voxel_grid.update(window, camera);
 
-        control_command_sender.submit(ControlCommand{
-            .acceleration = 20,
-            .steering_angle_velocity = 1
-        });
+        if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_J)) {
+            control_command_sender.submit(ControlCommand{
+                .acceleration = 0,
+                .steering_angle_velocity = -1
+            });
+        }
+        if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_K)) {
+            control_command_sender.submit(ControlCommand{
+                .acceleration = 0,
+                .steering_angle_velocity = 1
+            });
+        }
+        if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_I)) {
+            control_command_sender.submit(ControlCommand{
+                .acceleration = 20,
+                .steering_angle_velocity = 0
+            });
+        }
+            
+
+
+        
         
         // texture_manager.mcp_visualization_texture_pass.render(
         //     mcp_visualization_texture,

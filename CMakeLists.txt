@@ -162,6 +162,7 @@ add_executable(app
   autopilot/odometry/odometry_estimator.cpp
   autopilot/sensors/lidar/lidar_scan.cpp
   autopilot/sensors/lidar/lidar_scan_receiver.cpp
+  autopilot/sensors/steering_wheel/steering_angle_receiver.cpp
   autopilot/dynamics/ackermann_dynamics.cpp
   autopilot/recorder/lidar_odometry_recorder.cpp
   autopilot/sensors/lidar/lidar_message.cpp

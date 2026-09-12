@@ -4,12 +4,14 @@
 #include <cstdint>
 
 #include "../../../renderer/point_cloud/point_cloud_preprocessor.h"
+#include "../../sensors/steering_wheel/steering_angle_receiver.h"
 #include "../../sensors/lidar/deskewing/lidar_scan_deskewer.h"
 #include "../../../vulkan_self/logger/logger_header.h"
 #include "../../sensors/lidar/lidar_scan_receiver.h"
 #include "../../../vulkan_self/vulkan_buffer.h"
 #include "../../odometry/odometry_estimator.h"
 #include "../../sensors/imu/imu_receiver.h"
+
 
 
 
@@ -32,6 +34,9 @@ public:
         uint16_t imu_port = 5003;
         size_t imu_queue_capacity = 1;
 
+        uint16_t steering_port = 5006;
+        size_t steering_queue_capacity = 3;
+
         uint32_t max_voxel_writes = 100000;
     };
 
@@ -46,6 +51,7 @@ public:
     
     void start_imu_receiver();
     void start_lidar_scan_receiver();
+    void start_steering_angle_receiver();
     
     void update(PointMapBlock& point_map_block, VoxelGrid* voxel_grid);
 
@@ -60,9 +66,11 @@ private:
 
     LidarScanReceiver m_lidar_scan_receiver;
     ImuReceiver m_imu_receiver;
+    SteeringAngleReceiver steering_angle_receiver;
     PointCloudPreprocessor m_point_cloud_preprocessor;
     OdometryEstimator m_odometry_estimator;
     LidarScanDeskewer m_deskewer;
+
 
     std::unique_ptr<LidarScan> m_network_scan;
     std::deque<std::unique_ptr<LidarScan>> m_retired_network_scans;

@@ -24,6 +24,7 @@ SensorReceiverBlock::SensorReceiverBlock(
             desc.lidar_port,
             desc.lidar_queue_capacity),
         m_imu_receiver(desc.imu_port, desc.imu_queue_capacity),
+        steering_angle_receiver(desc.steering_port, desc.steering_queue_capacity),
         m_deskewer(m_odometry_estimator),
         m_voxel_write_list(VulkanBuffer::create_host_visible_storage_buffer(
             engine, 
@@ -38,15 +39,26 @@ void SensorReceiverBlock::start_lidar_scan_receiver() {
     m_lidar_scan_receiver.start();
 }
 
+void SensorReceiverBlock::start_steering_angle_receiver() {
+    steering_angle_receiver.start();
+}
+
 void SensorReceiverBlock::start() {
     start_imu_receiver();
     start_lidar_scan_receiver();
+    start_steering_angle_receiver();
 }
 
 void SensorReceiverBlock::update(PointMapBlock& point_map_block, VoxelGrid* voxel_grid) {
+    LOG_METHOD();
+
     try_receive_and_process_imu();
     if (!m_odometry_estimator.is_gravity_calibration_underway())
         try_receive_and_process_lidar_scan(point_map_block, voxel_grid);
+    
+    float steering_angle = 0;
+    if (steering_angle_receiver.try_pop_back(steering_angle))
+        logger().log() << "Steering angle: " << std::to_string(steering_angle) << "\n";
 }
 
 OdometryEstimator& SensorReceiverBlock::odometry_estimator() {
