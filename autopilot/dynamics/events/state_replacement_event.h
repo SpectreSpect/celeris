@@ -6,8 +6,8 @@
 #include "../../../vulkan_self/logger/logger_header.h"
 
 namespace celeris {
-    template<class State>
-    class StateReplacementEvent : public InstantEvent<State> {
+    template<class State, class EventState>
+    class StateReplacementEvent : public InstantEvent<State, EventState> {
     public:
         _XCHILD_NAME(StateReplacementEvent);
 
@@ -15,7 +15,7 @@ namespace celeris {
             :   InstantEvent<State>(timestamp), 
                 m_state(std::move(state)) {}
 
-        void apply(StateEstimate<State>& state) const override {
+        void apply(StateEstimate<State>& state, EventState& event_state) const override {
             LOG_METHOD();
 
             state.state = m_state;

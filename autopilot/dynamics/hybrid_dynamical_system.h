@@ -15,7 +15,7 @@
 #include "events/instant_event.h"
 
 namespace celeris {
-    template<class State>
+    template<class State, class EventState>
     class HybridDynamicalSystem {
     public:
         _XPARENT_NAME(HybridDynamicalSystem);
@@ -23,10 +23,17 @@ namespace celeris {
         using Timestamp = simulation::Timestamp;
         using Duration = simulation::Duration;
 
-        using EventPtr = std::unique_ptr<InstantEvent<State>>;
-        using EventBucket = std::vector<EventPtr>;
-
         using StateHistoryContainer = std::map<Timestamp, StateEstimate<State>>;
+
+        
+        using EventPtr = std::unique_ptr<InstantEvent<State, EventState>>;
+
+        struct EventContainer {
+            EventPtr event;
+            EventState state;
+        };
+
+        using EventBucket = std::vector<EventContainer>;
         using EventHistoryContainer = std::map<Timestamp, EventBucket>;
 
         /*
@@ -39,7 +46,8 @@ namespace celeris {
             std::unique_ptr<DynamicInterface<State>> dynamic_model,
             const StateEstimate<State>& initial_state = StateEstimate<TotalVehicleState>{},
             Duration max_integration_step = std::chrono::milliseconds{10},
-            Duration max_history_step = std::chrono::milliseconds{100})
+            Duration max_history_step = std::chrono::milliseconds{100}
+        )
             :   m_dynamic_model(std::move(dynamic_model)),
                 m_initial_state(initial_state),
                 m_max_integration_step(max_integration_step),
@@ -104,6 +112,7 @@ namespace celeris {
             check_event_ptr(event);
 
             const Timestamp timestamp = event->timestamp();
+
             m_event_history[timestamp].push_back(std::move(event));
 
             invalidate_cache_from(timestamp);

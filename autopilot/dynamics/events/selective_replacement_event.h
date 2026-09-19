@@ -14,7 +14,7 @@ namespace celeris {
         { destination ^= replacement } -> std::same_as<State&>;
     };
 
-    template<class State, class Replacement>
+    template<class State, class EventState, class Replacement>
     class SelectiveReplacementEvent {
         static_assert(
             selectively_replaceable_from<State, Replacement>,
@@ -23,9 +23,9 @@ namespace celeris {
         );
     };
 
-    template<class State, class Replacement>
+    template<class State, class EventState, class Replacement>
     requires (selectively_replaceable_from<State, Replacement>)
-    class SelectiveReplacementEvent<State, Replacement> : public InstantEvent<State> {
+    class SelectiveReplacementEvent<State, EventState, Replacement> : public InstantEvent<State, EventState> {
     public:
         _XCHILD_NAME(SelectiveReplacementEvent);
 
@@ -33,7 +33,7 @@ namespace celeris {
         :   InstantEvent<State>(timestamp),
             m_replacement(std::move(replacement)) {}
 
-        void apply(StateEstimate<State>& state) const override {
+        void apply(StateEstimate<State>& state, EventState& event_state) const override {
             LOG_METHOD();
 
             state.state ^= m_replacement;

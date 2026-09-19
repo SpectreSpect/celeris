@@ -5,7 +5,7 @@
 #include "../../../vulkan_self/logger/logger_header.h"
 
 namespace celeris {
-    template<class State>
+    template<class State, class EventState>
     class InstantEvent {
     public:
         _XPARENT_NAME(InstantEvent);
@@ -19,7 +19,7 @@ namespace celeris {
             return m_timestamp;
         }
 
-        virtual void apply(StateEstimate<State>& state) const = 0;
+        virtual void apply(StateEstimate<State>& state, EventState& event_state) const = 0;
     
     protected:
         InstantEvent(const InstantEvent&) = default;
