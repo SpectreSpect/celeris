@@ -11,6 +11,8 @@ namespace celeris {
 
         using Timestamp = simulation::Timestamp;
 
+        virtual ~TrajectoryInterface() = default;
+
         virtual Y define_trajectory(Timestamp timestamp) = 0;
     };
 }

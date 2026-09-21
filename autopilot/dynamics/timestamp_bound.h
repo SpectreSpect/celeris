@@ -10,6 +10,7 @@ namespace celeris {
     template<class Container, class Key>
     concept bound_searchable_range =
         std::ranges::forward_range<Container> &&
+        std::ranges::common_range<Container> &&
         requires(Container& container, const Key& key) {
             { container.lower_bound(key) }
                 -> std::same_as<std::ranges::iterator_t<Container>>;
@@ -17,6 +18,12 @@ namespace celeris {
             { container.upper_bound(key) }
                 -> std::same_as<std::ranges::iterator_t<Container>>;
         };
+    
+    enum BoundValueType {
+        NEG_INFINITY,
+        NUMERICAL_VALUE,
+        PLUS_INFINITY
+    };
 
     class TimestampBound {
     public:
@@ -25,7 +32,7 @@ namespace celeris {
         using Timestamp = simulation::Timestamp;
         
         [[nodiscard]]
-        char is_infinity() const noexcept;
+        BoundValueType bound_value_type() const noexcept;
 
         [[nodiscard]]
         bool is_include() const noexcept;
@@ -59,8 +66,9 @@ namespace celeris {
         static std::ranges::iterator_t<Container> to_iterator(Container& container, TimestampBound bound) {
             LOG_NAMED("TimestampBound");
 
-            if (bound.is_infinity() != 0) {
-                return bound.is_infinity() < 0 ? container.begin() : container.end();
+            if (bound.bound_value_type() != BoundValueType::NUMERICAL_VALUE) {
+                return bound.bound_value_type() == BoundValueType::NEG_INFINITY ? 
+                        std::ranges::begin(container) : std::ranges::end(container);
             } else {
                 Timestamp timestamp_bound = *bound;
 
@@ -78,18 +86,18 @@ namespace celeris {
     
     private:
         TimestampBound(
-            Timestamp bound,
+            Timestamp value,
             bool is_left_bound,
             bool include, 
-            char is_inifinity
+            BoundValueType bound_value_type
         );
 
-        TimestampBound(char is_inifinity);
+        TimestampBound(BoundValueType bound_value_type);
 
     private:
         Timestamp m_bound;
         bool m_is_left_bound = true;
         bool m_include = true;
-        char m_is_infinity = 0;
+        BoundValueType m_bound_value_type = BoundValueType::NUMERICAL_VALUE;
     };
 }

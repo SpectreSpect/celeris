@@ -8,7 +8,7 @@
 
 namespace celeris {
     template<class Y>
-    class ForwardPropagatableTrajectoryBase : ForwardPropagatableTrajectoryInterface<Y> {
+    class ForwardPropagatableTrajectoryBase : public ForwardPropagatableTrajectoryInterface<Y> {
     public:
         _XCHILD_NAME(ForwardPropagatableTrajectoryBase);
 
@@ -23,8 +23,8 @@ namespace celeris {
         ForwardPropagatableTrajectoryBase(const ForwardPropagatableTrajectoryBase&) = default;
         ForwardPropagatableTrajectoryBase& operator=(const ForwardPropagatableTrajectoryBase&) = default;
 
-        ForwardPropagatableTrajectoryBase(ForwardPropagatableTrajectoryBase&&) noexcept = default;
-        ForwardPropagatableTrajectoryBase& operator=(ForwardPropagatableTrajectoryBase&&) noexcept = default;
+        ForwardPropagatableTrajectoryBase(ForwardPropagatableTrajectoryBase&&) = default;
+        ForwardPropagatableTrajectoryBase& operator=(ForwardPropagatableTrajectoryBase&&) = default;
 
         [[nodiscard]]
         Timestamp initial_value_timestamp() const noexcept override {
@@ -45,7 +45,7 @@ namespace celeris {
             );
 
             Y propagatable_value = initial_value();
-            propagate_until(initial_value_timestamp(), timestamp, propagatable_value);
+            this->propagate_until(initial_value_timestamp(), timestamp, propagatable_value);
 
             return propagatable_value;
         }

@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <utility>
+#include <iterator>
 #include <map>
 
 #include "trajectory_cache_interface.h"
@@ -41,6 +42,17 @@ namespace celeris {
 
         void invalidate(TimestampBound left_bound, TimestampBound right_bound) override {
             LOG_METHOD();
+
+            bool both_intervals_have_numerical_values = 
+                left_bound.bound_value_type() == 0 && right_bound.bound_value_type() == 0;
+            
+            if (both_intervals_have_numerical_values) {
+                bool is_entire_interval_erasing = left_bound.is_include() && right_bound.is_include();
+
+                if (*left_bound == *right_bound && !is_entire_interval_erasing) {
+                    return;
+                }
+            }
 
             m_cache.erase(
                 to_iterator(left_bound),

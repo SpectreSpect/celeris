@@ -19,6 +19,9 @@ namespace celeris {
     public:
         _XCHILD_NAME(CachedForwardPropagatableTrajectory);
 
+        using Timestamp = typename ForwardPropagatableTrajectoryBase<Y>::Timestamp;
+        using CacheEntryRefMutable = typename TrajectoryCacheInterface<Y>::CacheEntryRefMutable;
+
         CachedForwardPropagatableTrajectory(
             Timestamp initial_value_timestamp,
             Y initial_value,
@@ -29,13 +32,23 @@ namespace celeris {
                     std::move(initial_value)
                 ),
                 m_cache_component(std::move(cache_component)),
-                m_splitter(std::move(splitter)) {}
+                m_splitter(std::move(splitter)) 
+        {
+            LOG_METHOD();
 
-        CachedForwardPropagatableTrajectory(const CachedForwardPropagatableTrajectory&) = default;
-        CachedForwardPropagatableTrajectory& operator=(const CachedForwardPropagatableTrajectory&) = default;
+            logger().check(
+                m_cache_component != nullptr, "`m_cache_component` is null."
+            );
+            logger().check(
+                m_splitter != nullptr, "`m_splitter` is null."
+            );
+        }
 
-        CachedForwardPropagatableTrajectory(CachedForwardPropagatableTrajectory&&) noexcept = default;
-        CachedForwardPropagatableTrajectory& operator=(CachedForwardPropagatableTrajectory&&) noexcept = default;
+        CachedForwardPropagatableTrajectory(const CachedForwardPropagatableTrajectory&) = delete;
+        CachedForwardPropagatableTrajectory& operator=(const CachedForwardPropagatableTrajectory&) = delete;
+
+        CachedForwardPropagatableTrajectory(CachedForwardPropagatableTrajectory&&) = default;
+        CachedForwardPropagatableTrajectory& operator=(CachedForwardPropagatableTrajectory&&) = default;
     
         Y define_trajectory(Timestamp timestamp) override {
             LOG_METHOD();
@@ -68,40 +81,17 @@ namespace celeris {
 
             Timestamp prev = from;
             for (Timestamp t : split_points) {
-                propagate_until(prev, t, value);
+                this->propagate_until(prev, t, value);
                 store_mutable(t, value);
                 
                 prev = t;
             }
 
-            propagate_until(prev, to, value);
+            this->propagate_until(prev, to, value);
             
             // В точке `to` не сохраняем
         }
-
-    protected:
-        /*
-            Сохраняет или заменяет значение в кэше точке `timestamp`
-            значением `value`.
-            
-            Возвращает ссылку на сохранённое после работы функции значение
-            `value` в точке `timestamp` внутри кэша.
-        */
-        Y& store_mutable(Timestamp timestamp, Y value) override {
-            LOG_METHOD();
-            
-            logger().check(m_cache_component != nullptr, "`m_cache_component` is null.");
-            logger().check(
-                timestamp > this->initial_value_timestamp(), 
-                "`timestamp` cannot preceed the initial value timestamp or be equal to it."
-            );
-
-            return m_cache_component->store(timestamp, std::move(value));
-        }
-
-        /*
-            Стирает кэш в указанном диапазоне.
-        */
+    
         void invalidate_cache(TimestampBound left_bound, TimestampBound right_bound) override {
             LOG_METHOD();
 
@@ -110,18 +100,28 @@ namespace celeris {
             m_cache_component->invalidate(left_bound, right_bound);
         }
 
-        /*
-            Определяет значение траектории в момент времени `timestamp` 
-            и кэширует его.
+    protected:
+        Y& store_uncheked_mutable(Timestamp timestamp, Y value) override {
+            LOG_METHOD();
+            
+            logger().check(m_cache_component != nullptr, "`m_cache_component` is null.");
+            logger().check(
+                timestamp >= this->initial_value_timestamp(), 
+                "`timestamp` cannot preceed the initial value timestamp."
+            );
 
-            Возвращает ссылку на закэшированное значение.
-        */
+            return m_cache_component->store(timestamp, std::move(value));
+        }
+
         Y& define_cached_value_at_mutable(Timestamp timestamp) override {
             LOG_METHOD();
 
             logger().check(
                 timestamp >= this->initial_value_timestamp(),
                 "`timestamp` cannot precede the initial value."
+            );
+            logger().check(
+                m_cache_component != nullptr, "`m_cache_component` is null."
             );
 
             std::optional<CacheEntryRefMutable> cache_opt = m_cache_component->find_cached_value_at_or_before(timestamp);
@@ -149,7 +149,7 @@ namespace celeris {
 
             propagate_and_cache_until(previous_timestamp, timestamp, previous_value_copy);
 
-            return store_mutable(timestamp, std::move(previous_value_copy));
+            return store_uncheked_mutable(timestamp, std::move(previous_value_copy));
         }
     
     private:
