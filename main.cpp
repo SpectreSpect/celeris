@@ -398,6 +398,7 @@ int main() {
         skybox_exposure
     );
     mcp_visualizer.transform.scale = glm::vec3(10, 1, 10);
+    
 
     // GazelleNext test_gazelle_next(mesh_manager, material_instance_manager, vehicle_geometry, skybox_exposure);
 
@@ -504,10 +505,6 @@ int main() {
                 .steering_angle_velocity = 0
             });
         }
-            
-
-
-        
         
         // texture_manager.mcp_visualization_texture_pass.render(
         //     mcp_visualization_texture,

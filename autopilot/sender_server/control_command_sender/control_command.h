@@ -7,3 +7,4 @@ struct ControlCommand {
     float steering_angle_velocity = 0;
     float jerk = 0;
 };
+                                                                                                                                            
