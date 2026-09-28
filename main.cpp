@@ -92,6 +92,7 @@
 #include "autopilot/celeris/new_celeris_visualizer.h"
 #include "autopilot/celeris/new_celeris_user_controller.h"
 #include "autopilot/sender_server/control_command_sender/control_command_sender.h"
+#include "autopilot/trajectory/trapezoidal_motion_profile_1d.h"
 
 #include <algorithm>
 #include <exception>
@@ -429,6 +430,9 @@ int main() {
         skybox_exposure
     );
     mcp_visualizer.transform.scale = glm::vec3(10, 1, 10);
+
+    TrapezoidalMotionProfile1D motion_profile(1.53f, 1.4f, -1.55f);
+    motion_profile.plan(0.32f, 2.114f);
     
 
     // GazelleNext test_gazelle_next(mesh_manager, material_instance_manager, vehicle_geometry, skybox_exposure);

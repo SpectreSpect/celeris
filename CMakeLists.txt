@@ -179,6 +179,7 @@ add_executable(app
   autopilot/celeris/blocks/sensor_receiver_block.cpp
   autopilot/celeris/blocks/global_planner_block.cpp
   autopilot/sender_server/control_command_sender/control_command_sender.cpp
+  autopilot/trajectory/trapezoidal_motion_profile_1d.cpp
 )
 
 target_compile_features(app PRIVATE cxx_std_20)
