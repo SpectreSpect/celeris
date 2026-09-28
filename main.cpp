@@ -408,8 +408,10 @@ int main() {
     // scene.add(celeris_visualizer);
     // // scene.add(test_gazelle_next);
     // scene.add(voxel_grid.render_object());
-    scene.add(voxel_grid);
-    scene.add(new_celeris_visualizer);
+    
+    // scene.add(voxel_grid);
+    // scene.add(new_celeris_visualizer);
+
     // scene.add(quad_object);
     // scene.add(mcp_visualizer);
     // scene.add(test_arrow);
