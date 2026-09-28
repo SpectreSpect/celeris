@@ -54,6 +54,10 @@ float TrapezoidalMotionProfile1D::position(float t) {
     return std::numeric_limits<float>::max();
 }
 
+float TrapezoidalMotionProfile1D::duration() const {
+    return m_t_2;
+}
+
 float TrapezoidalMotionProfile1D::position_1(float t) {
     LOG_METHOD();
     logger().check(m_is_planned, "The motion must be planned first");

@@ -431,8 +431,9 @@ int main() {
     );
     mcp_visualizer.transform.scale = glm::vec3(10, 1, 10);
 
-    TrapezoidalMotionProfile1D motion_profile(1.53f, 1.4f, -1.55f);
-    motion_profile.plan(0.32f, 2.114f);
+    TrapezoidalMotionProfile1D motion_profile(3.0f, 5.0f, -3.0f);
+    float motion_start_time = 0.0f;
+    bool action_sphere_is_moving = false;
     
 
     // GazelleNext test_gazelle_next(mesh_manager, material_instance_manager, vehicle_geometry, skybox_exposure);
@@ -551,6 +552,22 @@ int main() {
         }
         if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_X)) {
             goal_sphere.transform.position.x = camera.position.x;
+        }
+        if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_C)) {
+            motion_profile.plan(
+                start_sphere.transform.position.x,
+                goal_sphere.transform.position.x
+            );
+            motion_start_time = current_frame_time;
+            action_sphere.transform.position.x = start_sphere.transform.position.x;
+            action_sphere_is_moving = true;
+        }
+        if (action_sphere_is_moving) {
+            const float motion_time = current_frame_time - motion_start_time;
+            action_sphere.transform.position.x = motion_profile.position(motion_time);
+            if (motion_time >= motion_profile.duration()) {
+                action_sphere_is_moving = false;
+            }
         }
         
         // texture_manager.mcp_visualization_texture_pass.render(

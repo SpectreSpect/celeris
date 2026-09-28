@@ -13,6 +13,7 @@ public:
     );
     void plan(float start_pos, float end_pos);
     float position(float t);
+    float duration() const;
 
 private:
     float m_acceleration_1 = 0;
