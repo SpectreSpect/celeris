@@ -541,13 +541,6 @@ int main() {
                 .steering_angle_velocity = 0
             });
         }
-        if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_Z)) {
-            start_sphere.transform.position.x = camera.position.x;
-            action_sphere.transform.position.x = camera.position.x;
-        }
-        if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_X)) {
-            goal_sphere.transform.position.x = camera.position.x;
-        }
         
         // texture_manager.mcp_visualization_texture_pass.render(
         //     mcp_visualization_texture,
