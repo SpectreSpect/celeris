@@ -278,7 +278,7 @@ int main() {
     RenderObject start_sphere(mesh_manager.sphere, material_instance_manager.pbr);
     start_sphere.set_material_data(PBRMaterialData::create(
         0.0f,
-        0.95f,
+        0.01f,
         skybox_exposure,
         glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)
     ));
@@ -288,7 +288,7 @@ int main() {
     RenderObject goal_sphere(mesh_manager.sphere, material_instance_manager.pbr);
     goal_sphere.set_material_data(PBRMaterialData::create(
         0.0f,
-        0.95f,
+        0.01f,
         skybox_exposure,
         glm::vec4(0.0f, 0.0f, 1.0f, 1.0f)
     ));
@@ -298,7 +298,7 @@ int main() {
     RenderObject action_sphere(mesh_manager.sphere, material_instance_manager.pbr);
     action_sphere.set_material_data(PBRMaterialData::create(
         0.0f,
-        0.95f,
+        0.01f,
         skybox_exposure,
         glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)
     ));
@@ -435,7 +435,6 @@ int main() {
     float motion_start_time = 0.0f;
     bool action_sphere_is_moving = false;
     
-
     // GazelleNext test_gazelle_next(mesh_manager, material_instance_manager, vehicle_geometry, skybox_exposure);
 
     Scene scene;
