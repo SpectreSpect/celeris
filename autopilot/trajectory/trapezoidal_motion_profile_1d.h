@@ -13,6 +13,7 @@ public:
     );
     void plan(float start_pos, float end_pos);
     float position(float t);
+    float velocity(float t);
     float duration() const;
 
 private:
@@ -34,4 +35,8 @@ private:
     float position_1(float t);
     float position_2(float t);
     float position_3(float t);
+
+    float velocity_1(float t);
+    float velocity_2(float t);
+    float velocity_3(float t);
 };

@@ -53,6 +53,21 @@ float TrapezoidalMotionProfile1D::position(float t) {
     return std::numeric_limits<float>::max();
 }
 
+float TrapezoidalMotionProfile1D::velocity(float t) {
+    LOG_METHOD();
+    logger().check(m_is_planned, "The motion must be planned first");
+
+    if (t < 0)
+        return velocity_1(0);
+    if (t >= 0 && t <= m_t_a)
+        return velocity_1(t);
+    if (t > m_t_a && t <= m_t_d)
+        return velocity_2(t);
+    if (t > m_t_d && t <= m_t_2)
+        return velocity_3(t);
+    return velocity_3(m_t_2);
+}
+
 float TrapezoidalMotionProfile1D::duration() const {
     return m_t_2;
 }
@@ -76,4 +91,25 @@ float TrapezoidalMotionProfile1D::position_3(float t) {
     logger().check(m_is_planned, "The motion must be planned first");
 
     return m_end_pos + std::pow((t - m_t_2), 2) * m_acceleration_2 * m_increasing_sign * -1.0f / 2.0f;
+}
+
+float TrapezoidalMotionProfile1D::velocity_1(float t) {
+    LOG_METHOD();
+    logger().check(m_is_planned, "The motion must be planned first");
+
+    return t * m_acceleration_1 * m_increasing_sign;
+}
+
+float TrapezoidalMotionProfile1D::velocity_2(float t) {
+    LOG_METHOD();
+    logger().check(m_is_planned, "The motion must be planned first");
+
+    return m_velocity * m_increasing_sign;
+}
+
+float TrapezoidalMotionProfile1D::velocity_3(float t) {
+    LOG_METHOD();
+    logger().check(m_is_planned, "The motion must be planned first");
+
+    return m_acceleration_2 * m_increasing_sign * -1.0f * (t - m_t_2);
 }

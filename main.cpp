@@ -478,6 +478,8 @@ int main() {
     ControlCommandSender control_command_sender("127.0.0.1", 5005);
     control_command_sender.start();
 
+    float action_sphere_velocity = 0;
+
     while (!engine.window().should_close()) {
         engine.window().poll_events();
         keyboard_input_receiver.update();
@@ -558,12 +560,16 @@ int main() {
                 goal_sphere.transform.position.x
             );
             motion_start_time = current_frame_time;
-            action_sphere.transform.position.x = start_sphere.transform.position.x;
+            // action_sphere.transform.position.x = start_sphere.transform.position.x;
             action_sphere_is_moving = true;
         }
         if (action_sphere_is_moving) {
             const float motion_time = current_frame_time - motion_start_time;
-            action_sphere.transform.position.x = motion_profile.position(motion_time);
+            // action_sphere.transform.position.x = motion_profile.position(motion_time);
+            action_sphere_velocity = motion_profile.velocity(motion_time);
+            logger().log() << "velocity: " << std::to_string(action_sphere_velocity) << "\n";
+            action_sphere.transform.position.x += action_sphere_velocity * delta_time;
+            
             if (motion_time >= motion_profile.duration()) {
                 action_sphere_is_moving = false;
             }
