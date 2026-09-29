@@ -479,6 +479,7 @@ int main() {
     control_command_sender.start();
 
     float action_sphere_velocity = 0;
+    float action_sphere_acceleration = 0;
 
     while (!engine.window().should_close()) {
         engine.window().poll_events();
@@ -566,8 +567,11 @@ int main() {
         if (action_sphere_is_moving) {
             const float motion_time = current_frame_time - motion_start_time;
             // action_sphere.transform.position.x = motion_profile.position(motion_time);
-            action_sphere_velocity = motion_profile.velocity(motion_time);
-            logger().log() << "velocity: " << std::to_string(action_sphere_velocity) << "\n";
+            // action_sphere_velocity = motion_profile.velocity(motion_time);
+            action_sphere_acceleration = motion_profile.acceleration(motion_time);
+            action_sphere_velocity += action_sphere_acceleration * delta_time;
+
+            // logger().log() << "velocity: " << std::to_string(action_sphere_velocity) << "\n";
             action_sphere.transform.position.x += action_sphere_velocity * delta_time;
             
             if (motion_time >= motion_profile.duration()) {

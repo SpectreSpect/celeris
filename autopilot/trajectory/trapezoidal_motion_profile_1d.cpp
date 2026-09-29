@@ -68,6 +68,21 @@ float TrapezoidalMotionProfile1D::velocity(float t) {
     return velocity_3(m_t_2);
 }
 
+float TrapezoidalMotionProfile1D::acceleration(float t) {
+    LOG_METHOD();
+    logger().check(m_is_planned, "The motion must be planned first");
+
+    if (t < 0)
+        return 0.0f;
+    if (t >= 0 && t <= m_t_a)
+        return m_acceleration_1 * m_increasing_sign;
+    if (t > m_t_a && t <= m_t_d)
+        return 0;
+    if (t > m_t_d && t <= m_t_2)
+        return m_acceleration_2 * m_increasing_sign * -1.0f;
+    return 0.0f;
+}
+
 float TrapezoidalMotionProfile1D::duration() const {
     return m_t_2;
 }

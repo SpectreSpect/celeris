@@ -14,6 +14,7 @@ public:
     void plan(float start_pos, float end_pos);
     float position(float t);
     float velocity(float t);
+    float acceleration(float t);
     float duration() const;
 
 private:
