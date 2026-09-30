@@ -16,59 +16,14 @@ TrapezoidalMotionProfile1D::TrapezoidalMotionProfile1D(
     logger().check(velocity != 0, "velocity must not be 0");
 }
 
-void TrapezoidalMotionProfile1D::plan(float start_pos, float start_velocity, float end_pos) {
+void TrapezoidalMotionProfile1D::plan(float start_pos, float end_pos) {
     m_start_pos = start_pos;
-    m_start_velocity = start_velocity;
+    // m_start_velocity = start_velocity;
     m_end_pos = end_pos;
 
-    m_increasing_sign = start_pos <= m_end_pos ? 1.0f : -1.0f;
+    m_increasing_sign = m_start_pos <= m_end_pos ? 1.0f : -1.0f;
 
-    m_t_g = 0;
-    if (m_start_velocity == m_velocity) {
-        // constant velocity phase
-        m_t_g = m_velocity / m_acceleration_1 * m_increasing_sign;
-        m_traj_start_pos = m_start_pos - std::pow(start_velocity, 2) / (2 * m_acceleration_1 * m_increasing_sign * 2);
-    } else if (m_start_velocity < m_velocity) {
-        float x_b = end_pos + std::pow(m_velocity, 2) / (m_acceleration_2 * m_increasing_sign * -1.0f * 2);
-        
-        if (start_pos < x_b) {
-            // accelerating phase
-            m_t_g = m_start_velocity / m_acceleration_1 * m_increasing_sign;
-            m_traj_start_pos = m_start_pos - std::pow(m_start_velocity, 2) / (2 * m_acceleration_1 * m_increasing_sign);
-        } else {
-            // CAN'T REACH THE DESTENATION, WE'RE MOVING TOO FAST
-            
-            // float part_1 = std::pow(m_velocity, 2) / (m_acceleration_2 * m_increasing_sign * -1.0f);
-            // float part_2 = std::pow(m_velocity, 2) / (m_acceleration_1 * m_increasing_sign);
-
-            // m_traj_start_pos = end_pos + part_1 + part_2;
-
-            // float t_g_part_1 = m_velocity * m_increasing_sign / m_acceleration_1 * m_increasing_sign;
-            // float t_g_part_2_numerator = (start_velocity - m_velocity * m_increasing_sign * 1.0f);
-            // float t_g_part_2_denominator = m_acceleration_2 * m_increasing_sign * -1.0f;
-
-            // t_g = t_g_part_1 +  t_g_part_2_numerator / t_g_part_2_denominator;
-
-            // t_g = m_start_velocity / m_acceleration_1 * m_increasing_sign;
-            // m_traj_start_pos = m_start_pos - std::pow(m_start_velocity, 2) / (2 * m_acceleration_1 * m_increasing_sign);
-        }
-    }
-
-    // if (m_start_velocity < m_velocity) {
-    //     t_g = m_start_velocity / m_acceleration_1 * m_increasing_sign;
-    //     m_traj_start_pos = m_start_pos - std::pow(m_start_velocity, 2) / (2 * m_acceleration_1 * m_increasing_sign);
-    // }
-    // else if (m_start_velocity == m_velocity) {
-    //     t_g = 
-    // }
-    
-
-    
-    
-
-    
-
-    float dist = m_end_pos - m_traj_start_pos;
+    float dist = m_end_pos - m_start_pos;
     if (m_increasing_sign < 0) dist *= -1;
     float numerator = 2 * dist * m_acceleration_1 * m_acceleration_2;
     float denominator = m_acceleration_1 + m_acceleration_2;
@@ -87,7 +42,7 @@ float TrapezoidalMotionProfile1D::position(float t) {
     logger().check(m_is_planned, "The motion must be planned first");
 
     if (t <= 0)
-        return m_traj_start_pos;
+        return m_start_pos;
     if (t > 0 && t <= m_t_a)
         return position_1(t);
     if (t > m_t_a && t <= m_t_d)
@@ -103,8 +58,6 @@ float TrapezoidalMotionProfile1D::velocity(float t) {
     LOG_METHOD();
     logger().check(m_is_planned, "The motion must be planned first");
 
-    t += m_t_g;
-
     if (t < 0)
         return velocity_1(0);
     if (t >= 0 && t <= m_t_a)
@@ -119,8 +72,6 @@ float TrapezoidalMotionProfile1D::velocity(float t) {
 float TrapezoidalMotionProfile1D::acceleration(float t) {
     LOG_METHOD();
     logger().check(m_is_planned, "The motion must be planned first");
-
-    t += m_t_g;
 
     if (t < 0)
         return 0.0f;
@@ -141,7 +92,7 @@ float TrapezoidalMotionProfile1D::position_1(float t) {
     LOG_METHOD();
     logger().check(m_is_planned, "The motion must be planned first");
 
-    return m_traj_start_pos + t * t * m_acceleration_1 * m_increasing_sign / 2.0f;
+    return m_start_pos + t * t * m_acceleration_1 * m_increasing_sign / 2.0f;
 }
 
 float TrapezoidalMotionProfile1D::position_2(float t) {

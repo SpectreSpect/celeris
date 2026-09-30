@@ -11,7 +11,7 @@ public:
         float velocity,
         float acceleration_2
     );
-    void plan(float start_pos, float start_velocity, float end_pos);
+    void plan(float start_pos, float end_pos);
     float position(float t);
     float velocity(float t);
     float acceleration(float t);
@@ -26,7 +26,6 @@ private:
 
     float m_start_pos = 0;
     float m_start_velocity = 0;
-    float m_traj_start_pos = 0;
     float m_end_pos = 0;
     float m_increasing_sign = 1;
 
@@ -36,7 +35,6 @@ private:
     float m_t_a = 0;
     float m_t_d = 0;
     float m_t_2 = 0;
-    float m_t_g = 0;
 
     float position_1(float t);
     float position_2(float t);

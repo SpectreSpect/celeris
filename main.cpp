@@ -431,10 +431,11 @@ int main() {
     );
     mcp_visualizer.transform.scale = glm::vec3(10, 1, 10);
 
-    TrapezoidalMotionProfile1D motion_profile(3.0f, 5.0f, -3.0f);
+    TrapezoidalMotionProfile1D motion_profile(0.5f, 5.0f, -3.0f);
     motion_profile.plan(
-                5,
-                20
+                4.1,
+                0,
+                10.03
             );
     float motion_start_time = 0.0f;
     bool action_sphere_is_moving = false;
@@ -558,11 +559,13 @@ int main() {
             action_sphere_velocity = 0;
         }
         if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_X)) {
-            goal_sphere.transform.position.x = camera.position.x;
+            // goal_sphere.transform.position.x = camera.position.x;
         }
         if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_C)) {
+            action_sphere_velocity = 4;
             motion_profile.plan(
-                start_sphere.transform.position.x,
+                action_sphere.transform.position.x,
+                action_sphere_velocity,
                 goal_sphere.transform.position.x
             );
             motion_start_time = current_frame_time;
