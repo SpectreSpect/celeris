@@ -18,6 +18,7 @@ TrapezoidalMotionProfile1D::TrapezoidalMotionProfile1D(
 
 void TrapezoidalMotionProfile1D::plan(float start_pos, float end_pos) {
     m_start_pos = start_pos;
+    // m_start_velocity = start_velocity;
     m_end_pos = end_pos;
 
     m_increasing_sign = m_start_pos <= m_end_pos ? 1.0f : -1.0f;
@@ -127,4 +128,26 @@ float TrapezoidalMotionProfile1D::velocity_3(float t) {
     logger().check(m_is_planned, "The motion must be planned first");
 
     return m_acceleration_2 * m_increasing_sign * -1.0f * (t - m_t_2);
+}
+
+float TrapezoidalMotionProfile1D::get_time_offset(float velocity) {
+    LOG_METHOD();
+    logger().check(m_is_planned, "The motion must be planned first");
+
+    float t_1 = velocity / m_acceleration_1 * m_increasing_sign;
+
+    if (t_1 >= 0 && t_1 <= m_t_a)
+        return t_1;
+
+    if (std::abs(velocity_1(m_t_a) - velocity) <= 0e-6)
+        return m_t_a;
+
+    float t_2 = m_t_2 - velocity / m_acceleration_2 * m_increasing_sign;
+
+    if (t_2 >= m_t_d && t_2 <= m_t_2)
+        return t_2;
+    
+    logger().check(m_is_planned, "Couldn't determine the time offset");
+
+    return -1;
 }

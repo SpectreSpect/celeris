@@ -432,6 +432,10 @@ int main() {
     mcp_visualizer.transform.scale = glm::vec3(10, 1, 10);
 
     TrapezoidalMotionProfile1D motion_profile(3.0f, 5.0f, -3.0f);
+    motion_profile.plan(
+                5,
+                20
+            );
     float motion_start_time = 0.0f;
     bool action_sphere_is_moving = false;
     
@@ -551,6 +555,7 @@ int main() {
         if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_Z)) {
             start_sphere.transform.position.x = camera.position.x;
             action_sphere.transform.position.x = camera.position.x;
+            action_sphere_velocity = 0;
         }
         if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_X)) {
             goal_sphere.transform.position.x = camera.position.x;

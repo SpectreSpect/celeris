@@ -17,12 +17,15 @@ public:
     float acceleration(float t);
     float duration() const;
 
+    float get_time_offset(float velocity);
+
 private:
     float m_acceleration_1 = 0;
     float m_velocity = 0;
     float m_acceleration_2 = 0;
 
     float m_start_pos = 0;
+    float m_start_velocity = 0;
     float m_end_pos = 0;
     float m_increasing_sign = 1;
 
