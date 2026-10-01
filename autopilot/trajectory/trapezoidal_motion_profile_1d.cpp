@@ -30,10 +30,12 @@ void TrapezoidalMotionProfile1D::plan(float start_pos, float start_velocity, flo
         m_traj_start_pos = m_start_pos - std::pow(start_velocity, 2) / (2 * m_acceleration_1 * m_increasing_sign * 2);
     } else if (m_start_velocity < m_velocity) {
         float x_b = end_pos + std::pow(m_velocity, 2) / (m_acceleration_2 * m_increasing_sign * -1.0f * 2);
-        
-        if (start_pos < x_b) {
+
+        bool is_first_phase = m_increasing_sign > 0 ? start_pos <= x_b : start_pos >= x_b;
+
+        if (is_first_phase) {
             // accelerating phase
-            m_t_g = m_start_velocity / m_acceleration_1 * m_increasing_sign;
+            m_t_g = m_start_velocity / m_acceleration_1;
             m_traj_start_pos = m_start_pos - std::pow(m_start_velocity, 2) / (2 * m_acceleration_1 * m_increasing_sign);
         } else {
             // CAN'T REACH THE DESTENATION, WE'RE MOVING TOO FAST

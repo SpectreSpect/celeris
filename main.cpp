@@ -431,11 +431,11 @@ int main() {
     );
     mcp_visualizer.transform.scale = glm::vec3(10, 1, 10);
 
-    TrapezoidalMotionProfile1D motion_profile(0.5f, 5.0f, -3.0f);
+    TrapezoidalMotionProfile1D motion_profile(-3.0f, -2.0f, 1.9f);
     motion_profile.plan(
-                4.1,
+                3.3f,
                 0,
-                10.03
+                -0.12f
             );
     float motion_start_time = 0.0f;
     bool action_sphere_is_moving = false;
@@ -557,12 +557,16 @@ int main() {
             start_sphere.transform.position.x = camera.position.x;
             action_sphere.transform.position.x = camera.position.x;
             action_sphere_velocity = 0;
+
+            // start_sphere.transform.position.x = 3.5f;
+            // action_sphere.transform.position.x = 3.5f;
+            // goal_sphere.transform.position.x = 4.34f;
         }
         if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_X)) {
             // goal_sphere.transform.position.x = camera.position.x;
         }
         if (keyboard_input_receiver.on_key_pressed(GLFW_KEY_C)) {
-            action_sphere_velocity = 4;
+            action_sphere_velocity = 0;
             motion_profile.plan(
                 action_sphere.transform.position.x,
                 action_sphere_velocity,
@@ -579,7 +583,7 @@ int main() {
             action_sphere_acceleration = motion_profile.acceleration(motion_time);
             action_sphere_velocity += action_sphere_acceleration * delta_time;
 
-            // logger().log() << "velocity: " << std::to_string(action_sphere_velocity) << "\n";
+            logger().log() << "time: " << std::to_string(motion_time) << "\n";
             action_sphere.transform.position.x += action_sphere_velocity * delta_time;
             
             if (motion_time >= motion_profile.duration()) {
