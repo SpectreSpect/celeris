@@ -12,7 +12,17 @@ namespace celeris {
         using Timestamp = simulation::Timestamp;
 
         virtual ~TrajectoryInterface() = default;
+        
+        /*
+            При неизменных данных, определяющих траекторию, результат
+            зависит только от timestamp.
 
+            Порядок и количество запросов, а также наличие или отсутствие
+            закэшированных значений не должны влиять на результат.
+
+            Вычисление может изменять внутренний кэш, но не должно
+            изменять определяемую объектом траекторию.
+        */
         virtual Y define_trajectory(Timestamp timestamp) = 0;
     };
 }

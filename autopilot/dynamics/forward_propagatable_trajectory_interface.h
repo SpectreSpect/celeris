@@ -23,7 +23,7 @@ namespace celeris {
             до момента `to`.
 
             После завершения:
-            1. `value` содержит значение траектории в `to`
+            1. `value` = trajectory(`to`) 
 
             Предусловия:
             1. `from` <= `to`

@@ -1,8 +1,9 @@
 #pragma once
 
 #include <optional>
-#include <utility>
 #include <iterator>
+#include <utility>
+#include <memory>
 #include <map>
 
 #include "trajectory_cache_interface.h"
@@ -10,27 +11,22 @@
 #include "clock.h"
 
 namespace celeris {
-    /*
-        Интерфейсы, как я понимаю, желательно всегда наследовать виртуально?
-        Не представляю ситуации, когда может понадобиться две их "копии"...
-    */
     template<class Y>
     class MapTrajectoryCache : public virtual TrajectoryCacheInterface<Y> {
     public:
         _XCHILD_NAME(MapTrajectoryCache);
 
-        // И всё-таки я бы хотел, чтобы ты поподробнее рассказал, зачем здесь нужен typename...
         using Timestamp = typename TrajectoryCacheInterface<Y>::Timestamp;
         using CacheEntryRefMutable = typename TrajectoryCacheInterface<Y>::CacheEntryRefMutable;
         using CacheEntryRefConst = typename TrajectoryCacheInterface<Y>::CacheEntryRefConst;
 
         MapTrajectoryCache() = default;
 
-        MapTrajectoryCache(const MapTrajectoryCache&) = default;
-        MapTrajectoryCache& operator=(const MapTrajectoryCache&) = default;
+        MapTrajectoryCache(const MapTrajectoryCache&) = delete;
+        MapTrajectoryCache& operator=(const MapTrajectoryCache&) = delete;
 
-        MapTrajectoryCache(MapTrajectoryCache&&) noexcept = default;
-        MapTrajectoryCache& operator=(MapTrajectoryCache&&) noexcept = default;
+        MapTrajectoryCache(MapTrajectoryCache&&) = default;
+        MapTrajectoryCache& operator=(MapTrajectoryCache&&) = default;
 
         Y& store(Timestamp timestamp, Y value) override {
             LOG_METHOD();
@@ -96,7 +92,7 @@ namespace celeris {
     private:
         std::map<Timestamp, Y> m_cache;
     
-    private:        
+    private:
         std::map<Timestamp, Y>::iterator to_iterator(TimestampBound bound) {
             LOG_METHOD();
 
