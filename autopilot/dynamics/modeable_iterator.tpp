@@ -4,10 +4,11 @@
 #include <optional>
 #include <iterator>
 #include <utility>
+#include <variant>
 #include <memory>
 
 #include "../../vulkan_self/logger/logger_header.h"
-#include "modeable_trajectory_cache_concept.h"
+#include "modeable_trajectory_cache.h"
 #include "iterator_interface.h"
 
 namespace celeris {
@@ -281,6 +282,10 @@ namespace celeris {
 
         using iterator_concept = std::bidirectional_iterator_tag;
         using iterator_category = std::bidirectional_iterator_tag;
+
+        using IteratorStorage = std::variant<NestedCacheIterator, ViewAllIterator>;
+
+        IteratorStorage m_iterator;
 
         Iterator() = default;
         
