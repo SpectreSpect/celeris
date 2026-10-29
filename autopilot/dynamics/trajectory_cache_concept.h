@@ -1,5 +1,6 @@
 #pragma once
 
+#include <type_traits>
 #include <concepts>
 #include <iterator>
 #include <utility>
@@ -39,8 +40,16 @@ namespace celeris {
         std::ranges::common_range<Range> && // Можно и строже, но нижнее условие и так задаёт нужное ограничение
         pair_value_range<Range, Key, Value> &&
         requires(Range& container, const Key& key) {
-            { container.lower_bound(key) } -> pair_value_iter<Key, Value>;
-            { container.upper_bound(key) } -> pair_value_iter<Key, Value>;
+            { container.lower_bound(key) } -> std::same_as<std::ranges::iterator_t<Range>>;
+            { container.upper_bound(key) } -> std::same_as<std::ranges::iterator_t<Range>>;
+        };
+    
+    // Двунапаравленный итератор, который разыминовывается в Value&
+    template<class Iterator, class Value>
+    concept bidirectional_dereferenceable_iterator =
+        std::bidirectional_iterator<Iterator> && 
+        requires(Iterator& iterator) {
+            { *iterator } -> std::same_as<Value&>;
         };
 
     // Стираемый контейнер
@@ -55,7 +64,7 @@ namespace celeris {
             { container.erase(first, last) } -> std::same_as<std::ranges::iterator_t<Range>>;
         };
     
-    // Контейнер может содержать только уникальные значения
+    // Вставка уникальных значений
     template<class Range, class Value>
     concept unique_value_insert = 
         requires(Range& container, Value value) {
@@ -65,12 +74,29 @@ namespace celeris {
                 >;
         };
     
+    // Сборка на месте уникальных значений
+    template<class Range, class Value, class... Args>
+    concept unique_value_emplace = 
+        std::constructible_from<Value, Args...> &&
+        requires(Range& container, Args&&... args) {
+            { container.emplace(std::forward<Args>(args)...) } 
+                -> std::same_as<
+                    std::pair<std::ranges::iterator_t<Range>, bool>
+                >;
+        };
+    
     template<class Range, class Key, class Value>
-    concept erasable_ordered_associative_range =
+    concept ordered_unique_key_range =
         ordered_associative_range<Range, Key, Value> &&
+        std::default_initializable<Range> &&
+        bidirectional_dereferenceable_iterator<
+            std::ranges::iterator_t<Range>, 
+            std::ranges::range_value_t<Range>
+        > &&
         erasable_range<Range> &&
-        unique_value_insert<Range, std::pair<Key, Value>>;
+        unique_value_insert<Range, std::pair<Key, Value>> &&
+        unique_value_emplace<Range, std::pair<Key, Value>, Key, Value>;
 
     template<template <class> class Cache, class Y>
-    concept trajectory_cache = erasable_ordered_associative_range<Cache<Y>, simulation::Timestamp, Y>;
+    concept trajectory_cache = ordered_unique_key_range<Cache<Y>, simulation::Timestamp, Y>;
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <unordered_set>
 #include <type_traits>
 #include <functional>
 #include <optional>
@@ -8,7 +9,6 @@
 #include <iterator>
 #include <utility>
 #include <ranges>
-#include <unordered_set>
 
 #include "../../vulkan_self/logger/logger_header.h"
 #include "trajectory_cache_concept.h"
@@ -39,527 +39,350 @@ namespace celeris {
     public:
         _XPARENT_NAME(ModeableTrajectoryCache);
 
+        struct ViewAllIterator;
+        struct Iterator;
+
         using Timestamp = simulation::Timestamp;
         using NestedCacheIterator = std::ranges::iterator_t<Cache<Y>>;
+        using CacheValueType = std::ranges::range_value_t<Cache<Y>>;
         using CacheContainer = std::unordered_map<ModeType, Cache<Y>>;
+        using reverse_iterator = std::reverse_iterator<Iterator>;
 
-        ModeableTrajectoryCache()
-            :   m_caches(create_cache_container()),
-                m_cache_state(
-                    CacheState{
-                        .mode = ModeType::VIEW_ALL,
-                        .cache_ref = m_caches[ModeType::VIEW_ALL]
-                    }
-                ) {}
+        ModeableTrajectoryCache() 
+            :   m_current_mode(ModeType::VIEW_ALL)
+        {
+            static_assert(std::bidirectional_iterator<ViewAllIterator>);
+            static_assert(std::bidirectional_iterator<Iterator>);
+
+            LOG_METHOD();
+
+            m_caches.try_emplace(m_current_mode);
+        }
+
+        const Cache<Y>& current_cache() const {
+            LOG_METHOD();
+
+            auto it = m_caches.find(m_current_mode);
+
+            logger().check(
+                it != m_caches.end(),
+                "Failed to find the current cache."
+            );
+
+            return it->second;
+        }
 
         Iterator begin() {
             LOG_METHOD();
 
-            return m_cache_state.cache_ref.get().begin();
+            if (m_current_mode == ModeType::VIEW_ALL) {
+                ModeType min_mode;
+                std::optional<NestedCacheIterator> min_iterator = std::nullopt;
+                for (auto& [mode, cache] : m_caches) {
+                    NestedCacheIterator it = cache.begin();
+                    
+                    if (it == cache.end()) {
+                        continue;
+                    }
+
+                    if (!min_iterator.has_value() || (*it).first < (**min_iterator).first) {
+                        min_iterator = std::move(it);
+                        min_mode = mode;
+                    }
+                }
+
+                return min_iterator.has_value() ?
+                    Iterator::view_all_iterator(m_caches, min_mode, *min_iterator) :
+                    Iterator::view_all_iterator_end(m_caches);
+            }
+
+            return Iterator(current_cache_mutable().begin());
         }
 
         Iterator end() {
             LOG_METHOD();
 
-            return m_cache_state.cache_ref.get().end();
+            if (m_current_mode == ModeType::VIEW_ALL) {
+                return Iterator::view_all_iterator_end(m_caches);
+            }
+
+            return Iterator(current_cache_mutable().end());
+        }
+
+        reverse_iterator rbegin() {
+            return std::make_reverse_iterator(end());
+        }
+
+        reverse_iterator rend() {
+            return std::make_reverse_iterator(begin());
         }
 
         Iterator lower_bound(Timestamp timestamp) {
             LOG_METHOD();
-            
-            Cache<Y>& cache_ref = m_cache_state.cache_ref.get();
 
-            if (m_cache_state.mode == ModeType::VIEW_ALL) {
-                return std::as_const(cache_ref).lower_bound(timestamp);
-            }
+            static auto nested_lower_bound = [](Cache<Y>& cache, Timestamp timestamp) {
+                return cache.lower_bound(timestamp);
+            };
 
-            return cache_ref.lower_bound(timestamp);
+            return find_bound(timestamp, nested_lower_bound);
         }
 
         Iterator upper_bound(Timestamp timestamp) {
             LOG_METHOD();
 
-            Cache<Y>& cache_ref = m_cache_state.cache_ref.get();
+            static auto nested_upper_bound = [](Cache<Y>& cache, Timestamp timestamp) {
+                return cache.upper_bound(timestamp);
+            };
 
-            if (m_cache_state.mode == ModeType::VIEW_ALL) {
-                return std::as_const(cache_ref).upper_bound(timestamp);
-            }
-
-            return cache_ref.upper_bound(timestamp);
+            return find_bound(timestamp, nested_upper_bound);
         }
 
         Iterator erase(Iterator first, Iterator last) {
             LOG_METHOD();
+            
+            if (m_current_mode == ModeType::VIEW_ALL) {
+                ViewAllIterator* first_view_all = first.as_view_all();
+                ViewAllIterator* last_view_all = last.as_view_all();
 
-            return m_cache_state.cache_ref.get().erase(first, last);
+                logger().check(
+                    first_view_all != nullptr,
+                    "The first iterator must contain a `ViewAllIterator` holder."
+                );
+
+                logger().check(
+                    last_view_all != nullptr,
+                    "The last iterator must contain a `ViewAllIterator` holder."
+                );
+
+                logger().check(
+                    first_view_all->m_caches == &m_caches &&
+                    last_view_all->m_caches == &m_caches,
+                    "Both iterators must belong to this cache."
+                );
+
+                if (first_view_all->is_end() && last_view_all->is_end()) {
+                    return last;
+                }
+
+                logger().check(
+                    !first_view_all->is_end(),
+                    "Reversed range: first == end(), while last != end()."
+                );
+
+                Timestamp first_timestamp = (*first).first;
+                std::optional<Timestamp> last_timestamp = 
+                    last_view_all->is_end() ?
+                    std::nullopt :
+                    std::optional<Timestamp>{(*last).first};
+
+                logger().check(
+                    !last_timestamp.has_value() || first_timestamp <= *last_timestamp,
+                    "Reversed range: first > last"
+                );
+
+                for (auto& [mode, cache] : m_caches) {
+                    auto from = first_view_all->m_iterators.at(mode);
+                    auto to = last_view_all->m_iterators.at(mode);
+
+                    last_view_all->m_iterators.at(mode) = cache.erase(from, to);
+                }
+
+                return last;
+            }
+
+            NestedCacheIterator* first_nested = first.as_nested_iterator();
+            NestedCacheIterator* last_nested = last.as_nested_iterator();
+
+            logger().check(
+                first_nested != nullptr,
+                "The first iterator must contain a `NestedCacheIterator` holder."
+            );
+
+            logger().check(
+                last_nested != nullptr,
+                "The last iterator must contain a `NestedCacheIterator` holder."
+            );
+
+            Cache<Y>& current_cache_ = current_cache_mutable();
+
+            std::optional<Timestamp> first_timestamp = 
+                *first_nested == current_cache_.end() ? 
+                std::nullopt : 
+                std::optional<Timestamp>{(**first_nested).first};
+            
+            std::optional<Timestamp> last_timestamp = 
+                *last_nested == current_cache_.end() ? 
+                std::nullopt : 
+                std::optional<Timestamp>{(**last_nested).first};
+            
+            if (!first_timestamp.has_value() && !last_timestamp.has_value()) {
+                return last;
+            }
+
+            logger().check(
+                first_timestamp.has_value(),
+                "Reversed range: first == end(), while last != end()."
+            );
+
+            logger().check(
+                !last_timestamp.has_value() || *first_timestamp <= *last_timestamp,
+                "Reversed range: first > last"
+            );
+
+            return current_cache_mutable().erase(*first_nested, *last_nested);
+        }
+
+        std::pair<Iterator, bool> insert(std::pair<Timestamp, Y> value) {
+            LOG_METHOD();
+
+            logger().check(
+                m_current_mode != ModeType::VIEW_ALL,
+                "Values ​​cannot be inserted in `VIEW_ALL` mode."
+            );
+
+            bool timestamp_is_free = true;
+            for (auto& [mode, cache] : m_caches) {
+                if (cache_contains(cache, value.first)) {
+                    timestamp_is_free = false;
+                    break;
+                }
+            }
+
+            Cache<Y>& cache = m_caches.at(m_current_mode);
+
+            if (!timestamp_is_free) {
+                auto it = cache.lower_bound(value.first);
+
+                if (it != cache.end() && (*it).first != value.first) {
+                    it = cache.end();
+                }
+
+                return {Iterator(std::move(it)), false};
+            }
+
+            return cache.insert(std::move(value));
+        }
+
+        std::pair<Iterator, bool> emplace(Timestamp timestamp, Y value) {
+            LOG_METHOD();
+
+            logger().check(
+                m_current_mode != ModeType::VIEW_ALL,
+                "Values ​​cannot be inserted in `VIEW_ALL` mode."
+            );
+
+            bool timestamp_is_free = true;
+            for (auto& [mode, cache] : m_caches) {
+                if (cache_contains(cache, timestamp)) {
+                    timestamp_is_free = false;
+                    break;
+                }
+            }
+
+            Cache<Y>& cache = m_caches.at(m_current_mode);
+
+            if (!timestamp_is_free) {
+                auto it = cache.lower_bound(timestamp);
+
+                if (it != cache.end() && (*it).first != timestamp) {
+                    it = cache.end();
+                }
+
+                return {Iterator(std::move(it)), false};
+            }
+
+            return cache.emplace(timestamp, std::move(value));
         }
 
         void set_mode(ModeType mode) {
             LOG_METHOD();
 
-            if (m_cache_state.mode == mode) {
+            if (m_current_mode == mode) {
                 return;
             }
 
-            auto it = m_caches.find(mode);
-            
-            Cache<Y>* cache;
-            if (it == m_caches.end()) {
-                auto [inserted_it, inserted] = m_caches.insert(mode, Cache<Y>());
-
-                logger().check(
-                    inserted,
-                    "Failed to insert cache for the new mode"
-                );
-
-                cache = &inserted_it->second;
-            } else {
-                cache = &it->second;
-            }
-
-            m_cache_state = CacheState{
-                .mode = mode,
-                .cache_ref = *cache
-            }
+            m_caches.try_emplace(mode);
+            m_current_mode = mode;
         }
-
-    private:
-        struct CacheState {
-            ModeType mode;
-            std::reference_wrapper<Cache<Y>> cache_ref;
-        };
-
-        struct ViewAllIterator {
-            _XPARENT_NAME(ViewAllIterator);
-            
-            std::unordered_map<ModeType, NestedCacheIterator> m_iterators;
-            CacheContainer* m_caches = nullptr;
-            std::optional<ModeType> m_current_mode = std::nullopt;
-
-            using reference = std::iter_reference_t<NestedCacheIterator>;
-            using value_type = std::iter_value_t<NestedCacheIterator>;
-            using difference_type = std::iter_difference_t<NestedCacheIterator>;
-
-            using iterator_concept = std::bidirectional_iterator_tag;
-            using iterator_category = std::bidirectional_iterator_tag;
-
-            ViewAllIterator() = default;
-
-            ViewAllIterator(
-                CacheContainer& caches,
-                ModeType iterator_mode,
-                NestedCacheIterator iterator)
-                :   m_caches(&caches)
-            {
-                LOG_METHOD();
-
-                auto cache_it = caches.find(iterator_mode);
-
-                logger().check(
-                    cache_it != caches.end(),
-                    "Failed to find a cache with the mode `iterator_mode`."
-                );
-
-                Cache<Y>& cache = cache_it->second;
-                m_current_mode = 
-                    iterator != cache.end() ?
-                    std::optional<ModeType>{iterator_mode} :
-                    std::nullopt;
-
-                auto [it, inserted] = m_iterators.emplace(iterator_mode, std::move(iterator));
-                
-                logger().check(inserted, "Failed to insert `iterator`");
-
-                ensure_all_iterators();
-            }
-
-            ViewAllIterator(CacheContainer& caches)
-                :   m_caches(&caches),
-                    m_current_mode(std::nullopt)
-            {
-                LOG_METHOD();
-
-                ensure_all_iterators();
-            }
-
-            static ViewAllIterator end(CacheContainer& caches) {
-                LOG_METHOD();
-
-                return ViewAllIterator(caches);
-            }
-
-            bool is_begin() const {
-                return !find_closest_prev_mode().has_value();
-            }
-
-            bool is_end() const noexcept {
-                return !m_current_mode.has_value();
-            }
-
-            NestedCacheIterator* get_current_iterator() {
-                LOG_METHOD();
-
-                if (!m_current_mode.has_value()) {
-                    return nullptr;
-                }
-
-                auto it = m_iterators.find(*m_current_mode);
-
-                logger().check(
-                    it != m_iterators.end(),
-                    "Can't find iterator with `m_current_mode` mode."
-                );
-
-                return &it->second;
-            }
-            
-            void ensure_all_iterators() {
-                LOG_METHOD();
-
-                logger().check(m_caches != nullptr, "`m_caches` is null.");
-
-                NestedCacheIterator* current_iterator = get_current_iterator();
-
-                for (auto& [mode, cache] : *m_caches) {
-                    if (!m_iterators.contains(mode)) {
-                        std::optional<NestedCacheIterator> iter;
-
-                        if (current_iterator != nullptr) {
-                            Timestamp current_timestamp = (*current_iterator)->first;
-
-                            // end() возможен - это норм
-                            iter = cache.upper_bound(current_timestamp);
-                        } else {
-                            iter = cache.end();
-                        }
-
-                        auto [inserted_it, inserted] = m_iterators.emplace(mode, std::move(*iter));
-                        logger().check(inserted, "Failed to insert `upper_bound_it`.");
-                    }
-                }
-            }
-
-            std::optional<ModeType> min_iterator_mode() {
-                LOG_METHOD();
-                
-                logger().check(m_caches != nullptr, "`m_caches` is null.");
-
-                ModeType min_mode;
-                NestedCacheIterator* min_it = nullptr;
-                for (auto& [mode, nested_it] : m_iterators) {
-                    Cache<Y>& cache = m_caches->at(mode);
-
-                    if (nested_it == cache.end()) {
-                        continue;
-                    }
-
-                    if (min_it == nullptr || nested_it->first < (*min_it)->first) {
-                        min_it = &nested_it;
-                        min_mode = mode;
-                    }
-                }
-
-                if (min_it == nullptr) {
-                    return std::nullopt;
-                }
-
-                return min_mode;
-            }
-
-            std::optional<ModeType> find_closest_prev_mode() const {
-                LOG_METHOD();
-
-                logger().check(m_caches != nullptr, "`m_caches` is null.");
-
-                ModeType closest_prev_mode;
-                std::optional<NestedCacheIterator> closest_prev_iterator;
-                for (auto& [mode, iterator] : m_iterators) {
-                    Cache<Y>& cache = m_caches->at(mode);
-
-                    if (iterator == cache.begin()) {
-                        continue;
-                    }
-
-                    // Гарантированно перепрыгнет левее current_iterator
-                    NestedCacheIterator prev = std::prev(iterator); 
-
-                    // Поэтому среди всех перепрыгнувших current_iterator, находим тот, что всех правее
-                    if (!closest_prev_iterator.has_value() || prev->first > (*closest_prev_iterator)->first) {
-                        closest_prev_iterator = std::move(prev);
-                        closest_prev_mode = mode;
-                    }
-                }
-
-                if (closest_prev_iterator.has_value()) {
-                    return closest_prev_mode;
-                } else {
-                    return std::nullopt;
-                }
-            }
-
-            ViewAllIterator& operator++() {
-                LOG_METHOD();
-
-                logger().check(
-                    m_current_mode.has_value(),
-                    "The iterator was pointing to end(). You cannot increment "
-                    "an iterator that points to end() :(."
-                );
-                
-                // Проверка выше гарантирует, что итератор current_iterator здесь есть
-                ++(*get_current_iterator());
-                
-                m_current_mode = min_iterator_mode();
-
-                return *this;
-            }
-
-            ViewAllIterator& operator--() {
-                LOG_METHOD();
-
-                std::optional<ModeType> closest_prev_mode = find_closest_prev_mode();
-
-                logger().check(
-                    closest_prev_mode.has_value(),
-                    "The iterator was pointing to begin(). You cannot decrement "
-                    "an iterator that points to begin() :(."
-                );
-                
-                m_current_mode = closest_prev_mode;
-                --(*get_current_iterator());
-
-                return *this;
-            }
-
-            ViewAllIterator operator++(int) {
-                LOG_METHOD();
-
-                ViewAllIterator copy = *this;
-                ++(*this);
-
-                return copy;
-            }
-
-            ViewAllIterator operator--(int) {
-                LOG_METHOD();
-
-                ViewAllIterator copy = *this;
-                --(*this);
-
-                return copy;
-            }
-
-            reference operator*() const {
-                LOG_METHOD();
-
-                logger().check(
-                    !is_end(),
-                    "You cannot dereference an iterator that points to end()."
-                );
-
-                return *m_iterators.at(*m_current_mode);
-            }
-
-            bool operator==(const ViewAllIterator& iter) const {
-                LOG_METHOD();
-
-                if (m_caches != iter.m_caches) {
-                    return false;
-                }
-
-                if (is_end() || iter.is_end()) {
-                    return is_end() && iter.is_end();
-                }
-
-                if (m_current_mode != iter.m_current_mode) {
-                    return false;
-                }
-
-                return m_iterators.at(*m_current_mode)
-                    == iter.m_iterators.at(*iter.m_current_mode);
-            }
-        };
-
-        static_assert(std::bidirectional_iterator<ViewAllIterator>);
-
-        struct IteratorInterface {
-            _XPARENT_NAME(IteratorInterface);
-
-            virtual ~IteratorInterface() = default;
-
-            virtual IteratorInterface& operator_pp() = 0;
-            virtual IteratorInterface& operator_mm() = 0;
-            virtual std::iter_reference_t<NestedCacheIterator> operator_deref() const = 0;
-            virtual bool operator_comp(const IteratorInterface& iter) const = 0;
-            virtual std::unique_ptr<IteratorInterface> clone() const = 0;
-        };
-
-        template<class Iterator>
-        struct IteratorHolder : public IteratorInterface {
-            _XCHILD_NAME(IteratorHolder);
-
-            IteratorHolder(Iterator iterator)
-                :   m_iterator(std::move(iterator)) {}
-            
-            IteratorInterface& operator_pp() override {
-                LOG_METHOD();
-                
-                ++m_iterator;
-                
-                return *this;
-            }
-
-            IteratorInterface& operator_mm() override {
-                LOG_METHOD();
-
-                --m_iterator;
-
-                return *this;
-            }
-
-            std::iter_reference_t<NestedCacheIterator> operator_deref() const override {
-                LOG_METHOD();
-
-                return *m_iterator;
-            }
-
-            bool operator_comp(const IteratorInterface& iter) const override {
-                LOG_METHOD();
-
-                const auto* other = dynamic_cast<const IteratorHolder<Iterator>*>(&iter);
-                
-                return other != nullptr && m_iterator == other->m_iterator;
-            }
-
-            std::unique_ptr<IteratorInterface> clone() const override {
-                LOG_METHOD();
-
-                return std::make_unique<IteratorHolder<Iterator>>(m_iterator);
-            }
-        
-        private:
-            Iterator m_iterator;
-        };
-
-        struct Iterator {
-            _XPARENT_NAME(Iterator);
-
-            using reference = std::iter_reference_t<NestedCacheIterator>;
-            using value_type = std::iter_value_t<NestedCacheIterator>;
-            using difference_type = std::iter_difference_t<NestedCacheIterator>;
-
-            using iterator_concept = std::bidirectional_iterator_tag;
-            using iterator_category = std::bidirectional_iterator_tag;
-
-            Iterator() = default;
-            
-            Iterator(ViewAllIterator iterator)
-                :   m_iterator(
-                        std::make_unique<IteratorHolder<ViewAllIterator>>(
-                            std::move(iterator)
-                        )
-                    ) {}
-            
-            Iterator(NestedCacheIterator iterator)
-                :   m_iterator(
-                        std::make_unique<IteratorHolder<NestedCacheIterator>>(
-                            std::move(iterator)
-                        )
-                    ) {}
-            
-            Iterator(const Iterator& other)
-                :   m_iterator(
-                        other.m_iterator != nullptr ? other.m_iterator->clone() : nullptr
-                    ) {}
-
-            Iterator& operator=(const Iterator& other) {
-                LOG_METHOD();
-
-                if (this != &other) {
-                    m_iterator = 
-                        other.m_iterator != nullptr ? other.m_iterator->clone() : nullptr;
-                }
-
-                return *this;
-            }
-
-            Iterator(Iterator&&) noexcept = default;
-            Iterator& operator=(Iterator&&) noexcept = default;
-
-            Iterator& operator++() {
-                LOG_METHOD();
-
-                logger().check(m_iterator != nullptr, "Iterator is not initialized.");
-
-                m_iterator->operator_pp();
-
-                return *this;
-            }
-
-            Iterator& operator--() {
-                LOG_METHOD();
-
-                logger().check(m_iterator != nullptr, "Iterator is not initialized.");
-
-                m_iterator->operator_mm();
-
-                return *this;
-            }
-
-            Iterator operator++(int) {
-                LOG_METHOD();
-
-                Iterator copy = *this;
-                ++(*this);
-
-                return copy;
-            }
-
-            Iterator operator--(int) {
-                LOG_METHOD();
-
-                Iterator copy = *this;
-                --(*this);
-
-                return copy;
-            }
-
-            reference operator*() const {
-                LOG_METHOD();
-
-                logger().check(m_iterator != nullptr, "Iterator is not initialized.");
-
-                return m_iterator->operator_deref();
-            }
-
-            bool operator==(const Iterator& iter) const {
-                LOG_METHOD();
-
-                if (!m_iterator || !iter.m_iterator) {
-                    return !m_iterator && !iter.m_iterator;
-                }
-
-                return m_iterator->operator_comp(*iter.m_iterator);
-            }
-
-        private:
-            std::unique_ptr<IteratorInterface> m_iterator;
-        };
-
-        static_assert(std::bidirectional_iterator<Iterator>);
     
     private:
         CacheContainer m_caches;
-        CacheState m_cache_state;
-    
+        ModeType m_current_mode;
+
     private:
-        CacheContainer create_cache_container() {
+        Cache<Y>& current_cache_mutable() {
             LOG_METHOD();
 
-            CacheContainer caches;
-            caches.insert(ModeType::VIEW_ALL, Cache<Y>());
+            auto it = m_caches.find(m_current_mode);
 
-            return caches;
+            logger().check(
+                it != m_caches.end(),
+                "Failed to find the current cache."
+            );
+
+            return it->second;
+        }
+
+        // Хотя для такой микро хелповой функции как будто можно было бы и без requires... Ну да пофиг :p
+        template<class Func>
+        requires(
+            requires(
+                Func& bound_finder,
+                Cache<Y>& cache,
+                Timestamp timestamp)
+            {
+                { bound_finder(cache, timestamp) } -> std::same_as<NestedCacheIterator>;
+            }
+        )
+        Iterator find_bound(Timestamp timestamp, Func& bound_finder) {
+            LOG_METHOD();
+
+            if (m_current_mode == ModeType::VIEW_ALL) {
+                ModeType bound_mode;
+                std::optional<NestedCacheIterator> bound_iterator = std::nullopt;
+                for (auto& [mode, cache] : m_caches) {
+                    NestedCacheIterator it = bound_finder(cache, timestamp);
+
+                    if (it == cache.end()) {
+                        continue;
+                    }
+
+                    if (!bound_iterator.has_value() || (*it).first < (**bound_iterator).first) {
+                        bound_iterator = std::move(it);
+                        bound_mode = mode;
+                    }
+                }
+
+                return bound_iterator.has_value() ?
+                        Iterator::view_all_iterator(m_caches, bound_mode, *bound_iterator) :
+                        Iterator::view_all_iterator_end(m_caches);
+            }
+
+            return Iterator(bound_finder(current_cache_mutable(), timestamp));
+        }
+
+        
+        bool cache_contains(Cache<Y>& cache, Timestamp timestamp) const
+            requires(
+                    requires(Cache<Y>& cache, Timestamp timestamp) {
+                    { cache.contains(timestamp) } -> std::same_as<bool>;
+                }
+            )
+        {
+
+            LOG_METHOD();
+
+            return cache.contains(timestamp);
+        }
+
+        bool cache_contains(Cache<Y>& cache, Timestamp timestamp) const {
+            LOG_METHOD();
+
+            auto it = cache.lower_bound(timestamp);
+            return it != cache.end() && (*it).first == timestamp;
+
         }
     };
 }
+
+#include "modeable_iterator.tpp"
