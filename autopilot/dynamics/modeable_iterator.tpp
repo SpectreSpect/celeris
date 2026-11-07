@@ -5,11 +5,9 @@
 #include <iterator>
 #include <utility>
 #include <variant>
-#include <memory>
 
 #include "../../vulkan_self/logger/logger_header.h"
 #include "modeable_trajectory_cache.h"
-#include "iterator_interface.h"
 
 namespace celeris {
     template<template<class> class Cache, class Y, class ModeType>
@@ -285,28 +283,20 @@ namespace celeris {
 
         using IteratorStorage = std::variant<NestedCacheIterator, ViewAllIterator>;
 
-        IteratorStorage m_iterator;
-
         Iterator() = default;
         
         Iterator(ViewAllIterator iterator)
-            :   m_iterator(
-                    std::make_unique<IteratorHolder<ViewAllIterator, value_type>>(
-                        std::move(iterator)
-                    )
-                ) {}
+            :   m_iterator(std::move(iterator)) {}
         
         Iterator(NestedCacheIterator iterator)
-            :   m_iterator(
-                    std::make_unique<IteratorHolder<NestedCacheIterator, value_type>>(
-                        std::move(iterator)
-                    )
-                ) {}
+            :   m_iterator(std::move(iterator)) {}
         
-        Iterator(const Iterator& other)
-            :   m_iterator(
-                    other.m_iterator != nullptr ? other.m_iterator->clone() : nullptr
-                ) {}
+        // По идее должены быть определены 
+        Iterator(const Iterator&) = default; 
+        Iterator& operator=(const Iterator&) = default;
+
+        Iterator(Iterator&&) = default;
+        Iterator& operator=(Iterator&&) = default;
         
         static Iterator view_all_iterator(
             CacheContainer& caches,
@@ -330,26 +320,15 @@ namespace celeris {
             );
         }
 
-        Iterator& operator=(const Iterator& other) {
-            LOG_METHOD();
-
-            if (this != &other) {
-                m_iterator = 
-                    other.m_iterator != nullptr ? other.m_iterator->clone() : nullptr;
-            }
-
-            return *this;
-        }
-
-        Iterator(Iterator&&) noexcept = default;
-        Iterator& operator=(Iterator&&) noexcept = default;
-
         Iterator& operator++() {
             LOG_METHOD();
 
-            logger().check(m_iterator != nullptr, "Iterator is not initialized.");
-
-            m_iterator->operator_pp();
+            std::visit(
+                [](auto& iterator) {
+                    ++iterator;
+                },
+                m_iterator
+            );
 
             return *this;
         }
@@ -357,9 +336,12 @@ namespace celeris {
         Iterator& operator--() {
             LOG_METHOD();
 
-            logger().check(m_iterator != nullptr, "Iterator is not initialized.");
-
-            m_iterator->operator_mm();
+            std::visit(
+                [](auto& iterator) {
+                    --iterator;
+                },
+                m_iterator
+            );
 
             return *this;
         }
@@ -367,80 +349,44 @@ namespace celeris {
         Iterator operator++(int) {
             LOG_METHOD();
 
-            Iterator copy = *this;
-            ++(*this);
-
-            return copy;
+            return std::visit(
+                [](auto& iterator) -> Iterator {
+                    return Iterator(iterator++);
+                },
+                m_iterator
+            );
         }
 
         Iterator operator--(int) {
             LOG_METHOD();
 
-            Iterator copy = *this;
-            --(*this);
-
-            return copy;
+            return std::visit(
+                [](auto& iterator) -> Iterator {
+                    return Iterator(iterator--);
+                },
+                m_iterator
+            );
         }
 
         reference operator*() const {
             LOG_METHOD();
 
-            logger().check(m_iterator != nullptr, "Iterator is not initialized.");
-
-            return m_iterator->operator_deref();
+            return std::visit(
+                [](const auto& iterator) -> reference {
+                    return *iterator;
+                },
+                m_iterator
+            );
         }
 
         bool operator==(const Iterator& iter) const {
             LOG_METHOD();
 
-            if (!m_iterator || !iter.m_iterator) {
-                return !m_iterator && !iter.m_iterator;
-            }
-
-            return m_iterator->operator_comp(*iter.m_iterator);
+            return m_iterator == iter.m_iterator;
         }
 
     private:
-        std::unique_ptr<IteratorInterface<value_type>> m_iterator;
-
+        IteratorStorage m_iterator;
         friend Iterator ModeableTrajectoryCache<Cache, Y, ModeType>::erase(Iterator first, Iterator last);
-
-        const ViewAllIterator* as_view_all() const noexcept {
-            LOG_METHOD();
-
-            const auto* it = 
-                dynamic_cast<
-                    const IteratorHolder<ViewAllIterator, value_type>*
-                >(m_iterator.get());
-
-            return it != nullptr
-                ? std::addressof(it->get())
-                : nullptr;
-        }
-
-        ViewAllIterator* as_view_all() noexcept {
-            return const_cast<ViewAllIterator*>(
-                std::as_const(*this).as_view_all()
-            );
-        }
-
-        const NestedCacheIterator* as_nested_iterator() const noexcept {
-            LOG_METHOD();
-
-            const auto* it = 
-                dynamic_cast<
-                    const IteratorHolder<NestedCacheIterator, value_type>*
-                >(m_iterator.get());
-
-            return it != nullptr
-                ? std::addressof(it->get())
-                : nullptr;
-        }
-
-        NestedCacheIterator* as_nested_iterator() noexcept {
-            return const_cast<NestedCacheIterator*>(
-                std::as_const(*this).as_nested_iterator()
-            );
-        }
     };
 }
